@@ -13,16 +13,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-type SortColumn = 'shortName' | 'title' | 'category' | 'provider';
+type SortColumn = 'shortName' | 'title' | 'category' | 'sector' | 'provider';
 type SortDirection = 'asc' | 'desc';
 
 interface ServiceTableProps {
   services: Service[];
   isLoading: boolean;
   onRowClick: (service: Service) => void;
+  showSector?: boolean; // If true, show Sector column instead of Category
 }
 
-export function ServiceTable({ services, isLoading, onRowClick }: ServiceTableProps) {
+export function ServiceTable({ services, isLoading, onRowClick, showSector = false }: ServiceTableProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
@@ -56,6 +57,10 @@ export function ServiceTable({ services, isLoading, onRowClick }: ServiceTablePr
         case 'category':
           aVal = a.categoryId?.name || '';
           bVal = b.categoryId?.name || '';
+          break;
+        case 'sector':
+          aVal = a.sectorId?.name || '';
+          bVal = b.sectorId?.name || '';
           break;
         case 'provider':
           aVal = a.provider || '';
@@ -106,7 +111,7 @@ export function ServiceTable({ services, isLoading, onRowClick }: ServiceTablePr
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium">Short Name</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Title</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">{showSector ? 'Sector' : 'Category'}</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Provider</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Version</th>
             </tr>
@@ -170,11 +175,11 @@ export function ServiceTable({ services, isLoading, onRowClick }: ServiceTablePr
             </th>
             <th
               className="cursor-pointer px-4 py-3 text-left text-sm font-medium hover:bg-muted/80"
-              onClick={() => handleSort('category')}
+              onClick={() => handleSort(showSector ? 'sector' : 'category')}
             >
               <span className="flex items-center">
-                Category
-                <SortIcon column="category" />
+                {showSector ? 'Sector' : 'Category'}
+                <SortIcon column={showSector ? 'sector' : 'category'} />
               </span>
             </th>
             <th
@@ -203,7 +208,7 @@ export function ServiceTable({ services, isLoading, onRowClick }: ServiceTablePr
               <td className="px-4 py-3 text-sm">{service.title}</td>
               <td className="px-4 py-3">
                 <Badge variant="secondary" className="font-normal">
-                  {service.categoryId?.name}
+                  {showSector ? service.sectorId?.name : service.categoryId?.name}
                 </Badge>
               </td>
               <td className="px-4 py-3 text-sm text-muted-foreground">{service.provider}</td>

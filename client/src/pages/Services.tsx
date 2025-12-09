@@ -261,6 +261,7 @@ export function Services() {
             services={infrastructureServices}
             isLoading={infrastructureLoading}
             onRowClick={handleRowClick}
+            showSector
           />
         </TabsContent>
       </Tabs>

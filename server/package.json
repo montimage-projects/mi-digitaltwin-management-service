@@ -7,6 +7,7 @@
     "start": "bun src/app.ts",
     "seed": "bun src/seed/index.ts",
     "migrate:sectors": "bun src/migrations/add-sectors-to-services.ts",
+    "migrate:category-to-sector": "bun src/migrations/migrate-category-to-sector.ts",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write src/**/*.ts",
