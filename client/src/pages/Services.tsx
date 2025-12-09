@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, Shield, Server } from 'lucide-react';
 import { servicesApi, categoriesApi, type Service } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -17,11 +18,17 @@ import { ServiceDrawer } from '@/components/services/ServiceDrawer';
 
 export function Services() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('');
-  const [providerFilter, setProviderFilter] = useState<string>('');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Separate filters for each tab
+  const [toolboxSearch, setToolboxSearch] = useState('');
+  const [toolboxCategory, setToolboxCategory] = useState<string>('');
+  const [toolboxProvider, setToolboxProvider] = useState<string>('');
+
+  const [infraSearch, setInfraSearch] = useState('');
+  const [infraCategory, setInfraCategory] = useState<string>('');
+  const [infraProvider, setInfraProvider] = useState<string>('');
 
   // Fetch categories
   const { data: categories = [] } = useQuery({
@@ -41,22 +48,30 @@ export function Services() {
     queryFn: () => servicesApi.list({ table: 'OTHER_SERVICES', limit: 100 }),
   });
 
-  // Get unique providers
-  const providers = useMemo(() => {
-    const allServices = [
-      ...(toolboxData?.services || []),
-      ...(infrastructureData?.services || []),
-    ];
-    return [...new Set(allServices.map((s) => s.provider))].sort();
-  }, [toolboxData, infrastructureData]);
+  // Get unique providers for each table
+  const toolboxProviders = useMemo(() => {
+    return [...new Set((toolboxData?.services || []).map((s) => s.provider))].sort();
+  }, [toolboxData]);
 
-  // Filter services
-  const filterServices = (services: Service[] = []) => {
+  const infraProviders = useMemo(() => {
+    return [...new Set((infrastructureData?.services || []).map((s) => s.provider))].sort();
+  }, [infrastructureData]);
+
+  // Filter services helper
+  const filterServices = (
+    services: Service[] = [],
+    search: string,
+    categoryFilter: string,
+    providerFilter: string
+  ) => {
     return services.filter((service) => {
+      const searchLower = search.toLowerCase();
       const matchesSearch =
         !search ||
-        service.shortName.toLowerCase().includes(search.toLowerCase()) ||
-        service.title.toLowerCase().includes(search.toLowerCase());
+        service.shortName.toLowerCase().includes(searchLower) ||
+        service.title.toLowerCase().includes(searchLower) ||
+        service.categoryId?.name?.toLowerCase().includes(searchLower) ||
+        service.description?.toLowerCase().includes(searchLower);
 
       const matchesCategory =
         categoryFilter === 'all' || !categoryFilter || service.categoryId?._id === categoryFilter;
@@ -68,8 +83,8 @@ export function Services() {
     });
   };
 
-  const toolboxServices = filterServices(toolboxData?.services);
-  const infrastructureServices = filterServices(infrastructureData?.services);
+  const toolboxServices = filterServices(toolboxData?.services, toolboxSearch, toolboxCategory, toolboxProvider);
+  const infrastructureServices = filterServices(infrastructureData?.services, infraSearch, infraCategory, infraProvider);
 
   const handleRowClick = (service: Service) => {
     setSelectedService(service);
@@ -78,89 +93,142 @@ export function Services() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Service Repository</h1>
-          <p className="text-muted-foreground">
-            Browse and explore INTACT cybersecurity services
-          </p>
-        </div>
-        <Button onClick={() => navigate('/services/add')}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Service
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold">Service Repository</h1>
+        <p className="text-muted-foreground">
+          Security tools and protected infrastructure services
+        </p>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search services..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+      {/* Tabbed Service Tables */}
+      <Tabs defaultValue="toolbox" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="toolbox" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            INTACT Toolbox
+            <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs">
+              {toolboxData?.services?.length || 0}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="infrastructure" className="flex items-center gap-2">
+            <Server className="h-4 w-4" />
+            Critical Infrastructure
+            <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs">
+              {infrastructureData?.services?.length || 0}
+            </span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="toolbox" className="space-y-4">
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <p className="text-sm text-muted-foreground">
+              Security tools for monitoring, attack simulation, auditing, and protection of critical infrastructure.
+            </p>
+          </div>
+          {/* Toolbox Filters */}
+          <div className="flex flex-wrap gap-4">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, title, category, description..."
+                value={toolboxSearch}
+                onChange={(e) => setToolboxSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={toolboxCategory} onValueChange={setToolboxCategory}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category._id} value={category._id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={toolboxProvider} onValueChange={setToolboxProvider}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="All Providers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Providers</SelectItem>
+                {toolboxProviders.map((provider) => (
+                  <SelectItem key={provider} value={provider}>
+                    {provider}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => navigate('/services/add?table=INTACT_TOOLBOX')}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Tool
+            </Button>
+          </div>
+          <ServiceTable
+            services={toolboxServices}
+            isLoading={toolboxLoading}
+            onRowClick={handleRowClick}
           />
-        </div>
+        </TabsContent>
 
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="All Categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.map((category) => (
-              <SelectItem key={category._id} value={category._id}>
-                {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={providerFilter} onValueChange={setProviderFilter}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="All Providers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Providers</SelectItem>
-            {providers.map((provider) => (
-              <SelectItem key={provider} value={provider}>
-                {provider}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* INTACT Toolbox Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">INTACT Toolbox</h2>
-          <span className="text-sm text-muted-foreground">
-            {toolboxServices.length} services
-          </span>
-        </div>
-        <ServiceTable
-          services={toolboxServices}
-          isLoading={toolboxLoading}
-          onRowClick={handleRowClick}
-        />
-      </div>
-
-      {/* Critical Infrastructure Services Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Critical Infrastructure Services</h2>
-          <span className="text-sm text-muted-foreground">
-            {infrastructureServices.length} services
-          </span>
-        </div>
-        <ServiceTable
-          services={infrastructureServices}
-          isLoading={infrastructureLoading}
-          onRowClick={handleRowClick}
-        />
-      </div>
+        <TabsContent value="infrastructure" className="space-y-4">
+          <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
+            <p className="text-sm text-muted-foreground">
+              Target services and systems that require protection and security testing.
+            </p>
+          </div>
+          {/* Infrastructure Filters */}
+          <div className="flex flex-wrap gap-4">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, title, category, description..."
+                value={infraSearch}
+                onChange={(e) => setInfraSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={infraCategory} onValueChange={setInfraCategory}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="All Categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category._id} value={category._id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={infraProvider} onValueChange={setInfraProvider}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="All Providers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Providers</SelectItem>
+                {infraProviders.map((provider) => (
+                  <SelectItem key={provider} value={provider}>
+                    {provider}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={() => navigate('/services/add?table=OTHER_SERVICES')}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Service
+            </Button>
+          </div>
+          <ServiceTable
+            services={infrastructureServices}
+            isLoading={infrastructureLoading}
+            onRowClick={handleRowClick}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Service Detail Drawer */}
       <ServiceDrawer

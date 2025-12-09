@@ -30,6 +30,7 @@ const serviceFormSchema = z.object({
   trlExpected: z.number().min(1).max(9).optional(),
   license: z.string().max(100).optional(),
   repositoryTable: z.enum(['INTACT_TOOLBOX', 'OTHER_SERVICES']),
+  currentVersion: z.string().max(50).optional(),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
@@ -38,9 +39,10 @@ interface ServiceFormProps {
   service?: Service;
   onSubmit: (data: CreateServiceData) => Promise<void>;
   isSubmitting?: boolean;
+  defaultTable?: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
 }
 
-export function ServiceForm({ service, onSubmit, isSubmitting }: ServiceFormProps) {
+export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: ServiceFormProps) {
   const [standards, setStandards] = useState<string[]>(service?.standards || []);
   const [standardInput, setStandardInput] = useState('');
   const [interactsWith, setInteractsWith] = useState<string[]>(service?.interactsWith || []);
@@ -73,7 +75,8 @@ export function ServiceForm({ service, onSubmit, isSubmitting }: ServiceFormProp
       trlCurrent: service?.trl?.current || 5,
       trlExpected: service?.trl?.expected || 7,
       license: service?.license || '',
-      repositoryTable: service?.repositoryTable || 'INTACT_TOOLBOX',
+      repositoryTable: service?.repositoryTable || defaultTable || 'INTACT_TOOLBOX',
+      currentVersion: service?.currentVersion || '',
     },
   });
 
@@ -94,6 +97,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting }: ServiceFormProp
       },
       license: data.license,
       repositoryTable: data.repositoryTable,
+      currentVersion: data.currentVersion,
       standards,
       inputs,
       outputs,
@@ -233,13 +237,22 @@ export function ServiceForm({ service, onSubmit, isSubmitting }: ServiceFormProp
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="space-y-2">
           <Label htmlFor="license">License</Label>
           <Input
             id="license"
             {...register('license')}
             placeholder="e.g., Apache 2.0"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="currentVersion">Version</Label>
+          <Input
+            id="currentVersion"
+            {...register('currentVersion')}
+            placeholder="e.g., 1.0.0"
           />
         </div>
 

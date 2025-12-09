@@ -1,6 +1,7 @@
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Trash2, MoreHorizontal } from 'lucide-react';
+import { Pencil, Trash2, MoreHorizontal, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { servicesApi, type Service } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+type SortColumn = 'shortName' | 'title' | 'category' | 'provider';
+type SortDirection = 'asc' | 'desc';
+
 interface ServiceTableProps {
   services: Service[];
   isLoading: boolean;
@@ -21,6 +25,59 @@ interface ServiceTableProps {
 export function ServiceTable({ services, isLoading, onRowClick }: ServiceTableProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedServices = useMemo(() => {
+    if (!sortColumn) return services;
+
+    return [...services].sort((a, b) => {
+      let aVal: string;
+      let bVal: string;
+
+      switch (sortColumn) {
+        case 'shortName':
+          aVal = a.shortName || '';
+          bVal = b.shortName || '';
+          break;
+        case 'title':
+          aVal = a.title || '';
+          bVal = b.title || '';
+          break;
+        case 'category':
+          aVal = a.categoryId?.name || '';
+          bVal = b.categoryId?.name || '';
+          break;
+        case 'provider':
+          aVal = a.provider || '';
+          bVal = b.provider || '';
+          break;
+        default:
+          return 0;
+      }
+
+      const comparison = aVal.localeCompare(bVal, undefined, { sensitivity: 'base' });
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [services, sortColumn, sortDirection]);
+
+  const SortIcon = ({ column }: { column: SortColumn }) => {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
+    }
+    return sortDirection === 'asc'
+      ? <ArrowUp className="ml-1 h-3 w-3" />
+      : <ArrowDown className="ml-1 h-3 w-3" />;
+  };
 
   const deleteMutation = useMutation({
     mutationFn: servicesApi.delete,
@@ -93,16 +150,48 @@ export function ServiceTable({ services, isLoading, onRowClick }: ServiceTablePr
       <table className="w-full">
         <thead className="border-b bg-muted/50">
           <tr>
-            <th className="px-4 py-3 text-left text-sm font-medium">Short Name</th>
-            <th className="px-4 py-3 text-left text-sm font-medium">Title</th>
-            <th className="px-4 py-3 text-left text-sm font-medium">Category</th>
-            <th className="px-4 py-3 text-left text-sm font-medium">Provider</th>
+            <th
+              className="cursor-pointer px-4 py-3 text-left text-sm font-medium hover:bg-muted/80"
+              onClick={() => handleSort('shortName')}
+            >
+              <span className="flex items-center">
+                Short Name
+                <SortIcon column="shortName" />
+              </span>
+            </th>
+            <th
+              className="cursor-pointer px-4 py-3 text-left text-sm font-medium hover:bg-muted/80"
+              onClick={() => handleSort('title')}
+            >
+              <span className="flex items-center">
+                Title
+                <SortIcon column="title" />
+              </span>
+            </th>
+            <th
+              className="cursor-pointer px-4 py-3 text-left text-sm font-medium hover:bg-muted/80"
+              onClick={() => handleSort('category')}
+            >
+              <span className="flex items-center">
+                Category
+                <SortIcon column="category" />
+              </span>
+            </th>
+            <th
+              className="cursor-pointer px-4 py-3 text-left text-sm font-medium hover:bg-muted/80"
+              onClick={() => handleSort('provider')}
+            >
+              <span className="flex items-center">
+                Provider
+                <SortIcon column="provider" />
+              </span>
+            </th>
             <th className="px-4 py-3 text-left text-sm font-medium">Version</th>
             <th className="w-12 px-4 py-3 text-left text-sm font-medium"></th>
           </tr>
         </thead>
         <tbody>
-          {services.map((service) => (
+          {sortedServices.map((service) => (
             <tr
               key={service._id}
               className="cursor-pointer border-b transition-colors hover:bg-muted/50"

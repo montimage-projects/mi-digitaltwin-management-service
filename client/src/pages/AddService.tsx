@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { servicesApi, type CreateServiceData } from '@/lib/api';
@@ -8,8 +8,13 @@ import { ServiceForm } from '@/components/services/ServiceForm';
 
 export function AddService() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+
+  const tableParam = searchParams.get('table');
+  const defaultTable = tableParam === 'OTHER_SERVICES' ? 'OTHER_SERVICES' : 'INTACT_TOOLBOX';
+  const isToolbox = defaultTable === 'INTACT_TOOLBOX';
 
   const createMutation = useMutation({
     mutationFn: servicesApi.create,
@@ -34,9 +39,13 @@ export function AddService() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold">Add Service</h1>
+          <h1 className="text-2xl font-bold">
+            {isToolbox ? 'Add Security Tool' : 'Add Infrastructure Service'}
+          </h1>
           <p className="text-muted-foreground">
-            Register a new cybersecurity service in the repository
+            {isToolbox
+              ? 'Register a new security tool in the INTACT Toolbox'
+              : 'Register a new service in Critical Infrastructure'}
           </p>
         </div>
       </div>
@@ -48,7 +57,11 @@ export function AddService() {
       )}
 
       <div className="rounded-lg border bg-background p-6">
-        <ServiceForm onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
+        <ServiceForm
+          onSubmit={handleSubmit}
+          isSubmitting={createMutation.isPending}
+          defaultTable={defaultTable}
+        />
       </div>
     </div>
   );
