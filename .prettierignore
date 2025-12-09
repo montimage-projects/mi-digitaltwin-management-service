@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+coverage
+.git
+*.min.js
+*.min.css
+bun.lockb
+package-lock.json
+
+# AI agent configs (may have specific formatting)
+.agent
+.claude
+.gemini
+.windsurf

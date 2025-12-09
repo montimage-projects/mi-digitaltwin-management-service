@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# INTACT Digital Twin Platform - Pre-commit Hook
+# Runs quality checks before allowing commits
+
+echo "Running pre-commit checks..."
+
+# Run lint-staged for staged files (format + lint)
+echo "Checking staged files..."
+bunx lint-staged
+
+# Check for security vulnerabilities (warning only, doesn't block)
+echo "Checking for security vulnerabilities..."
+bun pm scan 2>/dev/null || echo "Security scan: Some vulnerabilities found (review recommended)"
+
+# Type checking
+echo "Running type checks..."
+cd client && bunx tsc --noEmit || { echo "Client type check failed!"; exit 1; }
+cd ../server && bunx tsc --noEmit || { echo "Server type check failed!"; exit 1; }
+cd ..
+
+echo "All pre-commit checks passed!"
