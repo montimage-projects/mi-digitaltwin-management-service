@@ -1,5 +1,6 @@
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { seedCategories } from './categories.seed.js';
+import { seedSectors } from './sectors.seed.js';
 import { seedServices } from './services.seed.js';
 import { seedAdmin } from './admin.seed.js';
 
@@ -9,8 +10,11 @@ const runSeeds = async (): Promise<void> => {
   try {
     await connectDatabase();
 
-    // Run seeds in order (categories must be first for services)
+    // Run seeds in order (categories and sectors must be first for services)
     await seedCategories();
+    console.log('');
+
+    await seedSectors();
     console.log('');
 
     await seedServices();

@@ -18,11 +18,13 @@ export interface IService extends Document {
   shortName: string;
   title: string;
   categoryId: Types.ObjectId;
+  sectorId?: Types.ObjectId;
   provider: string;
   description?: string;
   currentVersion?: string;
   versions: IVersion[];
   type: 'Software' | 'Hardware' | 'Software/Hardware';
+  uiType: 'web' | 'terminal' | 'both';
   trl: {
     current?: number;
     expected?: number;
@@ -79,6 +81,10 @@ const serviceSchema = new Schema<IService>(
       ref: 'Category',
       required: true,
     },
+    sectorId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Sector',
+    },
     provider: {
       type: String,
       required: true,
@@ -97,6 +103,11 @@ const serviceSchema = new Schema<IService>(
       type: String,
       enum: ['Software', 'Hardware', 'Software/Hardware'],
       default: 'Software',
+    },
+    uiType: {
+      type: String,
+      enum: ['web', 'terminal', 'both'],
+      default: 'web',
     },
     trl: {
       current: { type: Number, min: 1, max: 9 },
@@ -124,6 +135,7 @@ const serviceSchema = new Schema<IService>(
 
 // Indexes (shortName already has unique: true in schema)
 serviceSchema.index({ categoryId: 1 });
+serviceSchema.index({ sectorId: 1 });
 serviceSchema.index({ repositoryTable: 1 });
 serviceSchema.index({ provider: 1 });
 serviceSchema.index({ 'versions.version': 1 });

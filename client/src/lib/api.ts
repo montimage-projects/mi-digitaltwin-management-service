@@ -59,6 +59,14 @@ export interface Category {
   description?: string;
 }
 
+export interface Sector {
+  _id: string;
+  name: string;
+  slug: string;
+  category: 'essential' | 'important';
+  description?: string;
+}
+
 export interface ServiceVersion {
   version: string;
   dockerImage: string;
@@ -71,11 +79,13 @@ export interface Service {
   shortName: string;
   title: string;
   categoryId: Category;
+  sectorId?: Sector;
   provider: string;
   description?: string;
   currentVersion?: string;
   versions: ServiceVersion[];
   type: 'Software' | 'Hardware' | 'Software/Hardware';
+  uiType: 'web' | 'terminal' | 'both';
   trl: {
     current?: number;
     expected?: number;
@@ -101,6 +111,7 @@ export interface ServicesResponse {
 export interface ServicesQuery {
   table?: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
   category?: string;
+  sector?: string;
   provider?: string;
   search?: string;
   limit?: number;
@@ -114,13 +125,22 @@ export const categoriesApi = {
   },
 };
 
+export const sectorsApi = {
+  list: async (): Promise<Sector[]> => {
+    const { data } = await api.get('/sectors');
+    return data;
+  },
+};
+
 export interface CreateServiceData {
   shortName: string;
   title: string;
   categoryId: string;
+  sectorId?: string;
   provider: string;
   description?: string;
   type?: 'Software' | 'Hardware' | 'Software/Hardware';
+  uiType?: 'web' | 'terminal' | 'both';
   trl?: { current?: number; expected?: number };
   license?: string;
   standards?: string[];
@@ -204,6 +224,7 @@ export const servicesApi = {
     const params = new URLSearchParams();
     if (query.table) params.append('table', query.table);
     if (query.category) params.append('category', query.category);
+    if (query.sector) params.append('sector', query.sector);
     if (query.provider) params.append('provider', query.provider);
     if (query.search) params.append('search', query.search);
     if (query.limit) params.append('limit', String(query.limit));

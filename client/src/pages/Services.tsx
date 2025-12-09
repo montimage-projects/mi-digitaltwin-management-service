@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Plus, Shield, Server } from 'lucide-react';
-import { servicesApi, categoriesApi, type Service } from '@/lib/api';
+import { servicesApi, categoriesApi, sectorsApi, type Service } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -27,13 +27,19 @@ export function Services() {
   const [toolboxProvider, setToolboxProvider] = useState<string>('');
 
   const [infraSearch, setInfraSearch] = useState('');
-  const [infraCategory, setInfraCategory] = useState<string>('');
+  const [infraSector, setInfraSector] = useState<string>('');
   const [infraProvider, setInfraProvider] = useState<string>('');
 
   // Fetch categories
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: categoriesApi.list,
+  });
+
+  // Fetch sectors (for Critical Infrastructure Services)
+  const { data: sectors = [] } = useQuery({
+    queryKey: ['sectors'],
+    queryFn: sectorsApi.list,
   });
 
   // Fetch all services for INTACT Toolbox
@@ -57,8 +63,8 @@ export function Services() {
     return [...new Set((infrastructureData?.services || []).map((s) => s.provider))].sort();
   }, [infrastructureData]);
 
-  // Filter services helper
-  const filterServices = (
+  // Filter services helper for toolbox (uses category)
+  const filterToolboxServices = (
     services: Service[] = [],
     search: string,
     categoryFilter: string,
@@ -83,8 +89,34 @@ export function Services() {
     });
   };
 
-  const toolboxServices = filterServices(toolboxData?.services, toolboxSearch, toolboxCategory, toolboxProvider);
-  const infrastructureServices = filterServices(infrastructureData?.services, infraSearch, infraCategory, infraProvider);
+  // Filter services helper for infrastructure (uses sector)
+  const filterInfraServices = (
+    services: Service[] = [],
+    search: string,
+    sectorFilter: string,
+    providerFilter: string
+  ) => {
+    return services.filter((service) => {
+      const searchLower = search.toLowerCase();
+      const matchesSearch =
+        !search ||
+        service.shortName.toLowerCase().includes(searchLower) ||
+        service.title.toLowerCase().includes(searchLower) ||
+        service.sectorId?.name?.toLowerCase().includes(searchLower) ||
+        service.description?.toLowerCase().includes(searchLower);
+
+      const matchesSector =
+        sectorFilter === 'all' || !sectorFilter || service.sectorId?._id === sectorFilter;
+
+      const matchesProvider =
+        providerFilter === 'all' || !providerFilter || service.provider === providerFilter;
+
+      return matchesSearch && matchesSector && matchesProvider;
+    });
+  };
+
+  const toolboxServices = filterToolboxServices(toolboxData?.services, toolboxSearch, toolboxCategory, toolboxProvider);
+  const infrastructureServices = filterInfraServices(infrastructureData?.services, infraSearch, infraSector, infraProvider);
 
   const handleRowClick = (service: Service) => {
     setSelectedService(service);
@@ -112,7 +144,7 @@ export function Services() {
           </TabsTrigger>
           <TabsTrigger value="infrastructure" className="flex items-center gap-2">
             <Server className="h-4 w-4" />
-            Critical Infrastructure
+            Critical Infrastructure Services
             <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs">
               {infrastructureData?.services?.length || 0}
             </span>
@@ -177,7 +209,7 @@ export function Services() {
         <TabsContent value="infrastructure" className="space-y-4">
           <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
             <p className="text-sm text-muted-foreground">
-              Target services and systems that require protection and security testing.
+              Target services and systems that require protection and security testing, classified by NIS2 critical sectors.
             </p>
           </div>
           {/* Infrastructure Filters */}
@@ -185,21 +217,24 @@ export function Services() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search by name, title, category, description..."
+                placeholder="Search by name, title, sector, description..."
                 value={infraSearch}
                 onChange={(e) => setInfraSearch(e.target.value)}
                 className="pl-9"
               />
             </div>
-            <Select value={infraCategory} onValueChange={setInfraCategory}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="All Categories" />
+            <Select value={infraSector} onValueChange={setInfraSector}>
+              <SelectTrigger className="w-[250px]">
+                <SelectValue placeholder="All Sectors" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category._id} value={category._id}>
-                    {category.name}
+                <SelectItem value="all">All Sectors</SelectItem>
+                {sectors.map((sector) => (
+                  <SelectItem key={sector._id} value={sector._id}>
+                    {sector.name}
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      ({sector.category})
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

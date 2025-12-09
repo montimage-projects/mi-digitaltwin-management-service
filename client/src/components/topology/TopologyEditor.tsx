@@ -15,6 +15,7 @@ interface TopologyNode {
     type?: string;
     serviceId?: string;
     serviceTitle?: string;
+    version?: string;
   };
 }
 
@@ -31,17 +32,24 @@ function nodesToYaml(nodes: TopologyNode[], edges: TopologyEdge[]): string {
   }
 
   const topology = {
-    services: nodes.map((node) => ({
-      id: node.id,
-      name: node.data.label,
-      title: node.data.serviceTitle || node.data.label,
-      type: node.data.type || 'server',
-      serviceId: node.data.serviceId,
-      position: {
-        x: Math.round(node.position.x),
-        y: Math.round(node.position.y),
-      },
-    })),
+    services: nodes.map((node) => {
+      const service: Record<string, unknown> = {
+        id: node.id,
+        name: node.data.label,
+        title: node.data.serviceTitle || node.data.label,
+        type: node.data.type || 'server',
+        serviceId: node.data.serviceId,
+        position: {
+          x: Math.round(node.position.x),
+          y: Math.round(node.position.y),
+        },
+      };
+      // Only include version if it's set (not using latest)
+      if (node.data.version) {
+        service.version = node.data.version;
+      }
+      return service;
+    }),
     connections: edges.map((edge) => ({
       id: edge.id,
       from: edge.source,

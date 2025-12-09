@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { Service } from '../models/Service.js';
 import { Category } from '../models/Category.js';
+import { Sector } from '../models/Sector.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateQuery, validateBody, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -19,9 +20,11 @@ const createServiceSchema = z.object({
   shortName: z.string().min(1).max(50).transform(val => val.toUpperCase()),
   title: z.string().min(1).max(200),
   categoryId: z.string().refine(val => objectIdSchema.safeParse(val).success, 'Invalid category ID'),
+  sectorId: z.string().refine(val => objectIdSchema.safeParse(val).success, 'Invalid sector ID').optional(),
   provider: z.string().min(1).max(100),
   description: z.string().max(2000).optional(),
   type: z.enum(['Software', 'Hardware', 'Software/Hardware']).default('Software'),
+  uiType: z.enum(['web', 'terminal', 'both']).default('web'),
   trl: z.object({
     current: z.number().min(1).max(9).optional(),
     expected: z.number().min(1).max(9).optional(),
@@ -53,6 +56,7 @@ const addVersionSchema = z.object({
 const listServicesSchema = z.object({
   table: z.enum(['INTACT_TOOLBOX', 'OTHER_SERVICES']).optional(),
   category: z.string().optional(),
+  sector: z.string().optional(),
   provider: z.string().optional(),
   search: z.string().optional(),
   limit: z
@@ -70,7 +74,7 @@ type ListServicesQuery = z.infer<typeof listServicesSchema>;
 // GET /api/services
 router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, res, next) => {
   try {
-    const { table, category, provider, search, limit, skip } = req.query as unknown as ListServicesQuery;
+    const { table, category, sector, provider, search, limit, skip } = req.query as unknown as ListServicesQuery;
 
     const query: Record<string, unknown> = {};
 
@@ -80,6 +84,10 @@ router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, r
 
     if (category) {
       query.categoryId = category;
+    }
+
+    if (sector) {
+      query.sectorId = sector;
     }
 
     if (provider) {
@@ -97,6 +105,7 @@ router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, r
     const [services, total] = await Promise.all([
       Service.find(query)
         .populate('categoryId', 'name slug')
+        .populate('sectorId', 'name slug category')
         .sort({ shortName: 1 })
         .skip(skip as number)
         .limit(limit as number)
@@ -126,7 +135,10 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
       throw new AppError('Invalid service ID', 400);
     }
 
-    const service = await Service.findById(id).populate('categoryId', 'name slug').lean();
+    const service = await Service.findById(id)
+      .populate('categoryId', 'name slug')
+      .populate('sectorId', 'name slug category')
+      .lean();
 
     if (!service) {
       throw new AppError('Service not found', 404);
@@ -149,6 +161,14 @@ router.post('/', authMiddleware, validateBody(createServiceSchema), async (req, 
       throw new AppError('Category not found', 400);
     }
 
+    // Check if sector exists (if provided)
+    if (data.sectorId) {
+      const sector = await Sector.findById(data.sectorId);
+      if (!sector) {
+        throw new AppError('Sector not found', 400);
+      }
+    }
+
     // Check for duplicate shortName
     const existingService = await Service.findOne({ shortName: data.shortName });
     if (existingService) {
@@ -165,6 +185,7 @@ router.post('/', authMiddleware, validateBody(createServiceSchema), async (req, 
 
     const populatedService = await Service.findById(service._id)
       .populate('categoryId', 'name slug')
+      .populate('sectorId', 'name slug category')
       .lean();
 
     res.status(201).json(populatedService);
@@ -193,6 +214,14 @@ router.put('/:id', authMiddleware, validateBody(updateServiceSchema), async (req
       }
     }
 
+    // Check if sector exists (if being updated)
+    if (data.sectorId) {
+      const sector = await Sector.findById(data.sectorId);
+      if (!sector) {
+        throw new AppError('Sector not found', 400);
+      }
+    }
+
     // Check for duplicate shortName (if being updated)
     if (data.shortName) {
       const existingService = await Service.findOne({
@@ -208,7 +237,10 @@ router.put('/:id', authMiddleware, validateBody(updateServiceSchema), async (req
       id,
       { $set: data },
       { new: true, runValidators: true }
-    ).populate('categoryId', 'name slug').lean();
+    )
+      .populate('categoryId', 'name slug')
+      .populate('sectorId', 'name slug category')
+      .lean();
 
     if (!service) {
       throw new AppError('Service not found', 404);
@@ -282,6 +314,7 @@ router.post('/:id/versions', authMiddleware, validateBody(addVersionSchema), asy
 
     const populatedService = await Service.findById(id)
       .populate('categoryId', 'name slug')
+      .populate('sectorId', 'name slug category')
       .lean();
 
     res.json(populatedService);
