@@ -62,8 +62,7 @@ const projectSchema = new Schema<IProject>(
   }
 );
 
-// Indexes
-projectSchema.index({ shortName: 1 }, { unique: true });
+// Indexes (shortName already has unique: true in schema)
 projectSchema.index({ sector: 1 });
 projectSchema.index({ leader: 1 });
 

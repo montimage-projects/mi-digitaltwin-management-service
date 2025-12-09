@@ -83,8 +83,7 @@ const infrastructureSchema = new Schema<IInfrastructure>(
   }
 );
 
-// Indexes
-infrastructureSchema.index({ name: 1 }, { unique: true });
+// Indexes (name already has unique: true in schema)
 infrastructureSchema.index({ type: 1 });
 infrastructureSchema.index({ status: 1 });
 

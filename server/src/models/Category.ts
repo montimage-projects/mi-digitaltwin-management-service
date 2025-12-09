@@ -34,10 +34,6 @@ const categorySchema = new Schema<ICategory>(
   }
 );
 
-// Indexes
-categorySchema.index({ name: 1 }, { unique: true });
-categorySchema.index({ slug: 1 }, { unique: true });
-
 // Remove __v from JSON output
 categorySchema.set('toJSON', {
   transform: function (_doc, ret) {

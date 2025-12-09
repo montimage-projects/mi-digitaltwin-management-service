@@ -24,8 +24,8 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col border-r bg-background">
       {/* Logo */}
-      <div className="flex h-16 items-center border-b px-6">
-        <span className="text-xl font-bold text-primary">INTACT</span>
+      <div className="flex h-16 items-center border-b px-4">
+        <img src="/intact_logo.png" alt="INTACT" className="h-10 w-auto" />
       </div>
 
       {/* Navigation */}
@@ -53,7 +53,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="border-t px-6 py-4">
         <p className="text-xs text-muted-foreground">Digital Twin Platform</p>
-        <p className="text-xs text-muted-foreground">v0.1.0</p>
+        <p className="text-xs text-muted-foreground">v1.0.0</p>
       </div>
     </div>
   );

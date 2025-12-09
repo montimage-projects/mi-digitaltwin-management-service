@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -8,15 +9,18 @@ import { connectDatabase, disconnectDatabase, isDatabaseConnected } from './conf
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 import authRoutes from './routes/auth.routes.js';
+import usersRoutes from './routes/users.routes.js';
 import categoriesRoutes from './routes/categories.routes.js';
 import servicesRoutes from './routes/services.routes.js';
 import projectsRoutes from './routes/projects.routes.js';
 import scenariosRoutes from './routes/scenarios.routes.js';
 import infrastructuresRoutes from './routes/infrastructures.routes.js';
+import { openApiSpec } from './docs/openapi.js';
 
 const app = express();
 
 // Middleware
+app.use(compression()); // gzip compression for responses
 app.use(helmet());
 app.use(
   cors({
@@ -38,8 +42,16 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// API Documentation (development only)
+if (env.NODE_ENV === 'development') {
+  app.get('/api/docs', (_req, res) => {
+    res.json(openApiSpec);
+  });
+}
+
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/services', servicesRoutes);
 app.use('/api/projects', projectsRoutes);

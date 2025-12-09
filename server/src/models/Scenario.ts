@@ -113,8 +113,7 @@ const scenarioSchema = new Schema<IScenario>(
   }
 );
 
-// Indexes
-scenarioSchema.index({ projectId: 1 });
+// Indexes (projectId already has index: true in schema)
 scenarioSchema.index({ title: 'text', description: 'text' });
 
 // Remove __v from JSON output

@@ -122,8 +122,7 @@ const serviceSchema = new Schema<IService>(
   }
 );
 
-// Indexes
-serviceSchema.index({ shortName: 1 }, { unique: true });
+// Indexes (shortName already has unique: true in schema)
 serviceSchema.index({ categoryId: 1 });
 serviceSchema.index({ repositoryTable: 1 });
 serviceSchema.index({ provider: 1 });
