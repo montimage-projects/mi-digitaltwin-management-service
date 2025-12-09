@@ -21,11 +21,7 @@ import '@xyflow/react/dist/style.css';
 import { Server, Database, Network, Shield, Monitor, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
@@ -51,6 +47,7 @@ interface ServiceOption {
   repositoryTable?: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
   currentVersion?: string;
   versions?: ServiceVersion[];
+  uiType?: string;
 }
 
 interface TopologyCanvasProps {
@@ -125,11 +122,11 @@ function TopologyCanvasInner({
 
   // Filter services by repository table
   const toolboxServices = useMemo(() => {
-    return services.filter(s => s.repositoryTable === 'INTACT_TOOLBOX');
+    return services.filter((s) => s.repositoryTable === 'INTACT_TOOLBOX');
   }, [services]);
 
   const infraServices = useMemo(() => {
-    return services.filter(s => s.repositoryTable === 'OTHER_SERVICES');
+    return services.filter((s) => s.repositoryTable === 'OTHER_SERVICES');
   }, [services]);
 
   // Helper function to group and filter services
@@ -195,12 +192,17 @@ function TopologyCanvasInner({
       const newNode = {
         id: `node-${Date.now()}`,
         type: 'service',
-        position: screenToFlowPosition({ x: 200 + Math.random() * 200, y: 100 + Math.random() * 200 }),
+        position: screenToFlowPosition({
+          x: 200 + Math.random() * 200,
+          y: 100 + Math.random() * 200,
+        }),
         data: {
           label: service.shortName,
           type: service.categoryId?.name?.toLowerCase() || 'server',
           serviceId: service._id,
           serviceTitle: service.title,
+          uiType: service.uiType || 'web',
+          repositoryTable: service.repositoryTable || 'OTHER_SERVICES',
           // Only include version if it's explicitly selected and not the current/latest version
           ...(version && version !== service.currentVersion && { version }),
         },
@@ -332,7 +334,12 @@ function TopologyCanvasInner({
           {/* Add Security Tool (INTACT Toolbox) */}
           <Popover open={toolboxOpen} onOpenChange={setToolboxOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8" disabled={toolboxServices.length === 0}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                disabled={toolboxServices.length === 0}
+              >
                 <Shield className="h-4 w-4 mr-1" />
                 Add Security Tool
               </Button>
@@ -345,11 +352,15 @@ function TopologyCanvasInner({
                     <Shield className="h-4 w-4 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm">{selectedService.shortName}</div>
-                      <div className="text-xs text-muted-foreground truncate">{selectedService.title}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {selectedService.title}
+                      </div>
                     </div>
                   </div>
                   <div className="mb-3">
-                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Select Version</label>
+                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                      Select Version
+                    </label>
                     <Select value={selectedVersion} onValueChange={setSelectedVersion}>
                       <SelectTrigger className="h-9">
                         <SelectValue placeholder="Select version" />
@@ -365,7 +376,12 @@ function TopologyCanvasInner({
                     </Select>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={cancelVersionSelection}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={cancelVersionSelection}
+                    >
                       Cancel
                     </Button>
                     <Button size="sm" className="flex-1" onClick={() => confirmAddService(true)}>
@@ -398,33 +414,37 @@ function TopologyCanvasInner({
                       </div>
                     ) : (
                       <div className="p-2">
-                        {Object.entries(groupedToolboxServices).map(([category, categoryServices]) => (
-                          <div key={category} className="mb-3">
-                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                              {category}
-                            </div>
-                            {categoryServices.map((service) => (
-                              <button
-                                key={service._id}
-                                onClick={() => handleServiceSelect(service, true)}
-                                className="w-full flex items-center gap-2 px-2 py-2 text-left rounded-md hover:bg-accent transition-colors"
-                              >
-                                <Shield className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-sm truncate">{service.shortName}</div>
-                                  <div className="text-xs text-muted-foreground truncate">
-                                    {service.title}
-                                    {service.versions && service.versions.length > 1 && (
-                                      <span className="ml-1 text-muted-foreground/60">
-                                        ({service.versions.length} versions)
-                                      </span>
-                                    )}
+                        {Object.entries(groupedToolboxServices).map(
+                          ([category, categoryServices]) => (
+                            <div key={category} className="mb-3">
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                {category}
+                              </div>
+                              {categoryServices.map((service) => (
+                                <button
+                                  key={service._id}
+                                  onClick={() => handleServiceSelect(service, true)}
+                                  className="w-full flex items-center gap-2 px-2 py-2 text-left rounded-md hover:bg-accent transition-colors"
+                                >
+                                  <Shield className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-sm truncate">
+                                      {service.shortName}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {service.title}
+                                      {service.versions && service.versions.length > 1 && (
+                                        <span className="ml-1 text-muted-foreground/60">
+                                          ({service.versions.length} versions)
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        ))}
+                                </button>
+                              ))}
+                            </div>
+                          )
+                        )}
                       </div>
                     )}
                   </ScrollArea>
@@ -436,7 +456,12 @@ function TopologyCanvasInner({
           {/* Add Infrastructure Service (Critical Infrastructure) */}
           <Popover open={infraOpen} onOpenChange={setInfraOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8" disabled={infraServices.length === 0}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                disabled={infraServices.length === 0}
+              >
                 <Server className="h-4 w-4 mr-1" />
                 Add Target
               </Button>
@@ -449,11 +474,15 @@ function TopologyCanvasInner({
                     <Server className="h-4 w-4 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm">{selectedService.shortName}</div>
-                      <div className="text-xs text-muted-foreground truncate">{selectedService.title}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {selectedService.title}
+                      </div>
                     </div>
                   </div>
                   <div className="mb-3">
-                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Select Version</label>
+                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                      Select Version
+                    </label>
                     <Select value={selectedVersion} onValueChange={setSelectedVersion}>
                       <SelectTrigger className="h-9">
                         <SelectValue placeholder="Select version" />
@@ -469,7 +498,12 @@ function TopologyCanvasInner({
                     </Select>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={cancelVersionSelection}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1"
+                      onClick={cancelVersionSelection}
+                    >
                       Cancel
                     </Button>
                     <Button size="sm" className="flex-1" onClick={() => confirmAddService(false)}>
@@ -502,33 +536,37 @@ function TopologyCanvasInner({
                       </div>
                     ) : (
                       <div className="p-2">
-                        {Object.entries(groupedInfraServices).map(([category, categoryServices]) => (
-                          <div key={category} className="mb-3">
-                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                              {category}
-                            </div>
-                            {categoryServices.map((service) => (
-                              <button
-                                key={service._id}
-                                onClick={() => handleServiceSelect(service, false)}
-                                className="w-full flex items-center gap-2 px-2 py-2 text-left rounded-md hover:bg-accent transition-colors"
-                              >
-                                <Server className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-sm truncate">{service.shortName}</div>
-                                  <div className="text-xs text-muted-foreground truncate">
-                                    {service.title}
-                                    {service.versions && service.versions.length > 1 && (
-                                      <span className="ml-1 text-muted-foreground/60">
-                                        ({service.versions.length} versions)
-                                      </span>
-                                    )}
+                        {Object.entries(groupedInfraServices).map(
+                          ([category, categoryServices]) => (
+                            <div key={category} className="mb-3">
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                {category}
+                              </div>
+                              {categoryServices.map((service) => (
+                                <button
+                                  key={service._id}
+                                  onClick={() => handleServiceSelect(service, false)}
+                                  className="w-full flex items-center gap-2 px-2 py-2 text-left rounded-md hover:bg-accent transition-colors"
+                                >
+                                  <Server className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-sm truncate">
+                                      {service.shortName}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {service.title}
+                                      {service.versions && service.versions.length > 1 && (
+                                        <span className="ml-1 text-muted-foreground/60">
+                                          ({service.versions.length} versions)
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        ))}
+                                </button>
+                              ))}
+                            </div>
+                          )
+                        )}
                       </div>
                     )}
                   </ScrollArea>

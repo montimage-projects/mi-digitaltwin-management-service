@@ -3,16 +3,19 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 <!-- OPENSPEC:START -->
-## OpenSpec Instructions
+
+# OpenSpec Instructions
 
 These instructions are for AI assistants working in this project.
 
 Always open `@/openspec/AGENTS.md` when the request:
+
 - Mentions planning or proposals (words like proposal, spec, change, plan)
 - Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
 - Sounds ambiguous and you need the authoritative spec before coding
 
 Use `@/openspec/AGENTS.md` to learn:
+
 - How to create and apply change proposals
 - Spec format and conventions
 - Project structure and guidelines
@@ -24,17 +27,20 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 ## Build and Development Commands
 
 ### Prerequisites
+
 - Bun v1.0+ (primary runtime)
 - Docker and Docker Compose (for MongoDB)
 - Node.js 18+ (optional fallback)
 
 ### Database
+
 ```bash
 docker-compose up -d mongodb    # Start MongoDB
 docker-compose down             # Stop all services
 ```
 
 ### Server (Express API on port 3000)
+
 ```bash
 cd server
 bun install                     # Install dependencies
@@ -46,6 +52,7 @@ bun run format                  # Format with Prettier
 ```
 
 ### Client (React on port 5173)
+
 ```bash
 cd client
 bun install                     # Install dependencies
@@ -56,11 +63,13 @@ bun run lint                    # Run ESLint
 ```
 
 ### Environment Setup
+
 Both `server/.env` and `client/.env` require setup. Copy from `.env.example` files. Default credentials: admin / intact2025
 
 ## Architecture Overview
 
 ### Monorepo Structure
+
 ```
 /
 ├── client/          # React frontend (Vite + TypeScript)
@@ -74,6 +83,7 @@ Both `server/.env` and `client/.env` require setup. Copy from `.env.example` fil
 **Entry Point:** `app.ts` - Express setup with middleware chain (helmet, cors, morgan) and graceful shutdown handling.
 
 **Layered Structure:**
+
 - `routes/` - API route definitions (auth, services, projects, scenarios, categories, infrastructures)
 - `models/` - Mongoose schemas (User, Service, Project, Scenario, Category, Infrastructure)
 - `middleware/` - Auth (JWT), validation (Zod), error handling
@@ -83,6 +93,7 @@ Both `server/.env` and `client/.env` require setup. Copy from `.env.example` fil
 - `utils/` - Utilities (encryption)
 
 **API Routes:**
+
 - `/api/auth` - JWT authentication
 - `/api/services` - CRUD for cybersecurity services
 - `/api/projects` - Digital twin project management
@@ -95,6 +106,7 @@ Both `server/.env` and `client/.env` require setup. Copy from `.env.example` fil
 **Entry Point:** `main.tsx` → `App.tsx` (React Router + React Query setup)
 
 **Key Directories:**
+
 - `pages/` - Route components (Dashboard, Services, Projects, Scenarios, Infrastructure, Analytics, Settings)
 - `components/ui/` - shadcn/ui primitives (buttons, forms, dialogs, etc.)
 - `components/layout/` - MainLayout wrapper, ProtectedRoute auth guard
@@ -106,12 +118,14 @@ Both `server/.env` and `client/.env` require setup. Copy from `.env.example` fil
 - `types/` - TypeScript type definitions
 
 **State Management:**
+
 - Server state: React Query with 5-minute stale time
 - Client state: Zustand stores for auth and workspace
 
 **UI Stack:** Tailwind CSS + shadcn/ui components + Radix UI primitives
 
 ### Data Flow
+
 1. Frontend calls `lib/api.ts` functions
 2. Requests hit Express routes with JWT auth middleware
 3. Routes use Mongoose models to interact with MongoDB

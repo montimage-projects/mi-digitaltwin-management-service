@@ -1,7 +1,24 @@
 import { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Code, Network, Columns, Save, RotateCcw, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import {
+  Code,
+  Network,
+  Columns,
+  Save,
+  RotateCcw,
+  PanelLeftClose,
+  PanelLeftOpen,
+  HelpCircle,
+  CheckCircle2,
+} from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { YamlEditor } from './YamlEditor';
 import { TopologyCanvas } from './TopologyCanvas';
 import { cn } from '@/lib/utils';
@@ -70,6 +87,14 @@ interface ServiceOption {
   categoryId?: { name: string };
 }
 
+interface Infrastructure {
+  _id: string;
+  name: string;
+  type: string;
+  status?: string;
+  endpoint?: string;
+}
+
 interface TopologyEditorProps {
   yaml: string;
   nodes: object[];
@@ -81,6 +106,11 @@ interface TopologyEditorProps {
   services?: ServiceOption[];
   isSaving?: boolean;
   isDirty?: boolean;
+  infrastructures?: Infrastructure[];
+  selectedInfrastructure?: string | null;
+  onInfrastructureChange?: (id: string | null) => void;
+  onValidate?: () => void;
+  onHelpClick?: () => void;
 }
 
 export function TopologyEditor({
@@ -94,6 +124,11 @@ export function TopologyEditor({
   services = [],
   isSaving = false,
   isDirty = false,
+  infrastructures = [],
+  selectedInfrastructure = null,
+  onInfrastructureChange,
+  onValidate,
+  onHelpClick,
 }: TopologyEditorProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [codeCollapsed, setCodeCollapsed] = useState(false);
@@ -137,6 +172,54 @@ export function TopologyEditor({
 
   return (
     <div className="flex flex-col h-full">
+      {/* Infrastructure Selector and Help Section */}
+      <div className="border-b px-4 py-3 bg-background space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 max-w-xs">
+            <label className="text-sm font-medium text-foreground block mb-1">
+              Target Infrastructure *
+            </label>
+            <Select
+              value={selectedInfrastructure || 'none'}
+              onValueChange={(value) => {
+                onInfrastructureChange?.(value === 'none' ? null : value);
+              }}
+            >
+              <SelectTrigger
+                className={cn(selectedInfrastructure ? '' : 'border-orange-500 bg-orange-50/50')}
+              >
+                <SelectValue placeholder="Select infrastructure..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {infrastructures.map((infra) => (
+                  <SelectItem key={infra._id} value={infra._id}>
+                    <div className="flex items-center gap-2">
+                      <span>{infra.name}</span>
+                      <span className="text-xs text-muted-foreground">({infra.type})</span>
+                      {infra.status === 'active' && (
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onHelpClick}
+              title="Learn how to build and deploy scenarios"
+            >
+              <HelpCircle className="h-4 w-4 mr-1" />
+              Help
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b px-4 py-2 bg-muted/30">
         <div className="flex items-center gap-2">
@@ -176,6 +259,15 @@ export function TopologyEditor({
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onValidate}
+            title="Validate the topology configuration"
+          >
+            <CheckCircle2 className="h-4 w-4 mr-1" />
+            Validate
+          </Button>
           <Button variant="outline" size="sm" onClick={handleReset} disabled={isSaving}>
             <RotateCcw className="h-4 w-4 mr-1" />
             Reset

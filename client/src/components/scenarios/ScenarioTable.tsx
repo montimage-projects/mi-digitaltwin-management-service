@@ -135,9 +135,7 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
                   <span className="text-muted-foreground">Never run</span>
                 )}
               </TableCell>
-              <TableCell>
-                {new Date(scenario.updatedAt).toLocaleDateString()}
-              </TableCell>
+              <TableCell>{new Date(scenario.updatedAt).toLocaleDateString()}</TableCell>
               <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -171,14 +169,15 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/scenarios/${scenario._id}?execute=true`);
+                        navigate(`/scenarios/${scenario._id}?deploy=true`);
                       }}
                       disabled={!scenario.infrastructureId}
+                      title="Deploy scenario to target infrastructure"
                     >
-                      <span title="Execute">
+                      <span>
                         <Play className="mr-2 h-4 w-4" />
                       </span>
-                      Execute
+                      Deploy
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
@@ -198,6 +197,7 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
               </TableCell>
             </TableRow>
           ))}
+          ```{' '}
         </TableBody>
       </Table>
 

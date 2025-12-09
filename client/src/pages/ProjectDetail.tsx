@@ -1,7 +1,9 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { ArrowLeft, Loader2, Pencil, Plus, Layers } from 'lucide-react';
 import { projectsApi, scenariosApi } from '@/lib/api';
+import { useWorkspaceStore } from '@/store/workspace-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -18,6 +20,7 @@ const sectorColors: Record<string, string> = {
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { tabs, closeTab } = useWorkspaceStore();
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
@@ -30,6 +33,17 @@ export function ProjectDetail() {
     queryFn: () => scenariosApi.list(id!),
     enabled: !!id,
   });
+
+  // Close scenarios from other projects when switching projects
+  useEffect(() => {
+    if (id) {
+      tabs.forEach((tab) => {
+        if (tab.type === 'scenario' && tab.projectId && tab.projectId !== id) {
+          closeTab(tab.id);
+        }
+      });
+    }
+  }, [id, tabs, closeTab]);
 
   if (isLoading) {
     return (
