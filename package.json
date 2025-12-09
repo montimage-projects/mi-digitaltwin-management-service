@@ -37,11 +37,11 @@
   "lint-staged": {
     "client/src/**/*.{ts,tsx}": [
       "prettier --write",
-      "eslint --fix --max-warnings=0 --config client/eslint.config.js"
+      "cd client && bunx eslint --fix --max-warnings=0"
     ],
     "server/src/**/*.ts": [
       "prettier --write",
-      "eslint --fix --max-warnings=0 --config server/eslint.config.js"
+      "cd server && bunx eslint --fix --max-warnings=0"
     ],
     "*.{js,json,md,css}": [
       "prettier --write"
