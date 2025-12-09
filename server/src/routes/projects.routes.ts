@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { Project } from '../models/Project.js';
+import { Scenario } from '../models/Scenario.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateBody, validateQuery, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -55,10 +56,18 @@ router.get('/', authMiddleware, validateQuery(listProjectsSchema), async (req, r
       .sort({ updatedAt: -1 })
       .lean();
 
-    // Get scenario counts for each project (will be added when Scenario model exists)
+    // Get scenario counts for each project
+    const projectIds = projects.map(p => p._id);
+    const scenarioCounts = await Scenario.aggregate([
+      { $match: { projectId: { $in: projectIds } } },
+      { $group: { _id: '$projectId', count: { $sum: 1 } } }
+    ]);
+
+    const countMap = new Map(scenarioCounts.map(sc => [sc._id.toString(), sc.count]));
+
     const projectsWithCounts = projects.map(project => ({
       ...project,
-      scenarioCount: 0, // Placeholder until Scenario model is created
+      scenarioCount: countMap.get(project._id.toString()) || 0,
     }));
 
     res.json(projectsWithCounts);

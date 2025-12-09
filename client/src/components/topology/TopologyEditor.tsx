@@ -1,10 +1,56 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Code, Network, Columns, Save, RotateCcw } from 'lucide-react';
+import { Code, Network, Columns, Save, RotateCcw, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { YamlEditor } from './YamlEditor';
 import { TopologyCanvas } from './TopologyCanvas';
 import { cn } from '@/lib/utils';
+import yaml from 'js-yaml';
+
+interface TopologyNode {
+  id: string;
+  position: { x: number; y: number };
+  data: {
+    label: string;
+    type?: string;
+    serviceId?: string;
+    serviceTitle?: string;
+  };
+}
+
+interface TopologyEdge {
+  id: string;
+  source: string;
+  target: string;
+}
+
+// Convert nodes and edges to YAML format
+function nodesToYaml(nodes: TopologyNode[], edges: TopologyEdge[]): string {
+  if (nodes.length === 0 && edges.length === 0) {
+    return '';
+  }
+
+  const topology = {
+    services: nodes.map((node) => ({
+      id: node.id,
+      name: node.data.label,
+      title: node.data.serviceTitle || node.data.label,
+      type: node.data.type || 'server',
+      serviceId: node.data.serviceId,
+      position: {
+        x: Math.round(node.position.x),
+        y: Math.round(node.position.y),
+      },
+    })),
+    connections: edges.map((edge) => ({
+      id: edge.id,
+      from: edge.source,
+      to: edge.target,
+    })),
+  };
+
+  return yaml.dump(topology, { indent: 2, lineWidth: -1 });
+}
 
 type ViewMode = 'code' | 'visual' | 'split';
 
@@ -30,7 +76,7 @@ interface TopologyEditorProps {
 }
 
 export function TopologyEditor({
-  yaml,
+  yaml: yamlProp,
   nodes,
   edges,
   onYamlChange,
@@ -42,6 +88,37 @@ export function TopologyEditor({
   isDirty = false,
 }: TopologyEditorProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('split');
+  const [codeCollapsed, setCodeCollapsed] = useState(false);
+  const isUpdatingFromCanvas = useRef(false);
+
+  // Sync nodes/edges changes to YAML
+  const handleNodesChangeWithYamlSync = useCallback(
+    (newNodes: object[]) => {
+      isUpdatingFromCanvas.current = true;
+      onNodesChange(newNodes);
+      const newYaml = nodesToYaml(newNodes as TopologyNode[], edges as TopologyEdge[]);
+      onYamlChange(newYaml);
+      // Reset flag after a short delay
+      setTimeout(() => {
+        isUpdatingFromCanvas.current = false;
+      }, 100);
+    },
+    [onNodesChange, onYamlChange, edges]
+  );
+
+  const handleEdgesChangeWithYamlSync = useCallback(
+    (newEdges: object[]) => {
+      isUpdatingFromCanvas.current = true;
+      onEdgesChange(newEdges);
+      const newYaml = nodesToYaml(nodes as TopologyNode[], newEdges as TopologyEdge[]);
+      onYamlChange(newYaml);
+      // Reset flag after a short delay
+      setTimeout(() => {
+        isUpdatingFromCanvas.current = false;
+      }, 100);
+    },
+    [onEdgesChange, onYamlChange, nodes]
+  );
 
   const handleReset = useCallback(() => {
     // Reset to empty topology
@@ -106,7 +183,7 @@ export function TopologyEditor({
       <div className="flex-1 min-h-0">
         {viewMode === 'code' && (
           <div className="h-full">
-            <YamlEditor value={yaml} onChange={onYamlChange} />
+            <YamlEditor value={yamlProp} onChange={onYamlChange} />
           </div>
         )}
 
@@ -115,8 +192,8 @@ export function TopologyEditor({
             <TopologyCanvas
               nodes={nodes}
               edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
+              onNodesChange={handleNodesChangeWithYamlSync}
+              onEdgesChange={handleEdgesChangeWithYamlSync}
               services={services}
             />
           </div>
@@ -124,15 +201,40 @@ export function TopologyEditor({
 
         {viewMode === 'split' && (
           <div className="flex h-full">
-            <div className={cn('h-full border-r', 'w-1/2')}>
-              <YamlEditor value={yaml} onChange={onYamlChange} />
+            {/* Collapsible Code Panel */}
+            <div
+              className={cn(
+                'h-full border-r transition-all duration-300 overflow-hidden',
+                codeCollapsed ? 'w-0' : 'w-1/2'
+              )}
+            >
+              <div className="h-full w-full min-w-[400px]">
+                <YamlEditor value={yamlProp} onChange={onYamlChange} />
+              </div>
             </div>
-            <div className={cn('h-full', 'w-1/2')}>
+            {/* Toggle Button */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 z-10 h-6 w-6 rounded-full border bg-background shadow-sm"
+                onClick={() => setCodeCollapsed(!codeCollapsed)}
+                title={codeCollapsed ? 'Show code editor' : 'Hide code editor'}
+              >
+                {codeCollapsed ? (
+                  <PanelLeftOpen className="h-3 w-3" />
+                ) : (
+                  <PanelLeftClose className="h-3 w-3" />
+                )}
+              </Button>
+            </div>
+            {/* Visual Canvas */}
+            <div className={cn('h-full flex-1 transition-all duration-300')}>
               <TopologyCanvas
                 nodes={nodes}
                 edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
+                onNodesChange={handleNodesChangeWithYamlSync}
+                onEdgesChange={handleEdgesChangeWithYamlSync}
                 services={services}
               />
             </div>

@@ -58,7 +58,7 @@ const listServicesSchema = z.object({
   limit: z
     .string()
     .optional()
-    .transform((val) => (val ? Math.min(parseInt(val, 10), 100) : 20)),
+    .transform((val) => (val ? Math.min(parseInt(val, 10), 1000) : 20)),
   skip: z
     .string()
     .optional()

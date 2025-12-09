@@ -21,6 +21,7 @@ interface ExecutionPanelProps {
   executions: Execution[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onExecutionStart?: (maestroUrl: string) => void;
 }
 
 const statusIcons: Record<string, React.ReactNode> = {
@@ -37,6 +38,7 @@ export function ExecutionPanel({
   executions,
   open,
   onOpenChange,
+  onExecutionStart,
 }: ExecutionPanelProps) {
   const queryClient = useQueryClient();
   const [selectedExecution, setSelectedExecution] = useState<Execution | null>(null);
@@ -47,9 +49,14 @@ export function ExecutionPanel({
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['scenario', scenarioId] });
       toast.success('Execution started');
-      // Open MAESTRO in new tab
+      // Open MAESTRO in iframe or new tab
       if (result.maestroUrl) {
-        window.open(result.maestroUrl, '_blank');
+        if (onExecutionStart) {
+          onExecutionStart(result.maestroUrl);
+          onOpenChange(false); // Close dialog
+        } else {
+          window.open(result.maestroUrl, '_blank');
+        }
       }
     },
     onError: (error: Error) => {

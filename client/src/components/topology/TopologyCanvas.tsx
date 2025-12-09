@@ -18,7 +18,7 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Database, Network, Shield, Monitor, Plus, Trash2, Search } from 'lucide-react';
+import { Server, Database, Network, Shield, Monitor, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -34,6 +34,7 @@ interface ServiceOption {
   title: string;
   description?: string;
   categoryId?: { name: string };
+  repositoryTable?: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
 }
 
 interface TopologyCanvasProps {
@@ -88,12 +89,25 @@ function TopologyCanvasInner({
 }: TopologyCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [addServiceOpen, setAddServiceOpen] = useState(false);
 
-  // Group services by category and filter by search
-  const groupedServices = useMemo(() => {
-    const filtered = services.filter((s) => {
+  // Separate state for each dropdown
+  const [toolboxOpen, setToolboxOpen] = useState(false);
+  const [toolboxSearch, setToolboxSearch] = useState('');
+  const [infraOpen, setInfraOpen] = useState(false);
+  const [infraSearch, setInfraSearch] = useState('');
+
+  // Filter services by repository table
+  const toolboxServices = useMemo(() => {
+    return services.filter(s => s.repositoryTable === 'INTACT_TOOLBOX');
+  }, [services]);
+
+  const infraServices = useMemo(() => {
+    return services.filter(s => s.repositoryTable === 'OTHER_SERVICES');
+  }, [services]);
+
+  // Helper function to group and filter services
+  const getGroupedServices = (serviceList: ServiceOption[], searchQuery: string) => {
+    const filtered = serviceList.filter((s) => {
       const query = searchQuery.toLowerCase();
       return (
         s.shortName.toLowerCase().includes(query) ||
@@ -113,7 +127,16 @@ function TopologyCanvasInner({
     });
 
     return groups;
-  }, [services, searchQuery]);
+  };
+
+  // Grouped services for each dropdown
+  const groupedToolboxServices = useMemo(() => {
+    return getGroupedServices(toolboxServices, toolboxSearch);
+  }, [toolboxServices, toolboxSearch]);
+
+  const groupedInfraServices = useMemo(() => {
+    return getGroupedServices(infraServices, infraSearch);
+  }, [infraServices, infraSearch]);
 
   // Convert to React Flow format
   const flowNodes = useMemo(
@@ -141,7 +164,7 @@ function TopologyCanvasInner({
 
   // Add a new node from a service
   const addNode = useCallback(
-    (service: ServiceOption) => {
+    (service: ServiceOption, isToolbox: boolean) => {
       const newNode = {
         id: `node-${Date.now()}`,
         type: 'service',
@@ -158,8 +181,13 @@ function TopologyCanvasInner({
         onNodesChangeProp(newNodes);
         return newNodes;
       });
-      setAddServiceOpen(false);
-      setSearchQuery('');
+      if (isToolbox) {
+        setToolboxOpen(false);
+        setToolboxSearch('');
+      } else {
+        setInfraOpen(false);
+        setInfraSearch('');
+      }
     },
     [setNodes, onNodesChangeProp, screenToFlowPosition]
   );
@@ -238,11 +266,12 @@ function TopologyCanvasInner({
       {/* Toolbar */}
       {!readOnly && (
         <div className="absolute top-2 left-2 z-10 flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg border p-1 shadow-sm">
-          <Popover open={addServiceOpen} onOpenChange={setAddServiceOpen}>
+          {/* Add Security Tool (INTACT Toolbox) */}
+          <Popover open={toolboxOpen} onOpenChange={setToolboxOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8" disabled={services.length === 0}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Service
+              <Button variant="outline" size="sm" className="h-8" disabled={toolboxServices.length === 0}>
+                <Shield className="h-4 w-4 mr-1" />
+                Add Security Tool
               </Button>
             </PopoverTrigger>
             <PopoverContent align="start" className="w-80 p-0">
@@ -250,25 +279,25 @@ function TopologyCanvasInner({
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search services..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search security tools..."
+                    value={toolboxSearch}
+                    onChange={(e) => setToolboxSearch(e.target.value)}
                     className="pl-8 h-9"
                   />
                 </div>
               </div>
               <ScrollArea className="h-72">
-                {services.length === 0 ? (
+                {toolboxServices.length === 0 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
-                    No services available
+                    No security tools available
                   </div>
-                ) : Object.keys(groupedServices).length === 0 ? (
+                ) : Object.keys(groupedToolboxServices).length === 0 ? (
                   <div className="p-4 text-center text-sm text-muted-foreground">
-                    No services match your search
+                    No security tools match your search
                   </div>
                 ) : (
                   <div className="p-2">
-                    {Object.entries(groupedServices).map(([category, categoryServices]) => (
+                    {Object.entries(groupedToolboxServices).map(([category, categoryServices]) => (
                       <div key={category} className="mb-3">
                         <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           {category}
@@ -276,7 +305,64 @@ function TopologyCanvasInner({
                         {categoryServices.map((service) => (
                           <button
                             key={service._id}
-                            onClick={() => addNode(service)}
+                            onClick={() => addNode(service, true)}
+                            className="w-full flex items-center gap-2 px-2 py-2 text-left rounded-md hover:bg-accent transition-colors"
+                          >
+                            <Shield className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm truncate">{service.shortName}</div>
+                              <div className="text-xs text-muted-foreground truncate">{service.title}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+
+          {/* Add Infrastructure Service (Critical Infrastructure) */}
+          <Popover open={infraOpen} onOpenChange={setInfraOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8" disabled={infraServices.length === 0}>
+                <Server className="h-4 w-4 mr-1" />
+                Add Target
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 p-0">
+              <div className="p-3 border-b">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search infrastructure services..."
+                    value={infraSearch}
+                    onChange={(e) => setInfraSearch(e.target.value)}
+                    className="pl-8 h-9"
+                  />
+                </div>
+              </div>
+              <ScrollArea className="h-72">
+                {infraServices.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    No infrastructure services available
+                  </div>
+                ) : Object.keys(groupedInfraServices).length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    No infrastructure services match your search
+                  </div>
+                ) : (
+                  <div className="p-2">
+                    {Object.entries(groupedInfraServices).map(([category, categoryServices]) => (
+                      <div key={category} className="mb-3">
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          {category}
+                        </div>
+                        {categoryServices.map((service) => (
+                          <button
+                            key={service._id}
+                            onClick={() => addNode(service, false)}
                             className="w-full flex items-center gap-2 px-2 py-2 text-left rounded-md hover:bg-accent transition-colors"
                           >
                             <Server className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -293,6 +379,7 @@ function TopologyCanvasInner({
               </ScrollArea>
             </PopoverContent>
           </Popover>
+
           <Button
             variant="outline"
             size="sm"
