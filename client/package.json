@@ -52,6 +52,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/js-yaml": "^4.0.9",
+    "monaco-editor": "^0.52.0",
     "@types/jspdf": "^2.0.0",
     "@types/node": "^22.7.4",
     "@types/react": "^18.3.11",

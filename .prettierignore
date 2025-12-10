@@ -8,6 +8,9 @@ coverage
 bun.lockb
 package-lock.json
 
+# Build outputs (minified assets)
+server/public/
+
 # AI agent configs (may have specific formatting)
 .agent
 .claude
