@@ -5,13 +5,17 @@ import fs from 'fs';
 const getClientDistPath = (): string => {
   // Try multiple possible paths for the client dist directory
   const possiblePaths = [
+    path.join(process.cwd(), '..', 'client', 'dist'), // From server directory (cd server && bun start)
     path.join(process.cwd(), 'client', 'dist'), // From project root
-    path.join(process.cwd(), '..', 'client', 'dist'), // From server directory
-    path.join(__dirname, '..', '..', '..', 'client', 'dist'), // Relative to this file
+    path.resolve(__dirname, '..', '..', '..', 'client', 'dist'), // Relative to this file (compiled)
+    path.resolve(__dirname, '..', '..', 'client', 'dist'), // Relative to src directory
   ];
 
+  console.log('[Static] Searching for client dist in:');
   for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
+    const exists = fs.existsSync(p);
+    console.log(`[Static]   ${exists ? '✓' : '✗'} ${p}`);
+    if (exists) {
       return p;
     }
   }
