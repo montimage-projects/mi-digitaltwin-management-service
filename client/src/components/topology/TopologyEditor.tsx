@@ -130,7 +130,7 @@ export function TopologyEditor({
   onValidate,
   onHelpClick,
 }: TopologyEditorProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('split');
+  const [viewMode, setViewMode] = useState<ViewMode>('visual');
   const [codeCollapsed, setCodeCollapsed] = useState(false);
   const isUpdatingFromCanvas = useRef(false);
 

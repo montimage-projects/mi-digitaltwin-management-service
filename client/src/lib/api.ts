@@ -289,7 +289,13 @@ export interface Scenario {
   title: string;
   description?: string;
   topology: Topology;
-  infrastructureId?: { _id: string; name: string; type: string; status: string; endpoint?: string } | null;
+  infrastructureId?: {
+    _id: string;
+    name: string;
+    type: string;
+    status: string;
+    endpoint?: string;
+  } | null;
   executions: Execution[];
   latestExecution?: {
     status: Execution['status'];
@@ -328,7 +334,9 @@ export const scenariosApi = {
     const { data } = await api.delete(`/scenarios/${id}`);
     return data;
   },
-  execute: async (id: string): Promise<{ executionId: string; maestroUrl: string; status: string }> => {
+  execute: async (
+    id: string
+  ): Promise<{ executionId: string; maestroUrl: string; status: string }> => {
     const { data } = await api.post(`/scenarios/${id}/execute`);
     return data;
   },
@@ -337,7 +345,20 @@ export const scenariosApi = {
     executionId: string,
     conclusion: { text: string; author: string }
   ): Promise<Execution> => {
-    const { data } = await api.post(`/scenarios/${scenarioId}/executions/${executionId}/conclusion`, conclusion);
+    const { data } = await api.post(
+      `/scenarios/${scenarioId}/executions/${executionId}/conclusion`,
+      conclusion
+    );
+    return data;
+  },
+  updateExecutionStatus: async (
+    scenarioId: string,
+    executionId: string,
+    status: 'pending' | 'running' | 'completed' | 'failed'
+  ): Promise<Execution> => {
+    const { data } = await api.put(`/scenarios/${scenarioId}/executions/${executionId}/status`, {
+      status,
+    });
     return data;
   },
 };
@@ -380,7 +401,10 @@ export const infrastructuresApi = {
     const { data } = await api.post('/infrastructures', infraData);
     return data;
   },
-  update: async (id: string, infraData: Partial<CreateInfrastructureData>): Promise<Infrastructure> => {
+  update: async (
+    id: string,
+    infraData: Partial<CreateInfrastructureData>
+  ): Promise<Infrastructure> => {
     const { data } = await api.put(`/infrastructures/${id}`, infraData);
     return data;
   },
@@ -388,7 +412,9 @@ export const infrastructuresApi = {
     const { data } = await api.delete(`/infrastructures/${id}`);
     return data;
   },
-  testConnection: async (id: string): Promise<{ success: boolean; status: string; lastHealthCheck: string; message: string }> => {
+  testConnection: async (
+    id: string
+  ): Promise<{ success: boolean; status: string; lastHealthCheck: string; message: string }> => {
     const { data } = await api.post(`/infrastructures/${id}/test`);
     return data;
   },

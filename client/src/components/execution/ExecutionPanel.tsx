@@ -21,7 +21,7 @@ interface ExecutionPanelProps {
   executions: Execution[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onExecutionStart?: (maestroUrl: string) => void;
+  onExecutionStart?: (maestroUrl: string, executionId: string) => void;
 }
 
 const statusIcons: Record<string, React.ReactNode> = {
@@ -52,7 +52,7 @@ export function ExecutionPanel({
       // Open MAESTRO in iframe or new tab
       if (result.maestroUrl) {
         if (onExecutionStart) {
-          onExecutionStart(result.maestroUrl);
+          onExecutionStart(result.maestroUrl, result.executionId);
           onOpenChange(false); // Close dialog
         } else {
           window.open(result.maestroUrl, '_blank');
@@ -124,9 +124,7 @@ export function ExecutionPanel({
           <div>
             <h3 className="font-medium mb-3">Execution History</h3>
             {executions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No executions yet
-              </p>
+              <p className="text-sm text-muted-foreground text-center py-4">No executions yet</p>
             ) : (
               <div className="space-y-2">
                 {executions

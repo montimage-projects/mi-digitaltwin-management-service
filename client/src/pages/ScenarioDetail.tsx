@@ -99,6 +99,7 @@ export function ScenarioDetail() {
   const [deploymentProgress, setDeploymentProgress] = useState(0);
   const [deploymentComplete, setDeploymentComplete] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
+  const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null);
 
   // Check if guidelines should auto-open on first load
   useEffect(() => {
@@ -123,7 +124,9 @@ export function ScenarioDetail() {
 
   // Handle execution start - set up tabs for MAESTRO and services
   const handleExecutionStart = useCallback(
-    (maestroUrl: string) => {
+    (maestroUrl: string, executionId: string) => {
+      // Store the execution ID for status updates
+      setCurrentExecutionId(executionId);
       // Validate topology before proceeding
       const validationResult = validateTopology(selectedInfrastructure, nodes, edges);
       if (!validationResult.isValid) {
@@ -185,7 +188,12 @@ export function ScenarioDetail() {
 
   // Simulate deployment progress over 10 seconds
   useEffect(() => {
-    if (!isDeploying) return;
+    if (!isDeploying || !currentExecutionId || !id) return;
+
+    // Update status to 'running' when deployment starts
+    scenariosApi.updateExecutionStatus(id, currentExecutionId, 'running').then(() => {
+      queryClient.invalidateQueries({ queryKey: ['scenario', id] });
+    });
 
     const interval = setInterval(() => {
       setDeploymentProgress((prev) => {
@@ -193,6 +201,10 @@ export function ScenarioDetail() {
           clearInterval(interval);
           setIsDeploying(false);
           setDeploymentComplete(true);
+          // Update status to 'completed' when deployment finishes
+          scenariosApi.updateExecutionStatus(id, currentExecutionId, 'completed').then(() => {
+            queryClient.invalidateQueries({ queryKey: ['scenario', id] });
+          });
           return 100;
         }
         return prev + 10; // 10% every second = 100% in 10 seconds
@@ -200,7 +212,7 @@ export function ScenarioDetail() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isDeploying]);
+  }, [isDeploying, currentExecutionId, id, queryClient]);
 
   // Add scenario to workspace tabs when loaded
   useEffect(() => {

@@ -39,7 +39,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Logo */}
       <div className="flex h-16 items-center justify-between border-b px-4">
         {!collapsed && (
-          <img src="/intact_logo.png" alt="INTACT" className="h-10 w-auto" />
+          <img src="/intact_logo.png" alt="INTACT" className="h-10 w-auto dark:invert" />
         )}
         <Button
           variant="ghost"

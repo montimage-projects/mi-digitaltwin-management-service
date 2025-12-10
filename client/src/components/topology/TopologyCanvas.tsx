@@ -77,12 +77,12 @@ function ServiceNode({ data }: { data: { label: string; type?: string; version?:
   };
 
   return (
-    <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-stone-400 min-w-[120px]">
+    <div className="px-4 py-2 shadow-md rounded-md bg-card border-2 border-border min-w-[120px]">
       <Handle type="target" position={Position.Top} className="w-3 h-3 !bg-teal-500" />
       <div className="flex items-center gap-2">
-        <div className="text-stone-600">{getIcon()}</div>
+        <div className="text-muted-foreground">{getIcon()}</div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium">{data.label}</div>
+          <div className="text-sm font-medium text-card-foreground">{data.label}</div>
           {data.version && (
             <div className="text-[10px] text-muted-foreground bg-muted/50 rounded px-1 py-0.5 inline-block mt-0.5">
               v{data.version}
@@ -607,15 +607,12 @@ function TopologyCanvasInner({
         proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-        <Controls showInteractive={false} />
-        <MiniMap
-          nodeStrokeWidth={3}
-          zoomable
-          pannable
-          style={{
-            backgroundColor: '#f8fafc',
-          }}
+        <Controls
+          showInteractive={false}
+          position="top-right"
+          className="!bg-card !border-border !shadow-md [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-muted [&>button>svg]:!fill-current"
         />
+        <MiniMap nodeStrokeWidth={3} zoomable pannable className="!bg-muted" />
       </ReactFlow>
     </div>
   );
