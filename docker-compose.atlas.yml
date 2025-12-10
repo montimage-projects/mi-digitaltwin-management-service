@@ -1,0 +1,40 @@
+# Docker Compose for MongoDB Atlas deployment (single container)
+# Use this when connecting to MongoDB Atlas instead of local MongoDB
+#
+# Required environment variables in .env:
+#   MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/intact?retryWrites=true&w=majority
+#   JWT_SECRET=<your-jwt-secret>
+#   ENCRYPTION_KEY=<your-encryption-key>
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: server/Dockerfile.unified
+    container_name: intact-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - app_data:/app/server/data  # Persist seed marker
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGODB_URI=${MONGODB_URI:?MONGODB_URI is required - use MongoDB Atlas connection string}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      - MAESTRO_BASE_URL=${MAESTRO_BASE_URL:-https://maestro.intact-project.eu}
+      - SERVE_STATIC=true
+      - SEED_ON_STARTUP=${SEED_ON_STARTUP:-true}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  app_data:
+    name: intact-app-data-atlas

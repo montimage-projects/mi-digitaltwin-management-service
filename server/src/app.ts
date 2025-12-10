@@ -8,6 +8,7 @@ import { env } from './config/env.js';
 import { connectDatabase, disconnectDatabase, isDatabaseConnected } from './config/database.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { configureStaticServing } from './middleware/staticServe.js';
+import { runStartupChecks, printServerReady } from './utils/startup.js';
 
 import authRoutes from './routes/auth.routes.js';
 import usersRoutes from './routes/users.routes.js';
@@ -108,17 +109,24 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // Start server
 const startServer = async (): Promise<void> => {
   try {
+    // Run startup checks (validates env, tests MongoDB connection)
+    const checksOk = await runStartupChecks();
+    if (!checksOk) {
+      process.exit(1);
+    }
+
+    // Connect to database (uses mongoose for app)
     await connectDatabase();
 
     app.listen(env.PORT, () => {
-      console.log(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
-      console.log(`Health check: http://localhost:${env.PORT}/api/health`);
-      if (staticServingEnabled) {
-        console.log(`Client app: http://localhost:${env.PORT}/`);
-      }
+      printServerReady(env.PORT, staticServingEnabled);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('\nFailed to start server:', error);
+    console.error('\nTroubleshooting:');
+    console.error('  1. Check MongoDB is running: docker-compose up -d mongodb');
+    console.error('  2. Verify .env file exists and has correct values');
+    console.error('  3. For Atlas: Ensure IP is whitelisted in Network Access\n');
     process.exit(1);
   }
 };
