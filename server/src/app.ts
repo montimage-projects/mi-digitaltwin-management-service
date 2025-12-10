@@ -78,11 +78,8 @@ app.use('/api/projects', projectsRoutes);
 app.use('/api', scenariosRoutes);
 app.use('/api/infrastructures', infrastructuresRoutes);
 
-// Static file serving (when SERVE_STATIC=true)
-let staticServingEnabled = false;
-if (env.SERVE_STATIC) {
-  staticServingEnabled = configureStaticServing(app);
-}
+// Static file serving - always enabled to serve client build
+const staticServingEnabled = configureStaticServing(app);
 
 // Error handling (only for API routes when static serving is enabled)
 if (!staticServingEnabled) {

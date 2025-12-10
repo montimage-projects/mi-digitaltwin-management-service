@@ -204,7 +204,6 @@ export function printEnvironmentInfo(): void {
   ${colors.dim}MONGODB_URI:${colors.reset}     ${mongoDisplay}
   ${colors.dim}CORS_ORIGIN:${colors.reset}     ${env.CORS_ORIGIN}
   ${colors.dim}JWT_EXPIRES_IN:${colors.reset}  ${env.JWT_EXPIRES_IN}
-  ${colors.dim}SERVE_STATIC:${colors.reset}    ${env.SERVE_STATIC}
   ${colors.dim}MAESTRO_URL:${colors.reset}     ${env.MAESTRO_BASE_URL}
 `);
 }

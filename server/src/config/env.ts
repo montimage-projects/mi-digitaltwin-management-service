@@ -14,10 +14,6 @@ const envSchema = z.object({
     .min(16, 'ENCRYPTION_KEY must be at least 16 characters')
     .default('intact-default-encryption-key-2025'),
   MAESTRO_BASE_URL: z.string().url().default('https://maestro.intact-project.eu'),
-  SERVE_STATIC: z
-    .string()
-    .transform((val) => val === 'true')
-    .default('false'),
 });
 
 const parseEnv = () => {
