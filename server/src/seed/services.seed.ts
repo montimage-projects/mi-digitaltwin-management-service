@@ -1,10 +1,12 @@
 import { Service } from '../models/Service.js';
 import { Category } from '../models/Category.js';
+import { Sector } from '../models/Sector.js';
 
 interface ServiceSeed {
   shortName: string;
   title: string;
   categorySlug: string;
+  sectorSlug?: string; // For Critical Infrastructure Services
   provider: string;
   description: string;
   type: 'Software' | 'Hardware' | 'Software/Hardware';
@@ -107,8 +109,7 @@ const intactToolboxServices: ServiceSeed[] = [
     title: 'Data Diode',
     categorySlug: 'automated-threat-inspection',
     provider: 'BEYOND',
-    description:
-      'Hardware-based unidirectional data transfer for air-gapped network protection.',
+    description: 'Hardware-based unidirectional data transfer for air-gapped network protection.',
     type: 'Hardware',
     trl: { current: 7, expected: 9 },
     license: 'Proprietary',
@@ -365,12 +366,14 @@ const intactToolboxServices: ServiceSeed[] = [
   },
 ];
 
-// Table 2: Related Infrastructure & Use Case Services
+// Table 2: Related Infrastructure & Use Case Services (Critical Infrastructure)
+// These services are mapped to NIS2 sectors for Critical Infrastructure classification
 const infrastructureServices: ServiceSeed[] = [
   {
     shortName: 'CORE-01',
     title: 'Free5GC',
     categorySlug: '5g-core',
+    sectorSlug: 'digital-infrastructure',
     provider: 'Open Source',
     description: '5G Core functions (NRF, AMF, SMF, UDM, etc.)',
     type: 'Software',
@@ -387,6 +390,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'CORE-02',
     title: 'Open5GS',
     categorySlug: '5g-core',
+    sectorSlug: 'digital-infrastructure',
     provider: 'Open Source',
     description: 'Alternative 5G Core Stack',
     type: 'Software',
@@ -403,6 +407,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'RAN-01',
     title: 'srsRAN + UERANSIM',
     categorySlug: '5g-ran',
+    sectorSlug: 'digital-infrastructure',
     provider: 'Open Source',
     description: 'Simulated gNodeB and UE behavior',
     type: 'Software',
@@ -419,6 +424,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'RAN-02',
     title: 'USRP',
     categorySlug: '5g-ran',
+    sectorSlug: 'digital-infrastructure',
     provider: 'Open Source',
     description: 'Universal Software Radio Peripheral',
     type: 'Hardware',
@@ -435,6 +441,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'UE-01',
     title: 'Android UE',
     categorySlug: 'user-equipment',
+    sectorSlug: 'digital-infrastructure',
     provider: 'Commercial',
     description: 'Mobile phone as UE',
     type: 'Hardware',
@@ -451,6 +458,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'TOOL-01',
     title: '5Greplay',
     categorySlug: 'attack-emulation',
+    sectorSlug: 'digital-infrastructure',
     provider: 'Open Source',
     description: '5G network traffic replay for attack simulation',
     type: 'Software',
@@ -467,6 +475,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'TOOL-02',
     title: 'Cybel CyberRange',
     categorySlug: 'training-simulation',
+    sectorSlug: 'digital-infrastructure',
     provider: 'THALES',
     description: 'Comprehensive cyber range platform',
     type: 'Software',
@@ -483,6 +492,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'HE-01',
     title: 'Radiology Medical VM',
     categorySlug: 'healthcare-equipment',
+    sectorSlug: 'health',
     provider: '5YPE',
     description: 'DICOM traffic simulation (MRI/CT scans)',
     type: 'Software',
@@ -499,6 +509,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'HE-02',
     title: 'Withings Wearable VM',
     categorySlug: 'healthcare-equipment',
+    sectorSlug: 'health',
     provider: '5YPE',
     description: 'ECG and SpO2 monitoring simulation',
     type: 'Software',
@@ -515,6 +526,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'HE-03',
     title: 'Anaesthesia Machine VM',
     categorySlug: 'healthcare-equipment',
+    sectorSlug: 'health',
     provider: '5YPE',
     description: 'Operating room anaesthesia machine simulation',
     type: 'Software',
@@ -531,6 +543,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'VIRT-01',
     title: 'Kubernetes',
     categorySlug: 'virtualization',
+    sectorSlug: 'ict-service-management-b2b',
     provider: 'Open Source',
     description: 'Container orchestration platform',
     type: 'Software',
@@ -547,6 +560,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'VIRT-02',
     title: 'Proxmox',
     categorySlug: 'virtualization',
+    sectorSlug: 'energy',
     provider: 'Open Source',
     description: 'VM and LXC container platform',
     type: 'Software',
@@ -563,6 +577,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'NET-01',
     title: 'GNS3',
     categorySlug: 'network-simulation',
+    sectorSlug: 'energy',
     provider: 'Open Source',
     description: 'Switching and routing simulation',
     type: 'Software',
@@ -579,6 +594,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'NET-02',
     title: 'Mininet',
     categorySlug: 'network-simulation',
+    sectorSlug: 'energy',
     provider: 'Open Source',
     description: 'Network emulation',
     type: 'Software',
@@ -595,6 +611,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'MON-01',
     title: 'Grafana',
     categorySlug: 'monitoring',
+    sectorSlug: 'ict-service-management-b2b',
     provider: 'Open Source',
     description: 'Data visualization platform',
     type: 'Software',
@@ -611,6 +628,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'MON-02',
     title: 'InfluxDB',
     categorySlug: 'monitoring',
+    sectorSlug: 'ict-service-management-b2b',
     provider: 'Open Source',
     description: 'Metrics storage',
     type: 'Software',
@@ -627,6 +645,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'SEC-01',
     title: 'Kafka',
     categorySlug: 'security-tools',
+    sectorSlug: 'ict-service-management-b2b',
     provider: 'Open Source',
     description: 'Event streaming platform',
     type: 'Software',
@@ -643,6 +662,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'SEC-02',
     title: 'OpenVPN',
     categorySlug: 'security-tools',
+    sectorSlug: 'energy',
     provider: 'Open Source',
     description: 'Secure remote access',
     type: 'Software',
@@ -659,6 +679,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'SEC-03',
     title: 'WireGuard',
     categorySlug: 'security-tools',
+    sectorSlug: 'energy',
     provider: 'Open Source',
     description: 'Modern VPN protocol',
     type: 'Software',
@@ -675,6 +696,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'TEST-01',
     title: 'AVL TestGuard',
     categorySlug: 'testing-tools',
+    sectorSlug: 'manufacturing',
     provider: 'AVL',
     description: 'Automotive security testing platform',
     type: 'Software',
@@ -691,6 +713,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'TEST-02',
     title: 'AVL ThreatGuard',
     categorySlug: 'testing-tools',
+    sectorSlug: 'manufacturing',
     provider: 'AVL',
     description: 'TARA and threat analysis tool',
     type: 'Software',
@@ -707,6 +730,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'TEST-03',
     title: 'LearnLib',
     categorySlug: 'testing-tools',
+    sectorSlug: 'manufacturing',
     provider: 'Open Source',
     description: 'Model learning toolkit',
     type: 'Software',
@@ -723,6 +747,7 @@ const infrastructureServices: ServiceSeed[] = [
     shortName: 'TEST-04',
     title: 'mCRL2',
     categorySlug: 'testing-tools',
+    sectorSlug: 'manufacturing',
     provider: 'Open Source',
     description: 'Formal verification toolkit',
     type: 'Software',
@@ -746,6 +771,10 @@ export const seedServices = async (): Promise<void> => {
   const categories = await Category.find();
   const categoryMap = new Map(categories.map((c) => [c.slug, c._id]));
 
+  // Get all sectors for lookup (for Critical Infrastructure Services migration)
+  const sectors = await Sector.find();
+  const sectorMap = new Map(sectors.map((s) => [s.slug, s._id]));
+
   for (const serviceData of servicesData) {
     const existing = await Service.findOne({ shortName: serviceData.shortName });
 
@@ -753,13 +782,27 @@ export const seedServices = async (): Promise<void> => {
       const categoryId = categoryMap.get(serviceData.categorySlug);
 
       if (!categoryId) {
-        console.error(`  Category not found for ${serviceData.shortName}: ${serviceData.categorySlug}`);
+        console.error(
+          `  Category not found for ${serviceData.shortName}: ${serviceData.categorySlug}`
+        );
         continue;
+      }
+
+      // Look up sector if provided (for Critical Infrastructure Services)
+      let sectorId = undefined;
+      if (serviceData.sectorSlug) {
+        sectorId = sectorMap.get(serviceData.sectorSlug);
+        if (!sectorId) {
+          console.warn(
+            `  Sector not found for ${serviceData.shortName}: ${serviceData.sectorSlug}`
+          );
+        }
       }
 
       await Service.create({
         ...serviceData,
         categoryId,
+        sectorId,
         currentVersion: '1.0.0',
         versions: [
           {
@@ -770,9 +813,25 @@ export const seedServices = async (): Promise<void> => {
           },
         ],
       });
-      console.log(`  Created service: ${serviceData.shortName}`);
+      const sectorInfo = sectorId ? ` (sector: ${serviceData.sectorSlug})` : '';
+      console.log(`  Created service: ${serviceData.shortName}${sectorInfo}`);
     } else {
-      console.log(`  Service exists: ${serviceData.shortName}`);
+      // Migration: Update existing services with sectorId if they don't have one
+      if (serviceData.sectorSlug && !existing.sectorId) {
+        const sectorId = sectorMap.get(serviceData.sectorSlug);
+        if (sectorId) {
+          await Service.updateOne({ _id: existing._id }, { sectorId });
+          console.log(
+            `  Migrated service: ${serviceData.shortName} -> sector: ${serviceData.sectorSlug}`
+          );
+        } else {
+          console.warn(
+            `  Sector not found for migration ${serviceData.shortName}: ${serviceData.sectorSlug}`
+          );
+        }
+      } else {
+        console.log(`  Service exists: ${serviceData.shortName}`);
+      }
     }
   }
 

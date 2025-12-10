@@ -32,7 +32,13 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/package.json ./
 
-# Set ownership
+# Copy entrypoint script and set permissions
+COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+
+# Create data directory for persistent state (seed marker)
+RUN mkdir -p /app/data
+
+# Set ownership (excluding entrypoint which stays root-owned but executable)
 RUN chown -R intact:nodejs /app
 
 # Switch to non-root user
@@ -41,13 +47,15 @@ USER intact
 # Environment defaults
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV SEED_ON_STARTUP=false
 
 # Expose port
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
 
-# Start the server
+# Use entrypoint for startup logic
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["bun", "src/app.ts"]

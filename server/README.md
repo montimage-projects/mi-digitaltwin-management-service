@@ -229,12 +229,20 @@ When `SERVE_STATIC=true`:
 2. API endpoints remain at `/api/*`
 3. All other routes return `index.html` (SPA fallback)
 
-### Deployment Options
+### Docker Deployment
 
-| Option          | Use Case                       | Setup                                             |
-| --------------- | ------------------------------ | ------------------------------------------------- |
-| **Unified**     | Demos, staging, simple hosting | `docker-compose -f docker-compose.unified.yml up` |
-| **nginx-based** | High-traffic production        | `docker-compose -f docker-compose.prod.yml up`    |
+For production deployment with automatic database seeding:
+
+```bash
+# Build and start (from project root)
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+This will:
+
+1. Build the unified image (server + client)
+2. Start MongoDB
+3. Automatically seed the database on first startup
 
 See [Deployment Playbook](../docs/playbooks/deployment.md) for details.
 

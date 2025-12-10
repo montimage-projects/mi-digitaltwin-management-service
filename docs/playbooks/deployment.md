@@ -4,16 +4,16 @@ Complete guide for deploying the INTACT Digital Twin Management Platform to prod
 
 ## Overview
 
-This playbook covers Docker-based deployment of the full service stack. Two deployment options are available:
+This playbook covers Docker-based deployment of the full service stack. The production deployment uses a unified approach where the Express server serves both the API and the client static files, avoiding CORS issues.
 
-| Option          | Containers                   | Best For                      |
-| --------------- | ---------------------------- | ----------------------------- |
-| **Unified**     | 2 (app + MongoDB)            | Demos, staging, single-server |
-| **nginx-based** | 3 (nginx + server + MongoDB) | High-traffic production       |
+| Configuration   | Containers          | Description                          |
+| --------------- | ------------------- | ------------------------------------ |
+| **Production**  | 2 (app + MongoDB)   | Server serves API + client (no CORS) |
+| **Development** | 2 (MongoDB + admin) | Local dev with hot reload            |
 
 Components served:
 
-- React frontend
+- React frontend (static files)
 - Express API server
 - MongoDB database
 
@@ -29,8 +29,6 @@ Before deploying, ensure you have:
 For detailed prerequisites, see [Prerequisites](../installation/prerequisites.md).
 
 ## Architecture
-
-### Unified Deployment
 
 ```mermaid
 graph TD
@@ -49,25 +47,11 @@ graph TD
     style M fill:#fce4ec
 ```
 
-### nginx-based Deployment
+**Key Benefits:**
 
-```mermaid
-graph TD
-    subgraph External
-        U[Users] --> N[nginx :80]
-    end
-
-    subgraph Docker Network
-        N --> |Static Files| S[Static Assets]
-        N --> |/api/*| A[Express API :3000]
-        A --> M[(MongoDB :27017)]
-    end
-
-    style U fill:#e1f5fe
-    style N fill:#fff3e0
-    style A fill:#e8f5e9
-    style M fill:#fce4ec
-```
+- No CORS configuration needed (same origin)
+- Simpler deployment (fewer containers)
+- Automatic database seeding on first startup
 
 ## Step 1: Clone and Configure
 
@@ -77,12 +61,12 @@ git clone <repository-url>
 cd service-repository-digitaltwin-management-platform
 
 # Create production environment file
-cp .env.example .env.prod
+cp .env.example .env
 ```
 
 ## Step 2: Configure Environment Variables
 
-Edit `.env.prod` with your production values:
+Edit `.env` with your production values:
 
 ```bash
 # Required - Generate secure keys
@@ -90,7 +74,7 @@ JWT_SECRET=<generate-with-openssl-rand-base64-48>
 ENCRYPTION_KEY=<generate-with-openssl-rand-hex-16>
 
 # Optional overrides
-PORT=80
+PORT=3000
 CORS_ORIGIN=https://your-domain.com
 NODE_ENV=production
 ```
@@ -107,65 +91,37 @@ openssl rand -hex 16
 
 ## Step 3: Build and Deploy
 
-Choose your deployment option:
-
-### Option A: Unified Deployment (Recommended for Simplicity)
-
 ```bash
-# Build and start unified container
-docker compose -f docker-compose.unified.yml up -d --build
-
-# View logs
-docker compose -f docker-compose.unified.yml logs -f
-```
-
-The application will be available at `http://localhost:3000`.
-
-### Option B: nginx-based Deployment (Recommended for Scale)
-
-```bash
-# Build and start all services
+# Build and start containers
 docker compose -f docker-compose.prod.yml up -d --build
 
 # View logs
 docker compose -f docker-compose.prod.yml logs -f
 ```
 
-The application will be available at `http://localhost:80`.
+The application will be available at `http://localhost:3000`.
 
-## Step 4: Initialize Database
+**Note:** Database seeding happens automatically on first startup. The seed includes:
 
-On first deployment only:
+- Default admin user (admin / intact2025)
+- Categories and NIS2 sectors
+- Sample services from INTACT Toolbox
 
-```bash
-# For unified deployment:
-docker compose -f docker-compose.unified.yml exec app bun src/seed/index.ts
-
-# For nginx-based deployment:
-docker compose -f docker-compose.prod.yml exec server bun src/seed/index.ts
-```
-
-Default credentials after seeding:
-
-- Username: `admin`
-- Password: `intact2025`
-
-**Important**: Change the admin password immediately after first login.
-
-## Step 5: Verify Deployment
+## Step 4: Verify Deployment
 
 ```bash
 # Check all containers are running
 docker compose -f docker-compose.prod.yml ps
 
 # Test health endpoints
-curl http://localhost/health          # Client health
-curl http://localhost/api/health      # API health
+curl http://localhost:3000/api/health      # API health
 
 # Verify MongoDB connection
 docker compose -f docker-compose.prod.yml exec mongodb \
   mongosh --eval "db.adminCommand('ping')"
 ```
+
+**Important**: Change the admin password immediately after first login.
 
 ## Updating the Application
 
@@ -177,7 +133,25 @@ git pull origin main
 docker compose -f docker-compose.prod.yml up -d --build
 
 # Verify health after update
-curl http://localhost/api/health
+curl http://localhost:3000/api/health
+```
+
+## Re-seeding the Database
+
+If you need to re-seed (e.g., after a fresh database):
+
+```bash
+# Remove the seed marker to allow re-seeding
+docker compose -f docker-compose.prod.yml exec app rm /app/server/data/.seeded
+
+# Restart the container
+docker compose -f docker-compose.prod.yml restart app
+```
+
+Or manually run the seed:
+
+```bash
+docker compose -f docker-compose.prod.yml exec app bun src/seed/index.ts
 ```
 
 ## Backup and Restore
@@ -231,10 +205,10 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 ```bash
 # Check container logs
-docker compose -f docker-compose.prod.yml logs -f <service-name>
+docker compose -f docker-compose.prod.yml logs -f app
 
 # Common issues:
-# - Port conflicts: Check if ports 80, 3000, 27017 are in use
+# - Port conflicts: Check if port 3000 is in use
 # - Memory: Ensure sufficient RAM available
 # - Disk space: Check available disk space
 ```
@@ -247,7 +221,7 @@ docker compose -f docker-compose.prod.yml exec mongodb \
   mongosh --eval "db.adminCommand('ping')"
 
 # Check network connectivity
-docker compose -f docker-compose.prod.yml exec server \
+docker compose -f docker-compose.prod.yml exec app \
   ping mongodb
 ```
 
@@ -255,10 +229,10 @@ docker compose -f docker-compose.prod.yml exec server \
 
 ```bash
 # Check server logs
-docker compose -f docker-compose.prod.yml logs server
+docker compose -f docker-compose.prod.yml logs app
 
 # Verify environment variables
-docker compose -f docker-compose.prod.yml exec server \
+docker compose -f docker-compose.prod.yml exec app \
   env | grep -E 'JWT|MONGO|ENCRYPTION'
 
 # Common causes:
@@ -271,12 +245,12 @@ docker compose -f docker-compose.prod.yml exec server \
 
 ```bash
 # Re-run seed script (resets to default credentials)
-docker compose -f docker-compose.prod.yml exec server bun src/seed/index.ts
+docker compose -f docker-compose.prod.yml exec app bun src/seed/index.ts
 ```
 
 ## Security Recommendations
 
-1. **Use HTTPS**: Configure nginx SSL termination or use a reverse proxy
+1. **Use HTTPS**: Use a reverse proxy (nginx, Caddy) for SSL termination
 2. **Rotate Secrets**: Change JWT_SECRET and ENCRYPTION_KEY periodically
 3. **Enable Auth**: Enable MongoDB authentication in production
 4. **Firewall**: Restrict access to MongoDB port (27017)

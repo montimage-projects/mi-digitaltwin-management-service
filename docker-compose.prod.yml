@@ -1,6 +1,6 @@
-# Production Docker Compose - nginx-based deployment (3 containers)
-# Recommended for: high-traffic production environments
-# For simpler deployments, use docker-compose.unified.yml
+# Production Docker Compose - Unified deployment (2 containers)
+# Server serves both API and client static files (no CORS issues)
+# For development with separate containers, use docker-compose.yml
 
 services:
   mongodb:
@@ -20,21 +20,27 @@ services:
     networks:
       - intact-network
 
-  server:
+  app:
     build:
-      context: ./server
-      dockerfile: Dockerfile
-    container_name: intact-server
+      context: .
+      dockerfile: server/Dockerfile.unified
+    container_name: intact-app
     restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - app_data:/app/server/data  # Persist seed marker
     environment:
       - NODE_ENV=production
       - PORT=3000
       - MONGODB_URI=mongodb://mongodb:27017/intact
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       - MAESTRO_BASE_URL=${MAESTRO_BASE_URL:-https://maestro.intact-project.eu}
+      - SERVE_STATIC=true
+      - SEED_ON_STARTUP=${SEED_ON_STARTUP:-true}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -43,33 +49,15 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
-    networks:
-      - intact-network
-
-  client:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-    container_name: intact-client
-    restart: unless-stopped
-    ports:
-      - "${PORT:-80}:80"
-    depends_on:
-      server:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
+      start_period: 30s
     networks:
       - intact-network
 
 volumes:
   mongodb_data:
     name: intact-mongodb-data-prod
+  app_data:
+    name: intact-app-data-prod
 
 networks:
   intact-network:
