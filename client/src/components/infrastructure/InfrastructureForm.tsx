@@ -26,11 +26,13 @@ const infrastructureSchema = z.object({
   type: z.enum(['kubernetes', 'docker', 'virtual']),
   endpoint: z.string().min(1, 'Endpoint is required').url('Must be a valid URL'),
   credentials: z.string().min(1, 'Credentials are required'),
-  capacity: z.object({
-    cpu: z.number().positive().optional(),
-    memory: z.number().positive().optional(),
-    storage: z.number().positive().optional(),
-  }).optional(),
+  capacity: z
+    .object({
+      cpu: z.number().positive().optional(),
+      memory: z.number().positive().optional(),
+      storage: z.number().positive().optional(),
+    })
+    .optional(),
 });
 
 type InfrastructureFormData = z.infer<typeof infrastructureSchema>;
@@ -125,7 +127,9 @@ export function InfrastructureForm({
               <FormControl>
                 <Input
                   type="password"
-                  placeholder={infrastructure ? 'Enter new credentials to update' : 'Enter credentials'}
+                  placeholder={
+                    infrastructure ? 'Enter new credentials to update' : 'Enter credentials'
+                  }
                   {...field}
                 />
               </FormControl>
@@ -144,7 +148,11 @@ export function InfrastructureForm({
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : infrastructure ? 'Update Infrastructure' : 'Add Infrastructure'}
+            {isSubmitting
+              ? 'Saving...'
+              : infrastructure
+                ? 'Update Infrastructure'
+                : 'Add Infrastructure'}
           </Button>
         </div>
       </form>

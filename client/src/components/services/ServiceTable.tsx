@@ -23,7 +23,12 @@ interface ServiceTableProps {
   showSector?: boolean; // If true, show Sector column instead of Category
 }
 
-export function ServiceTable({ services, isLoading, onRowClick, showSector = false }: ServiceTableProps) {
+export function ServiceTable({
+  services,
+  isLoading,
+  onRowClick,
+  showSector = false,
+}: ServiceTableProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
@@ -79,9 +84,11 @@ export function ServiceTable({ services, isLoading, onRowClick, showSector = fal
     if (sortColumn !== column) {
       return <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />;
     }
-    return sortDirection === 'asc'
-      ? <ArrowUp className="ml-1 h-3 w-3" />
-      : <ArrowDown className="ml-1 h-3 w-3" />;
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="ml-1 h-3 w-3" />
+    ) : (
+      <ArrowDown className="ml-1 h-3 w-3" />
+    );
   };
 
   const deleteMutation = useMutation({
@@ -111,7 +118,9 @@ export function ServiceTable({ services, isLoading, onRowClick, showSector = fal
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium">Short Name</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Title</th>
-              <th className="px-4 py-3 text-left text-sm font-medium">{showSector ? 'Sector' : 'Category'}</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">
+                {showSector ? 'Sector' : 'Category'}
+              </th>
               <th className="px-4 py-3 text-left text-sm font-medium">Provider</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Version</th>
             </tr>
@@ -202,9 +211,7 @@ export function ServiceTable({ services, isLoading, onRowClick, showSector = fal
               className="cursor-pointer border-b transition-colors hover:bg-muted/50"
               onClick={() => onRowClick(service)}
             >
-              <td className="px-4 py-3 font-mono text-sm font-medium">
-                {service.shortName}
-              </td>
+              <td className="px-4 py-3 font-mono text-sm font-medium">{service.shortName}</td>
               <td className="px-4 py-3 text-sm">{service.title}</td>
               <td className="px-4 py-3">
                 <Badge variant="secondary" className="font-normal">
@@ -212,9 +219,7 @@ export function ServiceTable({ services, isLoading, onRowClick, showSector = fal
                 </Badge>
               </td>
               <td className="px-4 py-3 text-sm text-muted-foreground">{service.provider}</td>
-              <td className="px-4 py-3 text-sm text-muted-foreground">
-                {service.currentVersion}
-              </td>
+              <td className="px-4 py-3 text-sm text-muted-foreground">{service.currentVersion}</td>
               <td className="px-4 py-3">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

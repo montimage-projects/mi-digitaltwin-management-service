@@ -115,6 +115,7 @@
 ## Parallelizable Work
 
 After Section 1 completes:
+
 - Backend (2, 3, 4) can proceed independently
 - Frontend (5, 6) can proceed independently
 - Integration (8) waits for all

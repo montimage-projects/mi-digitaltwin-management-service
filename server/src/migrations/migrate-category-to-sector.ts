@@ -15,9 +15,9 @@ const categoryToSectorMapping: Record<string, string> = {
   'healthcare-equipment': 'health',
 
   // Monitoring and Infrastructure -> ICT service management
-  'monitoring': 'ict-service-management-b2b',
-  'infrastructure': 'ict-service-management-b2b',
-  'virtualization': 'ict-service-management-b2b',
+  monitoring: 'ict-service-management-b2b',
+  infrastructure: 'ict-service-management-b2b',
+  virtualization: 'ict-service-management-b2b',
 
   // Attack/Security related -> Digital providers or ICT
   'attack-emulation': 'digital-infrastructure',
@@ -32,7 +32,7 @@ const categoryToSectorMapping: Record<string, string> = {
   'explainable-ai': 'research',
   'service-management': 'ict-service-management-b2b',
   'training-simulation': 'research',
-  'orchestration': 'ict-service-management-b2b',
+  orchestration: 'ict-service-management-b2b',
 
   // Security and Testing tools
   'security-tools': 'ict-service-management-b2b',
@@ -91,7 +91,9 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
       // Find the sector mapping
       const sectorSlug = categoryToSectorMapping[category.slug];
       if (!sectorSlug) {
-        console.log(`  [WARN] ${service.shortName} - no sector mapping for category "${category.slug}"`);
+        console.log(
+          `  [WARN] ${service.shortName} - no sector mapping for category "${category.slug}"`
+        );
         noMapping++;
         continue;
       }
@@ -104,10 +106,7 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
       }
 
       // Update the service with the sector
-      await Service.updateOne(
-        { _id: service._id },
-        { $set: { sectorId: sector._id } }
-      );
+      await Service.updateOne({ _id: service._id }, { $set: { sectorId: sector._id } });
 
       console.log(`  [OK] ${service.shortName}: ${category.name} -> ${sector.name}`);
       updated++;
@@ -119,7 +118,6 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
     console.log(`Skipped (already has sector): ${skipped}`);
     console.log(`No mapping available: ${noMapping}`);
     console.log('\nMigration completed!');
-
   } catch (error) {
     console.error('Migration failed:', error);
     process.exit(1);

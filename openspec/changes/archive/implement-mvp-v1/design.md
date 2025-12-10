@@ -3,6 +3,7 @@
 ## Architecture Overview
 
 The MVP builds on Sprint 0's foundation by adding:
+
 - Full CRUD operations for services, projects, scenarios, and infrastructures
 - Split-screen topology editor (Monaco + React Flow)
 - Tabbed workspace for embedded service dashboards
@@ -15,13 +16,13 @@ The MVP builds on Sprint 0's foundation by adding:
 
 ```typescript
 interface IProject {
-  shortName: string;        // Unique identifier
+  shortName: string; // Unique identifier
   title: string;
   sector: 'Telecommunications' | 'Healthcare' | 'Transportation' | 'Nuclear' | 'Cross-Sector';
-  leader: string;           // Lead organization
+  leader: string; // Lead organization
   involvedPartners: string[]; // Array of partner abbreviations
   description?: string;
-  isComposite: boolean;     // True for cross-sector DTs
+  isComposite: boolean; // True for cross-sector DTs
   atomicProjectIds: ObjectId[]; // References to composed projects
   createdAt: Date;
   updatedAt: Date;
@@ -32,13 +33,13 @@ interface IProject {
 
 ```typescript
 interface IScenario {
-  projectId: ObjectId;      // Parent project reference
+  projectId: ObjectId; // Parent project reference
   title: string;
   description?: string;
   topology: {
-    yaml: string;           // YAML source
-    nodes: object[];        // React Flow nodes
-    edges: object[];        // React Flow edges
+    yaml: string; // YAML source
+    nodes: object[]; // React Flow nodes
+    edges: object[]; // React Flow edges
   };
   infrastructureId: ObjectId;
   executions: IExecution[];
@@ -71,14 +72,14 @@ interface IInfrastructure {
   type: 'kubernetes' | 'docker' | 'virtual';
   endpoint: string;
   credentials: {
-    iv: string;             // AES-256-GCM initialization vector
-    encrypted: string;      // Encrypted kubeconfig/token
-    authTag: string;        // Authentication tag
+    iv: string; // AES-256-GCM initialization vector
+    encrypted: string; // Encrypted kubeconfig/token
+    authTag: string; // Authentication tag
   };
   capacity: {
-    cpu?: number;           // vCPUs
-    memory?: number;        // GB
-    storage?: number;       // GB
+    cpu?: number; // vCPUs
+    memory?: number; // GB
+    storage?: number; // GB
   };
   status: 'active' | 'inactive' | 'error';
   lastHealthCheck?: Date;
@@ -132,12 +133,14 @@ interface IInfrastructure {
 ## API Endpoints
 
 ### Services (Extended)
+
 - `POST /api/services` - Create new service
 - `PUT /api/services/:id` - Update service
 - `DELETE /api/services/:id` - Soft delete service
 - `POST /api/services/:id/versions` - Add new version
 
 ### Projects
+
 - `GET /api/projects` - List all projects
 - `POST /api/projects` - Create project
 - `GET /api/projects/:id` - Get project with scenarios
@@ -145,6 +148,7 @@ interface IInfrastructure {
 - `DELETE /api/projects/:id` - Delete project
 
 ### Scenarios
+
 - `GET /api/projects/:projectId/scenarios` - List project scenarios
 - `POST /api/projects/:projectId/scenarios` - Create scenario
 - `GET /api/scenarios/:id` - Get scenario detail
@@ -155,6 +159,7 @@ interface IInfrastructure {
 - `GET /api/scenarios/:id/executions/:executionId/export/pdf` - Export PDF
 
 ### Infrastructures
+
 - `GET /api/infrastructures` - List infrastructures
 - `POST /api/infrastructures` - Create infrastructure (encrypts credentials)
 - `PUT /api/infrastructures/:id` - Update infrastructure
@@ -224,14 +229,15 @@ interface Tab {
   id: string;
   title: string;
   type: 'iframe' | 'component' | 'maestro';
-  url?: string;           // For iFrame tabs
-  component?: ReactNode;  // For component tabs
+  url?: string; // For iFrame tabs
+  component?: ReactNode; // For component tabs
 }
 ```
 
 ## Error Handling
 
 All endpoints follow consistent error format:
+
 ```json
 {
   "error": "Error message",
@@ -240,6 +246,7 @@ All endpoints follow consistent error format:
 ```
 
 HTTP Status Codes:
+
 - 400: Validation error
 - 401: Unauthorized
 - 404: Not found

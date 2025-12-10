@@ -35,17 +35,11 @@ export function AddProject() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold">Add Project</h1>
-          <p className="text-muted-foreground">
-            Create a new Digital Twin project
-          </p>
+          <p className="text-muted-foreground">Create a new Digital Twin project</p>
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-md bg-destructive/10 p-4 text-destructive">
-          {error}
-        </div>
-      )}
+      {error && <div className="rounded-md bg-destructive/10 p-4 text-destructive">{error}</div>}
 
       <div className="rounded-lg border bg-background p-6">
         <ProjectForm onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />

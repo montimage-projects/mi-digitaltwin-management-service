@@ -48,7 +48,8 @@ const sectorsData = [
     name: 'Digital infrastructure',
     slug: 'digital-infrastructure',
     category: 'essential' as const,
-    description: 'Internet exchange points, DNS providers, TLD registries, cloud computing, data centers, CDNs, trust service providers, and electronic communications networks',
+    description:
+      'Internet exchange points, DNS providers, TLD registries, cloud computing, data centers, CDNs, trust service providers, and electronic communications networks',
   },
   {
     name: 'ICT service management (B2B)',
@@ -91,13 +92,15 @@ const sectorsData = [
     name: 'Production, processing and distribution of food',
     slug: 'food',
     category: 'important' as const,
-    description: 'Food businesses engaged in wholesale distribution, industrial production, and processing',
+    description:
+      'Food businesses engaged in wholesale distribution, industrial production, and processing',
   },
   {
     name: 'Manufacturing',
     slug: 'manufacturing',
     category: 'important' as const,
-    description: 'Manufacturers of medical devices, computers, electronics, machinery, motor vehicles, and transport equipment',
+    description:
+      'Manufacturers of medical devices, computers, electronics, machinery, motor vehicles, and transport equipment',
   },
   {
     name: 'Digital providers',

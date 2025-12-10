@@ -10,20 +10,28 @@ const router = Router();
 
 // Validation schemas
 const createProjectSchema = z.object({
-  shortName: z.string().min(1).max(50).transform(val => val.toUpperCase()),
+  shortName: z
+    .string()
+    .min(1)
+    .max(50)
+    .transform((val) => val.toUpperCase()),
   title: z.string().min(1).max(200),
   sector: z.enum(['Telecommunications', 'Healthcare', 'Transportation', 'Nuclear', 'Cross-Sector']),
   leader: z.string().min(1).max(100),
   involvedPartners: z.array(z.string().max(50)).default([]),
   description: z.string().max(2000).optional(),
   isComposite: z.boolean().default(false),
-  atomicProjectIds: z.array(z.string().refine(val => objectIdSchema.safeParse(val).success)).default([]),
+  atomicProjectIds: z
+    .array(z.string().refine((val) => objectIdSchema.safeParse(val).success))
+    .default([]),
 });
 
 const updateProjectSchema = createProjectSchema.partial();
 
 const listProjectsSchema = z.object({
-  sector: z.enum(['Telecommunications', 'Healthcare', 'Transportation', 'Nuclear', 'Cross-Sector']).optional(),
+  sector: z
+    .enum(['Telecommunications', 'Healthcare', 'Transportation', 'Nuclear', 'Cross-Sector'])
+    .optional(),
   leader: z.string().optional(),
   search: z.string().optional(),
 });
@@ -57,15 +65,15 @@ router.get('/', authMiddleware, validateQuery(listProjectsSchema), async (req, r
       .lean();
 
     // Get scenario counts for each project
-    const projectIds = projects.map(p => p._id);
+    const projectIds = projects.map((p) => p._id);
     const scenarioCounts = await Scenario.aggregate([
       { $match: { projectId: { $in: projectIds } } },
-      { $group: { _id: '$projectId', count: { $sum: 1 } } }
+      { $group: { _id: '$projectId', count: { $sum: 1 } } },
     ]);
 
-    const countMap = new Map(scenarioCounts.map(sc => [sc._id.toString(), sc.count]));
+    const countMap = new Map(scenarioCounts.map((sc) => [sc._id.toString(), sc.count]));
 
-    const projectsWithCounts = projects.map(project => ({
+    const projectsWithCounts = projects.map((project) => ({
       ...project,
       scenarioCount: countMap.get(project._id.toString()) || 0,
     }));
@@ -178,7 +186,9 @@ router.put('/:id', authMiddleware, validateBody(updateProjectSchema), async (req
       id,
       { $set: data },
       { new: true, runValidators: true }
-    ).populate('atomicProjectIds', 'shortName title sector').lean();
+    )
+      .populate('atomicProjectIds', 'shortName title sector')
+      .lean();
 
     if (!project) {
       throw new AppError('Project not found', 404);

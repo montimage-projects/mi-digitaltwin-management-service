@@ -3,10 +3,13 @@
 ## System Overview
 
 ### Purpose
+
 The INTACT Digital Twin Management Platform is a web-based application that provides centralized management of cybersecurity services and orchestration of Digital Twin projects for the INTACT EU research consortium. The platform enables security professionals to catalog services, design security testing scenarios with visual topology editors, deploy scenarios to Kubernetes infrastructure via MAESTRO orchestration, and generate execution reports.
 
 ### Scope
+
 This document covers the technical architecture for:
+
 - **Frontend Application**: React-based SPA with visual topology editor and tabbed workspace
 - **Backend API**: RESTful API server handling business logic, authentication, and data persistence
 - **Database Layer**: MongoDB document store for flexible schema management
@@ -16,16 +19,16 @@ This document covers the technical architecture for:
 
 ### Alignment with PRD
 
-| PRD Requirement | Technical Solution |
-|-----------------|-------------------|
-| Service Repository with versioning | MongoDB collections with embedded version arrays |
-| Visual topology editor | React Flow library for canvas, Monaco Editor for YAML |
-| Split-screen editor | React layout with synchronized state management |
-| MAESTRO integration | iFrame embedding within tabbed workspace |
-| Credential encryption | AES-256-GCM server-side encryption |
-| PDF export | PDFKit server-side generation |
-| <3s page load | Vite bundling, code splitting, lazy loading |
-| 50 concurrent users | Stateless API design, connection pooling |
+| PRD Requirement                    | Technical Solution                                    |
+| ---------------------------------- | ----------------------------------------------------- |
+| Service Repository with versioning | MongoDB collections with embedded version arrays      |
+| Visual topology editor             | React Flow library for canvas, Monaco Editor for YAML |
+| Split-screen editor                | React layout with synchronized state management       |
+| MAESTRO integration                | iFrame embedding within tabbed workspace              |
+| Credential encryption              | AES-256-GCM server-side encryption                    |
+| PDF export                         | PDFKit server-side generation                         |
+| <3s page load                      | Vite bundling, code splitting, lazy loading           |
+| 50 concurrent users                | Stateless API design, connection pooling              |
 
 ---
 
@@ -226,56 +229,56 @@ graph TB
 
 ### Frontend Stack
 
-| Technology | Version | Purpose | Justification |
-|------------|---------|---------|---------------|
-| **Bun** | Latest | JavaScript runtime & package manager | Fast installation, native TypeScript support |
-| **Vite** | 5.x | Build tool | Fast HMR, optimized production builds |
-| **React** | 18.x | UI framework | Component-based architecture, large ecosystem |
-| **TypeScript** | 5.x | Type safety | Compile-time error detection, better DX |
-| **React Router** | 6.x | Client-side routing | Standard React routing solution |
-| **shadcn/ui** | Latest | UI component library | Accessible, customizable, Tailwind-based |
-| **Tailwind CSS** | 3.x | Styling | Utility-first, consistent design system |
-| **Lucide React** | Latest | Icons | Consistent icon set, tree-shakeable |
-| **React Flow** | 11.x | Visual canvas | Mature node-based editor, good documentation |
-| **Monaco Editor** | Latest | Code editor | VS Code's editor, excellent YAML support |
-| **Zustand** | 4.x | State management | Lightweight, simple API for tab state |
-| **React Query** | 5.x | Server state | Caching, background refetching, optimistic updates |
-| **React Hook Form** | 7.x | Form handling | Performance-optimized forms |
-| **Zod** | 3.x | Validation | TypeScript-first schema validation |
-| **js-yaml** | 4.x | YAML parsing | Parse/stringify topology definitions |
+| Technology          | Version | Purpose                              | Justification                                      |
+| ------------------- | ------- | ------------------------------------ | -------------------------------------------------- |
+| **Bun**             | Latest  | JavaScript runtime & package manager | Fast installation, native TypeScript support       |
+| **Vite**            | 5.x     | Build tool                           | Fast HMR, optimized production builds              |
+| **React**           | 18.x    | UI framework                         | Component-based architecture, large ecosystem      |
+| **TypeScript**      | 5.x     | Type safety                          | Compile-time error detection, better DX            |
+| **React Router**    | 6.x     | Client-side routing                  | Standard React routing solution                    |
+| **shadcn/ui**       | Latest  | UI component library                 | Accessible, customizable, Tailwind-based           |
+| **Tailwind CSS**    | 3.x     | Styling                              | Utility-first, consistent design system            |
+| **Lucide React**    | Latest  | Icons                                | Consistent icon set, tree-shakeable                |
+| **React Flow**      | 11.x    | Visual canvas                        | Mature node-based editor, good documentation       |
+| **Monaco Editor**   | Latest  | Code editor                          | VS Code's editor, excellent YAML support           |
+| **Zustand**         | 4.x     | State management                     | Lightweight, simple API for tab state              |
+| **React Query**     | 5.x     | Server state                         | Caching, background refetching, optimistic updates |
+| **React Hook Form** | 7.x     | Form handling                        | Performance-optimized forms                        |
+| **Zod**             | 3.x     | Validation                           | TypeScript-first schema validation                 |
+| **js-yaml**         | 4.x     | YAML parsing                         | Parse/stringify topology definitions               |
 
 ### Backend Stack
 
-| Technology | Version | Purpose | Justification |
-|------------|---------|---------|---------------|
-| **Bun** | Latest | JavaScript runtime | Fast execution, native TypeScript |
-| **Express.js** | 4.x | Web framework | Mature, extensive middleware ecosystem |
-| **Mongoose** | 8.x | MongoDB ODM | Schema validation, middleware, population |
-| **jsonwebtoken** | 9.x | JWT handling | Standard JWT implementation |
-| **bcrypt** | 5.x | Password hashing | Industry-standard password security |
-| **Zod** | 3.x | Request validation | Consistent validation frontend/backend |
-| **PDFKit** | 0.14.x | PDF generation | Server-side PDF creation |
-| **cors** | 2.x | CORS middleware | Cross-origin request handling |
-| **helmet** | 7.x | Security headers | HTTP security best practices |
-| **morgan** | 1.x | HTTP logging | Request logging for debugging |
-| **dotenv** | 16.x | Environment config | Configuration management |
+| Technology       | Version | Purpose            | Justification                             |
+| ---------------- | ------- | ------------------ | ----------------------------------------- |
+| **Bun**          | Latest  | JavaScript runtime | Fast execution, native TypeScript         |
+| **Express.js**   | 4.x     | Web framework      | Mature, extensive middleware ecosystem    |
+| **Mongoose**     | 8.x     | MongoDB ODM        | Schema validation, middleware, population |
+| **jsonwebtoken** | 9.x     | JWT handling       | Standard JWT implementation               |
+| **bcrypt**       | 5.x     | Password hashing   | Industry-standard password security       |
+| **Zod**          | 3.x     | Request validation | Consistent validation frontend/backend    |
+| **PDFKit**       | 0.14.x  | PDF generation     | Server-side PDF creation                  |
+| **cors**         | 2.x     | CORS middleware    | Cross-origin request handling             |
+| **helmet**       | 7.x     | Security headers   | HTTP security best practices              |
+| **morgan**       | 1.x     | HTTP logging       | Request logging for debugging             |
+| **dotenv**       | 16.x    | Environment config | Configuration management                  |
 
 ### Database
 
-| Technology | Version | Purpose | Justification |
-|------------|---------|---------|---------------|
-| **MongoDB** | 7.x | Document database | Flexible schema for varied service metadata |
-| **MongoDB Atlas** | N/A | Hosted MongoDB (optional) | Managed service, free tier available |
+| Technology        | Version | Purpose                   | Justification                               |
+| ----------------- | ------- | ------------------------- | ------------------------------------------- |
+| **MongoDB**       | 7.x     | Document database         | Flexible schema for varied service metadata |
+| **MongoDB Atlas** | N/A     | Hosted MongoDB (optional) | Managed service, free tier available        |
 
 ### Development Tools
 
-| Tool | Purpose |
-|------|---------|
-| **VS Code** | Primary IDE with extensions |
-| **Git** | Version control |
-| **GitHub** | Repository hosting |
-| **Postman/Insomnia** | API testing |
-| **MongoDB Compass** | Database GUI |
+| Tool                 | Purpose                     |
+| -------------------- | --------------------------- |
+| **VS Code**          | Primary IDE with extensions |
+| **Git**              | Version control             |
+| **GitHub**           | Repository hosting          |
+| **Postman/Insomnia** | API testing                 |
+| **MongoDB Compass**  | Database GUI                |
 
 ### Dependency Graph
 
@@ -320,19 +323,19 @@ graph LR
 
 ### Component Overview
 
-| Component | Description | Responsibilities | Dependencies |
-|-----------|-------------|------------------|--------------|
-| **React SPA** | Single-page application | UI rendering, user interaction, state management | Vite, React, shadcn/ui |
-| **Topology Editor** | Split-screen scenario designer | YAML editing, visual canvas, bidirectional sync | Monaco, React Flow, js-yaml |
-| **Tab Workspace** | Multi-tab container | Tab management, iFrame embedding | Zustand, React |
-| **Express API** | REST API server | Request handling, business logic, response formatting | Bun, Express, Mongoose |
-| **Auth Service** | Authentication logic | Login, JWT generation/validation | jsonwebtoken, bcrypt |
-| **Service Repository** | Service management | CRUD operations, version tracking | Mongoose |
-| **Project Service** | Project management | CRUD, composite project handling | Mongoose |
-| **Scenario Service** | Scenario management | CRUD, execution tracking, conclusions | Mongoose |
-| **Infrastructure Service** | Infrastructure management | CRUD, credential encryption, connectivity testing | Mongoose, crypto |
-| **PDF Generator** | Report generation | Create PDF from scenario execution data | PDFKit |
-| **MongoDB** | Data persistence | Document storage, indexing, querying | MongoDB driver |
+| Component                  | Description                    | Responsibilities                                      | Dependencies                |
+| -------------------------- | ------------------------------ | ----------------------------------------------------- | --------------------------- |
+| **React SPA**              | Single-page application        | UI rendering, user interaction, state management      | Vite, React, shadcn/ui      |
+| **Topology Editor**        | Split-screen scenario designer | YAML editing, visual canvas, bidirectional sync       | Monaco, React Flow, js-yaml |
+| **Tab Workspace**          | Multi-tab container            | Tab management, iFrame embedding                      | Zustand, React              |
+| **Express API**            | REST API server                | Request handling, business logic, response formatting | Bun, Express, Mongoose      |
+| **Auth Service**           | Authentication logic           | Login, JWT generation/validation                      | jsonwebtoken, bcrypt        |
+| **Service Repository**     | Service management             | CRUD operations, version tracking                     | Mongoose                    |
+| **Project Service**        | Project management             | CRUD, composite project handling                      | Mongoose                    |
+| **Scenario Service**       | Scenario management            | CRUD, execution tracking, conclusions                 | Mongoose                    |
+| **Infrastructure Service** | Infrastructure management      | CRUD, credential encryption, connectivity testing     | Mongoose, crypto            |
+| **PDF Generator**          | Report generation              | Create PDF from scenario execution data               | PDFKit                      |
+| **MongoDB**                | Data persistence               | Document storage, indexing, querying                  | MongoDB driver              |
 
 ### Frontend Component Details
 
@@ -617,259 +620,299 @@ erDiagram
 
 ```javascript
 // models/User.js
-const userSchema = new Schema({
-  username: {
-    type: String,
-    required: true,
-    unique: true,
-    minlength: 3,
-    maxlength: 50
+const userSchema = new Schema(
+  {
+    username: {
+      type: String,
+      required: true,
+      unique: true,
+      minlength: 3,
+      maxlength: 50,
+    },
+    passwordHash: {
+      type: String,
+      required: true,
+    },
+    role: {
+      type: String,
+      enum: ['admin'],
+      default: 'admin',
+    },
+    lastLogin: Date,
   },
-  passwordHash: {
-    type: String,
-    required: true
-  },
-  role: {
-    type: String,
-    enum: ['admin'],
-    default: 'admin'
-  },
-  lastLogin: Date
-}, { timestamps: true });
+  { timestamps: true }
+);
 
 // models/Category.js
-const categorySchema = new Schema({
-  name: {
-    type: String,
-    required: true,
-    unique: true,
-    maxlength: 100
+const categorySchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      unique: true,
+      maxlength: 100,
+    },
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+    },
+    description: {
+      type: String,
+      maxlength: 500,
+    },
   },
-  slug: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true
-  },
-  description: {
-    type: String,
-    maxlength: 500
-  }
-}, { timestamps: true });
+  { timestamps: true }
+);
 
 // models/Service.js
-const versionSchema = new Schema({
-  version: { type: String, required: true },
-  dockerImage: { type: String, required: true },
-  releaseNotes: String,
-  releasedAt: { type: Date, default: Date.now },
-  releasedBy: String
-}, { _id: true });
+const versionSchema = new Schema(
+  {
+    version: { type: String, required: true },
+    dockerImage: { type: String, required: true },
+    releaseNotes: String,
+    releasedAt: { type: Date, default: Date.now },
+    releasedBy: String,
+  },
+  { _id: true }
+);
 
-const ioSchema = new Schema({
-  name: { type: String, required: true },
-  description: String,
-  format: String
-}, { _id: false });
+const ioSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    description: String,
+    format: String,
+  },
+  { _id: false }
+);
 
-const serviceSchema = new Schema({
-  shortName: {
-    type: String,
-    required: true,
-    unique: true,
-    uppercase: true,
-    maxlength: 50
+const serviceSchema = new Schema(
+  {
+    shortName: {
+      type: String,
+      required: true,
+      unique: true,
+      uppercase: true,
+      maxlength: 50,
+    },
+    title: {
+      type: String,
+      required: true,
+      maxlength: 200,
+    },
+    categoryId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Category',
+      required: true,
+    },
+    provider: {
+      type: String,
+      required: true,
+      maxlength: 100,
+    },
+    description: {
+      type: String,
+      maxlength: 2000,
+    },
+    currentVersion: String,
+    versions: [versionSchema],
+    type: {
+      type: String,
+      enum: ['Software', 'Hardware', 'Software/Hardware'],
+      default: 'Software',
+    },
+    trl: {
+      current: { type: Number, min: 1, max: 9 },
+      expected: { type: Number, min: 1, max: 9 },
+    },
+    license: String,
+    standards: [String],
+    inputs: [ioSchema],
+    outputs: [ioSchema],
+    interactsWith: [String],
+    potentialUseCases: [String],
+    repositoryTable: {
+      type: String,
+      enum: ['INTACT_TOOLBOX', 'OTHER_SERVICES'],
+      default: 'INTACT_TOOLBOX',
+    },
+    createdBy: String,
   },
-  title: {
-    type: String,
-    required: true,
-    maxlength: 200
-  },
-  categoryId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Category',
-    required: true
-  },
-  provider: {
-    type: String,
-    required: true,
-    maxlength: 100
-  },
-  description: {
-    type: String,
-    maxlength: 2000
-  },
-  currentVersion: String,
-  versions: [versionSchema],
-  type: {
-    type: String,
-    enum: ['Software', 'Hardware', 'Software/Hardware'],
-    default: 'Software'
-  },
-  trl: {
-    current: { type: Number, min: 1, max: 9 },
-    expected: { type: Number, min: 1, max: 9 }
-  },
-  license: String,
-  standards: [String],
-  inputs: [ioSchema],
-  outputs: [ioSchema],
-  interactsWith: [String],
-  potentialUseCases: [String],
-  repositoryTable: {
-    type: String,
-    enum: ['INTACT_TOOLBOX', 'OTHER_SERVICES'],
-    default: 'INTACT_TOOLBOX'
-  },
-  createdBy: String
-}, { timestamps: true });
+  { timestamps: true }
+);
 
 // models/Project.js
-const projectSchema = new Schema({
-  shortName: {
-    type: String,
-    required: true,
-    unique: true,
-    maxlength: 50
+const projectSchema = new Schema(
+  {
+    shortName: {
+      type: String,
+      required: true,
+      unique: true,
+      maxlength: 50,
+    },
+    title: {
+      type: String,
+      required: true,
+      maxlength: 200,
+    },
+    sector: {
+      type: String,
+      enum: ['Telecommunications', 'Healthcare', 'Transportation', 'Nuclear', 'Cross-Sector'],
+      required: true,
+    },
+    leader: {
+      type: String,
+      required: true,
+      maxlength: 100,
+    },
+    involvedPartners: [String],
+    description: {
+      type: String,
+      maxlength: 2000,
+    },
+    isComposite: {
+      type: Boolean,
+      default: false,
+    },
+    atomicProjectIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Project',
+      },
+    ],
+    createdBy: String,
   },
-  title: {
-    type: String,
-    required: true,
-    maxlength: 200
-  },
-  sector: {
-    type: String,
-    enum: ['Telecommunications', 'Healthcare', 'Transportation', 'Nuclear', 'Cross-Sector'],
-    required: true
-  },
-  leader: {
-    type: String,
-    required: true,
-    maxlength: 100
-  },
-  involvedPartners: [String],
-  description: {
-    type: String,
-    maxlength: 2000
-  },
-  isComposite: {
-    type: Boolean,
-    default: false
-  },
-  atomicProjectIds: [{
-    type: Schema.Types.ObjectId,
-    ref: 'Project'
-  }],
-  createdBy: String
-}, { timestamps: true });
+  { timestamps: true }
+);
 
 // models/Scenario.js
-const topologyServiceSchema = new Schema({
-  id: { type: String, required: true },
-  serviceId: { type: Schema.Types.ObjectId, ref: 'Service' },
-  serviceName: String,
-  version: String,
-  config: Schema.Types.Mixed,
-  position: {
-    x: Number,
-    y: Number
-  }
-}, { _id: false });
-
-const topologyConnectionSchema = new Schema({
-  id: { type: String, required: true },
-  from: { type: String, required: true },
-  to: { type: String, required: true },
-  label: String,
-  via: String,
-  topic: String
-}, { _id: false });
-
-const conclusionSchema = new Schema({
-  content: { type: String, required: true },
-  author: { type: String, required: true },
-  date: { type: Date, default: Date.now }
-}, { _id: false });
-
-const executionSchema = new Schema({
-  executedAt: { type: Date, default: Date.now },
-  executedBy: String,
-  status: {
-    type: String,
-    enum: ['pending', 'deploying', 'running', 'completed', 'failed'],
-    default: 'pending'
-  },
-  deployedServices: [{
-    serviceId: String,
+const topologyServiceSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    serviceId: { type: Schema.Types.ObjectId, ref: 'Service' },
     serviceName: String,
-    dashboardUrl: String,
-    dashboardType: { type: String, enum: ['web', 'cli'] }
-  }],
-  conclusion: conclusionSchema,
-  errorMessage: String
-}, { _id: true, timestamps: true });
+    version: String,
+    config: Schema.Types.Mixed,
+    position: {
+      x: Number,
+      y: Number,
+    },
+  },
+  { _id: false }
+);
 
-const scenarioSchema = new Schema({
-  projectId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Project',
-    required: true
+const topologyConnectionSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    from: { type: String, required: true },
+    to: { type: String, required: true },
+    label: String,
+    via: String,
+    topic: String,
   },
-  title: {
-    type: String,
-    required: true,
-    maxlength: 200
+  { _id: false }
+);
+
+const conclusionSchema = new Schema(
+  {
+    content: { type: String, required: true },
+    author: { type: String, required: true },
+    date: { type: Date, default: Date.now },
   },
-  description: {
-    type: String,
-    maxlength: 2000
+  { _id: false }
+);
+
+const executionSchema = new Schema(
+  {
+    executedAt: { type: Date, default: Date.now },
+    executedBy: String,
+    status: {
+      type: String,
+      enum: ['pending', 'deploying', 'running', 'completed', 'failed'],
+      default: 'pending',
+    },
+    deployedServices: [
+      {
+        serviceId: String,
+        serviceName: String,
+        dashboardUrl: String,
+        dashboardType: { type: String, enum: ['web', 'cli'] },
+      },
+    ],
+    conclusion: conclusionSchema,
+    errorMessage: String,
   },
-  topology: {
-    format: { type: String, enum: ['yaml', 'json'], default: 'yaml' },
-    content: String,
-    services: [topologyServiceSchema],
-    connections: [topologyConnectionSchema]
+  { _id: true, timestamps: true }
+);
+
+const scenarioSchema = new Schema(
+  {
+    projectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project',
+      required: true,
+    },
+    title: {
+      type: String,
+      required: true,
+      maxlength: 200,
+    },
+    description: {
+      type: String,
+      maxlength: 2000,
+    },
+    topology: {
+      format: { type: String, enum: ['yaml', 'json'], default: 'yaml' },
+      content: String,
+      services: [topologyServiceSchema],
+      connections: [topologyConnectionSchema],
+    },
+    infrastructureId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Infrastructure',
+    },
+    executions: [executionSchema],
   },
-  infrastructureId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Infrastructure'
-  },
-  executions: [executionSchema]
-}, { timestamps: true });
+  { timestamps: true }
+);
 
 // models/Infrastructure.js
-const infrastructureSchema = new Schema({
-  name: {
-    type: String,
-    required: true,
-    maxlength: 100
+const infrastructureSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      maxlength: 100,
+    },
+    type: {
+      type: String,
+      enum: ['kubernetes'],
+      default: 'kubernetes',
+    },
+    endpoint: {
+      type: String,
+      required: true,
+    },
+    credentials: {
+      encryptedData: String,
+      iv: String,
+      authTag: String,
+    },
+    capacity: {
+      cpuCores: Number,
+      memoryGB: Number,
+      storageGB: Number,
+    },
+    status: {
+      type: String,
+      enum: ['available', 'busy', 'offline', 'unverified'],
+      default: 'unverified',
+    },
+    lastHealthCheck: Date,
   },
-  type: {
-    type: String,
-    enum: ['kubernetes'],
-    default: 'kubernetes'
-  },
-  endpoint: {
-    type: String,
-    required: true
-  },
-  credentials: {
-    encryptedData: String,
-    iv: String,
-    authTag: String
-  },
-  capacity: {
-    cpuCores: Number,
-    memoryGB: Number,
-    storageGB: Number
-  },
-  status: {
-    type: String,
-    enum: ['available', 'busy', 'offline', 'unverified'],
-    default: 'unverified'
-  },
-  lastHealthCheck: Date
-}, { timestamps: true });
+  { timestamps: true }
+);
 ```
 
 ### Database Indexes
@@ -985,27 +1028,27 @@ sequenceDiagram
 
 ### Storage Requirements
 
-| Collection | Estimated Documents | Avg Document Size | Total Size (Year 1) |
-|------------|--------------------:|------------------:|--------------------:|
-| users | 50 | 0.5 KB | 25 KB |
-| categories | 15 | 0.3 KB | 5 KB |
-| services | 100 | 5 KB | 500 KB |
-| projects | 20 | 2 KB | 40 KB |
-| scenarios | 200 | 20 KB | 4 MB |
-| infrastructures | 10 | 1 KB | 10 KB |
-| **Total** | **~400** | - | **~5 MB** |
+| Collection      | Estimated Documents | Avg Document Size | Total Size (Year 1) |
+| --------------- | ------------------: | ----------------: | ------------------: |
+| users           |                  50 |            0.5 KB |               25 KB |
+| categories      |                  15 |            0.3 KB |                5 KB |
+| services        |                 100 |              5 KB |              500 KB |
+| projects        |                  20 |              2 KB |               40 KB |
+| scenarios       |                 200 |             20 KB |                4 MB |
+| infrastructures |                  10 |              1 KB |               10 KB |
+| **Total**       |            **~400** |                 - |           **~5 MB** |
 
 **Note:** Storage requirements are minimal. MongoDB Atlas free tier (512 MB) is sufficient for MVP and beyond.
 
 ### Backup Strategy
 
-| Aspect | Strategy |
-|--------|----------|
-| **Frequency** | Daily automated backups |
-| **Retention** | 7 days rolling |
-| **Method** | MongoDB Atlas automated backup (if hosted) or mongodump script |
-| **Recovery** | Point-in-time recovery within retention window |
-| **Testing** | Monthly restore verification |
+| Aspect        | Strategy                                                       |
+| ------------- | -------------------------------------------------------------- |
+| **Frequency** | Daily automated backups                                        |
+| **Retention** | 7 days rolling                                                 |
+| **Method**    | MongoDB Atlas automated backup (if hosted) or mongodump script |
+| **Recovery**  | Point-in-time recovery within retention window                 |
+| **Testing**   | Monthly restore verification                                   |
 
 ---
 
@@ -1057,7 +1100,7 @@ services:
     image: mongo:7
     container_name: intact-mongodb
     ports:
-      - "27017:27017"
+      - '27017:27017'
     volumes:
       - mongodb_data:/data/db
     environment:
@@ -1071,7 +1114,7 @@ services:
       dockerfile: Dockerfile
     container_name: intact-backend
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       - NODE_ENV=development
       - MONGODB_URI=mongodb://mongodb:27017/intact
@@ -1091,7 +1134,7 @@ services:
       dockerfile: Dockerfile
     container_name: intact-frontend
     ports:
-      - "5173:5173"
+      - '5173:5173'
     environment:
       - VITE_API_URL=http://localhost:3000
     depends_on:
@@ -1321,17 +1364,17 @@ sequenceDiagram
 
 ### Security Implementation Details
 
-| Security Aspect | Implementation |
-|-----------------|----------------|
-| **Password Storage** | bcrypt with cost factor 12 |
-| **Session Tokens** | JWT with 24-hour expiration |
-| **Token Storage** | httpOnly cookie or Authorization header |
-| **API Protection** | All routes (except /auth/login) require valid JWT |
-| **Request Validation** | Zod schemas validate all input |
-| **SQL/NoSQL Injection** | Mongoose parameterized queries |
-| **XSS Prevention** | React automatic escaping, CSP headers |
-| **CSRF Protection** | SameSite cookies, CORS restrictions |
-| **Rate Limiting** | express-rate-limit (100 req/15min per IP) |
+| Security Aspect         | Implementation                                    |
+| ----------------------- | ------------------------------------------------- |
+| **Password Storage**    | bcrypt with cost factor 12                        |
+| **Session Tokens**      | JWT with 24-hour expiration                       |
+| **Token Storage**       | httpOnly cookie or Authorization header           |
+| **API Protection**      | All routes (except /auth/login) require valid JWT |
+| **Request Validation**  | Zod schemas validate all input                    |
+| **SQL/NoSQL Injection** | Mongoose parameterized queries                    |
+| **XSS Prevention**      | React automatic escaping, CSP headers             |
+| **CSRF Protection**     | SameSite cookies, CORS restrictions               |
+| **Rate Limiting**       | express-rate-limit (100 req/15min per IP)         |
 
 ### Credential Encryption Service
 
@@ -1354,22 +1397,18 @@ export const CryptoService = {
     return {
       encryptedData: encrypted,
       iv: iv.toString('hex'),
-      authTag: authTag.toString('hex')
+      authTag: authTag.toString('hex'),
     };
   },
 
   decrypt(encryptedObj) {
-    const decipher = crypto.createDecipheriv(
-      ALGORITHM,
-      KEY,
-      Buffer.from(encryptedObj.iv, 'hex')
-    );
+    const decipher = crypto.createDecipheriv(ALGORITHM, KEY, Buffer.from(encryptedObj.iv, 'hex'));
     decipher.setAuthTag(Buffer.from(encryptedObj.authTag, 'hex'));
 
     let decrypted = decipher.update(encryptedObj.encryptedData, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
-  }
+  },
 };
 ```
 
@@ -1385,14 +1424,14 @@ export const securityMiddleware = helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"], // Monaco Editor needs inline
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", 'data:', 'https:'],
       connectSrc: ["'self'", process.env.MAESTRO_BASE_URL],
-      frameSrc: ["'self'", process.env.MAESTRO_BASE_URL, "*"], // iFrame sources
-      frameAncestors: ["'self'"]
-    }
+      frameSrc: ["'self'", process.env.MAESTRO_BASE_URL, '*'], // iFrame sources
+      frameAncestors: ["'self'"],
+    },
   },
   crossOriginEmbedderPolicy: false, // Required for iFrames
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 });
 ```
 
@@ -1416,14 +1455,14 @@ export const securityMiddleware = helmet({
 
 ### Performance Targets
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| **Initial Page Load** | <3 seconds | Lighthouse performance score |
-| **Time to Interactive** | <5 seconds | Lighthouse TTI |
-| **API Response Time** | <500ms (p95) | Server-side logging |
-| **Topology Editor FPS** | 60 FPS | React DevTools |
-| **Concurrent Users** | 50 | Load testing |
-| **Database Queries** | <100ms (p95) | MongoDB profiler |
+| Metric                  | Target       | Measurement                  |
+| ----------------------- | ------------ | ---------------------------- |
+| **Initial Page Load**   | <3 seconds   | Lighthouse performance score |
+| **Time to Interactive** | <5 seconds   | Lighthouse TTI               |
+| **API Response Time**   | <500ms (p95) | Server-side logging          |
+| **Topology Editor FPS** | 60 FPS       | React DevTools               |
+| **Concurrent Users**    | 50           | Load testing                 |
+| **Database Queries**    | <100ms (p95) | MongoDB profiler             |
 
 ### Frontend Optimization Strategies
 
@@ -1486,7 +1525,7 @@ const Analytics = lazy(() => import('./pages/Analytics'));
 
 // Heavy components lazy loaded within pages
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
-const ReactFlow = lazy(() => import('@xyflow/react').then(m => ({ default: m.ReactFlow })));
+const ReactFlow = lazy(() => import('@xyflow/react').then((m) => ({ default: m.ReactFlow })));
 
 function App() {
   return (
@@ -1506,14 +1545,14 @@ function App() {
 
 ### Backend Optimization Strategies
 
-| Strategy | Implementation |
-|----------|----------------|
-| **Connection Pooling** | Mongoose default pool size (5), increase if needed |
+| Strategy               | Implementation                                      |
+| ---------------------- | --------------------------------------------------- |
+| **Connection Pooling** | Mongoose default pool size (5), increase if needed  |
 | **Query Optimization** | Proper indexes, projection to limit returned fields |
-| **Pagination** | Limit/skip or cursor-based for large collections |
-| **Caching** | In-memory cache for categories (rarely changes) |
-| **Compression** | gzip compression via express compression middleware |
-| **Async Operations** | Non-blocking I/O throughout |
+| **Pagination**         | Limit/skip or cursor-based for large collections    |
+| **Caching**            | In-memory cache for categories (rarely changes)     |
+| **Compression**        | gzip compression via express compression middleware |
+| **Async Operations**   | Non-blocking I/O throughout                         |
 
 ### Database Query Optimization
 
@@ -1547,15 +1586,15 @@ const getExecutionStats = async (startDate, endDate) => {
     { $unwind: '$executions' },
     {
       $match: {
-        'executions.executedAt': { $gte: startDate, $lte: endDate }
-      }
+        'executions.executedAt': { $gte: startDate, $lte: endDate },
+      },
     },
     {
       $group: {
         _id: '$executions.status',
-        count: { $sum: 1 }
-      }
-    }
+        count: { $sum: 1 },
+      },
+    },
   ]);
 };
 ```
@@ -1595,11 +1634,11 @@ graph TB
     style P3A fill:#ff7043
 ```
 
-| Phase | Users | Infrastructure | Monthly Cost Est. |
-|-------|-------|----------------|-------------------|
-| MVP | 50 | Single VPS + MongoDB Atlas Free | $0-20 |
-| Growth | 100-500 | 2x VPS + MongoDB Atlas M10 | $100-200 |
-| Scale | 500-2000 | K8s + CDN + Redis + MongoDB M30 | $500-1000 |
+| Phase  | Users    | Infrastructure                  | Monthly Cost Est. |
+| ------ | -------- | ------------------------------- | ----------------- |
+| MVP    | 50       | Single VPS + MongoDB Atlas Free | $0-20             |
+| Growth | 100-500  | 2x VPS + MongoDB Atlas M10      | $100-200          |
+| Scale  | 500-2000 | K8s + CDN + Redis + MongoDB M30 | $500-1000         |
 
 ---
 
@@ -1776,12 +1815,12 @@ graph LR
 
 ### Testing Strategy
 
-| Test Type | Tools | Coverage Target | Focus Areas |
-|-----------|-------|-----------------|-------------|
-| **Unit Tests** | Vitest, Testing Library | 70% | Services, utilities, validators |
-| **Integration Tests** | Supertest | 60% | API endpoints, database operations |
-| **Component Tests** | Testing Library | 50% | React components |
-| **E2E Tests** | Playwright (future) | Critical paths | Login, service CRUD, scenario execution |
+| Test Type             | Tools                   | Coverage Target | Focus Areas                             |
+| --------------------- | ----------------------- | --------------- | --------------------------------------- |
+| **Unit Tests**        | Vitest, Testing Library | 70%             | Services, utilities, validators         |
+| **Integration Tests** | Supertest               | 60%             | API endpoints, database operations      |
+| **Component Tests**   | Testing Library         | 50%             | React components                        |
+| **E2E Tests**         | Playwright (future)     | Critical paths  | Login, service CRUD, scenario execution |
 
 ### Test File Structure
 
@@ -1853,15 +1892,15 @@ gantt
 
 ### Milestone Summary
 
-| Milestone | Target Date | Deliverables |
-|-----------|-------------|--------------|
-| **M1: Foundation** | Week 1 | Project setup, auth, database |
-| **M2: Service Repository** | Week 2 | Complete service CRUD with versioning |
-| **M3: Projects & Scenarios** | Week 3 | Project and scenario management |
-| **M4: Topology Editor** | Week 4 | Split-screen code + visual editor |
-| **M5: Integration** | Week 5 | MAESTRO integration, tabbed workspace |
-| **M6: Infrastructure** | Week 5.5 | Infrastructure management, encryption |
-| **M7: MVP Complete** | Week 6 | Analytics, PDF export, polish |
+| Milestone                    | Target Date | Deliverables                          |
+| ---------------------------- | ----------- | ------------------------------------- |
+| **M1: Foundation**           | Week 1      | Project setup, auth, database         |
+| **M2: Service Repository**   | Week 2      | Complete service CRUD with versioning |
+| **M3: Projects & Scenarios** | Week 3      | Project and scenario management       |
+| **M4: Topology Editor**      | Week 4      | Split-screen code + visual editor     |
+| **M5: Integration**          | Week 5      | MAESTRO integration, tabbed workspace |
+| **M6: Infrastructure**       | Week 5.5    | Infrastructure management, encryption |
+| **M7: MVP Complete**         | Week 6      | Analytics, PDF export, polish         |
 
 ---
 
@@ -1869,25 +1908,25 @@ gantt
 
 ### Technical Risks
 
-| Risk | Probability | Impact | Mitigation Strategy |
-|------|-------------|--------|---------------------|
-| **iFrame Blocking** | Medium | High | Verify MAESTRO/service CSP headers; implement fallback to new window |
-| **Monaco Editor Performance** | Low | Medium | Lazy load editor; implement debounced sync; limit file size |
-| **React Flow Complex Topologies** | Medium | Medium | Implement virtualization for 50+ nodes; optimize re-renders |
-| **MongoDB Atlas Connection Issues** | Low | High | Implement connection retry logic; local fallback for development |
-| **JWT Token Theft** | Low | High | httpOnly cookies; short expiration; token refresh mechanism |
-| **YAML Parsing Errors** | Medium | Low | Robust error handling; clear error messages; syntax validation |
-| **Service Version Conflicts** | Low | Medium | Clear version selection UI; validation before deployment |
+| Risk                                | Probability | Impact | Mitigation Strategy                                                  |
+| ----------------------------------- | ----------- | ------ | -------------------------------------------------------------------- |
+| **iFrame Blocking**                 | Medium      | High   | Verify MAESTRO/service CSP headers; implement fallback to new window |
+| **Monaco Editor Performance**       | Low         | Medium | Lazy load editor; implement debounced sync; limit file size          |
+| **React Flow Complex Topologies**   | Medium      | Medium | Implement virtualization for 50+ nodes; optimize re-renders          |
+| **MongoDB Atlas Connection Issues** | Low         | High   | Implement connection retry logic; local fallback for development     |
+| **JWT Token Theft**                 | Low         | High   | httpOnly cookies; short expiration; token refresh mechanism          |
+| **YAML Parsing Errors**             | Medium      | Low    | Robust error handling; clear error messages; syntax validation       |
+| **Service Version Conflicts**       | Low         | Medium | Clear version selection UI; validation before deployment             |
 
 ### Operational Risks
 
-| Risk | Probability | Impact | Mitigation Strategy |
-|------|-------------|--------|---------------------|
-| **Single Developer Dependency** | High | High | Comprehensive documentation; clean code practices |
-| **Scope Creep** | Medium | Medium | Strict adherence to MVP features; parking lot for future ideas |
-| **Integration with MAESTRO** | Medium | High | Early integration testing; clear API contract documentation |
-| **Data Loss** | Low | Critical | Regular backups; MongoDB transactions for critical operations |
-| **Performance Degradation** | Low | Medium | Performance monitoring; query optimization; caching strategy |
+| Risk                            | Probability | Impact   | Mitigation Strategy                                            |
+| ------------------------------- | ----------- | -------- | -------------------------------------------------------------- |
+| **Single Developer Dependency** | High        | High     | Comprehensive documentation; clean code practices              |
+| **Scope Creep**                 | Medium      | Medium   | Strict adherence to MVP features; parking lot for future ideas |
+| **Integration with MAESTRO**    | Medium      | High     | Early integration testing; clear API contract documentation    |
+| **Data Loss**                   | Low         | Critical | Regular backups; MongoDB transactions for critical operations  |
+| **Performance Degradation**     | Low         | Medium   | Performance monitoring; query optimization; caching strategy   |
 
 ### Risk Response Matrix
 
@@ -1915,13 +1954,13 @@ quadrantChart
 
 ### Contingency Plans
 
-| Risk Scenario | Contingency |
-|---------------|-------------|
-| MAESTRO iFrame blocked | Implement popup window fallback with message passing |
-| Service dashboard CSP issues | Document workaround; contact service owners |
-| Performance bottleneck | Add Redis caching layer; optimize queries |
-| Developer unavailable | Ensure all documentation current; code reviews |
-| Feature creep delaying MVP | Defer non-critical features to v1.1 |
+| Risk Scenario                | Contingency                                          |
+| ---------------------------- | ---------------------------------------------------- |
+| MAESTRO iFrame blocked       | Implement popup window fallback with message passing |
+| Service dashboard CSP issues | Document workaround; contact service owners          |
+| Performance bottleneck       | Add Redis caching layer; optimize queries            |
+| Developer unavailable        | Ensure all documentation current; code reviews       |
+| Feature creep delaying MVP   | Defer non-critical features to v1.1                  |
 
 ---
 
@@ -1991,16 +2030,52 @@ Analytics:
 ```javascript
 // backend/src/seed/categories.seed.js
 export const categoriesSeed = [
-  { name: "Predictive Threat Intelligence", slug: "predictive-threat-intelligence", description: "Tools for predicting and analyzing cyber threats" },
-  { name: "AI Attack-Defence Emulation", slug: "ai-attack-defence-emulation", description: "AI-powered attack simulation and defense testing" },
-  { name: "Automated Threat Inspection", slug: "automated-threat-inspection", description: "Automated tools for inspecting and detecting threats" },
-  { name: "Zero-Trust Distributed Computing", slug: "zero-trust-distributed-computing", description: "Zero-trust architecture and distributed security" },
-  { name: "Twinning Agents", slug: "twinning-agents", description: "Agents for digital twin synchronization" },
-  { name: "Dashboard & Explainable AI", slug: "dashboard-xai", description: "Visualization dashboards and explainable AI tools" },
-  { name: "Open Security Service Repository", slug: "ossr", description: "Security service catalog and management" },
-  { name: "Training", slug: "training", description: "Security training and simulation tools" },
-  { name: "Orchestration", slug: "orchestration", description: "Service orchestration and deployment" },
-  { name: "Message Broker", slug: "message-broker", description: "Message queuing and event streaming" }
+  {
+    name: 'Predictive Threat Intelligence',
+    slug: 'predictive-threat-intelligence',
+    description: 'Tools for predicting and analyzing cyber threats',
+  },
+  {
+    name: 'AI Attack-Defence Emulation',
+    slug: 'ai-attack-defence-emulation',
+    description: 'AI-powered attack simulation and defense testing',
+  },
+  {
+    name: 'Automated Threat Inspection',
+    slug: 'automated-threat-inspection',
+    description: 'Automated tools for inspecting and detecting threats',
+  },
+  {
+    name: 'Zero-Trust Distributed Computing',
+    slug: 'zero-trust-distributed-computing',
+    description: 'Zero-trust architecture and distributed security',
+  },
+  {
+    name: 'Twinning Agents',
+    slug: 'twinning-agents',
+    description: 'Agents for digital twin synchronization',
+  },
+  {
+    name: 'Dashboard & Explainable AI',
+    slug: 'dashboard-xai',
+    description: 'Visualization dashboards and explainable AI tools',
+  },
+  {
+    name: 'Open Security Service Repository',
+    slug: 'ossr',
+    description: 'Security service catalog and management',
+  },
+  { name: 'Training', slug: 'training', description: 'Security training and simulation tools' },
+  {
+    name: 'Orchestration',
+    slug: 'orchestration',
+    description: 'Service orchestration and deployment',
+  },
+  {
+    name: 'Message Broker',
+    slug: 'message-broker',
+    description: 'Message queuing and event streaming',
+  },
 ];
 ```
 
@@ -2010,30 +2085,30 @@ export const categoriesSeed = [
 // backend/src/seed/services.seed.js
 export const servicesSeed = [
   {
-    shortName: "ULANCS-GAME",
-    title: "Joint Security-vs-QoS Modelling/Game Optimisation",
-    category: "predictive-threat-intelligence",
-    provider: "ULANCS",
-    description: "Intelligent selection of countermeasures balancing security and QoS",
-    type: "Software",
+    shortName: 'ULANCS-GAME',
+    title: 'Joint Security-vs-QoS Modelling/Game Optimisation',
+    category: 'predictive-threat-intelligence',
+    provider: 'ULANCS',
+    description: 'Intelligent selection of countermeasures balancing security and QoS',
+    type: 'Software',
     trl: { current: 4, expected: 7 },
-    license: "Proprietary",
-    standards: ["STIX", "MITRE ATT&CK"],
-    repositoryTable: "INTACT_TOOLBOX",
-    versions: [{ version: "1.0.0", dockerImage: "registry.example.com/ulancs/game:v1.0.0" }]
+    license: 'Proprietary',
+    standards: ['STIX', 'MITRE ATT&CK'],
+    repositoryTable: 'INTACT_TOOLBOX',
+    versions: [{ version: '1.0.0', dockerImage: 'registry.example.com/ulancs/game:v1.0.0' }],
   },
   {
-    shortName: "NETWORK-FUZZER",
-    title: "Montimage Network Fuzzer",
-    category: "ai-attack-defence-emulation",
-    provider: "MONT",
-    description: "Generates malicious traffic by mutating nominal traffic",
-    type: "Software",
+    shortName: 'NETWORK-FUZZER',
+    title: 'Montimage Network Fuzzer',
+    category: 'ai-attack-defence-emulation',
+    provider: 'MONT',
+    description: 'Generates malicious traffic by mutating nominal traffic',
+    type: 'Software',
     trl: { current: 4, expected: 7 },
-    license: "MIT",
-    standards: ["MITRE ATT&CK"],
-    repositoryTable: "INTACT_TOOLBOX",
-    versions: [{ version: "1.0.0", dockerImage: "registry.example.com/mont/fuzzer:v1.0.0" }]
+    license: 'MIT',
+    standards: ['MITRE ATT&CK'],
+    repositoryTable: 'INTACT_TOOLBOX',
+    versions: [{ version: '1.0.0', dockerImage: 'registry.example.com/mont/fuzzer:v1.0.0' }],
   },
   // ... (remaining 19 services from D2.1 Tables 17-37)
 ];
@@ -2074,51 +2149,57 @@ RATE_LIMIT_MAX_REQUESTS=100
 
 ### D. Glossary
 
-| Term | Definition |
-|------|------------|
-| **Atomic Digital Twin** | A Digital Twin representing a single sector |
-| **Cross-Sector Digital Twin** | A composite DT combining multiple atomic DTs |
-| **D2.1** | INTACT Deliverable 2.1: Reference architecture document |
-| **MAESTRO** | INTACT service orchestrator developed by UBITECH |
-| **PUC** | Pilot Use Case (Telcos, Health, Transport, Nuclear) |
-| **Scenario** | A configured topology of services with defined data flows |
-| **Topology** | The arrangement and connections of services |
-| **TRL** | Technology Readiness Level (1-9 scale) |
-| **JWT** | JSON Web Token for authentication |
-| **ODM** | Object Document Mapper (Mongoose for MongoDB) |
-| **CSP** | Content Security Policy |
-| **iFrame** | Inline frame for embedding external content |
+| Term                          | Definition                                                |
+| ----------------------------- | --------------------------------------------------------- |
+| **Atomic Digital Twin**       | A Digital Twin representing a single sector               |
+| **Cross-Sector Digital Twin** | A composite DT combining multiple atomic DTs              |
+| **D2.1**                      | INTACT Deliverable 2.1: Reference architecture document   |
+| **MAESTRO**                   | INTACT service orchestrator developed by UBITECH          |
+| **PUC**                       | Pilot Use Case (Telcos, Health, Transport, Nuclear)       |
+| **Scenario**                  | A configured topology of services with defined data flows |
+| **Topology**                  | The arrangement and connections of services               |
+| **TRL**                       | Technology Readiness Level (1-9 scale)                    |
+| **JWT**                       | JSON Web Token for authentication                         |
+| **ODM**                       | Object Document Mapper (Mongoose for MongoDB)             |
+| **CSP**                       | Content Security Policy                                   |
+| **iFrame**                    | Inline frame for embedding external content               |
 
 ### E. AI Research Insights
 
 **Research Round 1: Technology Stack Validation**
+
 - Bun runtime shows 3-4x faster cold starts vs Node.js (validated via benchmarks)
 - React Flow is the dominant choice for node-based editors (50k+ GitHub stars)
 - Monaco Editor widely adopted, proven at scale (VS Code, CodeSandbox)
 - shadcn/ui gaining rapid adoption for accessible React components
 
 **Research Round 2: Infrastructure Analysis**
+
 - MongoDB Atlas free tier sufficient for MVP (512 MB storage)
 - Single VPS ($5-20/month) handles 50+ concurrent users
 - Docker Compose simplifies local development significantly
 
 **Research Round 3: Security Best Practices**
+
 - bcrypt cost factor 12 recommended (10-12 range per OWASP)
 - AES-256-GCM provides authenticated encryption
 - JWT 24h expiration balances security and UX
 - Rate limiting essential for public-facing APIs
 
 **Research Round 4: Performance Optimization**
+
 - React Query caching reduces API calls by 40-60%
 - Code splitting reduces initial bundle by 30-50%
 - MongoDB indexes critical for >100ms query performance
 
 **AI-Identified Risks:**
+
 1. iFrame CSP compatibility with diverse service dashboards
 2. Monaco Editor memory usage with large YAML files (>1MB)
 3. React Flow performance degradation beyond 100 nodes
 
 **AI-Suggested Optimizations:**
+
 1. Implement service dashboard URL validation before tab creation
 2. Add topology complexity warnings in editor
 3. Consider WebSocket for real-time execution status (v1.1)
@@ -2126,6 +2207,6 @@ RATE_LIMIT_MAX_REQUESTS=100
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2025-01-13*
-*Author: INTACT Technical Team*
+_Document Version: 1.0_
+_Last Updated: 2025-01-13_
+_Author: INTACT Technical Team_

@@ -48,6 +48,7 @@ Excellent, I now have a clear picture. Let me formalize the technical design.
 ## 2. Data Models (MongoDB Schemas)
 
 ### 2.1 User Collection
+
 ```javascript
 {
   _id: ObjectId,
@@ -60,6 +61,7 @@ Excellent, I now have a clear picture. Let me formalize the technical design.
 ```
 
 ### 2.2 Category Collection
+
 ```javascript
 {
   _id: ObjectId,
@@ -84,6 +86,7 @@ Excellent, I now have a clear picture. Let me formalize the technical design.
 ```
 
 ### 2.3 Service Collection
+
 ```javascript
 {
   _id: ObjectId,
@@ -139,6 +142,7 @@ Excellent, I now have a clear picture. Let me formalize the technical design.
 ```
 
 ### 2.4 Project Collection
+
 ```javascript
 {
   _id: ObjectId,
@@ -163,6 +167,7 @@ Excellent, I now have a clear picture. Let me formalize the technical design.
 ```
 
 ### 2.5 Scenario Collection
+
 ```javascript
 {
   _id: ObjectId,
@@ -218,6 +223,7 @@ Excellent, I now have a clear picture. Let me formalize the technical design.
 ```
 
 ### 2.6 Infrastructure Collection
+
 ```javascript
 {
   _id: ObjectId,
@@ -255,47 +261,47 @@ For the code-based editor, I propose a YAML format:
 
 ```yaml
 # scenario-topology.yaml
-version: "1.0"
-name: "5G Attack Detection Scenario"
-description: "DDoS attack simulation and detection flow"
+version: '1.0'
+name: '5G Attack Detection Scenario'
+description: 'DDoS attack simulation and detection flow'
 
 services:
   - id: fuzzer
-    service: "network-fuzzer"    # shortName from Service repo
-    version: "latest"
+    service: 'network-fuzzer' # shortName from Service repo
+    version: 'latest'
     config:
-      targetProtocol: "5G-NAS"
-      attackType: "ddos"
+      targetProtocol: '5G-NAS'
+      attackType: 'ddos'
 
   - id: mmt
-    service: "MMT"
-    version: "8.0"
+    service: 'MMT'
+    version: '8.0'
     config:
-      mode: "real-time"
+      mode: 'real-time'
 
   - id: threat-intel
-    service: "predictive-threat-intelligence"
-    version: "1.0"
+    service: 'predictive-threat-intelligence'
+    version: '1.0'
 
   - id: maestro
-    service: "MAESTRO"
-    version: "latest"
+    service: 'MAESTRO'
+    version: 'latest'
 
 # Data flow connections
 connections:
   - from: fuzzer
     to: mmt
-    label: "Malicious traffic"
+    label: 'Malicious traffic'
 
   - from: mmt
     to: threat-intel
-    label: "STIX alerts"
-    via: "kafka"
-    topic: "security-alerts"
+    label: 'STIX alerts'
+    via: 'kafka'
+    topic: 'security-alerts'
 
   - from: threat-intel
     to: maestro
-    label: "Mitigation commands"
+    label: 'Mitigation commands'
 ```
 
 The visual canvas will render this as a directed graph.
@@ -305,6 +311,7 @@ The visual canvas will render this as a directed graph.
 ## 4. API Endpoints
 
 ### Authentication
+
 ```
 POST   /api/auth/login          # Login, returns JWT
 POST   /api/auth/logout         # Invalidate session
@@ -312,6 +319,7 @@ GET    /api/auth/me             # Get current user info
 ```
 
 ### Categories
+
 ```
 GET    /api/categories          # List all categories
 POST   /api/categories          # Create new category (admin)
@@ -320,6 +328,7 @@ DELETE /api/categories/:id      # Delete category
 ```
 
 ### Services
+
 ```
 GET    /api/services                    # List all services
 GET    /api/services?table=INTACT_TOOLBOX  # Filter by repository table
@@ -332,6 +341,7 @@ DELETE /api/services/:id                # Delete service
 ```
 
 ### Projects
+
 ```
 GET    /api/projects                    # List all projects
 GET    /api/projects/:id                # Get project with scenarios
@@ -341,6 +351,7 @@ DELETE /api/projects/:id                # Delete project
 ```
 
 ### Scenarios
+
 ```
 GET    /api/projects/:projectId/scenarios           # List scenarios
 GET    /api/scenarios/:id                           # Get scenario details
@@ -362,6 +373,7 @@ GET    /api/scenarios/:id/executions/:execId/export/pdf  # Export as PDF
 ```
 
 ### Infrastructure
+
 ```
 GET    /api/infrastructures             # List all
 GET    /api/infrastructures/:id         # Get details (credentials excluded)
@@ -372,6 +384,7 @@ POST   /api/infrastructures/:id/test    # Test connection
 ```
 
 ### Analytics
+
 ```
 GET    /api/analytics/scenarios         # Scenario execution history
 GET    /api/analytics/scenarios/stats   # Aggregated stats
@@ -472,16 +485,12 @@ export function encryptCredentials(plaintext) {
   return {
     encryptedData: encrypted,
     iv: iv.toString('hex'),
-    authTag: authTag.toString('hex')
+    authTag: authTag.toString('hex'),
   };
 }
 
 export function decryptCredentials(encrypted) {
-  const decipher = crypto.createDecipheriv(
-    ALGORITHM,
-    SECRET_KEY,
-    Buffer.from(encrypted.iv, 'hex')
-  );
+  const decipher = crypto.createDecipheriv(ALGORITHM, SECRET_KEY, Buffer.from(encrypted.iv, 'hex'));
   decipher.setAuthTag(Buffer.from(encrypted.authTag, 'hex'));
 
   let decrypted = decipher.update(encrypted.encryptedData, 'hex', 'utf8');
@@ -500,8 +509,8 @@ interface Tab {
   id: string;
   title: string;
   type: 'iframe' | 'component';
-  url?: string;           // for iframe
-  component?: string;     // for internal components
+  url?: string; // for iframe
+  component?: string; // for internal components
 }
 
 interface WorkspaceStore {
@@ -516,25 +525,25 @@ export const useWorkspace = create<WorkspaceStore>((set) => ({
   tabs: [],
   activeTabId: null,
 
-  openTab: (tab) => set((state) => {
-    const exists = state.tabs.find(t => t.id === tab.id);
-    if (exists) {
-      return { activeTabId: tab.id };
-    }
-    return {
-      tabs: [...state.tabs, tab],
-      activeTabId: tab.id
-    };
-  }),
+  openTab: (tab) =>
+    set((state) => {
+      const exists = state.tabs.find((t) => t.id === tab.id);
+      if (exists) {
+        return { activeTabId: tab.id };
+      }
+      return {
+        tabs: [...state.tabs, tab],
+        activeTabId: tab.id,
+      };
+    }),
 
-  closeTab: (id) => set((state) => ({
-    tabs: state.tabs.filter(t => t.id !== id),
-    activeTabId: state.activeTabId === id
-      ? state.tabs[0]?.id || null
-      : state.activeTabId
-  })),
+  closeTab: (id) =>
+    set((state) => ({
+      tabs: state.tabs.filter((t) => t.id !== id),
+      activeTabId: state.activeTabId === id ? state.tabs[0]?.id || null : state.activeTabId,
+    })),
 
-  setActiveTab: (id) => set({ activeTabId: id })
+  setActiveTab: (id) => set({ activeTabId: id }),
 }));
 ```
 
@@ -558,7 +567,10 @@ interface TopologyEdge {
   label: string;
 }
 
-export function parseYamlToGraph(yamlContent: string): { nodes: TopologyNode[], edges: TopologyEdge[] } {
+export function parseYamlToGraph(yamlContent: string): {
+  nodes: TopologyNode[];
+  edges: TopologyEdge[];
+} {
   const parsed = yaml.load(yamlContent) as any;
 
   // Auto-layout nodes in a grid
@@ -567,14 +579,14 @@ export function parseYamlToGraph(yamlContent: string): { nodes: TopologyNode[], 
     type: 'serviceNode',
     position: {
       x: (index % 3) * 250 + 50,
-      y: Math.floor(index / 3) * 150 + 50
+      y: Math.floor(index / 3) * 150 + 50,
     },
     data: {
       label: svc.service,
       serviceId: svc.service,
       version: svc.version,
-      config: svc.config
-    }
+      config: svc.config,
+    },
   }));
 
   const edges = parsed.connections.map((conn: any, index: number) => ({
@@ -582,7 +594,7 @@ export function parseYamlToGraph(yamlContent: string): { nodes: TopologyNode[], 
     source: conn.from,
     target: conn.to,
     label: conn.label,
-    animated: true
+    animated: true,
   }));
 
   return { nodes, edges };
@@ -593,17 +605,17 @@ export function graphToYaml(nodes: TopologyNode[], edges: TopologyEdge[], metada
     version: '1.0',
     name: metadata.name,
     description: metadata.description,
-    services: nodes.map(n => ({
+    services: nodes.map((n) => ({
       id: n.id,
       service: n.data.serviceId,
       version: n.data.version,
-      config: n.data.config
+      config: n.data.config,
     })),
-    connections: edges.map(e => ({
+    connections: edges.map((e) => ({
       from: e.source,
       to: e.target,
-      label: e.label
-    }))
+      label: e.label,
+    })),
   };
 
   return yaml.dump(topology);
@@ -644,7 +656,7 @@ export async function exportScenarioPDF(req, res) {
 
   // Deployed Services
   doc.fontSize(14).text('Deployed Services:');
-  execution.deployedServices.forEach(svc => {
+  execution.deployedServices.forEach((svc) => {
     doc.fontSize(10).text(`  - ${svc.serviceId}: ${svc.dashboardUrl}`);
   });
   doc.moveDown();
@@ -653,7 +665,9 @@ export async function exportScenarioPDF(req, res) {
   if (execution.conclusion) {
     doc.fontSize(14).text('Conclusion:');
     doc.fontSize(12).text(execution.conclusion.content);
-    doc.fontSize(10).text(`Author: ${execution.conclusion.author}, Date: ${execution.conclusion.date}`);
+    doc
+      .fontSize(10)
+      .text(`Author: ${execution.conclusion.author}, Date: ${execution.conclusion.date}`);
   }
 
   doc.end();
@@ -680,13 +694,13 @@ Before implementation begins, a few final clarifications:
 
 ## 9. Implementation Roadmap
 
-| Phase | Scope | Duration |
-|-------|-------|----------|
-| **Phase 1** | Project setup, Auth, Service Repository CRUD | 1 week |
-| **Phase 2** | Projects & Scenarios CRUD, basic topology editor (code-only) | 1 week |
-| **Phase 3** | Visual canvas integration, split-screen editor | 1 week |
-| **Phase 4** | MAESTRO integration, tabbed workspace, iFrame handling | 1 week |
-| **Phase 5** | Infrastructure management, credential encryption | 3-4 days |
-| **Phase 6** | Analytics, PDF export, polish | 3-4 days |
+| Phase       | Scope                                                        | Duration |
+| ----------- | ------------------------------------------------------------ | -------- |
+| **Phase 1** | Project setup, Auth, Service Repository CRUD                 | 1 week   |
+| **Phase 2** | Projects & Scenarios CRUD, basic topology editor (code-only) | 1 week   |
+| **Phase 3** | Visual canvas integration, split-screen editor               | 1 week   |
+| **Phase 4** | MAESTRO integration, tabbed workspace, iFrame handling       | 1 week   |
+| **Phase 5** | Infrastructure management, credential encryption             | 3-4 days |
+| **Phase 6** | Analytics, PDF export, polish                                | 3-4 days |
 
 **Total: ~5-6 weeks for MVP**

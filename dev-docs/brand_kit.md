@@ -5,6 +5,7 @@
 **Brand Mission:** To provide security professionals with a unified, intuitive platform for managing cybersecurity services and orchestrating Digital Twin projects, enabling efficient design, deployment, and evaluation of security scenarios across critical infrastructure sectors.
 
 **Brand Personality:**
+
 - **Professional** — Reflects the serious nature of cybersecurity and EU research
 - **Precise** — Emphasizes technical accuracy and reliability
 - **Efficient** — Supports streamlined workflows and productivity
@@ -12,6 +13,7 @@
 - **Modern** — Contemporary design without unnecessary embellishment
 
 **Target Audience:**
+
 - Tool owners (Senior Research Engineers) maintaining cybersecurity services
 - Security analysts designing and executing scenarios
 - Project leaders overseeing consortium activities
@@ -26,6 +28,7 @@
 ### Design Philosophy
 
 The INTACT color system follows a strict minimalist approach using only **white, gray, black, and yellow**. This constraint ensures:
+
 - Maximum readability and focus on content
 - Professional, research-grade aesthetic
 - Reduced visual noise in complex interfaces
@@ -38,6 +41,7 @@ The INTACT color system follows a strict minimalist approach using only **white,
 ### Primary Colors
 
 **Black (Primary)**
+
 - **Hex:** `#0F172A`
 - **RGB:** `rgb(15, 23, 42)`
 - **HSL:** `hsl(222, 47%, 11%)`
@@ -46,6 +50,7 @@ The INTACT color system follows a strict minimalist approach using only **white,
 - **Rationale:** Deep slate-black conveys authority, professionalism, and technical precision. Slightly warmer than pure black for better screen readability.
 
 **Yellow (Accent)**
+
 - **Hex:** `#FACC15`
 - **RGB:** `rgb(250, 204, 21)`
 - **HSL:** `hsl(48, 96%, 53%)`
@@ -55,6 +60,7 @@ The INTACT color system follows a strict minimalist approach using only **white,
 - **Rationale:** High-visibility accent that draws attention to critical elements without overwhelming the minimal palette.
 
 **Yellow Variants (Text/Border Only)**
+
 - **Yellow Light:** `#FDE047` (`yellow-300`) — Subtle highlights, hover states
 - **Yellow Dark:** `#EAB308` (`yellow-500`) — Strong emphasis, active borders
 - **Yellow Darker:** `#CA8A04` (`yellow-600`) — Text on light backgrounds
@@ -63,20 +69,20 @@ The INTACT color system follows a strict minimalist approach using only **white,
 
 ### Neutral Palette
 
-| Name | Hex | Tailwind | RGB | Usage |
-|------|-----|----------|-----|-------|
-| **White** | `#FFFFFF` | `white` | `rgb(255, 255, 255)` | Page backgrounds, cards, input backgrounds |
-| **Gray 50** | `#F8FAFC` | `slate-50` | `rgb(248, 250, 252)` | Subtle backgrounds, hover states |
-| **Gray 100** | `#F1F5F9` | `slate-100` | `rgb(241, 245, 249)` | Secondary backgrounds, disabled inputs |
-| **Gray 200** | `#E2E8F0` | `slate-200` | `rgb(226, 232, 240)` | Borders, dividers, table lines |
-| **Gray 300** | `#CBD5E1` | `slate-300` | `rgb(203, 213, 225)` | Disabled text, placeholder borders |
-| **Gray 400** | `#94A3B8` | `slate-400` | `rgb(148, 163, 184)` | Placeholder text, secondary icons |
-| **Gray 500** | `#64748B` | `slate-500` | `rgb(100, 116, 139)` | Secondary text, muted content |
-| **Gray 600** | `#475569` | `slate-600` | `rgb(71, 85, 105)` | Body text, descriptions |
-| **Gray 700** | `#334155` | `slate-700` | `rgb(51, 65, 85)` | Strong secondary text |
-| **Gray 800** | `#1E293B` | `slate-800` | `rgb(30, 41, 59)` | Dark UI elements |
-| **Gray 900** | `#0F172A` | `slate-900` | `rgb(15, 23, 42)` | Primary text, headings |
-| **Black** | `#020617` | `slate-950` | `rgb(2, 6, 23)` | Maximum contrast text |
+| Name         | Hex       | Tailwind    | RGB                  | Usage                                      |
+| ------------ | --------- | ----------- | -------------------- | ------------------------------------------ |
+| **White**    | `#FFFFFF` | `white`     | `rgb(255, 255, 255)` | Page backgrounds, cards, input backgrounds |
+| **Gray 50**  | `#F8FAFC` | `slate-50`  | `rgb(248, 250, 252)` | Subtle backgrounds, hover states           |
+| **Gray 100** | `#F1F5F9` | `slate-100` | `rgb(241, 245, 249)` | Secondary backgrounds, disabled inputs     |
+| **Gray 200** | `#E2E8F0` | `slate-200` | `rgb(226, 232, 240)` | Borders, dividers, table lines             |
+| **Gray 300** | `#CBD5E1` | `slate-300` | `rgb(203, 213, 225)` | Disabled text, placeholder borders         |
+| **Gray 400** | `#94A3B8` | `slate-400` | `rgb(148, 163, 184)` | Placeholder text, secondary icons          |
+| **Gray 500** | `#64748B` | `slate-500` | `rgb(100, 116, 139)` | Secondary text, muted content              |
+| **Gray 600** | `#475569` | `slate-600` | `rgb(71, 85, 105)`   | Body text, descriptions                    |
+| **Gray 700** | `#334155` | `slate-700` | `rgb(51, 65, 85)`    | Strong secondary text                      |
+| **Gray 800** | `#1E293B` | `slate-800` | `rgb(30, 41, 59)`    | Dark UI elements                           |
+| **Gray 900** | `#0F172A` | `slate-900` | `rgb(15, 23, 42)`    | Primary text, headings                     |
+| **Black**    | `#020617` | `slate-950` | `rgb(2, 6, 23)`      | Maximum contrast text                      |
 
 ---
 
@@ -85,6 +91,7 @@ The INTACT color system follows a strict minimalist approach using only **white,
 **Important:** Semantic colors are used for **text, icons, and borders only**—never as background fills. Use gray backgrounds with semantic-colored text/borders instead.
 
 #### Success (Green)
+
 - **Text/Icon:** `#16A34A` (`green-600`)
 - **Border:** `#22C55E` (`green-500`)
 - **Light Text:** `#15803D` (`green-700`) — For dark backgrounds
@@ -92,6 +99,7 @@ The INTACT color system follows a strict minimalist approach using only **white,
 - **Background Alternative:** `#F8FAFC` (gray-50) with green border/text
 
 #### Error (Red)
+
 - **Text/Icon:** `#DC2626` (`red-600`)
 - **Border:** `#EF4444` (`red-500`)
 - **Light Text:** `#B91C1C` (`red-700`) — For dark backgrounds
@@ -99,6 +107,7 @@ The INTACT color system follows a strict minimalist approach using only **white,
 - **Background Alternative:** `#F8FAFC` (gray-50) with red border/text
 
 #### Warning (Amber)
+
 - **Text/Icon:** `#D97706` (`amber-600`)
 - **Border:** `#F59E0B` (`amber-500`)
 - **Light Text:** `#B45309` (`amber-700`) — For dark backgrounds
@@ -106,6 +115,7 @@ The INTACT color system follows a strict minimalist approach using only **white,
 - **Background Alternative:** `#F8FAFC` (gray-50) with amber border/text
 
 #### Info (Blue)
+
 - **Text/Icon:** `#2563EB` (`blue-600`)
 - **Border:** `#3B82F6` (`blue-500`)
 - **Light Text:** `#1D4ED8` (`blue-700`) — For dark backgrounds
@@ -116,14 +126,14 @@ The INTACT color system follows a strict minimalist approach using only **white,
 
 ### Status Badge Colors
 
-| Status | Text Color | Border Color | Background | Icon |
-|--------|------------|--------------|------------|------|
-| **Pending** | `#64748B` (gray-500) | `#E2E8F0` (gray-200) | `#FFFFFF` | Clock |
-| **Running** | `#FACC15` (yellow-400) | `#FACC15` (yellow-400) | `#FFFFFF` | Loader2 |
-| **Completed** | `#16A34A` (green-600) | `#22C55E` (green-500) | `#FFFFFF` | CheckCircle |
-| **Failed** | `#DC2626` (red-600) | `#EF4444` (red-500) | `#FFFFFF` | XCircle |
-| **Available** | `#16A34A` (green-600) | `#22C55E` (green-500) | `#FFFFFF` | Circle (filled) |
-| **Offline** | `#DC2626` (red-600) | `#EF4444` (red-500) | `#FFFFFF` | Circle (outline) |
+| Status        | Text Color             | Border Color           | Background | Icon             |
+| ------------- | ---------------------- | ---------------------- | ---------- | ---------------- |
+| **Pending**   | `#64748B` (gray-500)   | `#E2E8F0` (gray-200)   | `#FFFFFF`  | Clock            |
+| **Running**   | `#FACC15` (yellow-400) | `#FACC15` (yellow-400) | `#FFFFFF`  | Loader2          |
+| **Completed** | `#16A34A` (green-600)  | `#22C55E` (green-500)  | `#FFFFFF`  | CheckCircle      |
+| **Failed**    | `#DC2626` (red-600)    | `#EF4444` (red-500)    | `#FFFFFF`  | XCircle          |
+| **Available** | `#16A34A` (green-600)  | `#22C55E` (green-500)  | `#FFFFFF`  | Circle (filled)  |
+| **Offline**   | `#DC2626` (red-600)    | `#EF4444` (red-500)    | `#FFFFFF`  | Circle (outline) |
 
 ---
 
@@ -131,16 +141,16 @@ The INTACT color system follows a strict minimalist approach using only **white,
 
 #### Contrast Ratios (WCAG 2.1 AA Compliant)
 
-| Combination | Foreground | Background | Ratio | Pass |
-|-------------|------------|------------|-------|------|
-| Primary text on white | `#0F172A` | `#FFFFFF` | 15.8:1 | ✅ AAA |
-| Secondary text on white | `#475569` | `#FFFFFF` | 7.0:1 | ✅ AAA |
-| Muted text on white | `#64748B` | `#FFFFFF` | 4.6:1 | ✅ AA |
-| Yellow text on black | `#FACC15` | `#0F172A` | 10.3:1 | ✅ AAA |
-| Yellow border on white | `#FACC15` | `#FFFFFF` | 1.8:1 | ✅ (decorative) |
-| Error text on white | `#DC2626` | `#FFFFFF` | 5.0:1 | ✅ AA |
-| Success text on white | `#16A34A` | `#FFFFFF` | 4.5:1 | ✅ AA |
-| White text on black | `#FFFFFF` | `#0F172A` | 15.8:1 | ✅ AAA |
+| Combination             | Foreground | Background | Ratio  | Pass            |
+| ----------------------- | ---------- | ---------- | ------ | --------------- |
+| Primary text on white   | `#0F172A`  | `#FFFFFF`  | 15.8:1 | ✅ AAA          |
+| Secondary text on white | `#475569`  | `#FFFFFF`  | 7.0:1  | ✅ AAA          |
+| Muted text on white     | `#64748B`  | `#FFFFFF`  | 4.6:1  | ✅ AA           |
+| Yellow text on black    | `#FACC15`  | `#0F172A`  | 10.3:1 | ✅ AAA          |
+| Yellow border on white  | `#FACC15`  | `#FFFFFF`  | 1.8:1  | ✅ (decorative) |
+| Error text on white     | `#DC2626`  | `#FFFFFF`  | 5.0:1  | ✅ AA           |
+| Success text on white   | `#16A34A`  | `#FFFFFF`  | 4.5:1  | ✅ AA           |
+| White text on black     | `#FFFFFF`  | `#0F172A`  | 15.8:1 | ✅ AAA          |
 
 #### Text Color Guidelines
 
@@ -157,57 +167,71 @@ The INTACT color system follows a strict minimalist approach using only **white,
 ### Font Families
 
 **Primary Font (System Stack)**
+
 ```css
-font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+font-family:
+  Inter,
+  ui-sans-serif,
+  system-ui,
+  -apple-system,
+  BlinkMacSystemFont,
+  'Segoe UI',
+  Roboto,
+  'Helvetica Neue',
+  Arial,
+  sans-serif;
 ```
+
 - **Source:** Google Fonts (Inter) with system fallbacks
 - **Weights Used:** 400 (Regular), 500 (Medium), 600 (Semi-Bold), 700 (Bold)
 - **Rationale:** Inter is highly legible, professional, and optimized for screens. System fallbacks ensure fast loading.
 
 **Monospace Font (Code)**
+
 ```css
-font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 ```
+
 - **Source:** Google Fonts (JetBrains Mono)
 - **Weights Used:** 400 (Regular), 500 (Medium)
 - **Usage:** YAML editor, code blocks, technical identifiers, Docker URLs
 
 ### Typography Scale
 
-| Element | Size (rem) | Size (px) | Weight | Line Height | Letter Spacing | Tailwind Class |
-|---------|------------|-----------|--------|-------------|----------------|----------------|
-| **Display** | 3rem | 48px | 700 | 1.1 | -0.025em | `text-5xl font-bold` |
-| **H1** | 2.25rem | 36px | 700 | 1.2 | -0.025em | `text-4xl font-bold` |
-| **H2** | 1.875rem | 30px | 600 | 1.25 | -0.02em | `text-3xl font-semibold` |
-| **H3** | 1.5rem | 24px | 600 | 1.3 | -0.015em | `text-2xl font-semibold` |
-| **H4** | 1.25rem | 20px | 600 | 1.35 | 0 | `text-xl font-semibold` |
-| **H5** | 1.125rem | 18px | 600 | 1.4 | 0 | `text-lg font-semibold` |
-| **Body Large** | 1.125rem | 18px | 400 | 1.6 | 0 | `text-lg` |
-| **Body** | 1rem | 16px | 400 | 1.6 | 0 | `text-base` |
-| **Body Small** | 0.875rem | 14px | 400 | 1.5 | 0 | `text-sm` |
-| **Caption** | 0.75rem | 12px | 400 | 1.4 | 0 | `text-xs` |
-| **Overline** | 0.75rem | 12px | 600 | 1.2 | 0.05em | `text-xs font-semibold uppercase tracking-wide` |
+| Element        | Size (rem) | Size (px) | Weight | Line Height | Letter Spacing | Tailwind Class                                  |
+| -------------- | ---------- | --------- | ------ | ----------- | -------------- | ----------------------------------------------- |
+| **Display**    | 3rem       | 48px      | 700    | 1.1         | -0.025em       | `text-5xl font-bold`                            |
+| **H1**         | 2.25rem    | 36px      | 700    | 1.2         | -0.025em       | `text-4xl font-bold`                            |
+| **H2**         | 1.875rem   | 30px      | 600    | 1.25        | -0.02em        | `text-3xl font-semibold`                        |
+| **H3**         | 1.5rem     | 24px      | 600    | 1.3         | -0.015em       | `text-2xl font-semibold`                        |
+| **H4**         | 1.25rem    | 20px      | 600    | 1.35        | 0              | `text-xl font-semibold`                         |
+| **H5**         | 1.125rem   | 18px      | 600    | 1.4         | 0              | `text-lg font-semibold`                         |
+| **Body Large** | 1.125rem   | 18px      | 400    | 1.6         | 0              | `text-lg`                                       |
+| **Body**       | 1rem       | 16px      | 400    | 1.6         | 0              | `text-base`                                     |
+| **Body Small** | 0.875rem   | 14px      | 400    | 1.5         | 0              | `text-sm`                                       |
+| **Caption**    | 0.75rem    | 12px      | 400    | 1.4         | 0              | `text-xs`                                       |
+| **Overline**   | 0.75rem    | 12px      | 600    | 1.2         | 0.05em         | `text-xs font-semibold uppercase tracking-wide` |
 
 ### Typography Color Application
 
-| Context | Color | Tailwind Class |
-|---------|-------|----------------|
-| Page headings (H1-H2) | `#0F172A` | `text-slate-900` |
-| Section headings (H3-H5) | `#0F172A` | `text-slate-900` |
-| Body text | `#475569` | `text-slate-600` |
-| Secondary/muted text | `#64748B` | `text-slate-500` |
-| Placeholder text | `#94A3B8` | `text-slate-400` |
-| Highlighted text | `#CA8A04` | `text-yellow-600` |
-| Link text (default) | `#0F172A` | `text-slate-900 underline` |
-| Link text (hover) | `#CA8A04` | `hover:text-yellow-600` |
+| Context                  | Color     | Tailwind Class             |
+| ------------------------ | --------- | -------------------------- |
+| Page headings (H1-H2)    | `#0F172A` | `text-slate-900`           |
+| Section headings (H3-H5) | `#0F172A` | `text-slate-900`           |
+| Body text                | `#475569` | `text-slate-600`           |
+| Secondary/muted text     | `#64748B` | `text-slate-500`           |
+| Placeholder text         | `#94A3B8` | `text-slate-400`           |
+| Highlighted text         | `#CA8A04` | `text-yellow-600`          |
+| Link text (default)      | `#0F172A` | `text-slate-900 underline` |
+| Link text (hover)        | `#CA8A04` | `hover:text-yellow-600`    |
 
 ### Code Typography
 
-| Element | Size | Font | Background | Text Color |
-|---------|------|------|------------|------------|
-| Inline code | 0.875em | JetBrains Mono | `#F1F5F9` | `#0F172A` |
-| Code block | 0.8125rem | JetBrains Mono | `#F8FAFC` | `#0F172A` |
-| Editor (Monaco) | 13px | JetBrains Mono | `#FFFFFF` | Syntax-highlighted |
+| Element         | Size      | Font           | Background | Text Color         |
+| --------------- | --------- | -------------- | ---------- | ------------------ |
+| Inline code     | 0.875em   | JetBrains Mono | `#F1F5F9`  | `#0F172A`          |
+| Code block      | 0.8125rem | JetBrains Mono | `#F8FAFC`  | `#0F172A`          |
+| Editor (Monaco) | 13px      | JetBrains Mono | `#FFFFFF`  | Syntax-highlighted |
 
 ---
 
@@ -220,23 +244,28 @@ The INTACT logo is a wordmark that emphasizes **precision** and **security**. Th
 ### Logo Variations
 
 **Primary Logo (Wordmark)**
+
 ```
 INTACT
 ```
+
 - **Font:** Inter, Bold (700)
 - **Color:** `#0F172A` (slate-900)
 - **Kerning:** Slightly tightened (-0.02em)
 - **Minimum Height:** 24px (digital), 0.25 inches (print)
 
 **Logo with Tagline**
+
 ```
 INTACT
 Digital Twin Security Platform
 ```
+
 - Tagline in Inter Regular, `#64748B` (slate-500)
 - Tagline size: 40% of main wordmark
 
 **Icon/Favicon**
+
 - Letter **"I"** in a square container
 - Container: `#0F172A` (slate-900)
 - Letter: `#FFFFFF` (white)
@@ -245,6 +274,7 @@ Digital Twin Security Platform
 ### Logo Usage Rules
 
 #### Clear Space
+
 Minimum clear space equal to the height of the letter "I" on all sides.
 
 ```
@@ -258,11 +288,11 @@ Minimum clear space equal to the height of the letter "I" on all sides.
 
 #### Color Applications
 
-| Context | Logo Color | Background |
-|---------|------------|------------|
-| Light backgrounds | `#0F172A` | White, Gray 50-100 |
-| Dark backgrounds | `#FFFFFF` | Slate 800-950 |
-| Highlighted | `#FACC15` border/underline | Any |
+| Context           | Logo Color                 | Background         |
+| ----------------- | -------------------------- | ------------------ |
+| Light backgrounds | `#0F172A`                  | White, Gray 50-100 |
+| Dark backgrounds  | `#FFFFFF`                  | Slate 800-950      |
+| Highlighted       | `#FACC15` border/underline | Any                |
 
 #### Logo Don'ts
 
@@ -281,43 +311,44 @@ Minimum clear space equal to the height of the letter "I" on all sides.
 ### Icon System
 
 **Icon Library:** Lucide React
+
 - **Style:** Outlined (stroke-based)
 - **Stroke Width:** 2px (default)
 - **Corner Style:** Rounded
 
 ### Icon Sizes
 
-| Size | Pixels | Tailwind | Usage |
-|------|--------|----------|-------|
-| **Extra Small** | 14px | `w-3.5 h-3.5` | Inline with small text |
-| **Small** | 16px | `w-4 h-4` | Inline with body text, badges |
-| **Default** | 20px | `w-5 h-5` | Buttons, navigation, form elements |
-| **Medium** | 24px | `w-6 h-6` | Section headers, feature icons |
-| **Large** | 32px | `w-8 h-8` | Empty states, feature highlights |
-| **Extra Large** | 48px | `w-12 h-12` | Hero sections, onboarding |
+| Size            | Pixels | Tailwind      | Usage                              |
+| --------------- | ------ | ------------- | ---------------------------------- |
+| **Extra Small** | 14px   | `w-3.5 h-3.5` | Inline with small text             |
+| **Small**       | 16px   | `w-4 h-4`     | Inline with body text, badges      |
+| **Default**     | 20px   | `w-5 h-5`     | Buttons, navigation, form elements |
+| **Medium**      | 24px   | `w-6 h-6`     | Section headers, feature icons     |
+| **Large**       | 32px   | `w-8 h-8`     | Empty states, feature highlights   |
+| **Extra Large** | 48px   | `w-12 h-12`   | Hero sections, onboarding          |
 
 ### Icon Colors
 
-| Context | Color | Tailwind Class |
-|---------|-------|----------------|
-| Default | `#64748B` | `text-slate-500` |
-| Active/Primary | `#0F172A` | `text-slate-900` |
-| Highlighted | `#CA8A04` | `text-yellow-600` |
-| Muted | `#94A3B8` | `text-slate-400` |
-| Success | `#16A34A` | `text-green-600` |
-| Error | `#DC2626` | `text-red-600` |
-| Warning | `#D97706` | `text-amber-600` |
-| Info | `#2563EB` | `text-blue-600` |
+| Context        | Color     | Tailwind Class    |
+| -------------- | --------- | ----------------- |
+| Default        | `#64748B` | `text-slate-500`  |
+| Active/Primary | `#0F172A` | `text-slate-900`  |
+| Highlighted    | `#CA8A04` | `text-yellow-600` |
+| Muted          | `#94A3B8` | `text-slate-400`  |
+| Success        | `#16A34A` | `text-green-600`  |
+| Error          | `#DC2626` | `text-red-600`    |
+| Warning        | `#D97706` | `text-amber-600`  |
+| Info           | `#2563EB` | `text-blue-600`   |
 
 ### Icon Usage by Feature
 
-| Feature Area | Icons Used |
-|--------------|------------|
-| Navigation | Home, Package, FolderKanban, Server, BarChart3, Users, Settings |
-| Actions | Plus, Pencil, Trash2, Copy, Download, ExternalLink, Play, Save |
-| Status | CheckCircle, XCircle, AlertCircle, Clock, Loader2, Circle |
-| UI Controls | ChevronDown, ChevronRight, ChevronLeft, X, Search, Filter, MoreVertical |
-| Domain | Network, Shield, Database, Cpu, Activity, GitBranch, Box |
+| Feature Area | Icons Used                                                              |
+| ------------ | ----------------------------------------------------------------------- |
+| Navigation   | Home, Package, FolderKanban, Server, BarChart3, Users, Settings         |
+| Actions      | Plus, Pencil, Trash2, Copy, Download, ExternalLink, Play, Save          |
+| Status       | CheckCircle, XCircle, AlertCircle, Clock, Loader2, Circle               |
+| UI Controls  | ChevronDown, ChevronRight, ChevronLeft, X, Search, Filter, MoreVertical |
+| Domain       | Network, Shield, Database, Cpu, Activity, GitBranch, Box                |
 
 ### Icon Guidelines
 
@@ -336,10 +367,12 @@ Minimum clear space equal to the height of the letter "I" on all sides.
 Given the technical nature of INTACT, photography is used sparingly:
 
 **When Used:**
+
 - Team/partner photos for About sections
 - Conference/event documentation
 
 **Style Guidelines:**
+
 - Black and white or desaturated
 - Professional, formal settings
 - Clean, uncluttered compositions
@@ -350,12 +383,14 @@ Given the technical nature of INTACT, photography is used sparingly:
 **Style:** Technical diagrams with minimal styling
 
 **Diagram Colors:**
+
 - Lines/strokes: `#0F172A` (slate-900) or `#64748B` (slate-500)
 - Fills: `#FFFFFF` (white) or `#F8FAFC` (gray-50)
 - Highlights: `#FACC15` (yellow-400) for emphasis (stroke/text only)
 - Connectors: `#CBD5E1` (slate-300)
 
 **Architecture Diagrams:**
+
 - Use Mermaid.js with custom theme
 - Box borders: 1px solid `#E2E8F0`
 - Box backgrounds: `#FFFFFF`
@@ -375,44 +410,47 @@ Given the technical nature of INTACT, photography is used sparingly:
 
 ### Spacing Scale (8px Base)
 
-| Token | Value | Tailwind | Usage |
-|-------|-------|----------|-------|
-| `space-0` | 0px | `p-0`, `m-0` | Reset |
-| `space-0.5` | 2px | `p-0.5`, `m-0.5` | Hairline spacing |
-| `space-1` | 4px | `p-1`, `m-1` | Tight inline spacing |
-| `space-2` | 8px | `p-2`, `m-2` | Default inline spacing |
-| `space-3` | 12px | `p-3`, `m-3` | Compact component padding |
-| `space-4` | 16px | `p-4`, `m-4` | Default component padding |
-| `space-5` | 20px | `p-5`, `m-5` | Comfortable padding |
-| `space-6` | 24px | `p-6`, `m-6` | Card padding, section gaps |
-| `space-8` | 32px | `p-8`, `m-8` | Large section padding |
-| `space-10` | 40px | `p-10`, `m-10` | Page section margins |
-| `space-12` | 48px | `p-12`, `m-12` | Major section spacing |
-| `space-16` | 64px | `p-16`, `m-16` | Page-level spacing |
+| Token       | Value | Tailwind         | Usage                      |
+| ----------- | ----- | ---------------- | -------------------------- |
+| `space-0`   | 0px   | `p-0`, `m-0`     | Reset                      |
+| `space-0.5` | 2px   | `p-0.5`, `m-0.5` | Hairline spacing           |
+| `space-1`   | 4px   | `p-1`, `m-1`     | Tight inline spacing       |
+| `space-2`   | 8px   | `p-2`, `m-2`     | Default inline spacing     |
+| `space-3`   | 12px  | `p-3`, `m-3`     | Compact component padding  |
+| `space-4`   | 16px  | `p-4`, `m-4`     | Default component padding  |
+| `space-5`   | 20px  | `p-5`, `m-5`     | Comfortable padding        |
+| `space-6`   | 24px  | `p-6`, `m-6`     | Card padding, section gaps |
+| `space-8`   | 32px  | `p-8`, `m-8`     | Large section padding      |
+| `space-10`  | 40px  | `p-10`, `m-10`   | Page section margins       |
+| `space-12`  | 48px  | `p-12`, `m-12`   | Major section spacing      |
+| `space-16`  | 64px  | `p-16`, `m-16`   | Page-level spacing         |
 
 ### Grid System
 
 **Container:**
+
 ```css
 max-width: 1280px;
 padding-inline: 24px;
 margin-inline: auto;
 ```
+
 Tailwind: `max-w-7xl mx-auto px-6`
 
 **Responsive Breakpoints:**
 
-| Breakpoint | Width | Tailwind Prefix |
-|------------|-------|-----------------|
-| Mobile | < 640px | Default |
-| Tablet | ≥ 640px | `sm:` |
-| Laptop | ≥ 1024px | `lg:` |
-| Desktop | ≥ 1280px | `xl:` |
-| Wide | ≥ 1536px | `2xl:` |
+| Breakpoint | Width    | Tailwind Prefix |
+| ---------- | -------- | --------------- |
+| Mobile     | < 640px  | Default         |
+| Tablet     | ≥ 640px  | `sm:`           |
+| Laptop     | ≥ 1024px | `lg:`           |
+| Desktop    | ≥ 1280px | `xl:`           |
+| Wide       | ≥ 1536px | `2xl:`          |
 
 ### Layout Patterns
 
 **Application Shell:**
+
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │ Header (h-14, border-b border-slate-200)                        │
@@ -425,6 +463,7 @@ Tailwind: `max-w-7xl mx-auto px-6`
 ```
 
 **Content Area Spacing:**
+
 - Page padding: `p-6` (24px)
 - Section gap: `space-y-8` (32px)
 - Card gap in grid: `gap-6` (24px)
@@ -437,8 +476,10 @@ Tailwind: `max-w-7xl mx-auto px-6`
 ### Buttons
 
 #### Primary Button (Black)
+
 ```jsx
-<button className="
+<button
+  className="
   bg-slate-900
   text-white
   px-4 py-2.5
@@ -453,22 +494,25 @@ Tailwind: `max-w-7xl mx-auto px-6`
   focus:ring-offset-2
   disabled:bg-slate-300
   disabled:cursor-not-allowed
-">
+"
+>
   Button Text
 </button>
 ```
 
-| State | Background | Text | Border |
-|-------|------------|------|--------|
-| Default | `slate-900` | `white` | none |
-| Hover | `slate-800` | `white` | none |
-| Active | `slate-950` | `white` | none |
-| Focus | `slate-900` | `white` | `ring-yellow-400` |
-| Disabled | `slate-300` | `white` | none |
+| State    | Background  | Text    | Border            |
+| -------- | ----------- | ------- | ----------------- |
+| Default  | `slate-900` | `white` | none              |
+| Hover    | `slate-800` | `white` | none              |
+| Active   | `slate-950` | `white` | none              |
+| Focus    | `slate-900` | `white` | `ring-yellow-400` |
+| Disabled | `slate-300` | `white` | none              |
 
 #### Secondary Button (Outlined)
+
 ```jsx
-<button className="
+<button
+  className="
   bg-white
   text-slate-900
   px-4 py-2.5
@@ -487,14 +531,17 @@ Tailwind: `max-w-7xl mx-auto px-6`
   disabled:bg-slate-50
   disabled:text-slate-400
   disabled:border-slate-200
-">
+"
+>
   Button Text
 </button>
 ```
 
 #### Ghost Button (Text Only)
+
 ```jsx
-<button className="
+<button
+  className="
   bg-transparent
   text-slate-600
   px-4 py-2.5
@@ -508,14 +555,17 @@ Tailwind: `max-w-7xl mx-auto px-6`
   focus:ring-2
   focus:ring-yellow-400
   focus:ring-offset-2
-">
+"
+>
   Button Text
 </button>
 ```
 
 #### Destructive Button
+
 ```jsx
-<button className="
+<button
+  className="
   bg-white
   text-red-600
   px-4 py-2.5
@@ -531,26 +581,29 @@ Tailwind: `max-w-7xl mx-auto px-6`
   focus:ring-2
   focus:ring-red-400
   focus:ring-offset-2
-">
+"
+>
   Delete
 </button>
 ```
 
 ### Button Sizes
 
-| Size | Padding | Font Size | Icon Size | Tailwind |
-|------|---------|-----------|-----------|----------|
-| Small | `px-3 py-1.5` | `text-xs` | `w-4 h-4` | `h-8` |
-| Default | `px-4 py-2.5` | `text-sm` | `w-5 h-5` | `h-10` |
-| Large | `px-6 py-3` | `text-base` | `w-5 h-5` | `h-12` |
+| Size    | Padding       | Font Size   | Icon Size | Tailwind |
+| ------- | ------------- | ----------- | --------- | -------- |
+| Small   | `px-3 py-1.5` | `text-xs`   | `w-4 h-4` | `h-8`    |
+| Default | `px-4 py-2.5` | `text-sm`   | `w-5 h-5` | `h-10`   |
+| Large   | `px-6 py-3`   | `text-base` | `w-5 h-5` | `h-12`   |
 
 ---
 
 ### Input Fields
 
 #### Text Input
+
 ```jsx
-<input className="
+<input
+  className="
   w-full
   px-3 py-2.5
   text-sm
@@ -569,20 +622,22 @@ Tailwind: `max-w-7xl mx-auto px-6`
   disabled:bg-slate-100
   disabled:text-slate-500
   disabled:cursor-not-allowed
-" />
+"
+/>
 ```
 
 #### Input States
 
-| State | Border | Background | Ring |
-|-------|--------|------------|------|
-| Default | `slate-300` | `white` | none |
-| Hover | `slate-400` | `white` | none |
-| Focus | `slate-900` | `white` | `yellow-400` |
-| Error | `red-500` | `white` | `red-400` on focus |
-| Disabled | `slate-200` | `slate-100` | none |
+| State    | Border      | Background  | Ring               |
+| -------- | ----------- | ----------- | ------------------ |
+| Default  | `slate-300` | `white`     | none               |
+| Hover    | `slate-400` | `white`     | none               |
+| Focus    | `slate-900` | `white`     | `yellow-400`       |
+| Error    | `red-500`   | `white`     | `red-400` on focus |
+| Disabled | `slate-200` | `slate-100` | none               |
 
 #### Input with Label
+
 ```jsx
 <div className="space-y-1.5">
   <label className="text-sm font-medium text-slate-900">
@@ -590,22 +645,17 @@ Tailwind: `max-w-7xl mx-auto px-6`
     <span className="text-red-600 ml-0.5">*</span>
   </label>
   <input className="..." />
-  <p className="text-xs text-slate-500">
-    A unique identifier for the service
-  </p>
+  <p className="text-xs text-slate-500">A unique identifier for the service</p>
 </div>
 ```
 
 #### Input with Error
+
 ```jsx
 <div className="space-y-1.5">
-  <label className="text-sm font-medium text-slate-900">
-    Service Name
-  </label>
+  <label className="text-sm font-medium text-slate-900">Service Name</label>
   <input className="... border-red-500 focus:ring-red-400" />
-  <p className="text-xs text-red-600">
-    This field is required
-  </p>
+  <p className="text-xs text-red-600">This field is required</p>
 </div>
 ```
 
@@ -614,22 +664,27 @@ Tailwind: `max-w-7xl mx-auto px-6`
 ### Cards
 
 #### Default Card
+
 ```jsx
-<div className="
+<div
+  className="
   bg-white
   border
   border-slate-200
   rounded-xl
   p-6
   shadow-sm
-">
+"
+>
   {/* Card content */}
 </div>
 ```
 
 #### Interactive Card (Clickable)
+
 ```jsx
-<div className="
+<div
+  className="
   bg-white
   border
   border-slate-200
@@ -643,20 +698,20 @@ Tailwind: `max-w-7xl mx-auto px-6`
   focus-within:ring-2
   focus-within:ring-yellow-400
   focus-within:ring-offset-2
-">
+"
+>
   {/* Card content */}
 </div>
 ```
 
 #### Card with Header
+
 ```jsx
 <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
   <div className="px-6 py-4 border-b border-slate-200">
     <h3 className="text-lg font-semibold text-slate-900">Card Title</h3>
   </div>
-  <div className="p-6">
-    {/* Card content */}
-  </div>
+  <div className="p-6">{/* Card content */}</div>
 </div>
 ```
 
@@ -665,6 +720,7 @@ Tailwind: `max-w-7xl mx-auto px-6`
 ### Badges
 
 #### Status Badges
+
 ```jsx
 // Neutral
 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-full">
@@ -692,6 +748,7 @@ Tailwind: `max-w-7xl mx-auto px-6`
 ```
 
 #### Category Badge
+
 ```jsx
 <span className="inline-flex items-center px-2.5 py-1 text-xs font-medium text-slate-700 bg-slate-100 rounded-md">
   Threat Inspection
@@ -825,12 +882,12 @@ focus:ring-offset-slate-900
 
 ### Tone Attributes
 
-| Attribute | Description | Example |
-|-----------|-------------|---------|
-| **Professional** | Authoritative without being cold | "Configure your deployment target" |
-| **Clear** | Direct, unambiguous language | "Save" not "Submit your changes" |
-| **Concise** | Minimal words, maximum clarity | "Service created" not "Your service has been successfully created" |
-| **Helpful** | Guide without condescending | "Enter the Docker image URL (e.g., registry/image:tag)" |
+| Attribute        | Description                      | Example                                                            |
+| ---------------- | -------------------------------- | ------------------------------------------------------------------ |
+| **Professional** | Authoritative without being cold | "Configure your deployment target"                                 |
+| **Clear**        | Direct, unambiguous language     | "Save" not "Submit your changes"                                   |
+| **Concise**      | Minimal words, maximum clarity   | "Service created" not "Your service has been successfully created" |
+| **Helpful**      | Guide without condescending      | "Enter the Docker image URL (e.g., registry/image:tag)"            |
 
 ### Writing Guidelines
 
@@ -843,38 +900,42 @@ focus:ring-offset-slate-900
 ### Standard Microcopy
 
 #### Button Labels
-| Action | Label |
-|--------|-------|
-| Create new item | "+ Add [Item]" or "+ New [Item]" |
-| Save changes | "Save" |
-| Cancel action | "Cancel" |
-| Delete item | "Delete" |
-| Confirm action | "Confirm" |
-| Submit form | "Submit" or action-specific ("Execute", "Deploy") |
+
+| Action          | Label                                             |
+| --------------- | ------------------------------------------------- |
+| Create new item | "+ Add [Item]" or "+ New [Item]"                  |
+| Save changes    | "Save"                                            |
+| Cancel action   | "Cancel"                                          |
+| Delete item     | "Delete"                                          |
+| Confirm action  | "Confirm"                                         |
+| Submit form     | "Submit" or action-specific ("Execute", "Deploy") |
 
 #### Form Validation Messages
-| Situation | Message Pattern |
-|-----------|-----------------|
-| Required field | "[Field name] is required" |
-| Invalid format | "Enter a valid [format description]" |
-| Too short | "[Field] must be at least [n] characters" |
-| Duplicate | "A [item] with this [field] already exists" |
+
+| Situation      | Message Pattern                             |
+| -------------- | ------------------------------------------- |
+| Required field | "[Field name] is required"                  |
+| Invalid format | "Enter a valid [format description]"        |
+| Too short      | "[Field] must be at least [n] characters"   |
+| Duplicate      | "A [item] with this [field] already exists" |
 
 #### Success Messages
-| Action | Message |
-|--------|---------|
-| Create | "[Item] created" |
-| Update | "Changes saved" |
-| Delete | "[Item] deleted" |
+
+| Action  | Message             |
+| ------- | ------------------- |
+| Create  | "[Item] created"    |
+| Update  | "Changes saved"     |
+| Delete  | "[Item] deleted"    |
 | Execute | "Execution started" |
 
 #### Error Messages
-| Situation | Message |
-|-----------|---------|
-| Generic error | "Something went wrong. Please try again." |
-| Network error | "Could not connect. Check your connection and try again." |
-| Validation error | Specific field errors shown inline |
-| Permission denied | "You don't have permission to perform this action." |
+
+| Situation         | Message                                                   |
+| ----------------- | --------------------------------------------------------- |
+| Generic error     | "Something went wrong. Please try again."                 |
+| Network error     | "Could not connect. Check your connection and try again." |
+| Validation error  | Specific field errors shown inline                        |
+| Permission denied | "You don't have permission to perform this action."       |
 
 ---
 
@@ -1001,10 +1062,7 @@ focus:ring-offset-slate-900
 ```javascript
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       fontFamily: {
@@ -1016,24 +1074,24 @@ export default {
         // Yellow accent - text/border only, never background
         accent: {
           DEFAULT: '#FACC15', // yellow-400
-          light: '#FDE047',   // yellow-300
-          dark: '#EAB308',    // yellow-500
-          darker: '#CA8A04',  // yellow-600 (for text)
+          light: '#FDE047', // yellow-300
+          dark: '#EAB308', // yellow-500
+          darker: '#CA8A04', // yellow-600 (for text)
         },
       },
       borderRadius: {
-        'xl': '0.75rem',  // 12px
-        '2xl': '1rem',    // 16px
+        xl: '0.75rem', // 12px
+        '2xl': '1rem', // 16px
       },
       boxShadow: {
-        'sm': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-        'DEFAULT': '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-        'md': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        DEFAULT: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+        md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
       },
     },
   },
   plugins: [],
-}
+};
 ```
 
 ### CSS Custom Properties
@@ -1042,31 +1100,31 @@ export default {
 /* globals.css */
 @layer base {
   :root {
-    --background: 0 0% 100%;           /* white */
-    --foreground: 222 47% 11%;         /* slate-900 */
+    --background: 0 0% 100%; /* white */
+    --foreground: 222 47% 11%; /* slate-900 */
 
-    --muted: 210 40% 96%;              /* slate-100 */
-    --muted-foreground: 215 16% 47%;   /* slate-500 */
+    --muted: 210 40% 96%; /* slate-100 */
+    --muted-foreground: 215 16% 47%; /* slate-500 */
 
-    --card: 0 0% 100%;                 /* white */
-    --card-foreground: 222 47% 11%;    /* slate-900 */
+    --card: 0 0% 100%; /* white */
+    --card-foreground: 222 47% 11%; /* slate-900 */
 
-    --border: 214 32% 91%;             /* slate-200 */
-    --input: 214 32% 91%;              /* slate-200 */
+    --border: 214 32% 91%; /* slate-200 */
+    --input: 214 32% 91%; /* slate-200 */
 
-    --primary: 222 47% 11%;            /* slate-900 */
-    --primary-foreground: 0 0% 100%;   /* white */
+    --primary: 222 47% 11%; /* slate-900 */
+    --primary-foreground: 0 0% 100%; /* white */
 
-    --secondary: 210 40% 96%;          /* slate-100 */
+    --secondary: 210 40% 96%; /* slate-100 */
     --secondary-foreground: 222 47% 11%; /* slate-900 */
 
-    --accent: 48 96% 53%;              /* yellow-400 */
-    --accent-foreground: 222 47% 11%;  /* slate-900 */
+    --accent: 48 96% 53%; /* yellow-400 */
+    --accent-foreground: 222 47% 11%; /* slate-900 */
 
-    --destructive: 0 84% 60%;          /* red-500 */
+    --destructive: 0 84% 60%; /* red-500 */
     --destructive-foreground: 0 0% 100%; /* white */
 
-    --ring: 48 96% 53%;                /* yellow-400 - focus ring */
+    --ring: 48 96% 53%; /* yellow-400 - focus ring */
 
     --radius: 0.5rem;
   }
@@ -1080,6 +1138,7 @@ export default {
 ### AI Research Insights
 
 **Research Round 1: Color Psychology Analysis**
+
 - **Black/Gray:** Conveys authority, professionalism, sophistication
 - **White:** Cleanliness, simplicity, space for content to breathe
 - **Yellow accent:** Attention, energy, optimism without overwhelming
@@ -1087,23 +1146,27 @@ export default {
 - **Competitor analysis:** Most security tools use blue (overused); monochrome with accent is differentiated
 
 **Research Round 2: Typography Research**
+
 - Inter is the most recommended system font for technical interfaces (GitHub, Figma, Linear)
 - JetBrains Mono provides excellent code readability and includes ligatures
 - Font loading: System stack fallbacks ensure zero FOUT (Flash of Unstyled Text)
 - Recommendation: Stick with proven defaults, customize sparingly
 
 **Research Round 3: Accessibility Validation**
+
 - All color combinations tested against WCAG 2.1 AA requirements
 - Yellow text (#CA8A04) on white passes 4.5:1 ratio
 - Focus states with yellow ring provide 3:1+ contrast
 - Recommendation: Always pair icons with text labels
 
 **Research Round 4: Design System Analysis**
+
 - Shadcn/ui provides excellent accessible component foundations
 - Tailwind's slate palette has more warmth than pure grays (better for long reading sessions)
 - Yellow focus rings are uncommon but highly visible—good for accessibility
 
 **Research Round 5: Holistic Review**
+
 - Design aligns with PRD's professional, technical audience
 - Minimal palette reduces cognitive load in complex interfaces
 - Yellow accent provides necessary visual hierarchy without color backgrounds
@@ -1119,30 +1182,30 @@ export default {
 
 ### Color Reference Quick Sheet
 
-| Purpose | Hex | Tailwind | Notes |
-|---------|-----|----------|-------|
-| Primary text | `#0F172A` | `text-slate-900` | Headings, important text |
-| Body text | `#475569` | `text-slate-600` | Paragraphs, descriptions |
-| Muted text | `#64748B` | `text-slate-500` | Secondary info |
-| Placeholder | `#94A3B8` | `text-slate-400` | Input placeholders |
-| Borders | `#E2E8F0` | `border-slate-200` | Dividers, card borders |
-| Background | `#FFFFFF` | `bg-white` | Page, card backgrounds |
-| Subtle BG | `#F8FAFC` | `bg-slate-50` | Canvas, secondary areas |
-| Highlight | `#FACC15` | `text-yellow-400` | Focus, active states |
-| Highlight text | `#CA8A04` | `text-yellow-600` | Emphasis text |
+| Purpose        | Hex       | Tailwind           | Notes                    |
+| -------------- | --------- | ------------------ | ------------------------ |
+| Primary text   | `#0F172A` | `text-slate-900`   | Headings, important text |
+| Body text      | `#475569` | `text-slate-600`   | Paragraphs, descriptions |
+| Muted text     | `#64748B` | `text-slate-500`   | Secondary info           |
+| Placeholder    | `#94A3B8` | `text-slate-400`   | Input placeholders       |
+| Borders        | `#E2E8F0` | `border-slate-200` | Dividers, card borders   |
+| Background     | `#FFFFFF` | `bg-white`         | Page, card backgrounds   |
+| Subtle BG      | `#F8FAFC` | `bg-slate-50`      | Canvas, secondary areas  |
+| Highlight      | `#FACC15` | `text-yellow-400`  | Focus, active states     |
+| Highlight text | `#CA8A04` | `text-yellow-600`  | Emphasis text            |
 
 ### Glossary
 
-| Term | Definition |
-|------|------------|
-| **Accent Color** | A contrasting color used sparingly to draw attention |
-| **Focus Ring** | Visual indicator showing which element has keyboard focus |
-| **Semantic Color** | Color with inherent meaning (success=green, error=red) |
-| **WCAG** | Web Content Accessibility Guidelines |
+| Term               | Definition                                                        |
+| ------------------ | ----------------------------------------------------------------- |
+| **Accent Color**   | A contrasting color used sparingly to draw attention              |
+| **Focus Ring**     | Visual indicator showing which element has keyboard focus         |
+| **Semantic Color** | Color with inherent meaning (success=green, error=red)            |
+| **WCAG**           | Web Content Accessibility Guidelines                              |
 | **Contrast Ratio** | Measure of luminance difference between foreground and background |
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2025-01-13*
-*Author: INTACT Design Team*
+_Document Version: 1.0_
+_Last Updated: 2025-01-13_
+_Author: INTACT Design Team_

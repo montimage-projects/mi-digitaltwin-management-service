@@ -68,11 +68,7 @@ export function EditService() {
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-md bg-destructive/10 p-4 text-destructive">
-          {error}
-        </div>
-      )}
+      {error && <div className="rounded-md bg-destructive/10 p-4 text-destructive">{error}</div>}
 
       <div className="rounded-lg border bg-background p-6">
         <ServiceForm

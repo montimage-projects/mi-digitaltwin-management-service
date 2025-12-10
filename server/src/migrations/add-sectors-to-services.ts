@@ -54,10 +54,7 @@ const migrate = async (): Promise<void> => {
     if (servicesWithoutUiType.length > 0) {
       console.log(`\nFound ${servicesWithoutUiType.length} services without uiType`);
 
-      await Service.updateMany(
-        { uiType: { $exists: false } },
-        { $set: { uiType: 'web' } }
-      );
+      await Service.updateMany({ uiType: { $exists: false } }, { $set: { uiType: 'web' } });
 
       console.log(`Updated ${servicesWithoutUiType.length} services with default uiType: 'web'`);
     }

@@ -15,7 +15,10 @@ export function MainLayout() {
       >
         Skip to main content
       </a>
-      <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
         <main id="main-content" className="flex-1 overflow-auto bg-muted/30 p-6" tabIndex={-1}>

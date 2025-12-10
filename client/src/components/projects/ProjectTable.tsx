@@ -67,13 +67,27 @@ export function ProjectTable({ projects, isLoading, onRowClick }: ProjectTablePr
           <tbody>
             {[1, 2, 3, 4, 5].map((i) => (
               <tr key={i} className="border-b">
-                <td className="px-4 py-3"><Skeleton className="h-5 w-24" /></td>
-                <td className="px-4 py-3"><Skeleton className="h-5 w-48" /></td>
-                <td className="px-4 py-3"><Skeleton className="h-5 w-28" /></td>
-                <td className="px-4 py-3"><Skeleton className="h-5 w-16" /></td>
-                <td className="px-4 py-3"><Skeleton className="h-5 w-12" /></td>
-                <td className="px-4 py-3"><Skeleton className="h-5 w-8" /></td>
-                <td className="px-4 py-3"><Skeleton className="h-5 w-8" /></td>
+                <td className="px-4 py-3">
+                  <Skeleton className="h-5 w-24" />
+                </td>
+                <td className="px-4 py-3">
+                  <Skeleton className="h-5 w-48" />
+                </td>
+                <td className="px-4 py-3">
+                  <Skeleton className="h-5 w-28" />
+                </td>
+                <td className="px-4 py-3">
+                  <Skeleton className="h-5 w-16" />
+                </td>
+                <td className="px-4 py-3">
+                  <Skeleton className="h-5 w-12" />
+                </td>
+                <td className="px-4 py-3">
+                  <Skeleton className="h-5 w-8" />
+                </td>
+                <td className="px-4 py-3">
+                  <Skeleton className="h-5 w-8" />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -131,9 +145,7 @@ export function ProjectTable({ projects, isLoading, onRowClick }: ProjectTablePr
               <td className="px-4 py-3 text-sm text-muted-foreground">
                 {project.involvedPartners.length}
               </td>
-              <td className="px-4 py-3 text-sm text-muted-foreground">
-                {project.scenarioCount}
-              </td>
+              <td className="px-4 py-3 text-sm text-muted-foreground">{project.scenarioCount}</td>
               <td className="px-4 py-3">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

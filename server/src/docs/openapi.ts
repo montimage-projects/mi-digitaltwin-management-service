@@ -3,7 +3,8 @@ export const openApiSpec = {
   info: {
     title: 'INTACT Digital Twin Management Platform API',
     version: '1.0.0',
-    description: 'API for managing cybersecurity services, digital twin projects, scenarios, and infrastructure.',
+    description:
+      'API for managing cybersecurity services, digital twin projects, scenarios, and infrastructure.',
     contact: {
       name: 'INTACT Project',
       url: 'https://intact-project.eu',
@@ -59,7 +60,10 @@ export const openApiSpec = {
           _id: { type: 'string' },
           shortName: { type: 'string' },
           title: { type: 'string' },
-          sector: { type: 'string', enum: ['Telecommunications', 'Healthcare', 'Transportation', 'Nuclear', 'Cross-Sector'] },
+          sector: {
+            type: 'string',
+            enum: ['Telecommunications', 'Healthcare', 'Transportation', 'Nuclear', 'Cross-Sector'],
+          },
           leader: { type: 'string' },
           involvedPartners: { type: 'array', items: { type: 'string' } },
           description: { type: 'string' },
@@ -175,7 +179,11 @@ export const openApiSpec = {
         tags: ['Services'],
         summary: 'List services',
         parameters: [
-          { name: 'table', in: 'query', schema: { type: 'string', enum: ['INTACT_TOOLBOX', 'OTHER_SERVICES'] } },
+          {
+            name: 'table',
+            in: 'query',
+            schema: { type: 'string', enum: ['INTACT_TOOLBOX', 'OTHER_SERVICES'] },
+          },
           { name: 'category', in: 'query', schema: { type: 'string' } },
           { name: 'search', in: 'query', schema: { type: 'string' } },
         ],

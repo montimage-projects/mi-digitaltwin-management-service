@@ -137,9 +137,7 @@ export function InfrastructureTable({ infrastructures, onEdit }: InfrastructureT
                 </div>
               </TableCell>
               <TableCell>
-                {infra.lastHealthCheck
-                  ? new Date(infra.lastHealthCheck).toLocaleString()
-                  : 'Never'}
+                {infra.lastHealthCheck ? new Date(infra.lastHealthCheck).toLocaleString() : 'Never'}
               </TableCell>
               <TableCell>
                 <DropdownMenu>
@@ -167,7 +165,10 @@ export function InfrastructureTable({ infrastructures, onEdit }: InfrastructureT
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(infra)}>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => handleDelete(infra)}
+                    >
                       <span title="Delete">
                         <Trash2 className="mr-2 h-4 w-4" />
                       </span>

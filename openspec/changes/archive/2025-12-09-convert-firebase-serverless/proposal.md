@@ -1,12 +1,15 @@
 # Proposal: Convert to Firebase Serverless Architecture
 
 ## Change ID
+
 `convert-firebase-serverless`
 
 ## Summary
+
 Convert the INTACT Digital Twin Management Platform from a traditional Express.js + MongoDB backend to a serverless Firebase architecture using Firebase Authentication and Firestore database. This phase focuses on the client-side integration only - Cloud Functions will be implemented separately in a future phase.
 
 ## Motivation
+
 - **Reduce operational overhead**: Eliminate the need to manage and deploy a Node.js server
 - **Cost efficiency**: Pay-per-use model with Firebase's generous free tier (50K reads/day, 20K writes/day, 1GB storage)
 - **Built-in authentication**: Leverage Firebase Auth for secure, scalable authentication with multiple providers
@@ -17,6 +20,7 @@ Convert the INTACT Digital Twin Management Platform from a traditional Express.j
 ## Scope
 
 ### In Scope
+
 1. Replace MongoDB with Firestore as the primary database
 2. Replace custom JWT authentication with Firebase Authentication
 3. Move all data access logic to client-side Firebase SDK
@@ -26,6 +30,7 @@ Convert the INTACT Digital Twin Management Platform from a traditional Express.j
 7. Remove Express.js server dependency
 
 ### Out of Scope (Deferred)
+
 - Cloud Functions for server-side logic (future phase)
 - Complex aggregations requiring server-side processing
 - PDF generation (will use client-side libraries temporarily)
@@ -58,14 +63,14 @@ Convert the INTACT Digital Twin Management Platform from a traditional Express.j
 
 ### Current MongoDB Collections → Firestore Collections
 
-| MongoDB Collection | Firestore Collection | Notes |
-|-------------------|---------------------|-------|
-| users | users | Email-based auth via Firebase Auth |
-| categories | categories | Direct migration |
-| services | services | Direct migration with nested objects |
-| projects | projects | Direct migration |
-| scenarios | scenarios | Subcollection under projects |
-| infrastructures | infrastructures | Credentials handled differently |
+| MongoDB Collection | Firestore Collection | Notes                                |
+| ------------------ | -------------------- | ------------------------------------ |
+| users              | users                | Email-based auth via Firebase Auth   |
+| categories         | categories           | Direct migration                     |
+| services           | services             | Direct migration with nested objects |
+| projects           | projects             | Direct migration                     |
+| scenarios          | scenarios            | Subcollection under projects         |
+| infrastructures    | infrastructures      | Credentials handled differently      |
 
 ### Firestore Document Structure
 
@@ -193,24 +198,28 @@ service cloud.firestore {
 ## Implementation Phases
 
 ### Phase 1: Firebase Setup & Authentication (This Proposal)
+
 - Initialize Firebase project
 - Configure Firebase Authentication with email/password
 - Replace custom JWT auth with Firebase Auth
 - Update auth store and login flow
 
 ### Phase 2: Firestore Data Layer
+
 - Create Firestore service modules
 - Migrate API calls to Firestore operations
 - Implement data converters (MongoDB → Firestore format)
 - Add real-time listeners where beneficial
 
 ### Phase 3: Data Migration & Cleanup
+
 - Create migration script for existing data
 - Test all CRUD operations
 - Remove Express.js server code
 - Update deployment configuration
 
 ### Future Phase: Cloud Functions
+
 - Credential encryption for infrastructures
 - Complex aggregations
 - PDF generation
@@ -220,6 +229,7 @@ service cloud.firestore {
 ## Trade-offs & Considerations
 
 ### Advantages
+
 1. **No server management**: Firebase handles scaling and availability
 2. **Built-in auth**: Industry-standard authentication with session management
 3. **Real-time updates**: Instant UI updates via Firestore listeners
@@ -227,6 +237,7 @@ service cloud.firestore {
 5. **Cost-effective**: Free tier covers typical development usage
 
 ### Limitations
+
 1. **No server-side encryption**: Infrastructure credentials cannot be encrypted without Cloud Functions
 2. **Query limitations**: Firestore has different query capabilities than MongoDB
 3. **Vendor lock-in**: Tight coupling to Firebase ecosystem
@@ -234,17 +245,20 @@ service cloud.firestore {
 5. **Text search**: No native full-text search (may need Algolia integration later)
 
 ### Mitigations
+
 - **Credentials**: Store only non-sensitive infrastructure config; credentials entered at execution time
 - **Search**: Use client-side filtering for small datasets; plan Algolia for scale
 - **Aggregations**: Maintain counter documents for scenario counts
 
 ## Dependencies
+
 - firebase (^11.x)
 - react-firebase-hooks (^5.x)
 
 ## Files to Modify/Create
 
 ### New Files
+
 - `client/src/lib/firebase.ts` - Firebase initialization
 - `client/src/lib/firestore/` - Firestore service modules
 - `firebase.json` - Firebase configuration
@@ -252,15 +266,18 @@ service cloud.firestore {
 - `.firebaserc` - Firebase project config
 
 ### Modified Files
+
 - `client/src/lib/api.ts` - Replace axios with Firestore
 - `client/src/store/auth-store.ts` - Use Firebase Auth
 - `client/src/pages/Login.tsx` - Firebase Auth login
 - `client/package.json` - Add Firebase dependencies
 
 ### Removed Files (Phase 3)
+
 - `server/` directory (entire Express.js backend)
 
 ## Success Criteria
+
 1. Users can authenticate via Firebase Auth
 2. All CRUD operations work via Firestore
 3. Real-time updates reflect data changes instantly
@@ -269,14 +286,16 @@ service cloud.firestore {
 6. No server required to run the application
 
 ## Risks
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Data migration errors | Medium | High | Thorough testing, rollback plan |
-| Query performance issues | Low | Medium | Index optimization, denormalization |
-| Firebase outages | Low | High | Firestore offline mode provides resilience |
-| Cost overruns | Low | Low | Monitor usage, set budget alerts |
+
+| Risk                     | Likelihood | Impact | Mitigation                                 |
+| ------------------------ | ---------- | ------ | ------------------------------------------ |
+| Data migration errors    | Medium     | High   | Thorough testing, rollback plan            |
+| Query performance issues | Low        | Medium | Index optimization, denormalization        |
+| Firebase outages         | Low        | High   | Firestore offline mode provides resilience |
+| Cost overruns            | Low        | Low    | Monitor usage, set budget alerts           |
 
 ## Timeline Estimate
+
 - Phase 1: Firebase Auth integration
 - Phase 2: Firestore data layer
 - Phase 3: Migration and cleanup

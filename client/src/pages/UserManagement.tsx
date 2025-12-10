@@ -145,9 +145,7 @@ export function UserManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">User Management</h2>
-          <p className="text-sm text-muted-foreground">
-            Manage user accounts and permissions
-          </p>
+          <p className="text-sm text-muted-foreground">Manage user accounts and permissions</p>
         </div>
         <Button onClick={() => setAddDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
@@ -221,9 +219,7 @@ export function UserManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add User</DialogTitle>
-            <DialogDescription>
-              Create a new user account
-            </DialogDescription>
+            <DialogDescription>Create a new user account</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddUser}>
             <div className="space-y-4 py-4">
@@ -250,17 +246,11 @@ export function UserManagement() {
               </div>
             </div>
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setAddDialogOpen(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => setAddDialogOpen(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
+                {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create User
               </Button>
             </DialogFooter>
@@ -274,8 +264,8 @@ export function UserManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete User</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete the user "{selectedUser?.username}"?
-              This action cannot be undone.
+              Are you sure you want to delete the user "{selectedUser?.username}"? This action
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -284,9 +274,7 @@ export function UserManagement() {
               onClick={() => selectedUser && deleteMutation.mutate(selectedUser._id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
+              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

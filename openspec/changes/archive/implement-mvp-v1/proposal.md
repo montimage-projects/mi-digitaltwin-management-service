@@ -46,12 +46,12 @@ Sprint 0 established the foundation with authentication, service repository list
 
 ## Risks
 
-| Risk | Mitigation |
-|------|------------|
-| React Flow learning curve | Use examples from documentation, keep canvas simple |
-| MAESTRO API contract unclear | Design for flexible iFrame URL construction |
-| Large topology files | Implement client-side validation and size limits |
-| iFrame CSP restrictions | Document fallback approaches for blocked dashboards |
+| Risk                         | Mitigation                                          |
+| ---------------------------- | --------------------------------------------------- |
+| React Flow learning curve    | Use examples from documentation, keep canvas simple |
+| MAESTRO API contract unclear | Design for flexible iFrame URL construction         |
+| Large topology files         | Implement client-side validation and size limits    |
+| iFrame CSP restrictions      | Document fallback approaches for blocked dashboards |
 
 ## Success Criteria
 

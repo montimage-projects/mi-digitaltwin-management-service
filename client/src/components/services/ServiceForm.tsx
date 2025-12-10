@@ -2,7 +2,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQuery } from '@tanstack/react-query';
-import { categoriesApi, sectorsApi, servicesApi, type Service, type CreateServiceData } from '@/lib/api';
+import {
+  categoriesApi,
+  sectorsApi,
+  servicesApi,
+  type Service,
+  type CreateServiceData,
+} from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,95 +20,345 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { X, Plus, Globe, Terminal, Monitor, ChevronsUpDown, Search, HelpCircle, Copy, Trash2 } from 'lucide-react';
+import {
+  X,
+  Plus,
+  Globe,
+  Terminal,
+  Monitor,
+  ChevronsUpDown,
+  Search,
+  HelpCircle,
+  Copy,
+  Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
 
 // Popular software licenses ordered by popularity
 const SOFTWARE_LICENSES = [
   { value: 'MIT', label: 'MIT License', description: 'Permissive, minimal restrictions' },
-  { value: 'Apache-2.0', label: 'Apache License 2.0', description: 'Permissive with patent protection' },
-  { value: 'GPL-3.0', label: 'GNU GPL v3.0', description: 'Strong copyleft, derivative works must be open' },
+  {
+    value: 'Apache-2.0',
+    label: 'Apache License 2.0',
+    description: 'Permissive with patent protection',
+  },
+  {
+    value: 'GPL-3.0',
+    label: 'GNU GPL v3.0',
+    description: 'Strong copyleft, derivative works must be open',
+  },
   { value: 'BSD-3-Clause', label: 'BSD 3-Clause', description: 'Permissive, requires attribution' },
   { value: 'GPL-2.0', label: 'GNU GPL v2.0', description: 'Copyleft, predecessor to GPL v3' },
-  { value: 'BSD-2-Clause', label: 'BSD 2-Clause', description: 'Simplified BSD, minimal restrictions' },
+  {
+    value: 'BSD-2-Clause',
+    label: 'BSD 2-Clause',
+    description: 'Simplified BSD, minimal restrictions',
+  },
   { value: 'ISC', label: 'ISC License', description: 'Permissive, functionally equivalent to MIT' },
-  { value: 'LGPL-3.0', label: 'GNU LGPL v3.0', description: 'Weak copyleft, allows proprietary linking' },
-  { value: 'MPL-2.0', label: 'Mozilla Public License 2.0', description: 'Weak copyleft, file-level copyleft' },
-  { value: 'AGPL-3.0', label: 'GNU AGPL v3.0', description: 'Strong copyleft, network use triggers' },
+  {
+    value: 'LGPL-3.0',
+    label: 'GNU LGPL v3.0',
+    description: 'Weak copyleft, allows proprietary linking',
+  },
+  {
+    value: 'MPL-2.0',
+    label: 'Mozilla Public License 2.0',
+    description: 'Weak copyleft, file-level copyleft',
+  },
+  {
+    value: 'AGPL-3.0',
+    label: 'GNU AGPL v3.0',
+    description: 'Strong copyleft, network use triggers',
+  },
   { value: 'Unlicense', label: 'The Unlicense', description: 'Public domain dedication' },
-  { value: 'CC0-1.0', label: 'CC0 1.0 Universal', description: 'Public domain, no rights reserved' },
+  {
+    value: 'CC0-1.0',
+    label: 'CC0 1.0 Universal',
+    description: 'Public domain, no rights reserved',
+  },
   { value: 'WTFPL', label: 'WTFPL', description: 'Do What The F*** You Want Public License' },
   { value: 'Zlib', label: 'zlib License', description: 'Permissive, used in zlib library' },
-  { value: 'EPL-2.0', label: 'Eclipse Public License 2.0', description: 'Weak copyleft, Eclipse Foundation' },
-  { value: 'EUPL-1.2', label: 'European Union Public License 1.2', description: 'Copyleft, EU compatible' },
-  { value: 'CC-BY-4.0', label: 'Creative Commons Attribution 4.0', description: 'For non-software works' },
-  { value: 'CC-BY-SA-4.0', label: 'Creative Commons Attribution-ShareAlike 4.0', description: 'Share-alike for non-software' },
+  {
+    value: 'EPL-2.0',
+    label: 'Eclipse Public License 2.0',
+    description: 'Weak copyleft, Eclipse Foundation',
+  },
+  {
+    value: 'EUPL-1.2',
+    label: 'European Union Public License 1.2',
+    description: 'Copyleft, EU compatible',
+  },
+  {
+    value: 'CC-BY-4.0',
+    label: 'Creative Commons Attribution 4.0',
+    description: 'For non-software works',
+  },
+  {
+    value: 'CC-BY-SA-4.0',
+    label: 'Creative Commons Attribution-ShareAlike 4.0',
+    description: 'Share-alike for non-software',
+  },
   { value: 'Proprietary', label: 'Proprietary', description: 'Closed source, all rights reserved' },
   { value: 'Commercial', label: 'Commercial License', description: 'Paid license required' },
 ];
 
 // Technology Readiness Levels (TRL) definitions
 const TRL_LEVELS = [
-  { level: 1, name: 'Basic Principles', description: 'Basic principles observed and reported. Scientific research begins.' },
-  { level: 2, name: 'Concept Formulated', description: 'Technology concept and/or application formulated. Practical applications identified.' },
-  { level: 3, name: 'Proof of Concept', description: 'Analytical and experimental critical function proof of concept. Active R&D initiated.' },
-  { level: 4, name: 'Lab Validation', description: 'Component and/or breadboard validation in laboratory environment.' },
-  { level: 5, name: 'Lab Scale Prototype', description: 'Component and/or breadboard validation in relevant environment.' },
-  { level: 6, name: 'Prototype Demo', description: 'System/subsystem model or prototype demonstration in relevant environment.' },
-  { level: 7, name: 'System Prototype', description: 'System prototype demonstration in operational environment.' },
-  { level: 8, name: 'System Complete', description: 'Actual system completed and qualified through test and demonstration.' },
-  { level: 9, name: 'Production Ready', description: 'Actual system proven through successful mission operations. Ready for deployment.' },
+  {
+    level: 1,
+    name: 'Basic Principles',
+    description: 'Basic principles observed and reported. Scientific research begins.',
+  },
+  {
+    level: 2,
+    name: 'Concept Formulated',
+    description:
+      'Technology concept and/or application formulated. Practical applications identified.',
+  },
+  {
+    level: 3,
+    name: 'Proof of Concept',
+    description:
+      'Analytical and experimental critical function proof of concept. Active R&D initiated.',
+  },
+  {
+    level: 4,
+    name: 'Lab Validation',
+    description: 'Component and/or breadboard validation in laboratory environment.',
+  },
+  {
+    level: 5,
+    name: 'Lab Scale Prototype',
+    description: 'Component and/or breadboard validation in relevant environment.',
+  },
+  {
+    level: 6,
+    name: 'Prototype Demo',
+    description: 'System/subsystem model or prototype demonstration in relevant environment.',
+  },
+  {
+    level: 7,
+    name: 'System Prototype',
+    description: 'System prototype demonstration in operational environment.',
+  },
+  {
+    level: 8,
+    name: 'System Complete',
+    description: 'Actual system completed and qualified through test and demonstration.',
+  },
+  {
+    level: 9,
+    name: 'Production Ready',
+    description:
+      'Actual system proven through successful mission operations. Ready for deployment.',
+  },
 ];
 
 // Comprehensive list of compliance standards
 const COMPLIANCE_STANDARDS = [
   // ISO/IEC Standards
-  { value: 'ISO/IEC 27001', label: 'ISO/IEC 27001', category: 'ISO/IEC Standards', description: 'Information Security Management' },
-  { value: 'ISO/IEC 27002', label: 'ISO/IEC 27002', category: 'ISO/IEC Standards', description: 'Security Controls' },
-  { value: 'ISO/IEC 27017', label: 'ISO/IEC 27017', category: 'ISO/IEC Standards', description: 'Cloud Security' },
-  { value: 'ISO/IEC 27018', label: 'ISO/IEC 27018', category: 'ISO/IEC Standards', description: 'Cloud Privacy' },
-  { value: 'ISO/IEC 27701', label: 'ISO/IEC 27701', category: 'ISO/IEC Standards', description: 'Privacy Information Management' },
-  { value: 'ISO/IEC 22301', label: 'ISO/IEC 22301', category: 'ISO/IEC Standards', description: 'Business Continuity' },
-  { value: 'ISO/IEC 20000', label: 'ISO/IEC 20000', category: 'ISO/IEC Standards', description: 'IT Service Management' },
-  { value: 'ISO 9001', label: 'ISO 9001', category: 'ISO/IEC Standards', description: 'Quality Management' },
+  {
+    value: 'ISO/IEC 27001',
+    label: 'ISO/IEC 27001',
+    category: 'ISO/IEC Standards',
+    description: 'Information Security Management',
+  },
+  {
+    value: 'ISO/IEC 27002',
+    label: 'ISO/IEC 27002',
+    category: 'ISO/IEC Standards',
+    description: 'Security Controls',
+  },
+  {
+    value: 'ISO/IEC 27017',
+    label: 'ISO/IEC 27017',
+    category: 'ISO/IEC Standards',
+    description: 'Cloud Security',
+  },
+  {
+    value: 'ISO/IEC 27018',
+    label: 'ISO/IEC 27018',
+    category: 'ISO/IEC Standards',
+    description: 'Cloud Privacy',
+  },
+  {
+    value: 'ISO/IEC 27701',
+    label: 'ISO/IEC 27701',
+    category: 'ISO/IEC Standards',
+    description: 'Privacy Information Management',
+  },
+  {
+    value: 'ISO/IEC 22301',
+    label: 'ISO/IEC 22301',
+    category: 'ISO/IEC Standards',
+    description: 'Business Continuity',
+  },
+  {
+    value: 'ISO/IEC 20000',
+    label: 'ISO/IEC 20000',
+    category: 'ISO/IEC Standards',
+    description: 'IT Service Management',
+  },
+  {
+    value: 'ISO 9001',
+    label: 'ISO 9001',
+    category: 'ISO/IEC Standards',
+    description: 'Quality Management',
+  },
   // NIST Frameworks
-  { value: 'NIST CSF', label: 'NIST CSF', category: 'NIST Frameworks', description: 'Cybersecurity Framework' },
-  { value: 'NIST SP 800-53', label: 'NIST SP 800-53', category: 'NIST Frameworks', description: 'Security and Privacy Controls' },
-  { value: 'NIST SP 800-171', label: 'NIST SP 800-171', category: 'NIST Frameworks', description: 'Protecting CUI' },
-  { value: 'NIST SP 800-82', label: 'NIST SP 800-82', category: 'NIST Frameworks', description: 'ICS Security' },
+  {
+    value: 'NIST CSF',
+    label: 'NIST CSF',
+    category: 'NIST Frameworks',
+    description: 'Cybersecurity Framework',
+  },
+  {
+    value: 'NIST SP 800-53',
+    label: 'NIST SP 800-53',
+    category: 'NIST Frameworks',
+    description: 'Security and Privacy Controls',
+  },
+  {
+    value: 'NIST SP 800-171',
+    label: 'NIST SP 800-171',
+    category: 'NIST Frameworks',
+    description: 'Protecting CUI',
+  },
+  {
+    value: 'NIST SP 800-82',
+    label: 'NIST SP 800-82',
+    category: 'NIST Frameworks',
+    description: 'ICS Security',
+  },
   // EU Regulations
-  { value: 'GDPR', label: 'GDPR', category: 'EU Regulations', description: 'General Data Protection Regulation' },
-  { value: 'NIS2', label: 'NIS2', category: 'EU Regulations', description: 'Network and Information Security Directive' },
-  { value: 'DORA', label: 'DORA', category: 'EU Regulations', description: 'Digital Operational Resilience Act' },
-  { value: 'EU AI Act', label: 'EU AI Act', category: 'EU Regulations', description: 'Artificial Intelligence Regulation' },
-  { value: 'eIDAS', label: 'eIDAS', category: 'EU Regulations', description: 'Electronic Identification' },
+  {
+    value: 'GDPR',
+    label: 'GDPR',
+    category: 'EU Regulations',
+    description: 'General Data Protection Regulation',
+  },
+  {
+    value: 'NIS2',
+    label: 'NIS2',
+    category: 'EU Regulations',
+    description: 'Network and Information Security Directive',
+  },
+  {
+    value: 'DORA',
+    label: 'DORA',
+    category: 'EU Regulations',
+    description: 'Digital Operational Resilience Act',
+  },
+  {
+    value: 'EU AI Act',
+    label: 'EU AI Act',
+    category: 'EU Regulations',
+    description: 'Artificial Intelligence Regulation',
+  },
+  {
+    value: 'eIDAS',
+    label: 'eIDAS',
+    category: 'EU Regulations',
+    description: 'Electronic Identification',
+  },
   // Industry Standards
-  { value: 'PCI DSS', label: 'PCI DSS', category: 'Industry Standards', description: 'Payment Card Industry Data Security' },
-  { value: 'SOC 2', label: 'SOC 2', category: 'Industry Standards', description: 'Service Organization Control' },
-  { value: 'SOC 1', label: 'SOC 1', category: 'Industry Standards', description: 'Financial Reporting Controls' },
-  { value: 'HIPAA', label: 'HIPAA', category: 'Industry Standards', description: 'Health Insurance Portability' },
-  { value: 'HITRUST', label: 'HITRUST', category: 'Industry Standards', description: 'Health Information Trust' },
+  {
+    value: 'PCI DSS',
+    label: 'PCI DSS',
+    category: 'Industry Standards',
+    description: 'Payment Card Industry Data Security',
+  },
+  {
+    value: 'SOC 2',
+    label: 'SOC 2',
+    category: 'Industry Standards',
+    description: 'Service Organization Control',
+  },
+  {
+    value: 'SOC 1',
+    label: 'SOC 1',
+    category: 'Industry Standards',
+    description: 'Financial Reporting Controls',
+  },
+  {
+    value: 'HIPAA',
+    label: 'HIPAA',
+    category: 'Industry Standards',
+    description: 'Health Insurance Portability',
+  },
+  {
+    value: 'HITRUST',
+    label: 'HITRUST',
+    category: 'Industry Standards',
+    description: 'Health Information Trust',
+  },
   // Industrial/OT Standards
-  { value: 'IEC 62443', label: 'IEC 62443', category: 'Industrial Standards', description: 'Industrial Automation Security' },
-  { value: 'NERC CIP', label: 'NERC CIP', category: 'Industrial Standards', description: 'Critical Infrastructure Protection' },
-  { value: 'IEC 61850', label: 'IEC 61850', category: 'Industrial Standards', description: 'Power Utility Automation' },
-  { value: 'IEC 62351', label: 'IEC 62351', category: 'Industrial Standards', description: 'Power Systems Security' },
+  {
+    value: 'IEC 62443',
+    label: 'IEC 62443',
+    category: 'Industrial Standards',
+    description: 'Industrial Automation Security',
+  },
+  {
+    value: 'NERC CIP',
+    label: 'NERC CIP',
+    category: 'Industrial Standards',
+    description: 'Critical Infrastructure Protection',
+  },
+  {
+    value: 'IEC 61850',
+    label: 'IEC 61850',
+    category: 'Industrial Standards',
+    description: 'Power Utility Automation',
+  },
+  {
+    value: 'IEC 62351',
+    label: 'IEC 62351',
+    category: 'Industrial Standards',
+    description: 'Power Systems Security',
+  },
   // Other Frameworks
-  { value: 'CIS Controls', label: 'CIS Controls', category: 'Other Frameworks', description: 'Center for Internet Security' },
-  { value: 'COBIT', label: 'COBIT', category: 'Other Frameworks', description: 'IT Governance Framework' },
-  { value: 'CSA STAR', label: 'CSA STAR', category: 'Other Frameworks', description: 'Cloud Security Alliance' },
-  { value: 'FedRAMP', label: 'FedRAMP', category: 'Other Frameworks', description: 'Federal Risk Authorization' },
-  { value: 'CMMC', label: 'CMMC', category: 'Other Frameworks', description: 'Cybersecurity Maturity Model' },
-  { value: 'TISAX', label: 'TISAX', category: 'Other Frameworks', description: 'Automotive Information Security' },
+  {
+    value: 'CIS Controls',
+    label: 'CIS Controls',
+    category: 'Other Frameworks',
+    description: 'Center for Internet Security',
+  },
+  {
+    value: 'COBIT',
+    label: 'COBIT',
+    category: 'Other Frameworks',
+    description: 'IT Governance Framework',
+  },
+  {
+    value: 'CSA STAR',
+    label: 'CSA STAR',
+    category: 'Other Frameworks',
+    description: 'Cloud Security Alliance',
+  },
+  {
+    value: 'FedRAMP',
+    label: 'FedRAMP',
+    category: 'Other Frameworks',
+    description: 'Federal Risk Authorization',
+  },
+  {
+    value: 'CMMC',
+    label: 'CMMC',
+    category: 'Other Frameworks',
+    description: 'Cybersecurity Maturity Model',
+  },
+  {
+    value: 'TISAX',
+    label: 'TISAX',
+    category: 'Other Frameworks',
+    description: 'Automotive Information Security',
+  },
 ];
 
 const serviceFormSchema = z.object({
@@ -142,10 +398,20 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
   const [interactsInput, setInteractsInput] = useState('');
   const [useCases, setUseCases] = useState<string[]>(service?.potentialUseCases || []);
   const [useCaseInput, setUseCaseInput] = useState('');
-  const [inputs, setInputs] = useState<{ name: string; description?: string }[]>(service?.inputs || []);
-  const [outputs, setOutputs] = useState<{ name: string; description?: string }[]>(service?.outputs || []);
-  const [versions, setVersions] = useState<{ version: string; dockerImage: string; releaseNotes?: string }[]>(
-    service?.versions?.map((v) => ({ version: v.version, dockerImage: v.dockerImage, releaseNotes: v.releaseNotes })) || []
+  const [inputs, setInputs] = useState<{ name: string; description?: string }[]>(
+    service?.inputs || []
+  );
+  const [outputs, setOutputs] = useState<{ name: string; description?: string }[]>(
+    service?.outputs || []
+  );
+  const [versions, setVersions] = useState<
+    { version: string; dockerImage: string; releaseNotes?: string }[]
+  >(
+    service?.versions?.map((v) => ({
+      version: v.version,
+      dockerImage: v.dockerImage,
+      releaseNotes: v.releaseNotes,
+    })) || []
   );
 
   const { data: categories = [] } = useQuery({
@@ -242,11 +508,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
     setter((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const addInputOutput = (
-    type: 'input' | 'output',
-    name: string,
-    description: string
-  ) => {
+  const addInputOutput = (type: 'input' | 'output', name: string, description: string) => {
     if (name.trim()) {
       const item = { name: name.trim(), description: description.trim() || undefined };
       if (type === 'input') {
@@ -322,8 +584,8 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
                   <div className="p-1">
                     {(() => {
                       const currentValue = watch('provider') || '';
-                      const filteredProviders = existingProviders.filter(
-                        (p) => p.toLowerCase().includes(currentValue.toLowerCase())
+                      const filteredProviders = existingProviders.filter((p) =>
+                        p.toLowerCase().includes(currentValue.toLowerCase())
                       );
 
                       if (filteredProviders.length === 0) {
@@ -362,9 +624,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
               </div>
             )}
           </div>
-          {errors.provider && (
-            <p className="text-sm text-destructive">{errors.provider.message}</p>
-          )}
+          {errors.provider && <p className="text-sm text-destructive">{errors.provider.message}</p>}
         </div>
       </div>
 
@@ -375,14 +635,8 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
             Full descriptive name of the service
           </p>
         </div>
-        <Input
-          id="title"
-          {...register('title')}
-          placeholder="e.g., Montimage Monitoring Tool"
-        />
-        {errors.title && (
-          <p className="text-sm text-destructive">{errors.title.message}</p>
-        )}
+        <Input id="title" {...register('title')} placeholder="e.g., Montimage Monitoring Tool" />
+        {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -432,9 +686,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
                 {sectors.map((sector) => (
                   <SelectItem key={sector._id} value={sector._id}>
                     {sector.name}
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      ({sector.category})
-                    </span>
+                    <span className="ml-2 text-xs text-muted-foreground">({sector.category})</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -523,9 +775,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
         <div className="space-y-2">
           <div>
             <Label htmlFor="license">License</Label>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Software license type
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">Software license type</p>
           </div>
           <Popover open={isLicensePopoverOpen} onOpenChange={setIsLicensePopoverOpen}>
             <PopoverTrigger asChild>
@@ -647,8 +897,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
             </PopoverContent>
           </Popover>
         </div>
-
-        </div>
+      </div>
 
       {/* Versions & Docker Images */}
       <div className="space-y-2">
@@ -703,15 +952,15 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
           <p className="text-xs font-medium text-muted-foreground">Add new version</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="newVersion" className="text-xs">Version *</Label>
-              <Input
-                id="newVersion"
-                placeholder="e.g., 1.0.0"
-                className="h-8 text-sm font-mono"
-              />
+              <Label htmlFor="newVersion" className="text-xs">
+                Version *
+              </Label>
+              <Input id="newVersion" placeholder="e.g., 1.0.0" className="h-8 text-sm font-mono" />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="newDockerImage" className="text-xs">Docker Image URL *</Label>
+              <Label htmlFor="newDockerImage" className="text-xs">
+                Docker Image URL *
+              </Label>
               <Input
                 id="newDockerImage"
                 placeholder="e.g., registry.example.com/image:v1.0.0"
@@ -720,7 +969,9 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
             </div>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="newReleaseNotes" className="text-xs">Release Notes</Label>
+            <Label htmlFor="newReleaseNotes" className="text-xs">
+              Release Notes
+            </Label>
             <Input
               id="newReleaseNotes"
               placeholder="e.g., Initial release, Bug fixes, New features..."
@@ -786,7 +1037,9 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
                         <div
                           key={trl.level}
                           className={`flex gap-3 p-2 rounded-md ${
-                            trl.level === trlCurrent ? 'bg-primary/10 border border-primary/20' : 'hover:bg-accent'
+                            trl.level === trlCurrent
+                              ? 'bg-primary/10 border border-primary/20'
+                              : 'hover:bg-accent'
                           }`}
                         >
                           <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -853,7 +1106,9 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
                         <div
                           key={trl.level}
                           className={`flex gap-3 p-2 rounded-md ${
-                            trl.level === trlExpected ? 'bg-primary/10 border border-primary/20' : 'hover:bg-accent'
+                            trl.level === trlExpected
+                              ? 'bg-primary/10 border border-primary/20'
+                              : 'hover:bg-accent'
                           }`}
                         >
                           <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1008,7 +1263,10 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
                   size="sm"
                   className="h-8 px-2"
                   onClick={() => {
-                    if (customStandardInput.trim() && !standards.includes(customStandardInput.trim())) {
+                    if (
+                      customStandardInput.trim() &&
+                      !standards.includes(customStandardInput.trim())
+                    ) {
                       setStandards([...standards, customStandardInput.trim()]);
                       setCustomStandardInput('');
                     }
@@ -1120,7 +1378,9 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
                                 className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent cursor-pointer"
                                 onClick={() => {
                                   if (isSelected) {
-                                    setInteractsWith(interactsWith.filter((s) => s !== svc.shortName));
+                                    setInteractsWith(
+                                      interactsWith.filter((s) => s !== svc.shortName)
+                                    );
                                   } else {
                                     setInteractsWith([...interactsWith, svc.shortName]);
                                   }
@@ -1151,7 +1411,9 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
                                 className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent cursor-pointer"
                                 onClick={() => {
                                   if (isSelected) {
-                                    setInteractsWith(interactsWith.filter((s) => s !== svc.shortName));
+                                    setInteractsWith(
+                                      interactsWith.filter((s) => s !== svc.shortName)
+                                    );
                                   } else {
                                     setInteractsWith([...interactsWith, svc.shortName]);
                                   }
@@ -1236,10 +1498,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
           {useCases.map((item, i) => (
             <Badge key={i} variant="secondary" className="gap-1">
               {item}
-              <X
-                className="h-3 w-3 cursor-pointer"
-                onClick={() => removeTag(i, setUseCases)}
-              />
+              <X className="h-3 w-3 cursor-pointer" onClick={() => removeTag(i, setUseCases)} />
             </Badge>
           ))}
         </div>
@@ -1254,16 +1513,8 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
           </p>
         </div>
         <div className="flex gap-2">
-          <Input
-            id="inputName"
-            placeholder="Name"
-            className="flex-1"
-          />
-          <Input
-            id="inputDesc"
-            placeholder="Description (optional)"
-            className="flex-1"
-          />
+          <Input id="inputName" placeholder="Name" className="flex-1" />
+          <Input id="inputDesc" placeholder="Description (optional)" className="flex-1" />
           <Button
             type="button"
             variant="outline"
@@ -1304,16 +1555,8 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
           </p>
         </div>
         <div className="flex gap-2">
-          <Input
-            id="outputName"
-            placeholder="Name"
-            className="flex-1"
-          />
-          <Input
-            id="outputDesc"
-            placeholder="Description (optional)"
-            className="flex-1"
-          />
+          <Input id="outputName" placeholder="Name" className="flex-1" />
+          <Input id="outputDesc" placeholder="Description (optional)" className="flex-1" />
           <Button
             type="button"
             variant="outline"

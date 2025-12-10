@@ -48,7 +48,8 @@ export function ServiceDrawer({ service, open, onClose }: ServiceDrawerProps) {
 
   // Get selected version or default to current version
   const activeVersionString = selectedVersion || service.currentVersion || '';
-  const activeVersion = service.versions?.find((v) => v.version === activeVersionString) || service.versions?.[0];
+  const activeVersion =
+    service.versions?.find((v) => v.version === activeVersionString) || service.versions?.[0];
 
   const UiTypeIcon = UI_TYPE_ICONS[service.uiType || 'web'];
 
@@ -224,10 +225,7 @@ export function ServiceDrawer({ service, open, onClose }: ServiceDrawerProps) {
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <h4 className="text-sm font-semibold">Version & Docker Image</h4>
-                  <Select
-                    value={activeVersionString}
-                    onValueChange={setSelectedVersion}
-                  >
+                  <Select value={activeVersionString} onValueChange={setSelectedVersion}>
                     <SelectTrigger className="h-7 w-[120px]">
                       <SelectValue placeholder="Select version" />
                     </SelectTrigger>
@@ -244,9 +242,7 @@ export function ServiceDrawer({ service, open, onClose }: ServiceDrawerProps) {
                 {activeVersion && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 rounded-md bg-muted p-2">
-                      <code className="flex-1 truncate text-xs">
-                        {activeVersion.dockerImage}
-                      </code>
+                      <code className="flex-1 truncate text-xs">{activeVersion.dockerImage}</code>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -257,7 +253,9 @@ export function ServiceDrawer({ service, open, onClose }: ServiceDrawerProps) {
                       </Button>
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>Released: {new Date(activeVersion.releasedAt).toLocaleDateString()}</span>
+                      <span>
+                        Released: {new Date(activeVersion.releasedAt).toLocaleDateString()}
+                      </span>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -269,9 +267,7 @@ export function ServiceDrawer({ service, open, onClose }: ServiceDrawerProps) {
                       </Button>
                     </div>
                     {activeVersion.releaseNotes && (
-                      <p className="text-xs text-muted-foreground">
-                        {activeVersion.releaseNotes}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{activeVersion.releaseNotes}</p>
                     )}
                   </div>
                 )}

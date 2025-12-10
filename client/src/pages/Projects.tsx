@@ -45,9 +45,7 @@ export function Projects() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Digital Twin Projects</h1>
-          <p className="text-muted-foreground">
-            Create and manage Digital Twin projects
-          </p>
+          <p className="text-muted-foreground">Create and manage Digital Twin projects</p>
         </div>
         <Button onClick={() => navigate('/projects/add')}>
           <Plus className="mr-2 h-4 w-4" />
@@ -85,9 +83,7 @@ export function Projects() {
       {/* Projects Table */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            {filteredProjects.length} projects
-          </span>
+          <span className="text-sm text-muted-foreground">{filteredProjects.length} projects</span>
         </div>
         <ProjectTable
           projects={filteredProjects}

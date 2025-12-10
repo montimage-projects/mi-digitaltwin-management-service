@@ -7,6 +7,7 @@ Sprint 5 is 69% complete (11/16 tasks done). The remaining tasks focus on produc
 ## What Changes
 
 ### In Scope
+
 1. **User Management Page (TASK-080)** - Basic UI for viewing/managing users
 2. **Settings Page (TASK-081)** - Application configuration UI with category management
 3. **Brand Kit Audit (TASK-082)** - Verify UI consistency with brand specifications
@@ -19,6 +20,7 @@ Sprint 5 is 69% complete (11/16 tasks done). The remaining tasks focus on produc
 10. **Final Integration Testing (TASK-090)** - End-to-end verification
 
 ### Out of Scope (Deferred)
+
 - E2E Testing Framework (TASK-087) - Can be added post-MVP
 - Multi-user roles beyond admin
 - Real-time WebSocket updates
@@ -36,8 +38,8 @@ Sprint 5 is 69% complete (11/16 tasks done). The remaining tasks focus on produc
 
 ## Risks
 
-| Risk | Mitigation |
-|------|------------|
-| Accessibility audit scope creep | Focus on critical WCAG AA items only |
-| Production Docker complexity | Use proven multi-stage patterns |
-| API docs generation effort | Use Zod-to-OpenAPI for automatic generation |
+| Risk                            | Mitigation                                  |
+| ------------------------------- | ------------------------------------------- |
+| Accessibility audit scope creep | Focus on critical WCAG AA items only        |
+| Production Docker complexity    | Use proven multi-stage patterns             |
+| API docs generation effort      | Use Zod-to-OpenAPI for automatic generation |

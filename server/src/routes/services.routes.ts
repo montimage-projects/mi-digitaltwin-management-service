@@ -17,18 +17,29 @@ const inputOutputSchema = z.object({
 });
 
 const createServiceSchema = z.object({
-  shortName: z.string().min(1).max(50).transform(val => val.toUpperCase()),
+  shortName: z
+    .string()
+    .min(1)
+    .max(50)
+    .transform((val) => val.toUpperCase()),
   title: z.string().min(1).max(200),
-  categoryId: z.string().refine(val => objectIdSchema.safeParse(val).success, 'Invalid category ID'),
-  sectorId: z.string().refine(val => objectIdSchema.safeParse(val).success, 'Invalid sector ID').optional(),
+  categoryId: z
+    .string()
+    .refine((val) => objectIdSchema.safeParse(val).success, 'Invalid category ID'),
+  sectorId: z
+    .string()
+    .refine((val) => objectIdSchema.safeParse(val).success, 'Invalid sector ID')
+    .optional(),
   provider: z.string().min(1).max(100),
   description: z.string().max(2000).optional(),
   type: z.enum(['Software', 'Hardware', 'Software/Hardware']).default('Software'),
   uiType: z.enum(['web', 'terminal', 'both']).default('web'),
-  trl: z.object({
-    current: z.number().min(1).max(9).optional(),
-    expected: z.number().min(1).max(9).optional(),
-  }).optional(),
+  trl: z
+    .object({
+      current: z.number().min(1).max(9).optional(),
+      expected: z.number().min(1).max(9).optional(),
+    })
+    .optional(),
   license: z.string().max(100).optional(),
   standards: z.array(z.string().max(100)).default([]),
   inputs: z.array(inputOutputSchema).default([]),
@@ -37,12 +48,16 @@ const createServiceSchema = z.object({
   potentialUseCases: z.array(z.string().max(500)).default([]),
   repositoryTable: z.enum(['INTACT_TOOLBOX', 'OTHER_SERVICES']).default('INTACT_TOOLBOX'),
   currentVersion: z.string().max(50).optional(),
-  versions: z.array(z.object({
-    version: z.string().min(1).max(50),
-    dockerImage: z.string().min(1).max(500),
-    releaseNotes: z.string().max(2000).optional(),
-    releasedAt: z.string().datetime().optional(),
-  })).default([]),
+  versions: z
+    .array(
+      z.object({
+        version: z.string().min(1).max(50),
+        dockerImage: z.string().min(1).max(500),
+        releaseNotes: z.string().max(2000).optional(),
+        releasedAt: z.string().datetime().optional(),
+      })
+    )
+    .default([]),
 });
 
 const updateServiceSchema = createServiceSchema.partial();
@@ -74,7 +89,8 @@ type ListServicesQuery = z.infer<typeof listServicesSchema>;
 // GET /api/services
 router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, res, next) => {
   try {
-    const { table, category, sector, provider, search, limit, skip } = req.query as unknown as ListServicesQuery;
+    const { table, category, sector, provider, search, limit, skip } =
+      req.query as unknown as ListServicesQuery;
 
     const query: Record<string, unknown> = {};
 
@@ -276,51 +292,56 @@ router.delete('/:id', authMiddleware, async (req, res, next) => {
 });
 
 // POST /api/services/:id/versions - Add new version
-router.post('/:id/versions', authMiddleware, validateBody(addVersionSchema), async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { version, dockerImage, releaseNotes } = req.body;
+router.post(
+  '/:id/versions',
+  authMiddleware,
+  validateBody(addVersionSchema),
+  async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { version, dockerImage, releaseNotes } = req.body;
 
-    // Validate ObjectId format
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid service ID', 400);
+      // Validate ObjectId format
+      const parseResult = objectIdSchema.safeParse(id);
+      if (!parseResult.success) {
+        throw new AppError('Invalid service ID', 400);
+      }
+
+      const service = await Service.findById(id);
+
+      if (!service) {
+        throw new AppError('Service not found', 404);
+      }
+
+      // Check for duplicate version
+      const existingVersion = service.versions.find((v) => v.version === version);
+      if (existingVersion) {
+        throw new AppError('Version already exists', 409);
+      }
+
+      // Add new version
+      service.versions.push({
+        version,
+        dockerImage,
+        releaseNotes,
+        releasedAt: new Date(),
+      });
+
+      // Update currentVersion
+      service.currentVersion = version;
+
+      await service.save();
+
+      const populatedService = await Service.findById(id)
+        .populate('categoryId', 'name slug')
+        .populate('sectorId', 'name slug category')
+        .lean();
+
+      res.json(populatedService);
+    } catch (error) {
+      next(error);
     }
-
-    const service = await Service.findById(id);
-
-    if (!service) {
-      throw new AppError('Service not found', 404);
-    }
-
-    // Check for duplicate version
-    const existingVersion = service.versions.find(v => v.version === version);
-    if (existingVersion) {
-      throw new AppError('Version already exists', 409);
-    }
-
-    // Add new version
-    service.versions.push({
-      version,
-      dockerImage,
-      releaseNotes,
-      releasedAt: new Date(),
-    });
-
-    // Update currentVersion
-    service.currentVersion = version;
-
-    await service.save();
-
-    const populatedService = await Service.findById(id)
-      .populate('categoryId', 'name slug')
-      .populate('sectorId', 'name slug category')
-      .lean();
-
-    res.json(populatedService);
-  } catch (error) {
-    next(error);
   }
-});
+);
 
 export default router;

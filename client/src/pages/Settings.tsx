@@ -15,9 +15,7 @@ export function Settings() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">
-          Configure platform settings and preferences
-        </p>
+        <p className="text-muted-foreground">Configure platform settings and preferences</p>
       </div>
 
       <Tabs defaultValue="general" className="space-y-6">
@@ -47,9 +45,7 @@ export function Settings() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Environment</p>
-                <Badge variant="outline">
-                  {import.meta.env.MODE || 'development'}
-                </Badge>
+                <Badge variant="outline">{import.meta.env.MODE || 'development'}</Badge>
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">API URL</p>
@@ -91,7 +87,8 @@ export function Settings() {
           <div className="rounded-lg border bg-background p-6">
             <h2 className="text-lg font-semibold mb-4">Service Categories</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Categories are used to organize services in the repository. These are based on the D2.1 specification.
+              Categories are used to organize services in the repository. These are based on the
+              D2.1 specification.
             </p>
             {categories.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No categories found</p>

@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Loader2 } from 'lucide-react';
-import { infrastructuresApi, Infrastructure as InfrastructureType, CreateInfrastructureData } from '@/lib/api';
+import {
+  infrastructuresApi,
+  Infrastructure as InfrastructureType,
+  CreateInfrastructureData,
+} from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -88,9 +92,7 @@ export function Infrastructure() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Infrastructure</h1>
-          <p className="text-muted-foreground">
-            Manage Kubernetes clusters and deployment targets
-          </p>
+          <p className="text-muted-foreground">Manage Kubernetes clusters and deployment targets</p>
         </div>
         <Button onClick={handleOpenDialog}>
           <Plus className="mr-2 h-4 w-4" />
@@ -111,9 +113,7 @@ export function Infrastructure() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>
-              {editingInfra ? 'Edit Infrastructure' : 'Add Infrastructure'}
-            </DialogTitle>
+            <DialogTitle>{editingInfra ? 'Edit Infrastructure' : 'Add Infrastructure'}</DialogTitle>
             <DialogDescription>
               {editingInfra
                 ? 'Update the infrastructure configuration'

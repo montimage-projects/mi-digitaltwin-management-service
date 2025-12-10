@@ -113,6 +113,7 @@
 **Completed:** 90/90 tasks (100%)
 
 ### MVP v1.0 Features Implemented:
+
 - Full Service Repository with CRUD operations
 - 44 INTACT Services seeded (21 Toolbox + 23 Infrastructure)
 - Project and Scenario management

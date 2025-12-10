@@ -12,14 +12,14 @@ This document outlines the development tasks for the INTACT Digital Twin Managem
 
 ## Development Phases
 
-| Phase | Sprint | Duration | Focus |
-|-------|--------|----------|-------|
-| **POC** | Sprint 0 | 3-4 days | Project foundation, auth, basic service listing |
-| **MVP** | Sprint 1 | 1 week | Service Repository CRUD, Categories |
-| **MVP** | Sprint 2 | 1 week | Projects, Scenarios, Basic Topology Editor |
-| **Full** | Sprint 3 | 1 week | Visual Canvas, Split-Screen Editor |
-| **Full** | Sprint 4 | 1 week | MAESTRO Integration, Tabbed Workspace |
-| **Full** | Sprint 5 | 1 week | Infrastructure, Analytics, Polish |
+| Phase    | Sprint   | Duration | Focus                                           |
+| -------- | -------- | -------- | ----------------------------------------------- |
+| **POC**  | Sprint 0 | 3-4 days | Project foundation, auth, basic service listing |
+| **MVP**  | Sprint 1 | 1 week   | Service Repository CRUD, Categories             |
+| **MVP**  | Sprint 2 | 1 week   | Projects, Scenarios, Basic Topology Editor      |
+| **Full** | Sprint 3 | 1 week   | Visual Canvas, Split-Screen Editor              |
+| **Full** | Sprint 4 | 1 week   | MAESTRO Integration, Tabbed Workspace           |
+| **Full** | Sprint 5 | 1 week   | Infrastructure, Analytics, Polish               |
 
 ---
 
@@ -36,6 +36,7 @@ This document outlines the development tasks for the INTACT Digital Twin Managem
 Set up the project structure with Bun as the runtime, creating a monorepo structure for frontend (React/Vite) and backend (Express.js). Configure TypeScript, ESLint, Prettier, and essential tooling.
 
 **Acceptance Criteria:**
+
 - [ ] Monorepo structure created with `/client` and `/server` directories
 - [ ] Bun configured as package manager and runtime
 - [ ] TypeScript configured for both client and server with strict mode
@@ -54,6 +55,7 @@ Set up the project structure with Bun as the runtime, creating a monorepo struct
 Create Docker Compose configuration for local development with MongoDB and the application services. Enables consistent development environment across machines.
 
 **Acceptance Criteria:**
+
 - [ ] `docker-compose.yml` created with MongoDB 7.x service
 - [ ] MongoDB data persistence configured with named volume
 - [ ] Health checks configured for MongoDB
@@ -71,6 +73,7 @@ Create Docker Compose configuration for local development with MongoDB and the a
 Set up Express.js backend with essential middleware, error handling, and logging. Establish the foundational API structure following RESTful conventions.
 
 **Acceptance Criteria:**
+
 - [ ] Express.js server configured with Bun runtime
 - [ ] Middleware configured: CORS, Helmet, Morgan, JSON parser
 - [ ] Global error handling middleware implemented
@@ -89,6 +92,7 @@ Set up Express.js backend with essential middleware, error handling, and logging
 Establish MongoDB connection using Mongoose ODM with connection pooling, retry logic, and proper error handling.
 
 **Acceptance Criteria:**
+
 - [ ] Mongoose connection established with retry logic
 - [ ] Connection events logged (connected, disconnected, error)
 - [ ] Connection pool configured (default: 10 connections)
@@ -106,6 +110,7 @@ Establish MongoDB connection using Mongoose ODM with connection pooling, retry l
 Create the User Mongoose model with password hashing using bcrypt. Implement the foundation for JWT-based authentication.
 
 **Acceptance Criteria:**
+
 - [ ] User schema defined: `username`, `passwordHash`, `role`, `timestamps`
 - [ ] Unique index on `username` field
 - [ ] Pre-save hook for password hashing (bcrypt, cost factor 12)
@@ -123,6 +128,7 @@ Create the User Mongoose model with password hashing using bcrypt. Implement the
 Implement JWT-based authentication with login endpoint, token generation, and authentication middleware for protected routes.
 
 **Acceptance Criteria:**
+
 - [ ] `POST /api/auth/login` endpoint implemented
 - [ ] JWT token generation with 24-hour expiration
 - [ ] JWT secret configurable via environment variable
@@ -142,6 +148,7 @@ Implement JWT-based authentication with login endpoint, token generation, and au
 Set up Zod for request validation with reusable schemas and validation middleware for consistent input validation across all endpoints.
 
 **Acceptance Criteria:**
+
 - [ ] Zod installed and configured
 - [ ] Validation middleware factory created
 - [ ] Auth schemas defined (login request)
@@ -159,6 +166,7 @@ Set up Zod for request validation with reusable schemas and validation middlewar
 Create the Category Mongoose model and seed script with the 10 categories from D2.1 document.
 
 **Acceptance Criteria:**
+
 - [ ] Category schema: `name`, `slug`, `description`, `timestamps`
 - [ ] Unique indexes on `name` and `slug`
 - [ ] Seed script creates 10 categories from D2.1:
@@ -185,6 +193,7 @@ Create the Category Mongoose model and seed script with the 10 categories from D
 Create the comprehensive Service Mongoose model with all fields from the D2.1 specification including version management support.
 
 **Acceptance Criteria:**
+
 - [ ] Service schema with all required fields:
   - `shortName` (unique), `title`, `categoryId` (ref)
   - `provider`, `description`, `currentVersion`
@@ -208,6 +217,7 @@ Create the comprehensive Service Mongoose model with all fields from the D2.1 sp
 Create seed script to populate the 21 services from D2.1 Tables 17-37 with accurate metadata.
 
 **Acceptance Criteria:**
+
 - [ ] Seed script creates all 21 services from D2.1:
   - ULANCS-GAME, NETWORK-FUZZER, SPLIT, CAST
   - ORION, DATA-DIODE, MMT, ROSCO-EBPF, LLM-TM
@@ -230,6 +240,7 @@ Create seed script to populate the 21 services from D2.1 Tables 17-37 with accur
 Implement read-only service listing endpoints for the POC phase to validate the data model and API structure.
 
 **Acceptance Criteria:**
+
 - [ ] `GET /api/services` - List services with pagination
 - [ ] Query parameters: `table`, `category`, `provider`, `search`
 - [ ] `limit` (default: 20, max: 100) and `skip` pagination
@@ -249,6 +260,7 @@ Implement read-only service listing endpoints for the POC phase to validate the 
 Initialize the React frontend with Vite, TypeScript, and essential dependencies including shadcn/ui component library setup.
 
 **Acceptance Criteria:**
+
 - [ ] Vite + React + TypeScript project created
 - [ ] Tailwind CSS configured with custom theme from brand kit
 - [ ] shadcn/ui initialized with slate color scheme
@@ -267,6 +279,7 @@ Initialize the React frontend with Vite, TypeScript, and essential dependencies 
 Set up React Router with the application shell layout including sidebar navigation and header.
 
 **Acceptance Criteria:**
+
 - [ ] React Router v6 configured with routes for:
   - `/login` - Login page
   - `/` - Dashboard (protected)
@@ -293,6 +306,7 @@ Set up React Router with the application shell layout including sidebar navigati
 Implement frontend authentication state management with Zustand and create the login page with form validation.
 
 **Acceptance Criteria:**
+
 - [ ] Zustand auth store with: `user`, `token`, `isAuthenticated`, `login`, `logout`
 - [ ] Token persistence in localStorage
 - [ ] Axios instance with auth interceptor
@@ -315,6 +329,7 @@ Implement frontend authentication state management with Zustand and create the l
 Create the Service Repository page with two tables (INTACT Toolbox and Other Services) displaying service data from the API.
 
 **Acceptance Criteria:**
+
 - [ ] Page displays two sections with tables
 - [ ] Table columns: Short Name, Title, Category (badge), Provider, Version
 - [ ] Loading skeleton while fetching
@@ -336,6 +351,7 @@ Create the Service Repository page with two tables (INTACT Toolbox and Other Ser
 Create a slide-out drawer component showing full service details when a service row is clicked.
 
 **Acceptance Criteria:**
+
 - [ ] Drawer slides in from right side
 - [ ] Displays all service metadata:
   - Title, Short Name, Provider
@@ -360,6 +376,7 @@ Create a slide-out drawer component showing full service details when a service 
 Create a seed script to create the initial admin user for system access.
 
 **Acceptance Criteria:**
+
 - [ ] Seed script creates admin user if not exists
 - [ ] Username and password configurable via environment variables
 - [ ] Default credentials for development: `admin` / `intact2025`
@@ -377,6 +394,7 @@ Create a seed script to create the initial admin user for system access.
 Verify the complete POC flow works end-to-end: login, view services, view service details.
 
 **Acceptance Criteria:**
+
 - [ ] Can start all services with single command (`docker-compose up`)
 - [ ] Can login with admin credentials
 - [ ] Service list loads and displays correctly
@@ -403,6 +421,7 @@ Verify the complete POC flow works end-to-end: login, view services, view servic
 Implement the POST endpoint for creating new services with full validation.
 
 **Acceptance Criteria:**
+
 - [ ] `POST /api/services` creates new service
 - [ ] Request body validated with Zod schema
 - [ ] `shortName` uniqueness enforced (409 Conflict if exists)
@@ -421,6 +440,7 @@ Implement the POST endpoint for creating new services with full validation.
 Implement the PUT endpoint for updating existing services.
 
 **Acceptance Criteria:**
+
 - [ ] `PUT /api/services/:id` updates service
 - [ ] All fields updatable except `shortName`
 - [ ] Category change validated
@@ -439,6 +459,7 @@ Implement the PUT endpoint for updating existing services.
 Implement the DELETE endpoint for removing services with proper validation.
 
 **Acceptance Criteria:**
+
 - [ ] `DELETE /api/services/:id` removes service
 - [ ] Returns 204 No Content on success
 - [ ] 404 if service not found
@@ -457,6 +478,7 @@ Implement the DELETE endpoint for removing services with proper validation.
 Implement endpoints for adding new versions to services and retrieving version history.
 
 **Acceptance Criteria:**
+
 - [ ] `POST /api/services/:id/versions` adds new version
 - [ ] Version schema: `version`, `dockerImageUrl`, `changelog`, `releasedAt`
 - [ ] Semver validation for version string
@@ -476,6 +498,7 @@ Implement endpoints for adding new versions to services and retrieving version h
 Implement full CRUD operations for categories to allow management beyond seed data.
 
 **Acceptance Criteria:**
+
 - [ ] `POST /api/categories` creates category
 - [ ] Auto-generates slug from name
 - [ ] Unique constraint on name and slug
@@ -494,6 +517,7 @@ Implement full CRUD operations for categories to allow management beyond seed da
 Create the frontend form for adding new services, implemented as a modal dialog.
 
 **Acceptance Criteria:**
+
 - [ ] "+ Add Service" button opens modal
 - [ ] Form fields for all required service properties:
   - Short Name, Title, Provider
@@ -519,6 +543,7 @@ Create the frontend form for adding new services, implemented as a modal dialog.
 Create the frontend form for editing existing services, pre-populated with current values.
 
 **Acceptance Criteria:**
+
 - [ ] Edit button in service detail drawer or row actions
 - [ ] Form pre-populated with existing values
 - [ ] Same fields as create form (except shortName disabled)
@@ -537,6 +562,7 @@ Create the frontend form for editing existing services, pre-populated with curre
 Implement delete functionality with confirmation dialog.
 
 **Acceptance Criteria:**
+
 - [ ] Delete button with trash icon in service actions
 - [ ] Confirmation dialog: "Delete [Service Name]?"
 - [ ] Warning text about permanent deletion
@@ -556,6 +582,7 @@ Implement delete functionality with confirmation dialog.
 Create modal for adding new versions to an existing service.
 
 **Acceptance Criteria:**
+
 - [ ] "Add Version" button in service detail drawer
 - [ ] Form fields:
   - Version number (semver format with validation)
@@ -577,6 +604,7 @@ Create modal for adding new versions to an existing service.
 Enhance service detail drawer to show complete version history with ability to view past versions.
 
 **Acceptance Criteria:**
+
 - [ ] Version history section in drawer
 - [ ] List shows: version number, release date, changelog preview
 - [ ] Current version highlighted/badged
@@ -595,6 +623,7 @@ Enhance service detail drawer to show complete version history with ability to v
 Create UI for managing categories in the Settings section.
 
 **Acceptance Criteria:**
+
 - [ ] Categories page/section in Settings
 - [ ] Table listing all categories with service count
 - [ ] Add Category button opens modal
@@ -613,6 +642,7 @@ Create UI for managing categories in the Settings section.
 Implement a global toast notification system for success/error/info messages.
 
 **Acceptance Criteria:**
+
 - [ ] Toast component using shadcn/ui Sonner or custom
 - [ ] Support for success, error, warning, info variants
 - [ ] Auto-dismiss after 5 seconds
@@ -631,6 +661,7 @@ Implement a global toast notification system for success/error/info messages.
 Implement consistent loading states across the application with skeleton components.
 
 **Acceptance Criteria:**
+
 - [ ] Skeleton components for:
   - Table rows
   - Cards
@@ -651,6 +682,7 @@ Implement consistent loading states across the application with skeleton compone
 Implement comprehensive error handling with user-friendly error displays and React error boundaries.
 
 **Acceptance Criteria:**
+
 - [ ] React Error Boundary wrapping main content
 - [ ] Fallback UI for caught errors
 - [ ] "Something went wrong" page with retry option
@@ -678,6 +710,7 @@ Implement comprehensive error handling with user-friendly error displays and Rea
 Create the Project Mongoose model for both atomic and composite Digital Twin projects.
 
 **Acceptance Criteria:**
+
 - [ ] Project schema with fields:
   - `shortName` (unique), `title`
   - `sector` enum: `TELECOMMUNICATIONS`, `HEALTHCARE`, `TRANSPORTATION`, `NUCLEAR`
@@ -701,6 +734,7 @@ Create the Project Mongoose model for both atomic and composite Digital Twin pro
 Implement full CRUD operations for Digital Twin Projects.
 
 **Acceptance Criteria:**
+
 - [ ] `GET /api/projects` - List with filters (sector, leader, search)
 - [ ] `GET /api/projects/:id` - Get single project with populated atomicProjects
 - [ ] `POST /api/projects` - Create project
@@ -720,6 +754,7 @@ Implement full CRUD operations for Digital Twin Projects.
 Create the Scenario Mongoose model with topology storage and execution tracking.
 
 **Acceptance Criteria:**
+
 - [ ] Scenario schema with fields:
   - `projectId` (ref to Project)
   - `title`, `description`
@@ -749,6 +784,7 @@ Create the Scenario Mongoose model with topology storage and execution tracking.
 Implement CRUD operations for Scenarios within a project context.
 
 **Acceptance Criteria:**
+
 - [ ] `GET /api/projects/:projectId/scenarios` - List scenarios for project
 - [ ] `GET /api/scenarios/:id` - Get single scenario
 - [ ] `POST /api/projects/:projectId/scenarios` - Create scenario
@@ -767,6 +803,7 @@ Implement CRUD operations for Scenarios within a project context.
 Create endpoint to validate scenario topology before saving or executing.
 
 **Acceptance Criteria:**
+
 - [ ] `POST /api/scenarios/:id/validate-topology` validates current topology
 - [ ] `POST /api/scenarios/validate-topology` validates topology in request body
 - [ ] Validation checks:
@@ -787,6 +824,7 @@ Create endpoint to validate scenario topology before saving or executing.
 Implement endpoints for scenario execution lifecycle management.
 
 **Acceptance Criteria:**
+
 - [ ] `POST /api/scenarios/:id/execute` - Start execution
   - Creates new execution record
   - Sets status to `pending`
@@ -807,6 +845,7 @@ Implement endpoints for scenario execution lifecycle management.
 Create the Digital Twin Projects list page with filtering and project cards.
 
 **Acceptance Criteria:**
+
 - [ ] Page header with "+ New Project" button
 - [ ] Filter controls: sector dropdown, search input
 - [ ] Project cards showing:
@@ -830,6 +869,7 @@ Create the Digital Twin Projects list page with filtering and project cards.
 Create modal form for creating and editing Digital Twin projects.
 
 **Acceptance Criteria:**
+
 - [ ] Form fields:
   - Short Name (disabled on edit)
   - Title
@@ -854,6 +894,7 @@ Create modal form for creating and editing Digital Twin projects.
 Create the project detail page showing project info and scenarios list.
 
 **Acceptance Criteria:**
+
 - [ ] Page header with project title and edit button
 - [ ] Project metadata section:
   - Short name, sector, leader
@@ -878,6 +919,7 @@ Create the project detail page showing project info and scenarios list.
 Create the scenario editor page with basic layout and metadata editing (without visual canvas yet).
 
 **Acceptance Criteria:**
+
 - [ ] Page header with:
   - Back button to project
   - Scenario title (editable)
@@ -901,6 +943,7 @@ Create the scenario editor page with basic layout and metadata editing (without 
 Integrate Monaco Editor for YAML topology editing with syntax highlighting and validation.
 
 **Acceptance Criteria:**
+
 - [ ] Monaco Editor component with YAML language mode
 - [ ] JetBrains Mono font configured
 - [ ] Theme matching brand kit (light theme, slate colors)
@@ -922,22 +965,23 @@ Integrate Monaco Editor for YAML topology editing with syntax highlighting and v
 Create the topology DSL format documentation and editor snippets.
 
 **Acceptance Criteria:**
+
 - [ ] Topology format documented:
   ```yaml
-  version: "1.0"
-  name: "Scenario Name"
-  description: "Description"
+  version: '1.0'
+  name: 'Scenario Name'
+  description: 'Description'
   services:
     - id: unique-id
-      service: "SERVICE-SHORTNAME"
-      version: "1.0.0"
+      service: 'SERVICE-SHORTNAME'
+      version: '1.0.0'
       config: {}
   connections:
     - from: service-id-1
       to: service-id-2
-      label: "Data flow description"
-      via: "kafka"
-      topic: "topic-name"
+      label: 'Data flow description'
+      via: 'kafka'
+      topic: 'topic-name'
   ```
 - [ ] Monaco snippets for:
   - New topology template
@@ -956,6 +1000,7 @@ Create the topology DSL format documentation and editor snippets.
 Create a panel showing available services that can be added to the topology.
 
 **Acceptance Criteria:**
+
 - [ ] Collapsible panel below or beside editor
 - [ ] Lists services from repository (grouped by category)
 - [ ] Search/filter services
@@ -974,6 +1019,7 @@ Create a panel showing available services that can be added to the topology.
 Implement the save flow with validation before persisting.
 
 **Acceptance Criteria:**
+
 - [ ] "Validate" button runs topology validation
 - [ ] Validation results displayed:
   - Success: green checkmark, "Valid topology"
@@ -996,6 +1042,7 @@ Implement the save flow with validation before persisting.
 Create a panel showing execution history for the current scenario.
 
 **Acceptance Criteria:**
+
 - [ ] Panel/tab in scenario editor showing executions
 - [ ] List of executions with:
   - Execution date/time
@@ -1018,6 +1065,7 @@ Create a panel showing execution history for the current scenario.
 Implement the flow for starting a scenario execution.
 
 **Acceptance Criteria:**
+
 - [ ] "Execute" button in scenario editor
 - [ ] Pre-execution checklist/confirmation:
   - Topology must be valid
@@ -1040,6 +1088,7 @@ Implement the flow for starting a scenario execution.
 Create modal for adding a conclusion to a completed execution.
 
 **Acceptance Criteria:**
+
 - [ ] "Add Conclusion" button on execution without conclusion
 - [ ] Modal with:
   - Execution info header (date, status)
@@ -1068,6 +1117,7 @@ Create modal for adding a conclusion to a completed execution.
 Set up React Flow library with custom styling matching brand kit.
 
 **Acceptance Criteria:**
+
 - [ ] React Flow installed and configured
 - [ ] Custom theme with brand colors:
   - Node borders: `slate-300`
@@ -1089,6 +1139,7 @@ Set up React Flow library with custom styling matching brand kit.
 Create custom React Flow node component for services.
 
 **Acceptance Criteria:**
+
 - [ ] Custom node component with:
   - Service short name (header)
   - Service title (subtitle)
@@ -1112,6 +1163,7 @@ Create custom React Flow node component for services.
 Create custom React Flow edge component for data flow connections.
 
 **Acceptance Criteria:**
+
 - [ ] Custom edge with:
   - Label (data flow description)
   - Arrow marker at target
@@ -1131,6 +1183,7 @@ Create custom React Flow edge component for data flow connections.
 Create the split-screen layout with resizable panels for code editor and visual canvas.
 
 **Acceptance Criteria:**
+
 - [ ] Horizontal split: left (code), right (canvas)
 - [ ] Resizable divider (drag to resize)
 - [ ] Minimum widths for each panel (300px)
@@ -1149,6 +1202,7 @@ Create the split-screen layout with resizable panels for code editor and visual 
 Implement parsing YAML topology and rendering as React Flow nodes and edges.
 
 **Acceptance Criteria:**
+
 - [ ] Parse YAML content on change (debounced 500ms)
 - [ ] Generate React Flow nodes from `services` array:
   - Position calculated using layout algorithm
@@ -1168,6 +1222,7 @@ Implement parsing YAML topology and rendering as React Flow nodes and edges.
 Implement automatic layout algorithm for positioning nodes when parsed from YAML.
 
 **Acceptance Criteria:**
+
 - [ ] Dagre or ELK layout algorithm integration
 - [ ] Left-to-right flow layout (default)
 - [ ] Consistent spacing between nodes
@@ -1185,6 +1240,7 @@ Implement automatic layout algorithm for positioning nodes when parsed from YAML
 Implement updating YAML when canvas is modified (add/remove/connect nodes).
 
 **Acceptance Criteria:**
+
 - [ ] Adding node from palette updates YAML
 - [ ] Removing node updates YAML
 - [ ] Creating connection updates YAML
@@ -1203,6 +1259,7 @@ Implement updating YAML when canvas is modified (add/remove/connect nodes).
 Enable dragging services from palette and dropping onto canvas to add them.
 
 **Acceptance Criteria:**
+
 - [ ] Services in palette are draggable
 - [ ] Drop zone is the React Flow canvas
 - [ ] Drop creates new node at drop position
@@ -1221,6 +1278,7 @@ Enable dragging services from palette and dropping onto canvas to add them.
 Implement node selection and right-click context menu for actions.
 
 **Acceptance Criteria:**
+
 - [ ] Click node to select (yellow border)
 - [ ] Multi-select with Shift+click or drag selection
 - [ ] Right-click opens context menu:
@@ -1240,6 +1298,7 @@ Implement node selection and right-click context menu for actions.
 Enable creating connections by dragging between node handles.
 
 **Acceptance Criteria:**
+
 - [ ] Drag from output handle shows connection preview
 - [ ] Drop on input handle creates connection
 - [ ] Connection dialog prompts for:
@@ -1260,6 +1319,7 @@ Enable creating connections by dragging between node handles.
 Enable editing and deleting connections on the canvas.
 
 **Acceptance Criteria:**
+
 - [ ] Click connection to select
 - [ ] Double-click opens edit dialog
 - [ ] Edit dialog: label, via, topic
@@ -1277,6 +1337,7 @@ Enable editing and deleting connections on the canvas.
 Create toolbar for canvas with common actions and view controls.
 
 **Acceptance Criteria:**
+
 - [ ] Toolbar positioned above canvas
 - [ ] Actions:
   - Zoom In / Zoom Out
@@ -1298,6 +1359,7 @@ Create toolbar for canvas with common actions and view controls.
 Show validation errors visually on both code and canvas.
 
 **Acceptance Criteria:**
+
 - [ ] Monaco: underline errors with red squiggle
 - [ ] Monaco: error markers in gutter
 - [ ] Canvas: error nodes have red border
@@ -1325,6 +1387,7 @@ Show validation errors visually on both code and canvas.
 Create the Infrastructure Mongoose model for Kubernetes cluster endpoints.
 
 **Acceptance Criteria:**
+
 - [ ] Infrastructure schema:
   - `name` (unique)
   - `type` enum: `kubernetes`, `docker`, `other`
@@ -1349,6 +1412,7 @@ Create the Infrastructure Mongoose model for Kubernetes cluster endpoints.
 Implement AES-256-GCM encryption for infrastructure credentials.
 
 **Acceptance Criteria:**
+
 - [ ] Encryption function using Node.js crypto
 - [ ] 32-byte encryption key from environment variable
 - [ ] Random 12-byte IV for each encryption
@@ -1368,6 +1432,7 @@ Implement AES-256-GCM encryption for infrastructure credentials.
 Implement CRUD operations for infrastructure management.
 
 **Acceptance Criteria:**
+
 - [ ] `GET /api/infrastructures` - List all (without credentials)
 - [ ] `GET /api/infrastructures/:id` - Get single (without credentials)
 - [ ] `POST /api/infrastructures` - Create with encrypted credentials
@@ -1389,6 +1454,7 @@ Implement CRUD operations for infrastructure management.
 Create the infrastructure management page in the UI.
 
 **Acceptance Criteria:**
+
 - [ ] Table listing infrastructures:
   - Name, Type, Endpoint, Status, Last Health Check
 - [ ] Status badge (Available green, Offline red, Maintenance yellow)
@@ -1408,6 +1474,7 @@ Create the infrastructure management page in the UI.
 Create modal for adding and editing infrastructure configurations.
 
 **Acceptance Criteria:**
+
 - [ ] Form fields:
   - Name (disabled on edit)
   - Type (dropdown)
@@ -1430,6 +1497,7 @@ Create modal for adding and editing infrastructure configurations.
 Add infrastructure selection to scenario editor.
 
 **Acceptance Criteria:**
+
 - [ ] Dropdown in scenario metadata section
 - [ ] Lists available infrastructures (status = available)
 - [ ] Shows current selection with status indicator
@@ -1448,6 +1516,7 @@ Add infrastructure selection to scenario editor.
 Create the tabbed workspace panel at bottom of application for service dashboards and MAESTRO.
 
 **Acceptance Criteria:**
+
 - [ ] Collapsible panel at bottom of screen
 - [ ] Tab bar with close buttons
 - [ ] Tabs can be:
@@ -1469,6 +1538,7 @@ Create the tabbed workspace panel at bottom of application for service dashboard
 Create the MAESTRO deployment tab with iFrame integration.
 
 **Acceptance Criteria:**
+
 - [ ] Tab labeled "MAESTRO"
 - [ ] iFrame loads MAESTRO URL with scenario parameters:
   - `https://maestro.example.com/deploy?scenario={id}`
@@ -1489,6 +1559,7 @@ Create the MAESTRO deployment tab with iFrame integration.
 Connect execution flow to open MAESTRO tab and track status.
 
 **Acceptance Criteria:**
+
 - [ ] Execute button:
   1. Validates topology
   2. Checks infrastructure selected
@@ -1509,6 +1580,7 @@ Connect execution flow to open MAESTRO tab and track status.
 Open service dashboards in workspace tabs during/after execution.
 
 **Acceptance Criteria:**
+
 - [ ] After deployment, MAESTRO provides dashboard URLs
 - [ ] "Open Dashboard" button per deployed service
 - [ ] Opens new tab with service name
@@ -1529,6 +1601,7 @@ Open service dashboards in workspace tabs during/after execution.
 Implement mechanism to update execution status (polling or webhook).
 
 **Acceptance Criteria:**
+
 - [ ] Option A - Polling:
   - Poll MAESTRO status endpoint every 10 seconds
   - Update local execution record
@@ -1551,6 +1624,7 @@ Implement mechanism to update execution status (polling or webhook).
 Create a read-only view of scenario for reviewing completed executions.
 
 **Acceptance Criteria:**
+
 - [ ] View mode shows topology (not editable)
 - [ ] Canvas displays services and connections
 - [ ] Execution history prominently displayed
@@ -1580,6 +1654,7 @@ Create a read-only view of scenario for reviewing completed executions.
 Create API endpoints for analytics data retrieval.
 
 **Acceptance Criteria:**
+
 - [ ] `GET /api/analytics/scenarios` - Execution history across all scenarios
   - Filters: dateRange, status, projectId
   - Pagination
@@ -1600,6 +1675,7 @@ Create API endpoints for analytics data retrieval.
 Create the dashboard home page with summary cards and quick actions.
 
 **Acceptance Criteria:**
+
 - [ ] Summary cards (top row):
   - Total Services (with +/- change indicator)
   - Total Projects
@@ -1627,6 +1703,7 @@ Create the dashboard home page with summary cards and quick actions.
 Create analytics page with execution history and statistics.
 
 **Acceptance Criteria:**
+
 - [ ] Date range filter (preset: 7d, 30d, 90d, custom)
 - [ ] Status filter (multi-select)
 - [ ] Project filter (dropdown)
@@ -1648,6 +1725,7 @@ Create analytics page with execution history and statistics.
 Create endpoint to generate PDF report for scenario execution.
 
 **Acceptance Criteria:**
+
 - [ ] `GET /api/scenarios/:id/executions/:execId/export/pdf`
 - [ ] PDFKit generates report with:
   - Header: INTACT logo, report title
@@ -1671,6 +1749,7 @@ Create endpoint to generate PDF report for scenario execution.
 Add PDF export functionality to execution view.
 
 **Acceptance Criteria:**
+
 - [ ] "Export PDF" button on execution detail
 - [ ] Button shows loading state during generation
 - [ ] Downloads PDF file on success
@@ -1688,6 +1767,7 @@ Add PDF export functionality to execution view.
 Create basic user management page for viewing and managing users.
 
 **Acceptance Criteria:**
+
 - [ ] Table listing users:
   - Username, Role, Created Date, Last Login (if tracked)
 - [ ] "+ Add User" button (admin only)
@@ -1706,6 +1786,7 @@ Create basic user management page for viewing and managing users.
 Create settings page with application configuration options.
 
 **Acceptance Criteria:**
+
 - [ ] Sections:
   - Category Management (link to TASK-029)
   - User Preferences (placeholder)
@@ -1723,6 +1804,7 @@ Create settings page with application configuration options.
 Audit all UI components against brand kit specifications and fix inconsistencies.
 
 **Acceptance Criteria:**
+
 - [ ] Colors match brand kit (slate palette, yellow accent)
 - [ ] Typography scale matches specification
 - [ ] Button styles match all states (hover, active, disabled)
@@ -1742,6 +1824,7 @@ Audit all UI components against brand kit specifications and fix inconsistencies
 Audit application for WCAG 2.1 AA compliance and fix issues.
 
 **Acceptance Criteria:**
+
 - [ ] All interactive elements keyboard accessible
 - [ ] Focus indicators visible on all elements
 - [ ] ARIA labels on icon-only buttons
@@ -1762,6 +1845,7 @@ Audit application for WCAG 2.1 AA compliance and fix issues.
 Optimize application performance to meet target metrics.
 
 **Acceptance Criteria:**
+
 - [ ] Initial page load < 3 seconds
 - [ ] API responses < 500ms (p95)
 - [ ] Code splitting by route implemented
@@ -1782,6 +1866,7 @@ Optimize application performance to meet target metrics.
 Set up error logging and basic monitoring for production.
 
 **Acceptance Criteria:**
+
 - [ ] Backend logging with structured format
 - [ ] Log levels: error, warn, info, debug
 - [ ] Request/response logging (sanitized)
@@ -1800,6 +1885,7 @@ Set up error logging and basic monitoring for production.
 Generate API documentation for all endpoints.
 
 **Acceptance Criteria:**
+
 - [ ] OpenAPI/Swagger specification
 - [ ] All endpoints documented:
   - HTTP method, path
@@ -1820,6 +1906,7 @@ Generate API documentation for all endpoints.
 Create end-to-end tests for critical user flows.
 
 **Acceptance Criteria:**
+
 - [ ] Test framework set up (Playwright or Cypress)
 - [ ] Tests for:
   - Login flow
@@ -1841,6 +1928,7 @@ Create end-to-end tests for critical user flows.
 Create optimized Docker images for production deployment.
 
 **Acceptance Criteria:**
+
 - [ ] Multi-stage Dockerfile for backend
 - [ ] Multi-stage Dockerfile for frontend (build + nginx)
 - [ ] Production build optimizations
@@ -1860,6 +1948,7 @@ Create optimized Docker images for production deployment.
 Create comprehensive deployment and operations documentation.
 
 **Acceptance Criteria:**
+
 - [ ] README with:
   - Project overview
   - Local development setup
@@ -1881,6 +1970,7 @@ Create comprehensive deployment and operations documentation.
 Complete end-to-end integration testing of all features.
 
 **Acceptance Criteria:**
+
 - [ ] All POC criteria verified
 - [ ] All MVP criteria verified
 - [ ] Service CRUD works completely
@@ -1901,30 +1991,30 @@ Complete end-to-end integration testing of all features.
 
 The following items require clarification for accurate implementation:
 
-| ID | Question | Impact | Suggested Default |
-|----|----------|--------|-------------------|
-| **CL-001** | Should service deletion be soft (mark deleted) or hard (permanent)? | TASK-021 | Soft delete with `isDeleted` flag |
-| **CL-002** | Should deletion be prevented if service is used in scenarios? | TASK-021 | Show warning but allow deletion |
-| **CL-003** | How does MAESTRO provide deployed service dashboard URLs? | TASK-072 | Manual entry or polling endpoint |
-| **CL-004** | Does MAESTRO provide status webhooks or polling endpoint? | TASK-073 | Polling every 10s |
-| **CL-005** | What is the exact MAESTRO URL pattern for deployment? | TASK-070 | Configurable via environment |
-| **CL-006** | Should execution logs be persisted? | TAD | Not in v1.0 |
-| **CL-007** | Maximum topology file size? | TAD | 1MB limit |
-| **CL-008** | Specific INTACT branding/logo files? | Brand Kit | Use wordmark as specified |
+| ID         | Question                                                            | Impact    | Suggested Default                 |
+| ---------- | ------------------------------------------------------------------- | --------- | --------------------------------- |
+| **CL-001** | Should service deletion be soft (mark deleted) or hard (permanent)? | TASK-021  | Soft delete with `isDeleted` flag |
+| **CL-002** | Should deletion be prevented if service is used in scenarios?       | TASK-021  | Show warning but allow deletion   |
+| **CL-003** | How does MAESTRO provide deployed service dashboard URLs?           | TASK-072  | Manual entry or polling endpoint  |
+| **CL-004** | Does MAESTRO provide status webhooks or polling endpoint?           | TASK-073  | Polling every 10s                 |
+| **CL-005** | What is the exact MAESTRO URL pattern for deployment?               | TASK-070  | Configurable via environment      |
+| **CL-006** | Should execution logs be persisted?                                 | TAD       | Not in v1.0                       |
+| **CL-007** | Maximum topology file size?                                         | TAD       | 1MB limit                         |
+| **CL-008** | Specific INTACT branding/logo files?                                | Brand Kit | Use wordmark as specified         |
 
 ---
 
 ## Task Summary
 
-| Sprint | Tasks | Estimated Days |
-|--------|-------|----------------|
-| Sprint 0 (POC) | TASK-001 to TASK-018 | 3-4 days |
-| Sprint 1 (MVP) | TASK-019 to TASK-032 | 5 days |
-| Sprint 2 (MVP) | TASK-033 to TASK-049 | 5 days |
-| Sprint 3 | TASK-050 to TASK-062 | 5 days |
-| Sprint 4 | TASK-063 to TASK-074 | 5 days |
-| Sprint 5 | TASK-075 to TASK-090 | 5 days |
-| **Total** | **90 tasks** | **~28-30 days** |
+| Sprint         | Tasks                | Estimated Days  |
+| -------------- | -------------------- | --------------- |
+| Sprint 0 (POC) | TASK-001 to TASK-018 | 3-4 days        |
+| Sprint 1 (MVP) | TASK-019 to TASK-032 | 5 days          |
+| Sprint 2 (MVP) | TASK-033 to TASK-049 | 5 days          |
+| Sprint 3       | TASK-050 to TASK-062 | 5 days          |
+| Sprint 4       | TASK-063 to TASK-074 | 5 days          |
+| Sprint 5       | TASK-075 to TASK-090 | 5 days          |
+| **Total**      | **90 tasks**         | **~28-30 days** |
 
 ---
 
@@ -1945,6 +2035,6 @@ A task is considered complete when:
 
 ---
 
-*Document Version: 1.0*  
-*Created: 2025-01-13*  
-*Project: INTACT Digital Twin Management Platform*
+_Document Version: 1.0_  
+_Created: 2025-01-13_  
+_Project: INTACT Digital Twin Management Platform_

@@ -97,4 +97,7 @@ infrastructureSchema.set('toJSON', {
   },
 });
 
-export const Infrastructure = mongoose.model<IInfrastructure>('Infrastructure', infrastructureSchema);
+export const Infrastructure = mongoose.model<IInfrastructure>(
+  'Infrastructure',
+  infrastructureSchema
+);

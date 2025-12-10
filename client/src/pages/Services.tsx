@@ -115,8 +115,18 @@ export function Services() {
     });
   };
 
-  const toolboxServices = filterToolboxServices(toolboxData?.services, toolboxSearch, toolboxCategory, toolboxProvider);
-  const infrastructureServices = filterInfraServices(infrastructureData?.services, infraSearch, infraSector, infraProvider);
+  const toolboxServices = filterToolboxServices(
+    toolboxData?.services,
+    toolboxSearch,
+    toolboxCategory,
+    toolboxProvider
+  );
+  const infrastructureServices = filterInfraServices(
+    infrastructureData?.services,
+    infraSearch,
+    infraSector,
+    infraProvider
+  );
 
   const handleRowClick = (service: Service) => {
     setSelectedService(service);
@@ -154,7 +164,8 @@ export function Services() {
         <TabsContent value="toolbox" className="space-y-4">
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
             <p className="text-sm text-muted-foreground">
-              Security tools for monitoring, attack simulation, auditing, and protection of critical infrastructure.
+              Security tools for monitoring, attack simulation, auditing, and protection of critical
+              infrastructure.
             </p>
           </div>
           {/* Toolbox Filters */}
@@ -209,7 +220,8 @@ export function Services() {
         <TabsContent value="infrastructure" className="space-y-4">
           <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-4">
             <p className="text-sm text-muted-foreground">
-              Target services and systems that require protection and security testing, classified by NIS2 critical sectors.
+              Target services and systems that require protection and security testing, classified
+              by NIS2 critical sectors.
             </p>
           </div>
           {/* Infrastructure Filters */}
@@ -232,9 +244,7 @@ export function Services() {
                 {sectors.map((sector) => (
                   <SelectItem key={sector._id} value={sector._id}>
                     {sector.name}
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      ({sector.category})
-                    </span>
+                    <span className="ml-2 text-xs text-muted-foreground">({sector.category})</span>
                   </SelectItem>
                 ))}
               </SelectContent>

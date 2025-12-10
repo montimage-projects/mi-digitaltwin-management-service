@@ -82,7 +82,7 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  User as FirebaseUser
+  User as FirebaseUser,
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -166,7 +166,7 @@ import {
   orderBy,
   limit,
   Timestamp,
-  DocumentReference
+  DocumentReference,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -242,6 +242,7 @@ Scenarios will be stored as a subcollection under projects:
 ```
 
 This design choice:
+
 - Enables efficient queries for scenarios within a project
 - Allows security rules to inherit from parent project
 - Simplifies deletion (delete project deletes all scenarios)
@@ -280,11 +281,9 @@ async function populateRef<T>(
   ref: DocumentReference | string,
   collectionName: string
 ): Promise<T | null> {
-  const docRef = typeof ref === 'string'
-    ? doc(db, collectionName, ref)
-    : ref;
+  const docRef = typeof ref === 'string' ? doc(db, collectionName, ref) : ref;
   const snapshot = await getDoc(docRef);
-  return snapshot.exists() ? { _id: snapshot.id, ...snapshot.data() } as T : null;
+  return snapshot.exists() ? ({ _id: snapshot.id, ...snapshot.data() } as T) : null;
 }
 
 // Usage in getServiceById
@@ -317,21 +316,25 @@ export { authApi }; // Keep as separate Firebase Auth implementation
 ## Data Type Considerations
 
 ### Timestamps
+
 - MongoDB: `Date` objects
 - Firestore: `Timestamp` objects
 - Conversion in `fromFirestore`: `timestamp.toDate().toISOString()`
 
 ### ObjectIds → Document IDs
+
 - MongoDB: `ObjectId` type
 - Firestore: String document IDs (auto-generated or custom)
 - Convention: Use `_id` field for compatibility
 
 ### References
+
 - MongoDB: `ObjectId` with `populate()`
 - Firestore: `DocumentReference` or store as string ID
 - Strategy: Store as string ID, resolve manually when needed
 
 ### Arrays of Objects
+
 - MongoDB: Subdocuments with `_id`
 - Firestore: Arrays of maps (no auto-generated IDs)
 - Strategy: Generate client-side IDs for `versions`, `executions`
@@ -397,6 +400,7 @@ service cloud.firestore {
 ## Migration Strategy
 
 ### Step 1: Export MongoDB Data
+
 ```bash
 # Export each collection to JSON
 mongoexport --db intact --collection categories --out categories.json --jsonArray
@@ -405,6 +409,7 @@ mongoexport --db intact --collection services --out services.json --jsonArray
 ```
 
 ### Step 2: Transform Data
+
 ```typescript
 // Migration script transforms:
 // - ObjectId → string
@@ -414,6 +419,7 @@ mongoexport --db intact --collection services --out services.json --jsonArray
 ```
 
 ### Step 3: Import to Firestore
+
 ```typescript
 // Use Firebase Admin SDK for bulk imports
 import { initializeApp, cert } from 'firebase-admin/app';
@@ -433,6 +439,7 @@ await batch.commit();
 ## Performance Considerations
 
 ### Indexes Required
+
 ```json
 // firestore.indexes.json
 {
@@ -458,13 +465,14 @@ await batch.commit();
 ```
 
 ### Denormalization for Counts
+
 Since Firestore doesn't support efficient counts, maintain counter documents:
 
 ```typescript
 // When creating a scenario, also update project's scenarioCount
 const projectRef = doc(db, 'projects', projectId);
 await updateDoc(projectRef, {
-  scenarioCount: increment(1)
+  scenarioCount: increment(1),
 });
 ```
 
@@ -493,16 +501,19 @@ function handleFirestoreError(error: unknown): never {
 ## Testing Strategy
 
 ### Local Development
+
 - Use Firebase Emulator Suite for local development
 - Emulator provides Auth + Firestore without cloud costs
 - Security rules can be tested locally
 
 ### Unit Tests
+
 - Mock Firestore with `@firebase/rules-unit-testing`
 - Test each service module independently
 - Verify data transformations
 
 ### Integration Tests
+
 - Use emulator for integration tests
 - Test full CRUD flows
 - Verify security rules enforcement

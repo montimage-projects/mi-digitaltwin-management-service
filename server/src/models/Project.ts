@@ -40,10 +40,12 @@ const projectSchema = new Schema<IProject>(
       maxlength: 100,
       trim: true,
     },
-    involvedPartners: [{
-      type: String,
-      maxlength: 50,
-    }],
+    involvedPartners: [
+      {
+        type: String,
+        maxlength: 50,
+      },
+    ],
     description: {
       type: String,
       maxlength: 2000,
@@ -52,10 +54,12 @@ const projectSchema = new Schema<IProject>(
       type: Boolean,
       default: false,
     },
-    atomicProjectIds: [{
-      type: Schema.Types.ObjectId,
-      ref: 'Project',
-    }],
+    atomicProjectIds: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Project',
+      },
+    ],
   },
   {
     timestamps: true,

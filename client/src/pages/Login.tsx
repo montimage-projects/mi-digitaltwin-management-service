@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { z } from 'zod';
 import { Loader2, Shield, Network, Lock } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { authApi } from '@/lib/api';
@@ -9,12 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
+type LoginForm = {
+  username: string;
+  password: string;
+};
 
 export function Login() {
   const navigate = useNavigate();
@@ -40,7 +37,7 @@ export function Login() {
       const response = await authApi.login(data.username, data.password);
       login(response.token, response.user);
       navigate('/');
-    } catch (err) {
+    } catch {
       setError('Invalid username or password');
     } finally {
       setIsLoading(false);
