@@ -3,25 +3,20 @@ import path from 'path';
 import fs from 'fs';
 
 const getClientDistPath = (): string => {
-  // Try multiple possible paths for the client dist directory
-  const possiblePaths = [
-    path.join(process.cwd(), '..', 'client', 'dist'), // From server directory (cd server && bun start)
-    path.join(process.cwd(), 'client', 'dist'), // From project root
-    path.resolve(__dirname, '..', '..', '..', 'client', 'dist'), // Relative to this file (compiled)
-    path.resolve(__dirname, '..', '..', 'client', 'dist'), // Relative to src directory
-  ];
+  // Client builds to server/public directory
+  const publicPath = path.join(process.cwd(), 'public');
 
-  console.log('[Static] Searching for client dist in:');
-  for (const p of possiblePaths) {
-    const exists = fs.existsSync(p);
-    console.log(`[Static]   ${exists ? '✓' : '✗'} ${p}`);
-    if (exists) {
-      return p;
-    }
+  if (fs.existsSync(publicPath)) {
+    return publicPath;
   }
 
-  // Default path (may not exist)
-  return possiblePaths[0];
+  // Fallback: try relative to this file
+  const fallbackPath = path.resolve(__dirname, '..', '..', 'public');
+  if (fs.existsSync(fallbackPath)) {
+    return fallbackPath;
+  }
+
+  return publicPath;
 };
 
 export const configureStaticServing = (app: Express): boolean => {

@@ -9,6 +9,11 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    // Output to server/public for easy static serving
+    outDir: path.resolve(__dirname, '../server/public'),
+    emptyOutDir: true,
+  },
   server: {
     port: 5173,
     proxy: {

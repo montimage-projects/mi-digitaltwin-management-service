@@ -5,11 +5,11 @@ node_modules/
 
 # Build outputs
 build/
+dist/
 *.tsbuildinfo
 
-# Ignore dist except client/dist (needed for deployment)
-dist/
-!client/dist/
+# Keep server/public (client build output for deployment)
+!server/public/
 
 # Environment files
 .env

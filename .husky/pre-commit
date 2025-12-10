@@ -24,7 +24,7 @@ echo "Building client for deployment..."
 cd client && bun run build || { echo "Client build failed!"; exit 1; }
 cd ..
 
-# Stage the client build output
-git add client/dist/
+# Stage the client build output (builds to server/public/)
+git add server/public/
 
 echo "All pre-commit checks passed!"
