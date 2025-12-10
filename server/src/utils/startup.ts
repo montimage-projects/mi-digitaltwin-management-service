@@ -123,20 +123,21 @@ function validateEnvironment(): ValidationResult[] {
 }
 
 /**
- * Test MongoDB connection
+ * Test MongoDB connection using mongoose
  */
 async function testMongoDBConnection(): Promise<ValidationResult> {
-  const { MongoClient } = await import('mongodb');
+  const mongoose = await import('mongoose');
 
   try {
-    const client = new MongoClient(env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000,
-    });
+    // Create a separate connection for testing (don't affect the main app connection)
+    const testConnection = await mongoose.default
+      .createConnection(env.MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000,
+      })
+      .asPromise();
 
-    await client.connect();
-    await client.db().admin().ping();
-    await client.close();
+    await testConnection.close();
 
     const isAtlas = env.MONGODB_URI.includes('mongodb+srv://');
     return {
