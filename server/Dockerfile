@@ -20,9 +20,12 @@ FROM oven/bun:1-slim AS production
 
 WORKDIR /app
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 intact
+# Install curl for healthcheck (required in slim image)
+# Create non-root user for security (Debian-based image)
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 1001 nodejs \
+    && useradd --system --uid 1001 --gid nodejs intact
 
 # Copy dependencies and source from builder
 COPY --from=builder /app/node_modules ./node_modules
@@ -35,11 +38,15 @@ RUN chown -R intact:nodejs /app
 # Switch to non-root user
 USER intact
 
+# Environment defaults
+ENV NODE_ENV=production
+ENV PORT=3000
+
 # Expose port
 EXPOSE 3000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Start the server

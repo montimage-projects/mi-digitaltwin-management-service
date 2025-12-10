@@ -4,9 +4,16 @@ Complete guide for deploying the INTACT Digital Twin Management Platform to prod
 
 ## Overview
 
-This playbook covers Docker-based deployment of the full service stack including:
+This playbook covers Docker-based deployment of the full service stack. Two deployment options are available:
 
-- React frontend (nginx)
+| Option          | Containers                   | Best For                      |
+| --------------- | ---------------------------- | ----------------------------- |
+| **Unified**     | 2 (app + MongoDB)            | Demos, staging, single-server |
+| **nginx-based** | 3 (nginx + server + MongoDB) | High-traffic production       |
+
+Components served:
+
+- React frontend
 - Express API server
 - MongoDB database
 
@@ -22,6 +29,27 @@ Before deploying, ensure you have:
 For detailed prerequisites, see [Prerequisites](../installation/prerequisites.md).
 
 ## Architecture
+
+### Unified Deployment
+
+```mermaid
+graph TD
+    subgraph External
+        U[Users] --> A[Express Server :3000]
+    end
+
+    subgraph Docker Network
+        A --> |/api/*| API[API Routes]
+        A --> |Static Files| S[Client Build]
+        A --> M[(MongoDB :27017)]
+    end
+
+    style U fill:#e1f5fe
+    style A fill:#e8f5e9
+    style M fill:#fce4ec
+```
+
+### nginx-based Deployment
 
 ```mermaid
 graph TD
@@ -79,6 +107,22 @@ openssl rand -hex 16
 
 ## Step 3: Build and Deploy
 
+Choose your deployment option:
+
+### Option A: Unified Deployment (Recommended for Simplicity)
+
+```bash
+# Build and start unified container
+docker compose -f docker-compose.unified.yml up -d --build
+
+# View logs
+docker compose -f docker-compose.unified.yml logs -f
+```
+
+The application will be available at `http://localhost:3000`.
+
+### Option B: nginx-based Deployment (Recommended for Scale)
+
 ```bash
 # Build and start all services
 docker compose -f docker-compose.prod.yml up -d --build
@@ -87,12 +131,17 @@ docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml logs -f
 ```
 
+The application will be available at `http://localhost:80`.
+
 ## Step 4: Initialize Database
 
 On first deployment only:
 
 ```bash
-# Seed the database with initial data
+# For unified deployment:
+docker compose -f docker-compose.unified.yml exec app bun src/seed/index.ts
+
+# For nginx-based deployment:
 docker compose -f docker-compose.prod.yml exec server bun src/seed/index.ts
 ```
 

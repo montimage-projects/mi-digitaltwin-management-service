@@ -1,4 +1,5 @@
-version: '3.8'
+# Development Docker Compose - MongoDB and admin tools only
+# Application runs locally with: bun run dev
 
 services:
   mongodb:

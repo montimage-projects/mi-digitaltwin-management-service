@@ -1,0 +1,47 @@
+# Dependencies
+node_modules
+*/node_modules
+
+# Build outputs
+dist
+*/dist
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test and coverage
+coverage
+*.test.ts
+*.spec.ts
+
+# OpenSpec
+openspec/changes/
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Misc
+.husky
+tasks/

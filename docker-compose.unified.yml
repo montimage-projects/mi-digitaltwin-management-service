@@ -1,6 +1,6 @@
-# Production Docker Compose - nginx-based deployment (3 containers)
-# Recommended for: high-traffic production environments
-# For simpler deployments, use docker-compose.unified.yml
+# Unified Docker Compose - Single container for API and client (2 containers total)
+# Recommended for: demos, staging, single-server hosting
+# For high-traffic production, use docker-compose.prod.yml (nginx-based)
 
 services:
   mongodb:
@@ -20,21 +20,24 @@ services:
     networks:
       - intact-network
 
-  server:
+  app:
     build:
-      context: ./server
-      dockerfile: Dockerfile
-    container_name: intact-server
+      context: .
+      dockerfile: server/Dockerfile.unified
+    container_name: intact-app
     restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
       - MONGODB_URI=mongodb://mongodb:27017/intact
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       - MAESTRO_BASE_URL=${MAESTRO_BASE_URL:-https://maestro.intact-project.eu}
+      - SERVE_STATIC=true
     depends_on:
       mongodb:
         condition: service_healthy
@@ -47,29 +50,9 @@ services:
     networks:
       - intact-network
 
-  client:
-    build:
-      context: ./client
-      dockerfile: Dockerfile
-    container_name: intact-client
-    restart: unless-stopped
-    ports:
-      - "${PORT:-80}:80"
-    depends_on:
-      server:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 5s
-    networks:
-      - intact-network
-
 volumes:
   mongodb_data:
-    name: intact-mongodb-data-prod
+    name: intact-mongodb-data-unified
 
 networks:
   intact-network:

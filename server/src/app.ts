@@ -7,6 +7,7 @@ import morgan from 'morgan';
 import { env } from './config/env.js';
 import { connectDatabase, disconnectDatabase, isDatabaseConnected } from './config/database.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { configureStaticServing } from './middleware/staticServe.js';
 
 import authRoutes from './routes/auth.routes.js';
 import usersRoutes from './routes/users.routes.js';
@@ -22,7 +23,22 @@ const app = express();
 
 // Middleware
 app.use(compression()); // gzip compression for responses
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'cdn.jsdelivr.net'],
+        styleSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'fonts.googleapis.com'],
+        fontSrc: ["'self'", 'fonts.gstatic.com', 'cdn.jsdelivr.net'],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        connectSrc: ["'self'", 'cdn.jsdelivr.net'],
+        workerSrc: ["'self'", 'blob:'],
+        frameSrc: ["'self'"],
+      },
+    },
+  })
+);
 app.use(
   cors({
     origin: env.CORS_ORIGIN,
@@ -60,8 +76,16 @@ app.use('/api/projects', projectsRoutes);
 app.use('/api', scenariosRoutes);
 app.use('/api/infrastructures', infrastructuresRoutes);
 
-// Error handling
-app.use(notFoundHandler);
+// Static file serving (when SERVE_STATIC=true)
+let staticServingEnabled = false;
+if (env.SERVE_STATIC) {
+  staticServingEnabled = configureStaticServing(app);
+}
+
+// Error handling (only for API routes when static serving is enabled)
+if (!staticServingEnabled) {
+  app.use(notFoundHandler);
+}
 app.use(errorHandler);
 
 // Graceful shutdown
@@ -89,6 +113,9 @@ const startServer = async (): Promise<void> => {
     app.listen(env.PORT, () => {
       console.log(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
       console.log(`Health check: http://localhost:${env.PORT}/api/health`);
+      if (staticServingEnabled) {
+        console.log(`Client app: http://localhost:${env.PORT}/`);
+      }
     });
   } catch (error) {
     console.error('Failed to start server:', error);

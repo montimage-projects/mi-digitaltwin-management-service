@@ -77,14 +77,15 @@ src/
 
 ## Environment Variables
 
-| Variable         | Description               | Default                            |
-| ---------------- | ------------------------- | ---------------------------------- |
-| `PORT`           | Server port               | `3000`                             |
-| `MONGODB_URI`    | MongoDB connection        | `mongodb://localhost:27017/intact` |
-| `JWT_SECRET`     | JWT signing secret        | (required)                         |
-| `JWT_EXPIRES_IN` | Token expiration          | `24h`                              |
-| `CORS_ORIGIN`    | Allowed CORS origin       | `http://localhost:5173`            |
-| `ENCRYPTION_KEY` | Credential encryption key | (required, 32 chars)               |
+| Variable         | Description                    | Default                            |
+| ---------------- | ------------------------------ | ---------------------------------- |
+| `PORT`           | Server port                    | `3000`                             |
+| `MONGODB_URI`    | MongoDB connection             | `mongodb://localhost:27017/intact` |
+| `JWT_SECRET`     | JWT signing secret             | (required)                         |
+| `JWT_EXPIRES_IN` | Token expiration               | `24h`                              |
+| `CORS_ORIGIN`    | Allowed CORS origin            | `http://localhost:5173`            |
+| `ENCRYPTION_KEY` | Credential encryption key      | (required, 32 chars)               |
+| `SERVE_STATIC`   | Serve client build from server | `false`                            |
 
 ## API Endpoints
 
@@ -202,6 +203,40 @@ Check JWT_SECRET is set in `.env`.
 ### Encryption Errors
 
 Ensure ENCRYPTION_KEY is exactly 32 characters.
+
+## Static File Serving
+
+The server can serve the client's production build directly, enabling a single-process deployment.
+
+### Enabling Static Serving
+
+```bash
+# Build the client
+cd client && bun run build
+
+# Start server with static serving
+cd server
+SERVE_STATIC=true bun run start
+```
+
+The full application will be available at `http://localhost:3000`.
+
+### How It Works
+
+When `SERVE_STATIC=true`:
+
+1. Server serves static files from `../client/dist`
+2. API endpoints remain at `/api/*`
+3. All other routes return `index.html` (SPA fallback)
+
+### Deployment Options
+
+| Option          | Use Case                       | Setup                                             |
+| --------------- | ------------------------------ | ------------------------------------------------- |
+| **Unified**     | Demos, staging, simple hosting | `docker-compose -f docker-compose.unified.yml up` |
+| **nginx-based** | High-traffic production        | `docker-compose -f docker-compose.prod.yml up`    |
+
+See [Deployment Playbook](../docs/playbooks/deployment.md) for details.
 
 ## Related Documentation
 
