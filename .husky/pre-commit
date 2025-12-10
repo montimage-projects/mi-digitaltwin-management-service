@@ -19,4 +19,12 @@ cd client && bunx tsc --noEmit || { echo "Client type check failed!"; exit 1; }
 cd ../server && bunx tsc --noEmit || { echo "Server type check failed!"; exit 1; }
 cd ..
 
+# Build client for deployment
+echo "Building client for deployment..."
+cd client && bun run build || { echo "Client build failed!"; exit 1; }
+cd ..
+
+# Stage the client build output
+git add client/dist/
+
 echo "All pre-commit checks passed!"

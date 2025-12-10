@@ -4,9 +4,12 @@ node_modules/
 .pnp.js
 
 # Build outputs
-dist/
 build/
 *.tsbuildinfo
+
+# Ignore dist except client/dist (needed for deployment)
+dist/
+!client/dist/
 
 # Environment files
 .env
