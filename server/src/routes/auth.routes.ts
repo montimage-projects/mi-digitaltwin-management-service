@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
 import { env } from '../config/env.js';
@@ -7,7 +7,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { loginSchema } from '../validators/auth.validator.js';
 import { AppError } from '../middleware/errorHandler.js';
 
-const router = Router();
+const router: RouterType = Router();
 
 // POST /api/auth/login
 router.post('/login', validate(loginSchema), async (req, res, next) => {

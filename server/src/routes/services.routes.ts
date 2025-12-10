@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { Service } from '../models/Service.js';
 import { Category } from '../models/Category.js';
@@ -7,7 +7,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { validateQuery, validateBody, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
 
-const router = Router();
+const router: RouterType = Router();
 
 // Validation schemas
 const inputOutputSchema = z.object({

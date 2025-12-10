@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { User } from '../models/User.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
 
-const router = Router();
+const router: RouterType = Router();
 
 // All routes require authentication
 router.use(authMiddleware);

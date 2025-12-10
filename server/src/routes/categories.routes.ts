@@ -1,8 +1,8 @@
-import { Router } from 'express';
+import { Router, type Router as RouterType } from 'express';
 import { Category } from '../models/Category.js';
 import { authMiddleware } from '../middleware/auth.js';
 
-const router = Router();
+const router: RouterType = Router();
 
 // GET /api/categories
 router.get('/', authMiddleware, async (_req, res, next) => {
