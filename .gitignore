@@ -48,3 +48,15 @@ bun.lockb
 
 # MongoDB data (if running locally without Docker)
 data/
+
+# Development documents
+dev-docs/
+openspec/
+AGENTS.md
+CLAUDE.md
+note.md
+
+# IDE and agent configuration
+.agent/
+.claude/
+.gemini/
