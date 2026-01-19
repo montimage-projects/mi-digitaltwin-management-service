@@ -1,6 +1,6 @@
 # MI Digital Twin Management Service
 
-A centralized, enterprise-grade platform for managing a comprehensive cybersecurity service repository and orchestrating Digital Twin projects across critical infrastructure. Enables security professionals to design, deploy, and evaluate cybersecurity scenarios in virtualized environments.
+A centralized platform for managing a comprehensive cybersecurity service repository and orchestrating Digital Twin projects across critical infrastructure. Enables security professionals to design, deploy, and evaluate cybersecurity scenarios in virtualized environments.
 
 ## Quick Start
 
@@ -210,7 +210,6 @@ See [Deployment Guide](docs/DEPLOYMENT.md) for detailed instructions.
 - **Status:** Active Development (v0.1.0)
 - **License:** Proprietary - Montimage
 - **Maintainer:** Montimage
-- **Based on:** Original INTACT Project Research
 
 ## Support & Contributions
 
