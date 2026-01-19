@@ -54,84 +54,76 @@ bun install && bun run dev
 Git-tracked folders and files:
 
 ```
- .github/ # GitHub workflows & configuration
- workflows/ # CI/CD pipeline definitions
+.github/
+  workflows/          # GitHub Actions CI/CD pipelines
+  WORKFLOWS_README.md # Workflows documentation
 
- .husky/ # Git hooks configuration
- pre-commit # Pre-commit hook
+.husky/              # Git hooks configuration
 
- client/ # React frontend (Vite + TypeScript)
- src/
- components/ # React components
- ui/ # shadcn/ui base components
- layout/ # Layout components
- topology/ # Topology editor
- services/ # Service components
- projects/ # Project components
- scenarios/ # Scenario components
- infrastructure/# Infrastructure components
- workspace/ # Workspace components
- execution/ # Execution components
- pages/ # Route pages
- lib/ # API client & utilities
- store/ # Zustand stores
- hooks/ # Custom React hooks
- public/ # Static assets
- package.json # Dependencies
- vite.config.ts # Vite configuration
- tsconfig.json # TypeScript config
- README.md # Client documentation
- Dockerfile # Client container build
+client/              # React frontend (Vite + TypeScript)
+  public/            # Static assets
+  src/
+    components/      # React components (ui, layout, topology, etc.)
+    hooks/           # Custom React hooks
+    lib/             # API client & utilities
+    pages/           # Route pages
+    store/           # Zustand state management
+    types/           # TypeScript definitions
+  package.json
+  vite.config.ts
+  tsconfig.json
+  Dockerfile
 
- server/ # Express backend (Bun + TypeScript)
- src/
- routes/ # API route handlers
- models/ # Mongoose schemas
- middleware/ # Express middleware
- validators/ # Zod validation schemas
- config/ # Configuration
- seed/ # Database seeding
- migrations/ # Database migrations
- utils/ # Utility functions
- docs/ # API documentation
- app.ts # Express entry point
- public/ # Static files
- assets/ # Asset files
- package.json # Dependencies
- tsconfig.json # TypeScript config
- README.md # Server documentation
- Dockerfile # Server container build
+server/              # Express backend (Bun + TypeScript)
+  src/
+    config/          # Configuration & database connection
+    middleware/      # Express middleware (auth, validation, error)
+    models/          # Mongoose schemas
+    routes/          # API route handlers
+    seed/            # Database seeding scripts
+    utils/           # Utility functions
+    validators/      # Zod validation schemas
+    app.ts           # Express entry point
+  public/            # Static files (client build)
+  package.json
+  tsconfig.json
+  Dockerfile
 
- docs/ # Technical documentation
- architecture/ # System design & architecture
- database/ # MongoDB schemas & relationships
- design/ # UI patterns & styling conventions
- installation/ # Setup & configuration
- integration/ # External services & integrations
- playbooks/ # Deployment & development guides
- troubleshooting/ # Common issues & debugging
- API.md # REST API reference
- COMPONENTS.md # React component reference
- DEVELOPMENT.md # Development workflow guide
- DEPLOYMENT.md # Production deployment guide
- README.md # Documentation index
+docs/                # Technical documentation
+  architecture/      # System design & components
+  database/          # MongoDB schemas & relationships
+  design/            # UI patterns & styling
+  installation/      # Prerequisites & configuration
+  integration/       # External integrations
+  playbooks/         # Development & deployment guides
+  troubleshooting/   # Issues & debugging
+  API.md             # REST API reference
+  COMPONENTS.md      # React component reference
+  DEVELOPMENT.md     # Development workflow guide
+  DEPLOYMENT.md      # Production deployment guide
+  README.md          # Documentation index
 
- .dockerignore # Docker build ignore patterns
- .env.example # Environment variables template
- .gitignore # Git ignore patterns
- .prettierrc # Prettier formatting config
- .prettierignore # Prettier ignore patterns
- bun.lock # Dependency lock file
- docker-compose.yml # Local development stack
- docker-compose.prod.yml # Production deployment stack
- docker-compose.atlas.yml # MongoDB Atlas variant
- package.json # Root monorepo config
+openspec/            # Specification-driven development configs
 
- CLAUDE.md # AI assistant configuration
- DEPLOYMENT.md # Deployment information
- DOCUMENTATION_REFACTOR.md # Documentation changes summary
- README.md # This file
+Configuration Files
+  .dockerignore
+  .env.example
+  .gitignore
+  .markdownlintrc
+  .prettierrc
+  .prettierignore
+  bun.lock
+  docker-compose.yml
+  docker-compose.prod.yml
+  docker-compose.atlas.yml
+  package.json
+
+Root Documentation
+  CLAUDE.md          # AI assistant configuration
+  README.md          # This file
 ```
+
+**Note:** Development documents are stored in `dev-docs/` and not tracked by git (see .gitignore).
 
 ## Key Features
 
