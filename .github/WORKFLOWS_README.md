@@ -422,14 +422,12 @@ markdownlint docs/**/*.md
 - [Workflows Guide](../docs/WORKFLOWS.md) - Detailed workflow documentation
 - [Development Guide](../docs/DEVELOPMENT.md) - Development workflow
 - [Documentation Standards](../docs/README.md) - Documentation conventions
-- [Contributing Guide](../CLAUDE.md) - Contribution guidelines
 
 ## Quick Links
 
 - **Documentation Index:** [docs/README.md](../docs/README.md)
 - **Workflow Status:** GitHub Actions tab
 - **Documentation Portal:** [docs/](../docs/)
-- **Contributing:** See CLAUDE.md
 
 ## Support
 

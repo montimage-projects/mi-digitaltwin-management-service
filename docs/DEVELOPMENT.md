@@ -167,7 +167,7 @@ cd client && bun run lint -- --fix
 
 ### Style Guidelines
 
-- **JavaScript/TypeScript:** Follow [ESLint config](.eslintrc.json)
+- **JavaScript/TypeScript:** Follow ESLint configuration
 - **Styling:** Review [Styling Guide](design/styling.md)
 - **UI Components:** Check [UI Patterns](design/ui-patterns.md)
 - **Naming:** Use camelCase for variables/functions, PascalCase for components/classes
