@@ -103,8 +103,6 @@ docs/                # Technical documentation
   DEPLOYMENT.md      # Production deployment guide
   README.md          # Documentation index
 
-openspec/            # Specification-driven development configs
-
 Configuration Files
   .dockerignore
   .env.example
@@ -119,7 +117,6 @@ Configuration Files
   package.json
 
 Root Documentation
-  CLAUDE.md          # AI assistant configuration
   README.md          # This file
 ```
 
@@ -127,11 +124,11 @@ Root Documentation
 
 ## Key Features
 
-- **Service Repository** - Catalog of 44+ INTACT cybersecurity services
-- **Digital Twin Projects** - Manage projects across critical infrastructure sectors (Telecom, Healthcare, Transportation, Nuclear)
+- **Service Repository** - Catalog of 44+ INTACT cybersecurity services (Base on proposal + deliverable)
+- **Digital Twin Projects** - Manage projects across critical infrastructure sectors (Telecom, Healthcare, Transportation, Nuclear) (Base on proposal + deliverable)
 - **Visual Topology Editor** - Drag-and-drop scenario design with real-time YAML synchronization
-- **Infrastructure Management** - Configure Kubernetes, Docker, and VM deployment targets
-- **MAESTRO Integration** - Execute scenarios via the UBITECH orchestrator
+- **Infrastructure Management** - Configure Kubernetes, Docker, and VM deployment targets (MOCKUP - TO BE COMPLETED)
+- **MAESTRO Integration** - Execute scenarios via the UBITECH orchestrator (MOCKUP - TO BE COMPLETED)
 - **Comprehensive Analytics** - Project reports and scenario execution insights
 
 ## Tech Stack
