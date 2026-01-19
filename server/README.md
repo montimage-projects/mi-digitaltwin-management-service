@@ -1,6 +1,6 @@
 # Server Module
 
-Express backend API for the INTACT Digital Twin Management Platform.
+Express backend API for the MI Digital Twin Management Service.
 
 ## Overview
 
@@ -246,8 +246,20 @@ This will:
 
 See [Deployment Playbook](../docs/playbooks/deployment.md) for details.
 
+## Next Steps
+
+- **Getting Started?** → [Development Guide](../docs/DEVELOPMENT.md)
+- **API Endpoints?** → [API Reference](../docs/API.md)
+- **Database Help?** → [Database Schema](../docs/database/schema.md)
+- **Deploy to Production?** → [Deployment Guide](../docs/DEPLOYMENT.md)
+- **Need Help?** → [Troubleshooting](../docs/troubleshooting/common-issues.md)
+
 ## Related Documentation
 
-- [Backend Architecture](../docs/architecture/backend.md)
-- [Database Schema](../docs/database/schema.md)
-- [Development Playbook](../docs/playbooks/development.md)
+- [Backend Architecture](../docs/architecture/backend.md) - Express API structure and layers
+- [API Reference](../docs/API.md) - Complete REST endpoint reference with examples
+- [Database Schema](../docs/database/schema.md) - MongoDB collections and fields
+- [Database Relationships](../docs/database/relationships.md) - Collection references
+- [Development Guide](../docs/DEVELOPMENT.md) - Full development workflow
+- [Deployment Guide](../docs/DEPLOYMENT.md) - Production deployment checklist
+- [Development Playbook](../docs/playbooks/development.md) - Step-by-step setup

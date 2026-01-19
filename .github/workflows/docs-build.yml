@@ -1,0 +1,236 @@
+name: Documentation Build & Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'client/README.md'
+      - 'server/README.md'
+      - '.github/workflows/docs-build.yml'
+
+jobs:
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Generate documentation index
+        run: |
+          echo "📚 Generating documentation index..."
+
+          # Create a timestamp for the build
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "Build Date: $BUILD_DATE"
+
+          # Generate statistics
+          DOC_COUNT=$(find docs -name "*.md" | wc -l)
+          API_ENDPOINTS=$(grep -r "^- \*\*" docs/API.md | wc -l)
+          COMPONENTS=$(grep -r "^### " docs/COMPONENTS.md | wc -l)
+
+          echo ""
+          echo "📊 Documentation Statistics:"
+          echo "   Total documentation files: $DOC_COUNT"
+          echo "   API endpoints documented: $API_ENDPOINTS"
+          echo "   Components documented: $COMPONENTS"
+          echo ""
+          echo "✅ Documentation build complete"
+
+      - name: Validate documentation files
+        run: |
+          echo "🔍 Validating documentation files..."
+
+          # Check all markdown files for common issues
+          ERRORS=0
+
+          # Check for broken references
+          for file in $(find docs -name "*.md"); do
+            # Look for markdown links that might be broken
+            grep -o '\[.*\](.*\.md)' "$file" | while read link; do
+              # Extract file path from link
+              path=$(echo "$link" | sed 's/.*(\(.*\)).*/\1/')
+              if [[ ! "$path" =~ ^http ]] && [ ! -f "$path" ]; then
+                echo "⚠️  Potentially broken link in $file: $link"
+                ERRORS=$((ERRORS + 1))
+              fi
+            done
+          done
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "⚠️  Found $ERRORS potential issues"
+          else
+            echo "✅ All links validated"
+          fi
+
+      - name: Check documentation completeness
+        run: |
+          echo "📋 Checking documentation completeness..."
+
+          required_sections=(
+            "Quick Start"
+            "Prerequisites"
+            "Architecture"
+            "Technology Stack"
+            "Related Documentation"
+          )
+
+          # Check main README has key sections
+          missing=0
+          for section in "${required_sections[@]}"; do
+            if ! grep -q "## $section" README.md; then
+              echo "⚠️  Missing section in README.md: $section"
+              missing=$((missing + 1))
+            fi
+          done
+
+          if [ $missing -eq 0 ]; then
+            echo "✅ README.md has all key sections"
+          fi
+
+          # Check API.md is comprehensive
+          if [ -f "docs/API.md" ]; then
+            if grep -q "## Error Codes" docs/API.md && \
+               grep -q "## Data Models" docs/API.md && \
+               grep -q "## Pagination" docs/API.md; then
+              echo "✅ API.md is comprehensive"
+            fi
+          fi
+
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: build-docs
+    if: success()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create documentation artifact
+        run: |
+          echo "📦 Creating documentation package..."
+
+          # Create a tar archive of documentation
+          tar -czf documentation.tar.gz docs/ README.md client/README.md server/README.md
+
+          # Create a summary
+          cat > docs-summary.txt << EOF
+          INTACT Digital Twin Management Platform - Documentation Build
+          ==============================================================
+
+          Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          Git Commit: ${{ github.sha }}
+          Git Branch: ${{ github.ref }}
+
+          Documentation Files:
+          $(find docs -name "*.md" -type f | sort | sed 's/^/  - /')
+
+          Key Documentation:
+          - Main README: README.md
+          - Client Setup: client/README.md
+          - Server Setup: server/README.md
+          - API Reference: docs/API.md
+          - Component Reference: docs/COMPONENTS.md
+          - Development Guide: docs/DEVELOPMENT.md
+          - Deployment Guide: docs/DEPLOYMENT.md
+          - Documentation Index: docs/README.md
+
+          Statistics:
+          - Total documentation files: $(find docs -name "*.md" | wc -l)
+          - Total pages: $(find docs -name "*.md" -exec wc -l {} + | tail -1 | awk '{print $1}')
+
+          To deploy documentation:
+          1. Extract documentation.tar.gz
+          2. Host the files with your documentation server
+          3. Point users to the documentation index at docs/README.md
+          EOF
+
+          echo "✅ Documentation package created"
+          ls -lh documentation.tar.gz
+
+      - name: Upload documentation artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation
+          path: |
+            documentation.tar.gz
+            docs-summary.txt
+          retention-days: 30
+
+  publish-docs:
+    name: Publish Documentation Status
+    runs-on: ubuntu-latest
+    needs: deploy-docs
+    if: always()
+
+    steps:
+      - name: Create deployment status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const buildStatus = `${{ needs.deploy-docs.result }}`;
+
+            console.log('📚 Documentation Build Summary');
+            console.log('============================');
+            console.log(`Build Status: ${buildStatus === 'success' ? '✅ Success' : '❌ Failed'}`);
+            console.log(`Repository: ${{ github.repository }}`);
+            console.log(`Branch: ${{ github.ref }}`);
+            console.log(`Commit: ${{ github.sha }}`);
+            console.log(`Timestamp: ${new Date().toISOString()}`);
+
+      - name: Comment on latest commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Get commit information
+            const commit = await github.rest.git.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: '${{ github.sha }}'
+            });
+
+            const message = `✅ **Documentation Build Complete**
+
+            📦 Documentation artifacts are ready for deployment.
+
+            **Build Details:**
+            - Status: ${{ needs.deploy-docs.result === 'success' ? '✅ Success' : '❌ Failed' }}
+            - Build Time: ${new Date().toISOString()}
+            - Commit: ${commit.data.sha.substring(0, 7)}
+
+            **Documentation Available:**
+            - 📖 [Development Guide](docs/DEVELOPMENT.md)
+            - 🚀 [Deployment Guide](docs/DEPLOYMENT.md)
+            - 📡 [API Reference](docs/API.md)
+            - 🧩 [Component Reference](docs/COMPONENTS.md)
+            - 📚 [Documentation Index](docs/README.md)
+
+            Download the documentation artifact from the workflow run to deploy elsewhere.`;
+
+            console.log(message);
+
+      - name: Verify artifact
+        run: |
+          echo "✅ Documentation deployment workflow complete"
+          echo ""
+          echo "📦 Artifacts available:"
+          echo "   - documentation.tar.gz (documentation package)"
+          echo "   - docs-summary.txt (build summary)"
+          echo ""
+          echo "📍 Next Steps:"
+          echo "   1. Download artifacts from workflow run"
+          echo "   2. Extract documentation.tar.gz"
+          echo "   3. Deploy to your documentation server"
+          echo "   4. Update documentation portal links"

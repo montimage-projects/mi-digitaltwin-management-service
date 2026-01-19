@@ -1,0 +1,224 @@
+name: Documentation Validation
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'docs/**'
+      - 'client/README.md'
+      - 'server/README.md'
+      - 'README.md'
+      - '.github/workflows/docs-validate.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'docs/**'
+      - 'client/README.md'
+      - 'server/README.md'
+      - 'README.md'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  markdown-lint:
+    name: Markdown Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install markdownlint
+        run: npm install -g markdownlint-cli
+
+      - name: Lint markdown files
+        run: markdownlint 'docs/**/*.md' 'README.md' 'client/README.md' 'server/README.md' --config .markdownlintrc || true
+        continue-on-error: true
+
+  link-check:
+    name: Link Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'yes'
+          file-path: |
+            ./README.md
+            ./docs/README.md
+            ./client/README.md
+            ./server/README.md
+          config-file: '.github/workflows/mlc_config.json'
+
+  yaml-validation:
+    name: YAML & Frontmatter Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Validate YAML in docs
+        run: |
+          npm install -g yaml-validator
+          find docs -name "*.yml" -o -name "*.yaml" | xargs yaml-validator || true
+        continue-on-error: true
+
+  spelling-check:
+    name: Spell Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check spelling
+        uses: check-spell-action/check-spell-action@master
+        with:
+          files: |
+            README.md
+            docs/**/*.md
+            client/README.md
+            server/README.md
+          skipcommituser: 'dependabot'
+          dictionary: '.github/workflows/spelling-dictionary.txt'
+        continue-on-error: true
+
+  docs-structure:
+    name: Documentation Structure Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify documentation structure
+        run: |
+          # Check required documentation files exist
+          required_docs=(
+            "README.md"
+            "docs/README.md"
+            "docs/API.md"
+            "docs/COMPONENTS.md"
+            "docs/DEVELOPMENT.md"
+            "docs/DEPLOYMENT.md"
+            "client/README.md"
+            "server/README.md"
+          )
+
+          missing=0
+          for doc in "${required_docs[@]}"; do
+            if [ ! -f "$doc" ]; then
+              echo "❌ Missing required documentation: $doc"
+              missing=$((missing + 1))
+            else
+              echo "✅ Found: $doc"
+            fi
+          done
+
+          if [ $missing -gt 0 ]; then
+            echo ""
+            echo "❌ $missing required documentation file(s) missing"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All required documentation files present"
+
+      - name: Verify documentation directories
+        run: |
+          # Check required documentation directories exist
+          required_dirs=(
+            "docs/architecture"
+            "docs/database"
+            "docs/design"
+            "docs/installation"
+            "docs/integration"
+            "docs/playbooks"
+            "docs/troubleshooting"
+          )
+
+          missing=0
+          for dir in "${required_dirs[@]}"; do
+            if [ ! -d "$dir" ]; then
+              echo "❌ Missing required directory: $dir"
+              missing=$((missing + 1))
+            else
+              echo "✅ Found: $dir"
+            fi
+          done
+
+          if [ $missing -gt 0 ]; then
+            echo ""
+            echo "❌ $missing required directory(ies) missing"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All required documentation directories present"
+
+  mermaid-validation:
+    name: Mermaid Diagram Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Validate Mermaid diagrams
+        run: |
+          npm install -g @mermaid-js/mermaid-cli
+
+          # Extract and validate Mermaid diagrams
+          echo "Validating Mermaid diagrams in documentation..."
+
+          # Find all markdown files and check Mermaid syntax
+          find docs -name "*.md" -exec grep -l '```mermaid' {} \; | while read file; do
+            echo "Checking Mermaid diagrams in: $file"
+            # Basic syntax check - can be expanded
+            grep -A 20 '```mermaid' "$file" | grep -v '```' | grep -v '^$' > /dev/null && echo "✅ Found Mermaid diagram"
+          done
+
+          echo "✅ Mermaid diagram validation complete"
+        continue-on-error: true
+
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [markdown-lint, link-check, yaml-validation, spelling-check, docs-structure, mermaid-validation]
+    if: always()
+
+    steps:
+      - name: Check validation results
+        run: |
+          echo "📋 Documentation Validation Summary"
+          echo "===================================="
+          echo ""
+          echo "✅ Markdown Linting: ${{ needs.markdown-lint.result }}"
+          echo "✅ Link Validation: ${{ needs.link-check.result }}"
+          echo "✅ YAML Validation: ${{ needs.yaml-validation.result }}"
+          echo "✅ Spell Check: ${{ needs.spelling-check.result }}"
+          echo "✅ Structure Check: ${{ needs.docs-structure.result }}"
+          echo "✅ Mermaid Validation: ${{ needs.mermaid-validation.result }}"

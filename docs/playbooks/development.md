@@ -1,6 +1,6 @@
 # Development Playbook
 
-Complete guide for setting up a local development environment for the INTACT Digital Twin Management Platform.
+Complete guide for setting up a local development environment for the MI Digital Twin Management Service.
 
 ## Overview
 

@@ -1,6 +1,6 @@
 # Client Module
 
-React frontend application for the INTACT Digital Twin Management Platform.
+React frontend application for the MI Digital Twin Management Service.
 
 ## Overview
 
@@ -150,8 +150,18 @@ bun run dev
 bunx tsc --noEmit
 ```
 
+## Next Steps
+
+- **Getting Started?** → [Development Guide](../docs/DEVELOPMENT.md)
+- **Building Components?** → [Component Reference](../docs/COMPONENTS.md)
+- **Need API?** → [API Reference](../docs/API.md)
+- **Need Help?** → [Troubleshooting](../docs/troubleshooting/common-issues.md)
+
 ## Related Documentation
 
-- [Frontend Architecture](../docs/architecture/frontend.md)
-- [UI Patterns](../docs/design/ui-patterns.md)
-- [Development Playbook](../docs/playbooks/development.md)
+- [Frontend Architecture](../docs/architecture/frontend.md) - Component structure and patterns
+- [Component Reference](../docs/COMPONENTS.md) - UI component API and usage
+- [UI Patterns](../docs/design/ui-patterns.md) - Design system and conventions
+- [Styling Guide](../docs/design/styling.md) - CSS/Tailwind guidelines
+- [Development Guide](../docs/DEVELOPMENT.md) - Full development workflow
+- [Development Playbook](../docs/playbooks/development.md) - Step-by-step setup

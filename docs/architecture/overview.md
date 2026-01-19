@@ -1,6 +1,6 @@
 # Architecture Overview
 
-High-level system architecture of the INTACT Digital Twin Management Platform.
+High-level system architecture of the MI Digital Twin Management Service.
 
 ## System Architecture
 

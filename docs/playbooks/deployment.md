@@ -1,6 +1,6 @@
 # Deployment Playbook
 
-Complete guide for deploying the INTACT Digital Twin Management Platform to production.
+Complete guide for deploying the MI Digital Twin Management Service to production.
 
 ## Overview
 
