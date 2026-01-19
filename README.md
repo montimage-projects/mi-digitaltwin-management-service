@@ -216,7 +216,6 @@ See [Deployment Guide](docs/DEPLOYMENT.md) for detailed instructions.
 - **Issues & Bugs:** Report via GitHub Issues
 - **Documentation:** Contribute improvements to `docs/`
 - **Code Guidelines:** See [Code Style](docs/design/styling.md) and [Architecture](docs/architecture/overview.md)
-- **Spec-Driven Development:** Review [OpenSpec Conventions](openspec/project.md)
 
 ---
 
