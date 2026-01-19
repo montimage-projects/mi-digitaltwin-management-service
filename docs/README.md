@@ -100,9 +100,6 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 ### Project Configuration
 
 - [Root README](../README.md) - Project overview and quick start
-- [OpenSpec Project Guide](../openspec/project.md) - Project conventions and structure
-- [OpenSpec Agents Guide](../openspec/AGENTS.md) - AI assistant guidelines
-- [CLAUDE.md](../CLAUDE.md) - Claude Code configuration
 
 ### Module Documentation
 
