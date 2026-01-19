@@ -173,64 +173,16 @@ jobs:
     if: always()
 
     steps:
-      - name: Create deployment status
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const buildStatus = `${{ needs.deploy-docs.result }}`;
-
-            console.log(' Documentation Build Summary');
-            console.log('============================');
-            console.log(`Build Status: ${buildStatus === 'success' ? ' Success' : ' Failed'}`);
-            console.log(`Repository: ${{ github.repository }}`);
-            console.log(`Branch: ${{ github.ref }}`);
-            console.log(`Commit: ${{ github.sha }}`);
-            console.log(`Timestamp: ${new Date().toISOString()}`);
-
-      - name: Comment on latest commit
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-
-            // Get commit information
-            const commit = await github.rest.git.getCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: '${{ github.sha }}'
-            });
-
-            const message = ` **Documentation Build Complete**
-
-             Documentation artifacts are ready for deployment.
-
-            **Build Details:**
-            - Status: ${{ needs.deploy-docs.result === 'success' ? ' Success' : ' Failed' }}
-            - Build Time: ${new Date().toISOString()}
-            - Commit: ${commit.data.sha.substring(0, 7)}
-
-            **Documentation Available:**
-            -  [Development Guide](docs/DEVELOPMENT.md)
-            -  [Deployment Guide](docs/DEPLOYMENT.md)
-            -  [API Reference](docs/API.md)
-            -  [Component Reference](docs/COMPONENTS.md)
-            -  [Documentation Index](docs/README.md)
-
-            Download the documentation artifact from the workflow run to deploy elsewhere.`;
-
-            console.log(message);
-
       - name: Verify artifact
         run: |
-          echo " Documentation deployment workflow complete"
+          echo "Documentation deployment workflow complete"
           echo ""
-          echo " Artifacts available:"
-          echo "   - documentation.tar.gz (documentation package)"
-          echo "   - docs-summary.txt (build summary)"
+          echo "Artifacts available:"
+          echo "  - documentation.tar.gz (documentation package)"
+          echo "  - docs-summary.txt (build summary)"
           echo ""
-          echo " Next Steps:"
-          echo "   1. Download artifacts from workflow run"
-          echo "   2. Extract documentation.tar.gz"
-          echo "   3. Deploy to your documentation server"
-          echo "   4. Update documentation portal links"
+          echo "Next Steps:"
+          echo "  1. Download artifacts from workflow run"
+          echo "  2. Extract documentation.tar.gz"
+          echo "  3. Deploy to your documentation server"
+          echo "  4. Update documentation portal links"
