@@ -1,276 +1,276 @@
 name: Documentation Quality Check
 
 on:
- schedule:
- # Run daily at 9 AM UTC
- - cron: '0 9 * * *'
- workflow_dispatch:
+  schedule:
+    # Run daily at 9 AM UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch:
 
 jobs:
- analyze-documentation:
- name: Analyze Documentation Quality
- runs-on: ubuntu-latest
+  analyze-documentation:
+    name: Analyze Documentation Quality
+    runs-on: ubuntu-latest
 
- steps:
- - name: Checkout code
- uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
- - name: Setup Node.js
- uses: actions/setup-node@v4
- with:
- node-version: '18'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
- - name: Calculate documentation metrics
- run: |
- echo " Documentation Quality Metrics"
- echo "================================"
- echo ""
+      - name: Calculate documentation metrics
+        run: |
+          echo " Documentation Quality Metrics"
+          echo "================================"
+          echo ""
 
- # Total documentation files
- DOC_FILES=$(find docs -name "*.md" -type f)
- DOC_COUNT=$(echo "$DOC_FILES" | wc -l)
- echo " Documentation Files: $DOC_COUNT"
+          # Total documentation files
+          DOC_FILES=$(find docs -name "*.md" -type f)
+          DOC_COUNT=$(echo "$DOC_FILES" | wc -l)
+          echo " Documentation Files: $DOC_COUNT"
 
- # Total lines of documentation
- TOTAL_LINES=$(echo "$DOC_FILES" | xargs wc -l | tail -1 | awk '{print $1}')
- echo " Total Lines: $TOTAL_LINES"
+          # Total lines of documentation
+          TOTAL_LINES=$(echo "$DOC_FILES" | xargs wc -l | tail -1 | awk '{print $1}')
+          echo " Total Lines: $TOTAL_LINES"
 
- # Average documentation per file
- AVG_LINES=$((TOTAL_LINES / DOC_COUNT))
- echo " Average Lines per File: $AVG_LINES"
+          # Average documentation per file
+          AVG_LINES=$((TOTAL_LINES / DOC_COUNT))
+          echo " Average Lines per File: $AVG_LINES"
 
- # Count code examples
- CODE_EXAMPLES=$(grep -r '```' docs | wc -l)
- echo " Code Examples: $((CODE_EXAMPLES / 2))"
+          # Count code examples
+          CODE_EXAMPLES=$(grep -r '```' docs | wc -l)
+          echo " Code Examples: $((CODE_EXAMPLES / 2))"
 
- # Count Mermaid diagrams
- DIAGRAMS=$(grep -r '```mermaid' docs | wc -l)
- echo " Mermaid Diagrams: $DIAGRAMS"
+          # Count Mermaid diagrams
+          DIAGRAMS=$(grep -r '```mermaid' docs | wc -l)
+          echo " Mermaid Diagrams: $DIAGRAMS"
 
- # Count internal links
- INTERNAL_LINKS=$(grep -r '\[.*\](.*\.md)' docs | wc -l)
- echo " Internal Links: $INTERNAL_LINKS"
+          # Count internal links
+          INTERNAL_LINKS=$(grep -r '\[.*\](.*\.md)' docs | wc -l)
+          echo " Internal Links: $INTERNAL_LINKS"
 
- # Check documentation coverage
- echo ""
- echo " Documentation Coverage Check:"
- echo "=================================="
+          # Check documentation coverage
+          echo ""
+          echo " Documentation Coverage Check:"
+          echo "=================================="
 
- # Required documentation files
- required_files=(
- "README.md"
- "docs/README.md"
- "docs/API.md"
- "docs/COMPONENTS.md"
- "docs/DEVELOPMENT.md"
- "docs/DEPLOYMENT.md"
- "client/README.md"
- "server/README.md"
- "docs/architecture/overview.md"
- "docs/database/schema.md"
- )
+          # Required documentation files
+          required_files=(
+            "README.md"
+            "docs/README.md"
+            "docs/API.md"
+            "docs/COMPONENTS.md"
+            "docs/DEVELOPMENT.md"
+            "docs/DEPLOYMENT.md"
+            "client/README.md"
+            "server/README.md"
+            "docs/architecture/overview.md"
+            "docs/database/schema.md"
+          )
 
- missing=0
- for file in "${required_files[@]}"; do
- if [ -f "$file" ]; then
- lines=$(wc -l < "$file")
- echo " $file ($lines lines)"
- else
- echo " $file (MISSING)"
- missing=$((missing + 1))
- fi
- done
+          missing=0
+          for file in "${required_files[@]}"; do
+            if [ -f "$file" ]; then
+              lines=$(wc -l < "$file")
+              echo " $file ($lines lines)"
+            else
+              echo " $file (MISSING)"
+              missing=$((missing + 1))
+            fi
+          done
 
- if [ $missing -eq 0 ]; then
- echo ""
- echo " All required documentation files present"
- else
- echo ""
- echo " $missing required file(s) missing"
- fi
+          if [ $missing -eq 0 ]; then
+            echo ""
+            echo " All required documentation files present"
+          else
+            echo ""
+            echo "  $missing required file(s) missing"
+          fi
 
- - name: Check documentation freshness
- run: |
- echo ""
- echo " Documentation Freshness Check:"
- echo "=================================="
+      - name: Check documentation freshness
+        run: |
+          echo ""
+          echo " Documentation Freshness Check:"
+          echo "=================================="
 
- # Get the last 10 commits that modified documentation
- echo ""
- echo "Recent documentation updates:"
- git log --pretty=format:"%h %ad %s" --date=short --name-only -- docs/ README.md client/README.md server/README.md | head -30
+          # Get the last 10 commits that modified documentation
+          echo ""
+          echo "Recent documentation updates:"
+          git log --pretty=format:"%h %ad %s" --date=short --name-only -- docs/ README.md client/README.md server/README.md | head -30
 
- echo ""
- echo "Last documentation update:"
- LAST_UPDATE=$(git log -1 --format="%ai" -- docs/ README.md client/README.md server/README.md)
- echo " $LAST_UPDATE"
+          echo ""
+          echo "Last documentation update:"
+          LAST_UPDATE=$(git log -1 --format="%ai" -- docs/ README.md client/README.md server/README.md)
+          echo " $LAST_UPDATE"
 
- # Calculate days since last update
- LAST_UPDATE_SECONDS=$(git log -1 --format=%at -- docs/ README.md client/README.md server/README.md)
- NOW=$(date +%s)
- DAYS_AGO=$(( (NOW - LAST_UPDATE_SECONDS) / 86400 ))
+          # Calculate days since last update
+          LAST_UPDATE_SECONDS=$(git log -1 --format=%at -- docs/ README.md client/README.md server/README.md)
+          NOW=$(date +%s)
+          DAYS_AGO=$(( (NOW - LAST_UPDATE_SECONDS) / 86400 ))
 
- if [ $DAYS_AGO -gt 30 ]; then
- echo " Documentation not updated for $DAYS_AGO days"
- echo " Consider updating documentation to reflect recent changes"
- elif [ $DAYS_AGO -gt 7 ]; then
- echo " Documentation not updated for $DAYS_AGO days"
- else
- echo " Documentation updated $DAYS_AGO days ago"
- fi
+          if [ $DAYS_AGO -gt 30 ]; then
+            echo "  Documentation not updated for $DAYS_AGO days"
+            echo " Consider updating documentation to reflect recent changes"
+          elif [ $DAYS_AGO -gt 7 ]; then
+            echo "  Documentation not updated for $DAYS_AGO days"
+          else
+            echo " Documentation updated $DAYS_AGO days ago"
+          fi
 
- - name: Check for TODO/FIXME in docs
- run: |
- echo ""
- echo " Checking for incomplete documentation:"
- echo "=========================================="
+      - name: Check for TODO/FIXME in docs
+        run: |
+          echo ""
+          echo " Checking for incomplete documentation:"
+          echo "=========================================="
 
- TODOs=$(grep -r "TODO\|FIXME\|XXX\|\[WIP\]" docs/ 2>/dev/null | wc -l)
+          TODOs=$(grep -r "TODO\|FIXME\|XXX\|\[WIP\]" docs/ 2>/dev/null | wc -l)
 
- if [ $TODOs -gt 0 ]; then
- echo " Found $TODOs items marked as TODO/FIXME:"
- echo ""
- grep -r "TODO\|FIXME\|XXX\|\[WIP\]" docs/ 2>/dev/null | head -10
- else
- echo " No TODO/FIXME markers found"
- fi
+          if [ $TODOs -gt 0 ]; then
+            echo "  Found $TODOs items marked as TODO/FIXME:"
+            echo ""
+            grep -r "TODO\|FIXME\|XXX\|\[WIP\]" docs/ 2>/dev/null | head -10
+          else
+            echo " No TODO/FIXME markers found"
+          fi
 
- - name: Validate markdown structure
- run: |
- echo ""
- echo " Markdown Structure Validation:"
- echo "==============================="
+      - name: Validate markdown structure
+        run: |
+          echo ""
+          echo " Markdown Structure Validation:"
+          echo "==============================="
 
- # Check that documentation files follow heading structure
- echo ""
- echo "Checking heading hierarchy..."
+          # Check that documentation files follow heading structure
+          echo ""
+          echo "Checking heading hierarchy..."
 
- for file in docs/**/*.md; do
- if [ -f "$file" ]; then
- # Check if file starts with # (H1 heading)
- first_heading=$(head -20 "$file" | grep -m 1 "^#")
- if [ -z "$first_heading" ]; then
- echo " $file: Missing main heading (H1)"
- fi
- fi
- done
+          for file in docs/**/*.md; do
+            if [ -f "$file" ]; then
+              # Check if file starts with # (H1 heading)
+              first_heading=$(head -20 "$file" | grep -m 1 "^#")
+              if [ -z "$first_heading" ]; then
+                echo "  $file: Missing main heading (H1)"
+              fi
+            fi
+          done
 
- echo " Structure validation complete"
+          echo " Structure validation complete"
 
- - name: Generate documentation report
- run: |
- cat > docs-quality-report.md << 'EOF'
- # Documentation Quality Report
+      - name: Generate documentation report
+        run: |
+          cat > docs-quality-report.md << 'EOF'
+          # Documentation Quality Report
 
- Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          Generated: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
- ## Quality Metrics
+          ## Quality Metrics
 
- ### File Statistics
- - Total Documentation Files: $(find docs -name "*.md" | wc -l)
- - Total Pages: $(find docs -name "*.md" -exec wc -l {} + | tail -1 | awk '{print $1}')
- - Main Modules: $(find docs -maxdepth 1 -type d -name '[a-z]*' | wc -l)
+          ### File Statistics
+          - Total Documentation Files: $(find docs -name "*.md" | wc -l)
+          - Total Pages: $(find docs -name "*.md" -exec wc -l {} + | tail -1 | awk '{print $1}')
+          - Main Modules: $(find docs -maxdepth 1 -type d -name '[a-z]*' | wc -l)
 
- ### Content Coverage
- - API Endpoints Documented: $(grep -c "^- \*\*" docs/API.md 2>/dev/null || echo "0")
- - Components Documented: $(grep -c "^### " docs/COMPONENTS.md 2>/dev/null || echo "0")
- - Architecture Diagrams: $(grep -c '```mermaid' docs/architecture/*.md 2>/dev/null || echo "0")
+          ### Content Coverage
+          - API Endpoints Documented: $(grep -c "^- \*\*" docs/API.md 2>/dev/null || echo "0")
+          - Components Documented: $(grep -c "^### " docs/COMPONENTS.md 2>/dev/null || echo "0")
+          - Architecture Diagrams: $(grep -c '```mermaid' docs/architecture/*.md 2>/dev/null || echo "0")
 
- ### Documentation Standards
- - Main README present
- - Module READMEs (client, server)
- - API Reference complete
- - Component Reference available
- - Development Guide provided
- - Deployment Guide provided
+          ### Documentation Standards
+          -  Main README present
+          -  Module READMEs (client, server)
+          -  API Reference complete
+          -  Component Reference available
+          -  Development Guide provided
+          -  Deployment Guide provided
 
- ## Recommendations
+          ## Recommendations
 
- 1. **Keep Documentation Updated**
- - Update docs when making code changes
- - Review API documentation quarterly
- - Refresh examples annually
+          1. **Keep Documentation Updated**
+             - Update docs when making code changes
+             - Review API documentation quarterly
+             - Refresh examples annually
 
- 2. **Maintain Quality**
- - Check links regularly
- - Verify code examples work
- - Update deprecated information
+          2. **Maintain Quality**
+             - Check links regularly
+             - Verify code examples work
+             - Update deprecated information
 
- 3. **Improve Coverage**
- - Add troubleshooting for common issues
- - Expand deployment scenarios
- - Document edge cases
+          3. **Improve Coverage**
+             - Add troubleshooting for common issues
+             - Expand deployment scenarios
+             - Document edge cases
 
- ## Next Steps
+          ## Next Steps
 
- - Review documentation for accuracy
- - Update sections marked as TODO/FIXME
- - Test all code examples
- - Verify all links are working
- EOF
+          - Review documentation for accuracy
+          - Update sections marked as TODO/FIXME
+          - Test all code examples
+          - Verify all links are working
+          EOF
 
- cat docs-quality-report.md
+          cat docs-quality-report.md
 
- - name: Create issue if problems found
- if: failure()
- uses: actions/github-script@v7
- with:
- script: |
- const { context } = require('@actions/github');
+      - name: Create issue if problems found
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { context } = require('@actions/github');
 
- // Check if issue already exists
- const issues = await github.rest.issues.listForRepo({
- owner: context.repo.owner,
- repo: context.repo.repo,
- state: 'open',
- labels: ['documentation', 'quality']
- });
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: ['documentation', 'quality']
+            });
 
- // Only create issue if one doesn't exist
- if (issues.data.length === 0) {
- github.rest.issues.create({
- owner: context.repo.owner,
- repo: context.repo.repo,
- title: ' Documentation Quality Check - Issues Found',
- body: `## Documentation Quality Issues Detected
+            // Only create issue if one doesn't exist
+            if (issues.data.length === 0) {
+              github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: ' Documentation Quality Check - Issues Found',
+                body: `## Documentation Quality Issues Detected
 
- The daily documentation quality check found some issues.
+                The daily documentation quality check found some issues.
 
- ### Action Items
- - [ ] Review documentation for outdated content
- - [ ] Check and fix broken links
- - [ ] Verify code examples are current
- - [ ] Update TODO/FIXME items
- - [ ] Run manual documentation review
+                ### Action Items
+                - [ ] Review documentation for outdated content
+                - [ ] Check and fix broken links
+                - [ ] Verify code examples are current
+                - [ ] Update TODO/FIXME items
+                - [ ] Run manual documentation review
 
- ### Resources
- - Documentation Index: docs/README.md
- - Quality Report: Check workflow artifacts
+                ### Resources
+                - Documentation Index: docs/README.md
+                - Quality Report: Check workflow artifacts
 
- **Note:** This is an automated check. Review the workflow run for details.`,
- labels: ['documentation', 'quality']
- });
- }
+                **Note:** This is an automated check. Review the workflow run for details.`,
+                labels: ['documentation', 'quality']
+              });
+            }
 
- documentation-stats:
- name: Document Statistics
- runs-on: ubuntu-latest
- if: always()
+  documentation-stats:
+    name: Document Statistics
+    runs-on: ubuntu-latest
+    if: always()
 
- steps:
- - name: Checkout code
- uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
- - name: Generate statistics
- run: |
- echo " Documentation Statistics"
- echo "=========================="
- echo ""
+      - name: Generate statistics
+        run: |
+          echo " Documentation Statistics"
+          echo "=========================="
+          echo ""
 
- echo "Repository: ${{ github.repository }}"
- echo "Branch: ${{ github.ref }}"
- echo "Commit: ${{ github.sha }}"
- echo "Run: ${{ github.run_number }}"
- echo ""
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Run: ${{ github.run_number }}"
+          echo ""
 
- echo " Documentation Quality Check Complete"
+          echo " Documentation Quality Check Complete"
