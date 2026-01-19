@@ -437,11 +437,11 @@ Access authentication state and actions.
 
 ```typescript
 {
-  user: User | null
-  token: string | null
-  isAuthenticated: boolean
-  login: (credentials) => Promise<void>
-  logout: () => void
+ user: User | null
+ token: string | null
+ isAuthenticated: boolean
+ login: (credentials) => Promise<void>
+ logout: () => void
 }
 ```
 
@@ -469,10 +469,10 @@ Fetch and manage services data.
 
 ```typescript
 {
-  services: Service[]
-  isLoading: boolean
-  error: Error | null
-  refetch: () => void
+ services: Service[]
+ isLoading: boolean
+ error: Error | null
+ refetch: () => void
 }
 ```
 
@@ -567,21 +567,21 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 
 export function ServiceList() {
-  const { data: services, isLoading } = useQuery({
-    queryKey: ['services'],
-    queryFn: api.getServices,
-  })
+ const { data: services, isLoading } = useQuery({
+ queryKey: ['services'],
+ queryFn: api.getServices,
+ })
 
-  const createMutation = useMutation({
-    mutationFn: api.createService,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['services'] })
-    },
-  })
+ const createMutation = useMutation({
+ mutationFn: api.createService,
+ onSuccess: () => {
+ queryClient.invalidateQueries({ queryKey: ['services'] })
+ },
+ })
 
-  return (
-    // Component JSX
-  )
+ return (
+ // Component JSX
+ )
 }
 ```
 

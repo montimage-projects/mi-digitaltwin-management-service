@@ -21,97 +21,97 @@ Detailed architecture of the React client application.
 
 ```mermaid
 graph TD
-    subgraph Entry
-        Main[main.tsx]
-        App[App.tsx]
-    end
+ subgraph Entry
+ Main[main.tsx]
+ App[App.tsx]
+ end
 
-    subgraph Providers
-        RQ[QueryClientProvider]
-        Router[BrowserRouter]
-    end
+ subgraph Providers
+ RQ[QueryClientProvider]
+ Router[BrowserRouter]
+ end
 
-    subgraph Layout
-        MainLayout[MainLayout]
-        Sidebar[Sidebar]
-        Header[Header]
-    end
+ subgraph Layout
+ MainLayout[MainLayout]
+ Sidebar[Sidebar]
+ Header[Header]
+ end
 
-    subgraph Pages
-        Dashboard[Dashboard]
-        Services[Services]
-        Projects[Projects]
-        Scenarios[Scenarios]
-        Infra[Infrastructure]
-    end
+ subgraph Pages
+ Dashboard[Dashboard]
+ Services[Services]
+ Projects[Projects]
+ Scenarios[Scenarios]
+ Infra[Infrastructure]
+ end
 
-    subgraph Guards
-        Protected[ProtectedRoute]
-        Auth[useAuth]
-    end
+ subgraph Guards
+ Protected[ProtectedRoute]
+ Auth[useAuth]
+ end
 
-    Main --> App
-    App --> RQ
-    RQ --> Router
-    Router --> Protected
-    Protected --> Auth
-    Auth -->|authenticated| MainLayout
-    MainLayout --> Sidebar
-    MainLayout --> Header
-    MainLayout --> Pages
+ Main --> App
+ App --> RQ
+ RQ --> Router
+ Router --> Protected
+ Protected --> Auth
+ Auth -->|authenticated| MainLayout
+ MainLayout --> Sidebar
+ MainLayout --> Header
+ MainLayout --> Pages
 ```
 
 ## Directory Structure
 
 ```
 client/src/
-├── components/
-│   ├── ui/              # shadcn/ui primitives
-│   │   ├── button.tsx
-│   │   ├── dialog.tsx
-│   │   ├── form.tsx
-│   │   └── ...
-│   ├── layout/          # Application layout
-│   │   ├── MainLayout.tsx
-│   │   ├── Sidebar.tsx
-│   │   └── ProtectedRoute.tsx
-│   ├── topology/        # Topology editor
-│   │   ├── TopologyEditor.tsx
-│   │   ├── TopologyCanvas.tsx
-│   │   └── YamlEditor.tsx
-│   ├── services/        # Service components
-│   ├── projects/        # Project components
-│   └── scenarios/       # Scenario components
-│
-├── pages/               # Route pages
-│   ├── Dashboard.tsx
-│   ├── Services.tsx
-│   ├── Projects.tsx
-│   ├── ProjectDetail.tsx
-│   ├── ScenarioDetail.tsx
-│   ├── Infrastructure.tsx
-│   ├── Analytics.tsx
-│   ├── Settings.tsx
-│   └── Login.tsx
-│
-├── lib/
-│   ├── api.ts           # API client (axios)
-│   ├── utils.ts         # Utility functions
-│   └── pdf-export.ts    # PDF generation
-│
-├── store/
-│   ├── auth-store.ts    # Authentication state
-│   └── workspace-store.ts # Tab/workspace state
-│
-├── hooks/               # Custom React hooks
-│   └── use-*.ts
-│
-├── types/               # TypeScript definitions
-│   └── index.ts
-│
-├── App.tsx              # Root component
-├── main.tsx             # Entry point
-└── index.css            # Global styles
+ components/
+ ui/ # shadcn/ui primitives
+ button.tsx
+ dialog.tsx
+ form.tsx
+ ...
+ layout/ # Application layout
+ MainLayout.tsx
+ Sidebar.tsx
+ ProtectedRoute.tsx
+ topology/ # Topology editor
+ TopologyEditor.tsx
+ TopologyCanvas.tsx
+ YamlEditor.tsx
+ services/ # Service components
+ projects/ # Project components
+ scenarios/ # Scenario components
+
+ pages/ # Route pages
+ Dashboard.tsx
+ Services.tsx
+ Projects.tsx
+ ProjectDetail.tsx
+ ScenarioDetail.tsx
+ Infrastructure.tsx
+ Analytics.tsx
+ Settings.tsx
+ Login.tsx
+
+ lib/
+ api.ts # API client (axios)
+ utils.ts # Utility functions
+ pdf-export.ts # PDF generation
+
+ store/
+ auth-store.ts # Authentication state
+ workspace-store.ts # Tab/workspace state
+
+ hooks/ # Custom React hooks
+ use-*.ts
+
+ types/ # TypeScript definitions
+ index.ts
+
+ App.tsx # Root component
+ main.tsx # Entry point
+ index.css # Global styles
 ```
 
 ## State Management
@@ -120,13 +120,13 @@ client/src/
 
 ```mermaid
 flowchart LR
-    Component[Component] --> Hook[useQuery/useMutation]
-    Hook --> Cache[Query Cache]
-    Cache --> API[API Client]
-    API --> Server[Express API]
+ Component[Component] --> Hook[useQuery/useMutation]
+ Hook --> Cache[Query Cache]
+ Cache --> API[API Client]
+ API --> Server[Express API]
 
-    Cache -->|stale| Refetch[Background Refetch]
-    Refetch --> API
+ Cache -->|stale| Refetch[Background Refetch]
+ Refetch --> API
 ```
 
 Configuration:
@@ -184,17 +184,17 @@ interface WorkspaceState {
 
 ```mermaid
 graph TD
-    Root["/"] --> Login["/login"]
-    Root --> Protected[ProtectedRoute]
+ Root["/"] --> Login["/login"]
+ Root --> Protected[ProtectedRoute]
 
-    Protected --> Dashboard["/dashboard"]
-    Protected --> Services["/services"]
-    Protected --> Projects["/projects"]
-    Protected --> ProjectDetail["/projects/:id"]
-    Protected --> Scenario["/scenarios/:id"]
-    Protected --> Infra["/infrastructure"]
-    Protected --> Analytics["/analytics"]
-    Protected --> Settings["/settings"]
+ Protected --> Dashboard["/dashboard"]
+ Protected --> Services["/services"]
+ Protected --> Projects["/projects"]
+ Protected --> ProjectDetail["/projects/:id"]
+ Protected --> Scenario["/scenarios/:id"]
+ Protected --> Infra["/infrastructure"]
+ Protected --> Analytics["/analytics"]
+ Protected --> Settings["/settings"]
 ```
 
 ## Component Patterns
@@ -213,10 +213,10 @@ Organized by domain (services, projects, scenarios):
 
 ```typescript
 // components/services/
-├── ServiceCard.tsx
-├── ServiceForm.tsx
-├── ServiceTable.tsx
-└── ServiceDrawer.tsx
+ServiceCard.tsx;
+ServiceForm.tsx;
+ServiceTable.tsx;
+ServiceDrawer.tsx;
 ```
 
 ### UI Components
@@ -234,16 +234,16 @@ shadcn/ui primitives in `components/ui/`:
 ```typescript
 // tailwind.config.js
 {
-  theme: {
-    extend: {
-      colors: {
-        border: "hsl(var(--border))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        // ... shadcn color tokens
-      },
-    },
-  },
+ theme: {
+ extend: {
+ colors: {
+ border: "hsl(var(--border))",
+ background: "hsl(var(--background))",
+ foreground: "hsl(var(--foreground))",
+ // ... shadcn color tokens
+ },
+ },
+ },
 }
 ```
 
@@ -258,27 +258,27 @@ shadcn/ui primitives in `components/ui/`:
 
 ```mermaid
 flowchart TB
-    subgraph TopologyEditor
-        Split[Split View]
-        Split --> Canvas[TopologyCanvas]
-        Split --> YAML[YamlEditor]
-    end
+ subgraph TopologyEditor
+ Split[Split View]
+ Split --> Canvas[TopologyCanvas]
+ Split --> YAML[YamlEditor]
+ end
 
-    subgraph Canvas
-        RF[React Flow]
-        Nodes[Service Nodes]
-        Edges[Connections]
-    end
+ subgraph Canvas
+ RF[React Flow]
+ Nodes[Service Nodes]
+ Edges[Connections]
+ end
 
-    subgraph YAML
-        Monaco[Monaco Editor]
-        Parse[YAML Parser]
-    end
+ subgraph YAML
+ Monaco[Monaco Editor]
+ Parse[YAML Parser]
+ end
 
-    Canvas <-->|sync| YAML
-    RF --> Nodes
-    RF --> Edges
-    Monaco --> Parse
+ Canvas <-->|sync| YAML
+ RF --> Nodes
+ RF --> Edges
+ Monaco --> Parse
 ```
 
 Features:

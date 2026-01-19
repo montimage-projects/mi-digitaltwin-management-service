@@ -5,8 +5,8 @@ Complete REST API reference for the MI Digital Twin Management Service.
 ## Base URL
 
 ```
-Development:  http://localhost:3000
-Production:   https://api.yourdomain.com
+Development: http://localhost:3000
+Production: https://api.yourdomain.com
 ```
 
 ## Authentication
@@ -51,12 +51,12 @@ Response:
 
 ```json
 {
-  "data": { ... },
-  "meta": {
-    "total": 100,
-    "page": 1,
-    "limit": 20
-  }
+ "data": { ... },
+ "meta": {
+ "total": 100,
+ "page": 1,
+ "limit": 20
+ }
 }
 ```
 
@@ -83,8 +83,8 @@ Response:
 
 ```bash
 curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"intact2025"}'
+ -H "Content-Type: application/json" \
+ -d '{"username":"admin","password":"intact2025"}'
 ```
 
 #### Get Current User
@@ -95,7 +95,7 @@ curl -X POST http://localhost:3000/api/auth/login \
 
 ```bash
 curl -X GET http://localhost:3000/api/auth/me \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Logout
@@ -106,7 +106,7 @@ curl -X GET http://localhost:3000/api/auth/me \
 
 ```bash
 curl -X POST http://localhost:3000/api/auth/logout \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Health Check
@@ -128,15 +128,15 @@ curl http://localhost:3000/api/health
 - **GET** `/api/services`
 - **Auth:** Required
 - **Query Parameters:**
-  - `category` (string, optional) - Filter by category ID
-  - `search` (string, optional) - Full-text search
-  - `page` (number, default: 1) - Page number
-  - `limit` (number, default: 20) - Items per page
+- `category` (string, optional) - Filter by category ID
+- `search` (string, optional) - Full-text search
+- `page` (number, default: 1) - Page number
+- `limit` (number, default: 20) - Items per page
 - **Response:** `{ services: Service[], meta: Pagination }`
 
 ```bash
 curl -X GET "http://localhost:3000/api/services?category=cat1&page=1&limit=20" \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Get Service
@@ -147,7 +147,7 @@ curl -X GET "http://localhost:3000/api/services?category=cat1&page=1&limit=20" \
 
 ```bash
 curl -X GET http://localhost:3000/api/services/service123 \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Create Service
@@ -159,13 +159,13 @@ curl -X GET http://localhost:3000/api/services/service123 \
 
 ```bash
 curl -X POST http://localhost:3000/api/services \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Service Name",
-    "description": "Service description",
-    "categoryId": "cat1"
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "name": "Service Name",
+ "description": "Service description",
+ "categoryId": "cat1"
+ }'
 ```
 
 #### Update Service
@@ -177,9 +177,9 @@ curl -X POST http://localhost:3000/api/services \
 
 ```bash
 curl -X PUT http://localhost:3000/api/services/service123 \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Updated Name"}'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"name": "Updated Name"}'
 ```
 
 #### Delete Service
@@ -190,7 +190,7 @@ curl -X PUT http://localhost:3000/api/services/service123 \
 
 ```bash
 curl -X DELETE http://localhost:3000/api/services/service123 \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Projects
@@ -200,13 +200,13 @@ curl -X DELETE http://localhost:3000/api/services/service123 \
 - **GET** `/api/projects`
 - **Auth:** Required
 - **Query Parameters:**
-  - `page` (number, default: 1)
-  - `limit` (number, default: 20)
+- `page` (number, default: 1)
+- `limit` (number, default: 20)
 - **Response:** `{ projects: Project[], meta: Pagination }`
 
 ```bash
 curl -X GET "http://localhost:3000/api/projects?page=1&limit=20" \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Get Project
@@ -217,7 +217,7 @@ curl -X GET "http://localhost:3000/api/projects?page=1&limit=20" \
 
 ```bash
 curl -X GET http://localhost:3000/api/projects/proj123 \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Create Project
@@ -229,13 +229,13 @@ curl -X GET http://localhost:3000/api/projects/proj123 \
 
 ```bash
 curl -X POST http://localhost:3000/api/projects \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Project Name",
-    "description": "Project description",
-    "sector": "Telecommunications"
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "name": "Project Name",
+ "description": "Project description",
+ "sector": "Telecommunications"
+ }'
 ```
 
 #### Update Project
@@ -247,9 +247,9 @@ curl -X POST http://localhost:3000/api/projects \
 
 ```bash
 curl -X PUT http://localhost:3000/api/projects/proj123 \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Updated Name"}'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"name": "Updated Name"}'
 ```
 
 #### Delete Project
@@ -260,7 +260,7 @@ curl -X PUT http://localhost:3000/api/projects/proj123 \
 
 ```bash
 curl -X DELETE http://localhost:3000/api/projects/proj123 \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Scenarios
@@ -270,14 +270,14 @@ curl -X DELETE http://localhost:3000/api/projects/proj123 \
 - **GET** `/api/scenarios`
 - **Auth:** Required
 - **Query Parameters:**
-  - `projectId` (string, optional) - Filter by project
-  - `page` (number, default: 1)
-  - `limit` (number, default: 20)
+- `projectId` (string, optional) - Filter by project
+- `page` (number, default: 1)
+- `limit` (number, default: 20)
 - **Response:** `{ scenarios: Scenario[], meta: Pagination }`
 
 ```bash
 curl -X GET "http://localhost:3000/api/scenarios?projectId=proj123" \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Get Scenario
@@ -288,7 +288,7 @@ curl -X GET "http://localhost:3000/api/scenarios?projectId=proj123" \
 
 ```bash
 curl -X GET http://localhost:3000/api/scenarios/scen123 \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Create Scenario
@@ -300,13 +300,13 @@ curl -X GET http://localhost:3000/api/scenarios/scen123 \
 
 ```bash
 curl -X POST http://localhost:3000/api/projects/proj123/scenarios \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Scenario Name",
-    "description": "Scenario description",
-    "topology": "nodes:\n  - id: node1\n    label: Service 1"
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "name": "Scenario Name",
+ "description": "Scenario description",
+ "topology": "nodes:\n - id: node1\n label: Service 1"
+ }'
 ```
 
 #### Update Scenario
@@ -318,11 +318,11 @@ curl -X POST http://localhost:3000/api/projects/proj123/scenarios \
 
 ```bash
 curl -X PUT http://localhost:3000/api/scenarios/scen123 \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "topology": "nodes:\n  - id: node1\n    label: Updated Service"
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "topology": "nodes:\n - id: node1\n label: Updated Service"
+ }'
 ```
 
 #### Delete Scenario
@@ -333,7 +333,7 @@ curl -X PUT http://localhost:3000/api/scenarios/scen123 \
 
 ```bash
 curl -X DELETE http://localhost:3000/api/scenarios/scen123 \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Execute Scenario
@@ -345,9 +345,9 @@ curl -X DELETE http://localhost:3000/api/scenarios/scen123 \
 
 ```bash
 curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"infrastructureId": "infra123"}'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"infrastructureId": "infra123"}'
 ```
 
 ### Infrastructures
@@ -357,14 +357,14 @@ curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
 - **GET** `/api/infrastructures`
 - **Auth:** Required
 - **Query Parameters:**
-  - `type` (string, optional) - Filter by type (kubernetes, docker, vm)
-  - `page` (number, default: 1)
-  - `limit` (number, default: 20)
+- `type` (string, optional) - Filter by type (kubernetes, docker, vm)
+- `page` (number, default: 1)
+- `limit` (number, default: 20)
 - **Response:** `{ infrastructures: Infrastructure[], meta: Pagination }`
 
 ```bash
 curl -X GET "http://localhost:3000/api/infrastructures?type=kubernetes" \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Get Infrastructure
@@ -375,7 +375,7 @@ curl -X GET "http://localhost:3000/api/infrastructures?type=kubernetes" \
 
 ```bash
 curl -X GET http://localhost:3000/api/infrastructures/infra123 \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Create Infrastructure
@@ -387,16 +387,16 @@ curl -X GET http://localhost:3000/api/infrastructures/infra123 \
 
 ```bash
 curl -X POST http://localhost:3000/api/infrastructures \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "K8s Cluster",
-    "type": "kubernetes",
-    "credentials": {
-      "apiServer": "https://k8s.example.com",
-      "token": "xxx"
-    }
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "name": "K8s Cluster",
+ "type": "kubernetes",
+ "credentials": {
+ "apiServer": "https://k8s.example.com",
+ "token": "xxx"
+ }
+ }'
 ```
 
 #### Update Infrastructure
@@ -408,9 +408,9 @@ curl -X POST http://localhost:3000/api/infrastructures \
 
 ```bash
 curl -X PUT http://localhost:3000/api/infrastructures/infra123 \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Updated K8s Cluster"}'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"name": "Updated K8s Cluster"}'
 ```
 
 #### Delete Infrastructure
@@ -421,7 +421,7 @@ curl -X PUT http://localhost:3000/api/infrastructures/infra123 \
 
 ```bash
 curl -X DELETE http://localhost:3000/api/infrastructures/infra123 \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Test Infrastructure Connection
@@ -432,7 +432,7 @@ curl -X DELETE http://localhost:3000/api/infrastructures/infra123 \
 
 ```bash
 curl -X POST http://localhost:3000/api/infrastructures/infra123/test \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Categories
@@ -445,7 +445,7 @@ curl -X POST http://localhost:3000/api/infrastructures/infra123/test \
 
 ```bash
 curl -X GET http://localhost:3000/api/categories \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Get Category
@@ -456,7 +456,7 @@ curl -X GET http://localhost:3000/api/categories \
 
 ```bash
 curl -X GET http://localhost:3000/api/categories/cat1 \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Create Category
@@ -468,12 +468,12 @@ curl -X GET http://localhost:3000/api/categories/cat1 \
 
 ```bash
 curl -X POST http://localhost:3000/api/categories \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Category Name",
-    "description": "Category description"
-  }'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "name": "Category Name",
+ "description": "Category description"
+ }'
 ```
 
 #### Update Category
@@ -485,9 +485,9 @@ curl -X POST http://localhost:3000/api/categories \
 
 ```bash
 curl -X PUT http://localhost:3000/api/categories/cat1 \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Updated Category"}'
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"name": "Updated Category"}'
 ```
 
 #### Delete Category
@@ -498,7 +498,7 @@ curl -X PUT http://localhost:3000/api/categories/cat1 \
 
 ```bash
 curl -X DELETE http://localhost:3000/api/categories/cat1 \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Data Models
@@ -578,11 +578,11 @@ curl -X DELETE http://localhost:3000/api/categories/cat1 \
 
 ```typescript
 {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt: Date;
-  updatedAt: Date;
+ id: string;
+ name: string;
+ description?: string;
+ createdAt: Date;
+ updatedAt: Date;
 }
 ```
 
@@ -626,7 +626,7 @@ List endpoints support pagination:
 ```bash
 # Get page 2 with 50 items
 curl -X GET "http://localhost:3000/api/services?page=2&limit=50" \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Filtering
@@ -645,7 +645,7 @@ Most endpoints support filters via query parameters:
 
 ```bash
 curl -X GET "http://localhost:3000/api/services?search=firewall&category=cat1&page=1" \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Rate Limiting
@@ -662,12 +662,12 @@ API rate limits (planned, not yet implemented):
 ```bash
 # Login
 TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"intact2025"}' | jq -r '.token')
+ -H "Content-Type: application/json" \
+ -d '{"username":"admin","password":"intact2025"}' | jq -r '.token')
 
 # Use token
 curl -X GET http://localhost:3000/api/services \
-  -H "Authorization: Bearer $TOKEN"
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Using REST Client (VS Code)
@@ -683,8 +683,8 @@ POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
 {
-  "username": "admin",
-  "password": "intact2025"
+ "username": "admin",
+ "password": "intact2025"
 }
 
 ### Get Services
@@ -697,9 +697,9 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "name": "New Service",
-  "description": "Service description",
-  "categoryId": "cat1"
+ "name": "New Service",
+ "description": "Service description",
+ "categoryId": "cat1"
 }
 ```
 

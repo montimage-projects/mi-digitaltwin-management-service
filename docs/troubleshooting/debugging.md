@@ -171,18 +171,18 @@ db.services.find({ categoryId: ObjectId('...') }).explain()
 ```bash
 # Login
 curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"intact2025"}'
+ -H "Content-Type: application/json" \
+ -d '{"username":"admin","password":"intact2025"}'
 
 # Get services (with auth)
 curl http://localhost:3000/api/services \
-  -H "Authorization: Bearer <token>"
+ -H "Authorization: Bearer <token>"
 
 # Create service
 curl -X POST http://localhost:3000/api/services \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{"shortName":"test","title":"Test Service"}'
+ -H "Authorization: Bearer <token>" \
+ -H "Content-Type: application/json" \
+ -d '{"shortName":"test","title":"Test Service"}'
 ```
 
 ## Error Tracking
@@ -243,9 +243,10 @@ api.interceptors.response.use(
 1. Open DevTools Network tab
 2. Reload page
 3. Analyze:
-   - Total load time
-   - Largest requests
-   - Blocking resources
+
+- Total load time
+- Largest requests
+- Blocking resources
 
 ### Bundle Analysis
 
@@ -263,26 +264,26 @@ ls -la dist/assets
 
 ```mermaid
 flowchart TD
-    A[Issue Reported] --> B{Frontend or Backend?}
+ A[Issue Reported] --> B{Frontend or Backend?}
 
-    B -->|Frontend| C[Check Console]
-    C --> D{JavaScript Error?}
-    D -->|Yes| E[Check Stack Trace]
-    D -->|No| F[Check Network Tab]
-    F --> G{API Error?}
-    G -->|Yes| H[Debug Backend]
-    G -->|No| I[Check React State]
+ B -->|Frontend| C[Check Console]
+ C --> D{JavaScript Error?}
+ D -->|Yes| E[Check Stack Trace]
+ D -->|No| F[Check Network Tab]
+ F --> G{API Error?}
+ G -->|Yes| H[Debug Backend]
+ G -->|No| I[Check React State]
 
-    B -->|Backend| H
-    H --> J[Check Server Logs]
-    J --> K{Database Issue?}
-    K -->|Yes| L[Query MongoDB]
-    K -->|No| M[Debug Route Handler]
+ B -->|Backend| H
+ H --> J[Check Server Logs]
+ J --> K{Database Issue?}
+ K -->|Yes| L[Query MongoDB]
+ K -->|No| M[Debug Route Handler]
 
-    E --> N[Fix Code]
-    I --> N
-    L --> N
-    M --> N
+ E --> N[Fix Code]
+ I --> N
+ L --> N
+ M --> N
 ```
 
 ## Common Debugging Patterns

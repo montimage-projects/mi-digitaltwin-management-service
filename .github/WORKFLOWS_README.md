@@ -4,7 +4,7 @@ This directory contains automated workflows that validate, check, and maintain d
 
 ## Workflows Overview
 
-### 📋 Workflow Files
+### Workflow Files
 
 | Workflow                         | File                | Purpose                                 | Trigger                       |
 | -------------------------------- | ------------------- | --------------------------------------- | ----------------------------- |
@@ -14,7 +14,7 @@ This directory contains automated workflows that validate, check, and maintain d
 | **Documentation Quality Check**  | `docs-quality.yml`  | Continuous quality monitoring           | Daily @ 9 AM UTC or manual    |
 | **Code Quality**                 | `ci.yml`            | Lint, type check, build                 | Push/PR                       |
 
-### 🔧 Configuration Files
+### Configuration Files
 
 | File                      | Purpose                              |
 | ------------------------- | ------------------------------------ |
@@ -30,12 +30,12 @@ This directory contains automated workflows that validate, check, and maintain d
 
 - Runs automatically when documentation changes
 - Checks:
-  - Markdown syntax and formatting
-  - Link validity (internal and external)
-  - YAML syntax
-  - Spelling
-  - Documentation structure
-  - Mermaid diagram syntax
+- Markdown syntax and formatting
+- Link validity (internal and external)
+- YAML syntax
+- Spelling
+- Documentation structure
+- Mermaid diagram syntax
 - Status: Found in PR checks
 
 **2. Documentation Required Check** (`docs-required.yml`)
@@ -44,9 +44,9 @@ This directory contains automated workflows that validate, check, and maintain d
 - Reminds developers to update docs when code changes
 - Adds helpful PR comments with documentation links
 - Checks:
-  - If API routes changed → need to update `docs/API.md`
-  - If components changed → need to update `docs/COMPONENTS.md`
-  - If setup changed → need to update `docs/DEVELOPMENT.md`
+- If API routes changed → need to update `docs/API.md`
+- If components changed → need to update `docs/COMPONENTS.md`
+- If setup changed → need to update `docs/DEVELOPMENT.md`
 
 **3. Documentation Build & Deploy** (`docs-build.yml`)
 
@@ -77,9 +77,9 @@ This directory contains automated workflows that validate, check, and maintain d
 
 Look for one of these in PR checks:
 
-- ✅ Documentation Validation (all checks passed)
-- ⚠️ Documentation Validation (warnings but didn't block)
-- ❌ Documentation Validation (failed - needs fixing)
+- Documentation Validation (all checks passed)
+- Documentation Validation (warnings but didn't block)
+- Documentation Validation (failed - needs fixing)
 
 ### For Quality Reports
 
@@ -99,17 +99,20 @@ Run quality check manually:
 1. Update `server/src/routes/services.ts` (or relevant route)
 2. Update `docs/API.md` with new/changed endpoint
 3. Include:
-   - HTTP method and path
-   - Request parameters
-   - Response format
-   - Error codes
-   - Example curl command
+
+- HTTP method and path
+- Request parameters
+- Response format
+- Error codes
+- Example curl command
+
 4. Push changes
 5. Create PR
 6. **Validation runs automatically:**
-   - PR comment reminds you to check docs
-   - Links validation runs
-   - Build completes if successful
+
+- PR comment reminds you to check docs
+- Links validation runs
+- Build completes if successful
 
 ### Scenario 2: I'm adding a new React component
 
@@ -117,17 +120,20 @@ Run quality check manually:
 
 1. Create component in `client/src/components/`
 2. Update `docs/COMPONENTS.md` with:
-   - Component name and description
-   - Props interface
-   - Usage examples
-   - Related components
+
+- Component name and description
+- Props interface
+- Usage examples
+- Related components
+
 3. Push changes
 4. Create PR
 5. **Validation runs automatically:**
-   - Checks markdown formatting
-   - Validates links in component docs
-   - PR comment provides documentation guidelines
-   - Marks as complete once docs updated
+
+- Checks markdown formatting
+- Validates links in component docs
+- PR comment provides documentation guidelines
+- Marks as complete once docs updated
 
 ### Scenario 3: Documentation has outdated information
 
@@ -135,10 +141,12 @@ Run quality check manually:
 
 1. Make a PR to update the documentation
 2. Workflows validate your changes:
-   - ✅ Markdown syntax
-   - ✅ Link validity
-   - ✅ Spelling
-   - ✅ Structure
+
+- Markdown syntax
+- Link validity
+- Spelling
+- Structure
+
 3. Fix any reported issues
 4. Push again
 5. Workflows re-run automatically
@@ -170,14 +178,14 @@ Run quality check manually:
 **Structure Check:**
 
 - Verifies all required documentation files exist:
-  - `README.md`
-  - `docs/README.md`
-  - `docs/API.md`
-  - `docs/COMPONENTS.md`
-  - `docs/DEVELOPMENT.md`
-  - `docs/DEPLOYMENT.md`
-  - `client/README.md`
-  - `server/README.md`
+- `README.md`
+- `docs/README.md`
+- `docs/API.md`
+- `docs/COMPONENTS.md`
+- `docs/DEVELOPMENT.md`
+- `docs/DEPLOYMENT.md`
+- `client/README.md`
+- `server/README.md`
 - Verifies directory structure
 
 **Mermaid Validation:**
@@ -192,20 +200,20 @@ Run quality check manually:
 - Detects changes in `server/src/routes/`
 - Checks if `docs/API.md` was updated
 - Provides checklist for documenting:
-  - Endpoint details
-  - Parameters
-  - Responses
-  - Error codes
-  - Examples
+- Endpoint details
+- Parameters
+- Responses
+- Error codes
+- Examples
 
 **Component Changes:**
 
 - Detects changes in `client/src/components/`
 - Checks if `docs/COMPONENTS.md` was updated
 - Reminds to document:
-  - Component props
-  - Usage examples
-  - Behavior changes
+- Component props
+- Usage examples
+- Behavior changes
 
 **PR Comment:**
 
@@ -382,9 +390,10 @@ Add patterns to ignore specific URLs.
 1. Go to Actions tab
 2. Look at recent workflow runs
 3. Check for:
-   - Recent successful builds
-   - No red failures
-   - Issues created for problems
+
+- Recent successful builds
+- No red failures
+- Issues created for problems
 
 **Manual quality check:**
 

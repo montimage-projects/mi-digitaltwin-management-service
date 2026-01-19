@@ -14,8 +14,8 @@ Install these before starting:
 **Verify installation:**
 
 ```bash
-bun --version        # Should be 1.0 or higher
-docker --version     # Should be 20.0 or higher
+bun --version # Should be 1.0 or higher
+docker --version # Should be 20.0 or higher
 docker-compose --version
 ```
 
@@ -86,8 +86,8 @@ bun run dev
 
 ```bash
 cd server
-bun run dev    # Start with hot reload
-bun run lint   # Check code style
+bun run dev # Start with hot reload
+bun run lint # Check code style
 bun run format # Fix formatting
 ```
 
@@ -119,10 +119,10 @@ See [Backend Architecture](architecture/backend.md) for detailed structure.
 
 ```bash
 cd client
-bun run dev     # Start with HMR hot reload
-bun run lint    # Check code style
-bun run format  # Fix formatting
-bun run build   # Production build
+bun run dev # Start with HMR hot reload
+bun run lint # Check code style
+bun run format # Fix formatting
+bun run build # Production build
 bun run preview # Preview production build
 ```
 
@@ -219,7 +219,7 @@ git pull origin main
 git checkout -b feature/your-feature-name
 
 # 3. Make your changes and test locally
-bun run dev  # Test in both client and server terminals
+bun run dev # Test in both client and server terminals
 
 # 4. Format and lint
 cd server && bun run format && bun run lint -- --fix
@@ -284,13 +284,15 @@ cd client && bun test --watch
 ### Manual Testing
 
 1. **Backend:** Use Postman, curl, or VS Code REST Client
-   - Example: `http://localhost:3000/api/services`
-   - Auth header: `Authorization: Bearer <token>`
+
+- Example: `http://localhost:3000/api/services`
+- Auth header: `Authorization: Bearer <token>`
 
 2. **Frontend:** Use browser DevTools
-   - Open http://localhost:5173
-   - Check Network tab for API calls
-   - Use React DevTools extension
+
+- Open http://localhost:5173
+- Check Network tab for API calls
+- Use React DevTools extension
 
 See [API Reference](API.md) for all endpoints.
 
@@ -414,12 +416,12 @@ See [Troubleshooting Guide](troubleshooting/common-issues.md) for more solutions
 
 ```mermaid
 graph LR
-    A["React Client<br/>:5173"] -->|API Calls| B["Express Server<br/>:3000"]
-    B -->|Query/Update| C["MongoDB<br/>:27017"]
-    A -->|State| D["Zustand Store"]
-    A -->|Cache| E["React Query"]
-    B -->|Validate| F["Zod Schemas"]
-    B -->|Auth| G["JWT + bcrypt"]
+ A["React Client<br/>:5173"] -->|API Calls| B["Express Server<br/>:3000"]
+ B -->|Query/Update| C["MongoDB<br/>:27017"]
+ A -->|State| D["Zustand Store"]
+ A -->|Cache| E["React Query"]
+ B -->|Validate| F["Zod Schemas"]
+ B -->|Auth| G["JWT + bcrypt"]
 ```
 
 **Data Flow:**

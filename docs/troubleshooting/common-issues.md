@@ -29,29 +29,30 @@ PORT=3001 bun run dev
 
 1. **Check if MongoDB is running:**
 
-   ```bash
-   docker-compose ps
-   # If not running:
-   docker-compose up -d mongodb
-   ```
+```bash
+docker-compose ps
+# If not running:
+docker-compose up -d mongodb
+```
 
 2. **Check MongoDB logs:**
 
-   ```bash
-   docker-compose logs mongodb
-   ```
+```bash
+docker-compose logs mongodb
+```
 
 3. **Verify connection string:**
 
-   ```bash
-   # In server/.env
-   MONGODB_URI=mongodb://localhost:27017/intact
-   ```
+```bash
+# In server/.env
+MONGODB_URI=mongodb://localhost:27017/intact
+```
 
 4. **Restart MongoDB:**
-   ```bash
-   docker-compose restart mongodb
-   ```
+
+```bash
+docker-compose restart mongodb
+```
 
 ### Module Not Found
 
@@ -61,20 +62,20 @@ PORT=3001 bun run dev
 
 1. **Clean reinstall:**
 
-   ```bash
-   rm -rf node_modules bun.lock
-   bun install
-   ```
+```bash
+rm -rf node_modules bun.lock
+bun install
+```
 
 2. **Check you're in the correct directory:**
 
-   ```bash
-   # For client packages
-   cd client && bun install
+```bash
+# For client packages
+cd client && bun install
 
-   # For server packages
-   cd server && bun install
-   ```
+# For server packages
+cd server && bun install
+```
 
 ### TypeScript Errors
 
@@ -84,19 +85,20 @@ PORT=3001 bun run dev
 
 1. **Run type check:**
 
-   ```bash
-   bun run typecheck
-   ```
+```bash
+bun run typecheck
+```
 
 2. **Clear TypeScript cache:**
 
-   ```bash
-   rm -rf client/.tsbuildinfo server/.tsbuildinfo
-   ```
+```bash
+rm -rf client/.tsbuildinfo server/.tsbuildinfo
+```
 
 3. **Restart TypeScript server in VS Code:**
-   - Cmd/Ctrl + Shift + P
-   - "TypeScript: Restart TS Server"
+
+- Cmd/Ctrl + Shift + P
+- "TypeScript: Restart TS Server"
 
 ## Authentication Issues
 
@@ -107,19 +109,21 @@ PORT=3001 bun run dev
 **Solutions:**
 
 1. **Clear browser storage:**
-   - Open DevTools > Application > Local Storage
-   - Delete `token` and `user` entries
+
+- Open DevTools > Application > Local Storage
+- Delete `token` and `user` entries
 
 2. **Check JWT_SECRET:**
 
-   ```bash
-   # Ensure JWT_SECRET is set in server/.env
-   cat server/.env | grep JWT_SECRET
-   ```
+```bash
+# Ensure JWT_SECRET is set in server/.env
+cat server/.env | grep JWT_SECRET
+```
 
 3. **Re-login:**
-   - Navigate to `/login`
-   - Enter credentials again
+
+- Navigate to `/login`
+- Enter credentials again
 
 ### Login Fails with Correct Credentials
 
@@ -129,20 +133,21 @@ PORT=3001 bun run dev
 
 1. **Reseed the database:**
 
-   ```bash
-   cd server && bun run seed
-   ```
+```bash
+cd server && bun run seed
+```
 
 2. **Check password in database:**
 
-   ```bash
-   docker-compose exec mongodb mongosh intact \
-     --eval "db.users.findOne({username: 'admin'})"
-   ```
+```bash
+docker-compose exec mongodb mongosh intact \
+--eval "db.users.findOne({username: 'admin'})"
+```
 
 3. **Verify bcrypt is working:**
-   - Ensure `bcrypt` package is installed
-   - Check for native module issues
+
+- Ensure `bcrypt` package is installed
+- Check for native module issues
 
 ## Database Issues
 
@@ -154,15 +159,16 @@ PORT=3001 bun run dev
 
 1. **Check Docker volume:**
 
-   ```bash
-   docker volume ls | grep mongodb
-   ```
+```bash
+docker volume ls | grep mongodb
+```
 
 2. **Verify volume mount in docker-compose.yml:**
-   ```yaml
-   volumes:
-     - mongodb_data:/data/db
-   ```
+
+```yaml
+volumes:
+  - mongodb_data:/data/db
+```
 
 ### Database Seeding Fails
 
@@ -172,22 +178,23 @@ PORT=3001 bun run dev
 
 1. **Ensure MongoDB is running:**
 
-   ```bash
-   docker-compose up -d mongodb
-   ```
+```bash
+docker-compose up -d mongodb
+```
 
 2. **Wait for MongoDB to be ready:**
 
-   ```bash
-   docker-compose exec mongodb mongosh --eval "db.adminCommand('ping')"
-   ```
+```bash
+docker-compose exec mongodb mongosh --eval "db.adminCommand('ping')"
+```
 
 3. **Check for existing data conflicts:**
-   ```bash
-   # Clear existing data
-   docker-compose exec mongodb mongosh intact --eval "db.dropDatabase()"
-   bun run seed
-   ```
+
+```bash
+# Clear existing data
+docker-compose exec mongodb mongosh intact --eval "db.dropDatabase()"
+bun run seed
+```
 
 ## Frontend Issues
 
@@ -198,23 +205,25 @@ PORT=3001 bun run dev
 **Solutions:**
 
 1. **Check for console errors:**
-   - Open browser DevTools
-   - Check Console and Network tabs
+
+- Open browser DevTools
+- Check Console and Network tabs
 
 2. **Verify base path:**
 
-   ```typescript
-   // vite.config.ts
-   export default defineConfig({
-     base: '/', // Adjust if deployed to subdirectory
-   });
-   ```
+```typescript
+// vite.config.ts
+export default defineConfig({
+  base: '/', // Adjust if deployed to subdirectory
+});
+```
 
 3. **Check API URL:**
-   ```bash
-   # In client/.env
-   VITE_API_URL=http://localhost:3000
-   ```
+
+```bash
+# In client/.env
+VITE_API_URL=http://localhost:3000
+```
 
 ### React Query Not Updating
 
@@ -224,21 +233,22 @@ PORT=3001 bun run dev
 
 1. **Check query invalidation:**
 
-   ```typescript
-   const mutation = useMutation({
-     mutationFn: createService,
-     onSuccess: () => {
-       // Ensure this is called
-       queryClient.invalidateQueries({ queryKey: ['services'] });
-     },
-   });
-   ```
+```typescript
+const mutation = useMutation({
+  mutationFn: createService,
+  onSuccess: () => {
+    // Ensure this is called
+    queryClient.invalidateQueries({ queryKey: ['services'] });
+  },
+});
+```
 
 2. **Force refetch:**
-   ```typescript
-   const { refetch } = useQuery(['services'], getServices);
-   // Call refetch() manually
-   ```
+
+```typescript
+const { refetch } = useQuery(['services'], getServices);
+// Call refetch() manually
+```
 
 ### Topology Editor Not Loading
 
@@ -248,18 +258,19 @@ PORT=3001 bun run dev
 
 1. **Check React Flow styles:**
 
-   ```typescript
-   // Ensure CSS is imported
-   import '@xyflow/react/dist/style.css';
-   ```
+```typescript
+// Ensure CSS is imported
+import '@xyflow/react/dist/style.css';
+```
 
 2. **Verify container dimensions:**
-   ```tsx
-   // Canvas container needs explicit dimensions
-   <div style={{ width: '100%', height: '500px' }}>
-     <ReactFlow />
-   </div>
-   ```
+
+```tsx
+// Canvas container needs explicit dimensions
+<div style={{ width: '100%', height: '500px' }}>
+  <ReactFlow />
+</div>
+```
 
 ## Build Issues
 
@@ -282,14 +293,15 @@ NODE_OPTIONS="--max-old-space-size=4096" bun run build
 
 1. **Fix lint errors:**
 
-   ```bash
-   bun run lint:fix
-   ```
+```bash
+bun run lint:fix
+```
 
 2. **Bypass for urgent commits (not recommended):**
-   ```bash
-   git commit --no-verify -m "message"
-   ```
+
+```bash
+git commit --no-verify -m "message"
+```
 
 ## Docker Issues
 
@@ -301,21 +313,22 @@ NODE_OPTIONS="--max-old-space-size=4096" bun run build
 
 1. **Check logs:**
 
-   ```bash
-   docker-compose logs <service-name>
-   ```
+```bash
+docker-compose logs <service-name>
+```
 
 2. **Verify environment variables:**
 
-   ```bash
-   docker-compose exec <service> env
-   ```
+```bash
+docker-compose exec <service> env
+```
 
 3. **Check for port conflicts:**
-   ```bash
-   docker-compose down
-   lsof -i :80 -i :3000 -i :27017
-   ```
+
+```bash
+docker-compose down
+lsof -i :80 -i :3000 -i :27017
+```
 
 ### Image Build Fails
 
@@ -325,13 +338,14 @@ NODE_OPTIONS="--max-old-space-size=4096" bun run build
 
 1. **Clear build cache:**
 
-   ```bash
-   docker-compose build --no-cache
-   ```
+```bash
+docker-compose build --no-cache
+```
 
 2. **Check Dockerfile syntax:**
-   - Ensure multi-stage builds complete
-   - Verify COPY paths exist
+
+- Ensure multi-stage builds complete
+- Verify COPY paths exist
 
 ## Related Documentation
 

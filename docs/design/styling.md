@@ -112,14 +112,14 @@ Colors are defined as CSS variables for light/dark mode support:
 
 // Form field spacing
 <div className="space-y-4">
-  <FormField />
-  <FormField />
+ <FormField />
+ <FormField />
 </div>
 
 // Horizontal spacing
 <div className="flex gap-2">
-  <Button />
-  <Button />
+ <Button />
+ <Button />
 </div>
 ```
 
@@ -147,8 +147,8 @@ Colors are defined as CSS variables for light/dark mode support:
 
 // Fixed columns
 <div className="grid grid-cols-12 gap-4">
-  <div className="col-span-8" />
-  <div className="col-span-4" />
+ <div className="col-span-8" />
+ <div className="col-span-4" />
 </div>
 ```
 
@@ -222,9 +222,9 @@ import { cn } from '@/lib/utils';
 // Mobile-first responsive
 <div
   className="
-  px-4 md:px-6 lg:px-8
-  grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3
-  text-sm md:text-base
+ px-4 md:px-6 lg:px-8
+ grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3
+ text-sm md:text-base
 "
 />
 ```

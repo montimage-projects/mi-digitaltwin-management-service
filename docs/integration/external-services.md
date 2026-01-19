@@ -6,26 +6,26 @@ Integration with third-party services and infrastructure.
 
 ```mermaid
 graph TD
-    subgraph Platform
-        A[React Client]
-        B[Express API]
-    end
+ subgraph Platform
+ A[React Client]
+ B[Express API]
+ end
 
-    subgraph External
-        C[MongoDB]
-        D[MAESTRO]
-        E[Kubernetes]
-        F[Docker Registry]
-    end
+ subgraph External
+ C[MongoDB]
+ D[MAESTRO]
+ E[Kubernetes]
+ F[Docker Registry]
+ end
 
-    A --> B
-    B --> C
-    A -->|iFrame| D
-    D --> E
-    E --> F
+ A --> B
+ B --> C
+ A -->|iFrame| D
+ D --> E
+ E --> F
 
-    style Platform fill:#e3f2fd
-    style External fill:#fff3e0
+ style Platform fill:#e3f2fd
+ style External fill:#fff3e0
 ```
 
 ## MongoDB
@@ -100,19 +100,19 @@ interface Infrastructure {
 apiVersion: v1
 kind: Config
 clusters:
-  - cluster:
-      server: https://k8s.example.com:6443
-      certificate-authority-data: <base64>
-    name: production
+ - cluster:
+ server: https://k8s.example.com:6443
+ certificate-authority-data: <base64>
+ name: production
 contexts:
-  - context:
-      cluster: production
-      user: admin
-    name: production
+ - context:
+ cluster: production
+ user: admin
+ name: production
 users:
-  - name: admin
-    user:
-      token: <service-account-token>
+ - name: admin
+ user:
+ token: <service-account-token>
 ```
 
 ### Connection Testing
@@ -149,8 +149,8 @@ Services reference Docker images for deployment:
 ```yaml
 # In service topology
 nodes:
-  - id: mmt-probe
-    image: registry.intact-project.eu/mmt-probe:1.2.0
+ - id: mmt-probe
+ image: registry.intact-project.eu/mmt-probe:1.2.0
 ```
 
 ### Registry Authentication
@@ -176,9 +176,9 @@ Services communicate via Kafka message broker:
 
 ```mermaid
 graph LR
-    A[MMT Probe] -->|publish| K[Kafka]
-    K -->|subscribe| B[SIEM]
-    K -->|subscribe| C[Dashboard]
+ A[MMT Probe] -->|publish| K[Kafka]
+ K -->|subscribe| B[SIEM]
+ K -->|subscribe| C[Dashboard]
 ```
 
 ### Topic Configuration
@@ -280,26 +280,26 @@ const encrypted = encrypt(credentials, ENCRYPTION_KEY);
 
 ```mermaid
 graph TD
-    subgraph Public
-        A[Users]
-    end
+ subgraph Public
+ A[Users]
+ end
 
-    subgraph DMZ
-        B[Load Balancer]
-        C[nginx]
-    end
+ subgraph DMZ
+ B[Load Balancer]
+ C[nginx]
+ end
 
-    subgraph Private
-        D[Express API]
-        E[MongoDB]
-        F[MAESTRO]
-    end
+ subgraph Private
+ D[Express API]
+ E[MongoDB]
+ F[MAESTRO]
+ end
 
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    D --> F
+ A --> B
+ B --> C
+ C --> D
+ D --> E
+ D --> F
 ```
 
 ## Troubleshooting

@@ -33,19 +33,19 @@ For detailed prerequisites, see [Prerequisites](../installation/prerequisites.md
 
 ```mermaid
 graph TD
-    subgraph External
-        U[Users] --> A[Express Server :3000]
-    end
+ subgraph External
+ U[Users] --> A[Express Server :3000]
+ end
 
-    subgraph Docker Network
-        A --> |/api/*| API[API Routes]
-        A --> |Static Files| S[Client Build]
-        A --> M[(MongoDB :27017)]
-    end
+ subgraph Docker Network
+ A --> |/api/*| API[API Routes]
+ A --> |Static Files| S[Client Build]
+ A --> M[(MongoDB :27017)]
+ end
 
-    style U fill:#e1f5fe
-    style A fill:#e8f5e9
-    style M fill:#fce4ec
+ style U fill:#e1f5fe
+ style A fill:#e8f5e9
+ style M fill:#fce4ec
 ```
 
 **Key Benefits:**
@@ -120,11 +120,11 @@ The application will be available at `http://localhost:3000`.
 docker compose -f docker-compose.prod.yml ps
 
 # Test health endpoints
-curl http://localhost:3000/api/health      # API health
+curl http://localhost:3000/api/health # API health
 
 # Verify MongoDB connection
 docker compose -f docker-compose.prod.yml exec mongodb \
-  mongosh --eval "db.adminCommand('ping')"
+ mongosh --eval "db.adminCommand('ping')"
 ```
 
 **Important**: Change the admin password immediately after first login.
@@ -167,7 +167,7 @@ docker compose -f docker-compose.prod.yml exec app bun src/seed/index.ts
 ```bash
 # Create MongoDB backup
 docker compose -f docker-compose.prod.yml exec mongodb \
-  mongodump --db intact --out /data/db/backup
+ mongodump --db intact --out /data/db/backup
 
 # Copy backup from container
 docker cp intact-mongodb:/data/db/backup ./backup-$(date +%Y%m%d)
@@ -184,7 +184,7 @@ docker cp ./backup-YYYYMMDD intact-mongodb:/data/db/restore
 
 # Restore database
 docker compose -f docker-compose.prod.yml exec mongodb \
-  mongorestore --db intact /data/db/restore/intact
+ mongorestore --db intact /data/db/restore/intact
 ```
 
 ## Rollback Procedure
@@ -224,11 +224,11 @@ docker compose -f docker-compose.prod.yml logs -f app
 ```bash
 # Verify MongoDB is healthy
 docker compose -f docker-compose.prod.yml exec mongodb \
-  mongosh --eval "db.adminCommand('ping')"
+ mongosh --eval "db.adminCommand('ping')"
 
 # Check network connectivity
 docker compose -f docker-compose.prod.yml exec app \
-  ping mongodb
+ ping mongodb
 ```
 
 ### API Returns 500 Errors
@@ -239,7 +239,7 @@ docker compose -f docker-compose.prod.yml logs app
 
 # Verify environment variables
 docker compose -f docker-compose.prod.yml exec app \
-  env | grep -E 'JWT|MONGO|ENCRYPTION'
+ env | grep -E 'JWT|MONGO|ENCRYPTION'
 
 # Common causes:
 # - Missing JWT_SECRET or ENCRYPTION_KEY
@@ -273,8 +273,9 @@ For cloud deployments, you can use MongoDB Atlas instead of running a local Mong
 2. Create a new cluster (free tier available for development)
 3. Create a database user with read/write permissions
 4. Configure Network Access:
-   - For development: Add your IP address
-   - For production: Add your server's IP or use `0.0.0.0/0` (allow from anywhere) with strong credentials
+
+- For development: Add your IP address
+- For production: Add your server's IP or use `0.0.0.0/0` (allow from anywhere) with strong credentials
 
 ### Step 2: Get Connection String
 
@@ -369,11 +370,11 @@ Access backups from the Atlas dashboard under "Backup" tab.
 
 ```bash
 docker compose -f docker-compose.atlas.yml exec app \
-  env | grep MONGODB_URI
+ env | grep MONGODB_URI
 
 # Test DNS resolution
 docker compose -f docker-compose.atlas.yml exec app \
-  nslookup <cluster>.mongodb.net
+ nslookup <cluster>.mongodb.net
 ```
 
 ## Scaling Considerations

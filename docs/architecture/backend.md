@@ -18,124 +18,124 @@ Detailed architecture of the Express API server.
 
 ```mermaid
 graph TD
-    subgraph Entry
-        App[app.ts]
-    end
+ subgraph Entry
+ App[app.ts]
+ end
 
-    subgraph Middleware
-        Helmet[helmet]
-        CORS[cors]
-        Morgan[morgan]
-        Auth[authMiddleware]
-        Validate[validateMiddleware]
-        Error[errorHandler]
-    end
+ subgraph Middleware
+ Helmet[helmet]
+ CORS[cors]
+ Morgan[morgan]
+ Auth[authMiddleware]
+ Validate[validateMiddleware]
+ Error[errorHandler]
+ end
 
-    subgraph Routes
-        AuthR["API: /api/auth"]
-        Users["API: /api/users"]
-        Services["API: /api/services"]
-        Projects["API: /api/projects"]
-        Scenarios["API: /api/scenarios"]
-        Infra["API: /api/infrastructures"]
-        Categories["API: /api/categories"]
-    end
+ subgraph Routes
+ AuthR["API: /api/auth"]
+ Users["API: /api/users"]
+ Services["API: /api/services"]
+ Projects["API: /api/projects"]
+ Scenarios["API: /api/scenarios"]
+ Infra["API: /api/infrastructures"]
+ Categories["API: /api/categories"]
+ end
 
-    subgraph Models
-        UserM[User]
-        ServiceM[Service]
-        ProjectM[Project]
-        ScenarioM[Scenario]
-        InfraM[Infrastructure]
-        CategoryM[Category]
-    end
+ subgraph Models
+ UserM[User]
+ ServiceM[Service]
+ ProjectM[Project]
+ ScenarioM[Scenario]
+ InfraM[Infrastructure]
+ CategoryM[Category]
+ end
 
-    subgraph Database
-        DB[(MongoDB)]
-    end
+ subgraph Database
+ DB[(MongoDB)]
+ end
 
-    App --> Helmet
-    Helmet --> CORS
-    CORS --> Morgan
-    Morgan --> Routes
-    Routes --> Auth
-    Auth --> Validate
-    Validate --> Models
-    Models --> DB
-    Routes --> Error
+ App --> Helmet
+ Helmet --> CORS
+ CORS --> Morgan
+ Morgan --> Routes
+ Routes --> Auth
+ Auth --> Validate
+ Validate --> Models
+ Models --> DB
+ Routes --> Error
 ```
 
 ## Directory Structure
 
 ```
 server/src/
-├── config/
-│   ├── database.ts      # MongoDB connection
-│   └── env.ts           # Environment variables
-│
-├── middleware/
-│   ├── auth.ts          # JWT authentication
-│   ├── validate.ts      # Zod validation
-│   └── errorHandler.ts  # Error handling
-│
-├── models/
-│   ├── User.ts          # User schema
-│   ├── Service.ts       # Service schema
-│   ├── Project.ts       # Project schema
-│   ├── Scenario.ts      # Scenario schema
-│   ├── Infrastructure.ts # Infrastructure schema
-│   ├── Category.ts      # Category schema
-│   └── Sector.ts        # Sector schema
-│
-├── routes/
-│   ├── auth.ts          # Authentication endpoints
-│   ├── users.ts         # User management
-│   ├── services.ts      # Service CRUD
-│   ├── projects.ts      # Project CRUD
-│   ├── scenarios.ts     # Scenario CRUD
-│   ├── infrastructures.ts # Infrastructure CRUD
-│   └── categories.ts    # Category endpoints
-│
-├── validators/
-│   └── *.ts             # Zod schemas per route
-│
-├── seed/
-│   ├── index.ts         # Seed entry point
-│   ├── users.ts         # Seed admin user
-│   ├── categories.ts    # Seed categories
-│   └── services.ts      # Seed sample services
-│
-├── utils/
-│   └── encryption.ts    # AES-256-GCM encryption
-│
-└── app.ts               # Application entry
+ config/
+ database.ts # MongoDB connection
+ env.ts # Environment variables
+
+ middleware/
+ auth.ts # JWT authentication
+ validate.ts # Zod validation
+ errorHandler.ts # Error handling
+
+ models/
+ User.ts # User schema
+ Service.ts # Service schema
+ Project.ts # Project schema
+ Scenario.ts # Scenario schema
+ Infrastructure.ts # Infrastructure schema
+ Category.ts # Category schema
+ Sector.ts # Sector schema
+
+ routes/
+ auth.ts # Authentication endpoints
+ users.ts # User management
+ services.ts # Service CRUD
+ projects.ts # Project CRUD
+ scenarios.ts # Scenario CRUD
+ infrastructures.ts # Infrastructure CRUD
+ categories.ts # Category endpoints
+
+ validators/
+ *.ts # Zod schemas per route
+
+ seed/
+ index.ts # Seed entry point
+ users.ts # Seed admin user
+ categories.ts # Seed categories
+ services.ts # Seed sample services
+
+ utils/
+ encryption.ts # AES-256-GCM encryption
+
+ app.ts # Application entry
 ```
 
 ## Request Lifecycle
 
 ```mermaid
 sequenceDiagram
-    participant C as Client
-    participant E as Express
-    participant H as Helmet
-    participant CO as CORS
-    participant A as Auth
-    participant V as Validator
-    participant R as Route Handler
-    participant M as Mongoose
-    participant DB as MongoDB
+ participant C as Client
+ participant E as Express
+ participant H as Helmet
+ participant CO as CORS
+ participant A as Auth
+ participant V as Validator
+ participant R as Route Handler
+ participant M as Mongoose
+ participant DB as MongoDB
 
-    C->>E: HTTP Request
-    E->>H: Security headers
-    H->>CO: CORS check
-    CO->>A: JWT verification
-    A->>V: Zod validation
-    V->>R: Route handler
-    R->>M: Database operation
-    M->>DB: Query
-    DB-->>M: Result
-    M-->>R: Document(s)
-    R-->>C: JSON Response
+ C->>E: HTTP Request
+ E->>H: Security headers
+ H->>CO: CORS check
+ CO->>A: JWT verification
+ A->>V: Zod validation
+ V->>R: Route handler
+ R->>M: Database operation
+ M->>DB: Query
+ DB-->>M: Result
+ M-->>R: Document(s)
+ R-->>C: JSON Response
 ```
 
 ## API Routes

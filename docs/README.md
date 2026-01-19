@@ -2,7 +2,7 @@
 
 Complete technical documentation for the MI Digital Twin Management Service. Choose your path below based on your role and needs.
 
-## 🎯 Quick Start Guides
+## Quick Start Guides
 
 **Just getting started?**
 
@@ -10,7 +10,7 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 2. **[Deployment Guide](DEPLOYMENT.md)** - Deploy to production (10 min read)
 3. **[API Reference](API.md)** - All REST endpoints with examples (reference)
 
-## 👥 Documentation by Role
+## Documentation by Role
 
 ### For Backend Developers
 
@@ -48,7 +48,7 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 5. [Styling Guide](design/styling.md) - Code style and conventions
 6. [Contribution Workflow](DEVELOPMENT.md#contributing) - How to contribute code
 
-## 📚 Documentation by Topic
+## Documentation by Topic
 
 ### Architecture & Design
 
@@ -95,7 +95,7 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 | [Troubleshooting](troubleshooting/common-issues.md) | Common issues and solutions           |
 | [Debugging Guide](troubleshooting/debugging.md)     | Debug techniques and tools            |
 
-## 🔗 Related Resources
+## Related Resources
 
 ### Project Configuration
 
@@ -109,7 +109,7 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 - [Client Module](../client/README.md) - React frontend setup and structure
 - [Server Module](../server/README.md) - Express backend setup and structure
 
-## 📋 Documentation Standards
+## Documentation Standards
 
 All documentation follows these conventions:
 
@@ -120,48 +120,48 @@ All documentation follows these conventions:
 - **Updates**: Include documentation updates in PRs when changing functionality
 - **Organization**: Group related information into logical sections
 
-## 🗂️ Directory Structure
+## Directory Structure
 
 ```
 docs/
-├── README.md                      # This file
-├── API.md                         # REST API reference
-├── COMPONENTS.md                  # Frontend component reference
-├── DEVELOPMENT.md                 # Development workflow guide
-├── DEPLOYMENT.md                  # Production deployment guide
-│
-├── architecture/                  # System design
-│   ├── overview.md               # High-level architecture
-│   ├── backend.md                # Backend structure
-│   ├── frontend.md               # Frontend structure
-│   └── data-flow.md              # Request flow diagrams
-│
-├── database/                      # Data layer documentation
-│   ├── schema.md                 # MongoDB collections
-│   └── relationships.md          # Collection relationships
-│
-├── design/                        # Design & development standards
-│   ├── ui-patterns.md            # UI component patterns
-│   └── styling.md                # Code style & conventions
-│
-├── integration/                   # External services
-│   ├── external-services.md      # Third-party integrations
-│   └── maestro.md                # MAESTRO orchestrator
-│
-├── installation/                  # Setup & configuration
-│   ├── prerequisites.md          # System requirements
-│   └── configuration.md          # Environment setup
-│
-├── playbooks/                     # Step-by-step guides
-│   ├── development.md            # Development setup
-│   └── deployment.md             # Production deployment
-│
-└── troubleshooting/               # Issues & debugging
-    ├── common-issues.md          # FAQs and solutions
-    └── debugging.md              # Debug techniques
+ README.md # This file
+ API.md # REST API reference
+ COMPONENTS.md # Frontend component reference
+ DEVELOPMENT.md # Development workflow guide
+ DEPLOYMENT.md # Production deployment guide
+
+ architecture/ # System design
+ overview.md # High-level architecture
+ backend.md # Backend structure
+ frontend.md # Frontend structure
+ data-flow.md # Request flow diagrams
+
+ database/ # Data layer documentation
+ schema.md # MongoDB collections
+ relationships.md # Collection relationships
+
+ design/ # Design & development standards
+ ui-patterns.md # UI component patterns
+ styling.md # Code style & conventions
+
+ integration/ # External services
+ external-services.md # Third-party integrations
+ maestro.md # MAESTRO orchestrator
+
+ installation/ # Setup & configuration
+ prerequisites.md # System requirements
+ configuration.md # Environment setup
+
+ playbooks/ # Step-by-step guides
+ development.md # Development setup
+ deployment.md # Production deployment
+
+ troubleshooting/ # Issues & debugging
+ common-issues.md # FAQs and solutions
+ debugging.md # Debug techniques
 ```
 
-## 🚀 Getting Help
+## Getting Help
 
 - **Setup Issues?** → [Troubleshooting Guide](troubleshooting/common-issues.md)
 - **API Questions?** → [API Reference](API.md)

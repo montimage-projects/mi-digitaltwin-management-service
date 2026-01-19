@@ -25,20 +25,20 @@ The application uses [shadcn/ui](https://ui.shadcn.com/) components built on Rad
 
 ```mermaid
 graph TD
-    subgraph MainLayout
-        Sidebar[Sidebar Navigation]
-        Content[Content Area]
-    end
+ subgraph MainLayout
+ Sidebar[Sidebar Navigation]
+ Content[Content Area]
+ end
 
-    subgraph ContentArea
-        Header[Page Header]
-        Actions[Action Bar]
-        Main[Main Content]
-    end
+ subgraph ContentArea
+ Header[Page Header]
+ Actions[Action Bar]
+ Main[Main Content]
+ end
 
-    Sidebar --> Content
-    Header --> Actions
-    Actions --> Main
+ Sidebar --> Content
+ Header --> Actions
+ Actions --> Main
 ```
 
 ```tsx

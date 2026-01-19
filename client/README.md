@@ -40,21 +40,21 @@ The application will be available at `http://localhost:5173`.
 
 ```
 src/
-├── components/         # React components
-│   ├── ui/             # shadcn/ui primitives
-│   ├── layout/         # Layout components
-│   ├── topology/       # Topology editor components
-│   ├── services/       # Service-related components
-│   ├── projects/       # Project-related components
-│   └── scenarios/      # Scenario-related components
-├── pages/              # Route page components
-├── lib/                # Utilities and API client
-├── store/              # Zustand state stores
-├── hooks/              # Custom React hooks
-├── types/              # TypeScript type definitions
-├── App.tsx             # Root component with routing
-├── main.tsx            # Application entry point
-└── index.css           # Global styles and Tailwind
+ components/ # React components
+ ui/ # shadcn/ui primitives
+ layout/ # Layout components
+ topology/ # Topology editor components
+ services/ # Service-related components
+ projects/ # Project-related components
+ scenarios/ # Scenario-related components
+ pages/ # Route page components
+ lib/ # Utilities and API client
+ store/ # Zustand state stores
+ hooks/ # Custom React hooks
+ types/ # TypeScript type definitions
+ App.tsx # Root component with routing
+ main.tsx # Application entry point
+ index.css # Global styles and Tailwind
 ```
 
 ## Environment Variables

@@ -8,47 +8,47 @@ MAESTRO is UBITECH's service orchestrator that handles the actual deployment and
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant P as Platform
-    participant M as MAESTRO
-    participant K as Kubernetes
+ participant U as User
+ participant P as Platform
+ participant M as MAESTRO
+ participant K as Kubernetes
 
-    U->>P: Execute scenario
-    P->>P: Prepare parameters
-    P->>M: Open in iFrame
-    M->>M: Parse topology
-    M->>K: Deploy services
-    K-->>M: Status updates
-    M-->>U: Execution progress
+ U->>P: Execute scenario
+ P->>P: Prepare parameters
+ P->>M: Open in iFrame
+ M->>M: Parse topology
+ M->>K: Deploy services
+ K-->>M: Status updates
+ M-->>U: Execution progress
 ```
 
 ## Architecture
 
 ```mermaid
 graph LR
-    subgraph Platform
-        A[React App]
-        B[Scenario Detail]
-    end
+ subgraph Platform
+ A[React App]
+ B[Scenario Detail]
+ end
 
-    subgraph MAESTRO
-        C[Orchestrator UI]
-        D[Deployment Engine]
-    end
+ subgraph MAESTRO
+ C[Orchestrator UI]
+ D[Deployment Engine]
+ end
 
-    subgraph Infrastructure
-        E[Kubernetes]
-        F[Docker]
-    end
+ subgraph Infrastructure
+ E[Kubernetes]
+ F[Docker]
+ end
 
-    B -->|iFrame| C
-    C --> D
-    D --> E
-    D --> F
+ B -->|iFrame| C
+ C --> D
+ D --> E
+ D --> F
 
-    style A fill:#e3f2fd
-    style C fill:#fff3e0
-    style E fill:#e8f5e9
+ style A fill:#e3f2fd
+ style C fill:#fff3e0
+ style E fill:#e8f5e9
 ```
 
 ## Configuration
@@ -77,29 +77,30 @@ When a user clicks "Execute" on a scenario:
 
 1. **Platform prepares parameters:**
 
-   ```typescript
-   const executionParams = {
-     scenarioId: scenario._id,
-     topology: scenario.topology,
-     infrastructureId: scenario.infrastructureId,
-     services: extractServices(scenario.topology),
-   };
-   ```
+```typescript
+const executionParams = {
+  scenarioId: scenario._id,
+  topology: scenario.topology,
+  infrastructureId: scenario.infrastructureId,
+  services: extractServices(scenario.topology),
+};
+```
 
 2. **Open MAESTRO in iFrame:**
 
-   ```tsx
-   <iframe
-     src={`${MAESTRO_URL}/deploy?${params}`}
-     title="MAESTRO Orchestrator"
-     className="w-full h-[600px] border-0"
-   />
-   ```
+```tsx
+<iframe
+  src={`${MAESTRO_URL}/deploy?${params}`}
+  title="MAESTRO Orchestrator"
+  className="w-full h-[600px] border-0"
+/>
+```
 
 3. **Pass execution context:**
-   - Scenario topology (YAML)
-   - Target infrastructure details
-   - Service configurations
+
+- Scenario topology (YAML)
+- Target infrastructure details
+- Service configurations
 
 ### Message Passing
 
@@ -153,30 +154,30 @@ apiVersion: v1
 kind: ScenarioTopology
 
 metadata:
-  name: security-assessment
-  project: telecom-dt
+ name: security-assessment
+ project: telecom-dt
 
 nodes:
-  - id: mmt-probe
-    service: mmt-probe
-    version: '1.2.0'
-    config:
-      interface: eth0
-      rulesPath: /etc/mmt/rules
+ - id: mmt-probe
+ service: mmt-probe
+ version: '1.2.0'
+ config:
+ interface: eth0
+ rulesPath: /etc/mmt/rules
 
-  - id: kafka-broker
-    service: kafka
-    version: '3.5.0'
-    config:
-      topics:
-        - security-events
-        - alerts
+ - id: kafka-broker
+ service: kafka
+ version: '3.5.0'
+ config:
+ topics:
+ - security-events
+ - alerts
 
 edges:
-  - source: mmt-probe
-    target: kafka-broker
-    protocol: kafka
-    topic: security-events
+ - source: mmt-probe
+ target: kafka-broker
+ protocol: kafka
+ topic: security-events
 ```
 
 ## Service Dashboard Integration

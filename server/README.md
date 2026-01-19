@@ -48,31 +48,31 @@ The API will be available at `http://localhost:3000`.
 
 ```
 src/
-├── config/             # Configuration
-│   ├── database.ts     # MongoDB connection
-│   └── env.ts          # Environment variables
-├── middleware/         # Express middleware
-│   ├── auth.ts         # JWT authentication
-│   ├── validate.ts     # Zod validation
-│   └── errorHandler.ts # Error handling
-├── models/             # Mongoose schemas
-│   ├── User.ts
-│   ├── Service.ts
-│   ├── Project.ts
-│   ├── Scenario.ts
-│   ├── Infrastructure.ts
-│   └── Category.ts
-├── routes/             # API routes
-│   ├── auth.ts
-│   ├── services.ts
-│   ├── projects.ts
-│   ├── scenarios.ts
-│   └── infrastructures.ts
-├── validators/         # Zod schemas
-├── seed/               # Database seeding
-├── utils/              # Utilities
-│   └── encryption.ts   # AES-256 encryption
-└── app.ts              # Application entry
+ config/ # Configuration
+ database.ts # MongoDB connection
+ env.ts # Environment variables
+ middleware/ # Express middleware
+ auth.ts # JWT authentication
+ validate.ts # Zod validation
+ errorHandler.ts # Error handling
+ models/ # Mongoose schemas
+ User.ts
+ Service.ts
+ Project.ts
+ Scenario.ts
+ Infrastructure.ts
+ Category.ts
+ routes/ # API routes
+ auth.ts
+ services.ts
+ projects.ts
+ scenarios.ts
+ infrastructures.ts
+ validators/ # Zod schemas
+ seed/ # Database seeding
+ utils/ # Utilities
+ encryption.ts # AES-256 encryption
+ app.ts # Application entry
 ```
 
 ## Environment Variables

@@ -6,72 +6,72 @@ MongoDB collections and Mongoose schema definitions.
 
 ```mermaid
 erDiagram
-    User ||--o{ Project : creates
-    Project ||--o{ Scenario : contains
-    Scenario }o--|| Infrastructure : targets
-    Service }o--|| Category : belongs_to
-    Service }o--|| Sector : belongs_to
-    Scenario }o--o{ Service : uses
+ User ||--o{ Project : creates
+ Project ||--o{ Scenario : contains
+ Scenario }o--|| Infrastructure : targets
+ Service }o--|| Category : belongs_to
+ Service }o--|| Sector : belongs_to
+ Scenario }o--o{ Service : uses
 
-    User {
-        ObjectId _id
-        string username
-        string password
-        string role
-        date createdAt
-    }
+ User {
+ ObjectId _id
+ string username
+ string password
+ string role
+ date createdAt
+ }
 
-    Category {
-        ObjectId _id
-        string name
-        string description
-        string color
-    }
+ Category {
+ ObjectId _id
+ string name
+ string description
+ string color
+ }
 
-    Sector {
-        ObjectId _id
-        string name
-        string description
-    }
+ Sector {
+ ObjectId _id
+ string name
+ string description
+ }
 
-    Service {
-        ObjectId _id
-        string shortName
-        string title
-        string description
-        ObjectId categoryId
-        ObjectId sectorId
-        string repositoryTable
-        string uiType
-        string currentVersion
-        array versions
-    }
+ Service {
+ ObjectId _id
+ string shortName
+ string title
+ string description
+ ObjectId categoryId
+ ObjectId sectorId
+ string repositoryTable
+ string uiType
+ string currentVersion
+ array versions
+ }
 
-    Project {
-        ObjectId _id
-        string name
-        string description
-        string sector
-        ObjectId createdBy
-        date createdAt
-    }
+ Project {
+ ObjectId _id
+ string name
+ string description
+ string sector
+ ObjectId createdBy
+ date createdAt
+ }
 
-    Scenario {
-        ObjectId _id
-        string name
-        string description
-        ObjectId projectId
-        ObjectId infrastructureId
-        string topology
-        string status
-    }
+ Scenario {
+ ObjectId _id
+ string name
+ string description
+ ObjectId projectId
+ ObjectId infrastructureId
+ string topology
+ string status
+ }
 
-    Infrastructure {
-        ObjectId _id
-        string name
-        string type
-        object credentials
-    }
+ Infrastructure {
+ ObjectId _id
+ string name
+ string type
+ object credentials
+ }
 ```
 
 ## Collections
@@ -82,12 +82,12 @@ Stores user accounts and authentication data.
 
 ```typescript
 {
-  _id: ObjectId,
-  username: string,          // Unique username
-  password: string,          // bcrypt hashed
-  role: 'admin' | 'user',    // User role
-  createdAt: Date,
-  updatedAt: Date
+ _id: ObjectId,
+ username: string, // Unique username
+ password: string, // bcrypt hashed
+ role: 'admin' | 'user', // User role
+ createdAt: Date,
+ updatedAt: Date
 }
 ```
 
@@ -113,10 +113,10 @@ Service category classification.
 
 ```typescript
 {
-  _id: ObjectId,
-  name: string,              // Category name
-  description: string,       // Category description
-  color: string              // Hex color for UI
+ _id: ObjectId,
+ name: string, // Category name
+ description: string, // Category description
+ color: string // Hex color for UI
 }
 ```
 
@@ -137,9 +137,9 @@ Critical infrastructure sectors.
 
 ```typescript
 {
-  _id: ObjectId,
-  name: string,              // Sector name
-  description: string        // Sector description
+ _id: ObjectId,
+ name: string, // Sector name
+ description: string // Sector description
 }
 ```
 
@@ -157,23 +157,23 @@ Cybersecurity service catalog.
 
 ```typescript
 {
-  _id: ObjectId,
-  shortName: string,         // Unique short identifier
-  title: string,             // Display title
-  description: string,       // Full description
-  categoryId: ObjectId,      // Reference to categories
-  sectorId: ObjectId,        // Reference to sectors (optional)
-  repositoryTable: 'INTACT_TOOLBOX' | 'OTHER_SERVICES',
-  uiType: 'web' | 'cli' | 'api',
-  currentVersion: string,    // Latest version number
-  versions: [{
-    version: string,
-    changelog: string,
-    releaseNotes: string,
-    releasedAt: Date
-  }],
-  createdAt: Date,
-  updatedAt: Date
+ _id: ObjectId,
+ shortName: string, // Unique short identifier
+ title: string, // Display title
+ description: string, // Full description
+ categoryId: ObjectId, // Reference to categories
+ sectorId: ObjectId, // Reference to sectors (optional)
+ repositoryTable: 'INTACT_TOOLBOX' | 'OTHER_SERVICES',
+ uiType: 'web' | 'cli' | 'api',
+ currentVersion: string, // Latest version number
+ versions: [{
+ version: string,
+ changelog: string,
+ releaseNotes: string,
+ releasedAt: Date
+ }],
+ createdAt: Date,
+ updatedAt: Date
 }
 ```
 
@@ -211,13 +211,13 @@ Digital twin project containers.
 
 ```typescript
 {
-  _id: ObjectId,
-  name: string,              // Project name
-  description: string,       // Project description
-  sector: string,            // Target sector
-  createdBy: ObjectId,       // Reference to users
-  createdAt: Date,
-  updatedAt: Date
+ _id: ObjectId,
+ name: string, // Project name
+ description: string, // Project description
+ sector: string, // Target sector
+ createdBy: ObjectId, // Reference to users
+ createdAt: Date,
+ updatedAt: Date
 }
 ```
 
@@ -243,20 +243,20 @@ Test scenarios within projects.
 
 ```typescript
 {
-  _id: ObjectId,
-  name: string,              // Scenario name
-  description: string,       // Scenario description
-  projectId: ObjectId,       // Reference to projects
-  infrastructureId: ObjectId, // Reference to infrastructures
-  topology: string,          // YAML topology definition
-  status: 'draft' | 'ready' | 'executed',
-  executionHistory: [{
-    executedAt: Date,
-    status: string,
-    result: object
-  }],
-  createdAt: Date,
-  updatedAt: Date
+ _id: ObjectId,
+ name: string, // Scenario name
+ description: string, // Scenario description
+ projectId: ObjectId, // Reference to projects
+ infrastructureId: ObjectId, // Reference to infrastructures
+ topology: string, // YAML topology definition
+ status: 'draft' | 'ready' | 'executed',
+ executionHistory: [{
+ executedAt: Date,
+ status: string,
+ result: object
+ }],
+ createdAt: Date,
+ updatedAt: Date
 }
 ```
 
@@ -268,14 +268,14 @@ Test scenarios within projects.
 
 ```yaml
 nodes:
-  - id: node-1
-    type: service
-    serviceId: '507f1f77bcf86cd799439013'
-    position: { x: 100, y: 100 }
+ - id: node-1
+ type: service
+ serviceId: '507f1f77bcf86cd799439013'
+ position: { x: 100, y: 100 }
 edges:
-  - id: edge-1
-    source: node-1
-    target: node-2
+ - id: edge-1
+ source: node-1
+ target: node-2
 ```
 
 ### infrastructures
@@ -284,19 +284,19 @@ Target deployment infrastructure.
 
 ```typescript
 {
-  _id: ObjectId,
-  name: string,              // Infrastructure name
-  type: 'kubernetes' | 'docker' | 'vm',
-  endpoint: string,          // API endpoint
-  credentials: {             // Encrypted with AES-256-GCM
-    iv: string,
-    encryptedData: string,
-    authTag: string
-  },
-  status: 'active' | 'inactive',
-  lastTested: Date,
-  createdAt: Date,
-  updatedAt: Date
+ _id: ObjectId,
+ name: string, // Infrastructure name
+ type: 'kubernetes' | 'docker' | 'vm',
+ endpoint: string, // API endpoint
+ credentials: { // Encrypted with AES-256-GCM
+ iv: string,
+ encryptedData: string,
+ authTag: string
+ },
+ status: 'active' | 'inactive',
+ lastTested: Date,
+ createdAt: Date,
+ updatedAt: Date
 }
 ```
 

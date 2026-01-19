@@ -17,31 +17,37 @@ The MI Digital Twin Management Service includes several GitHub Actions workflows
 **Steps:**
 
 1. **Markdown Linting** - Checks markdown syntax and formatting
-   - Uses `markdownlint` for style consistency
-   - Configuration: `.markdownlintrc`
+
+- Uses `markdownlint` for style consistency
+- Configuration: `.markdownlintrc`
 
 2. **Link Validation** - Checks all internal and external links
-   - Validates relative paths exist
-   - Tests external URLs (with localhost/example.com excluded)
-   - Configuration: `.github/workflows/mlc_config.json`
+
+- Validates relative paths exist
+- Tests external URLs (with localhost/example.com excluded)
+- Configuration: `.github/workflows/mlc_config.json`
 
 3. **YAML Validation** - Checks YAML syntax in documentation
-   - Validates any embedded YAML
-   - Catches syntax errors early
+
+- Validates any embedded YAML
+- Catches syntax errors early
 
 4. **Spell Check** - Detects misspellings
-   - Uses project-specific dictionary
-   - Configuration: `.github/workflows/spelling-dictionary.txt`
-   - Can be customized for project terminology
+
+- Uses project-specific dictionary
+- Configuration: `.github/workflows/spelling-dictionary.txt`
+- Can be customized for project terminology
 
 5. **Documentation Structure** - Verifies required files exist
-   - Checks for all required documentation files
-   - Checks for all required directory structure
-   - Reports missing documentation
+
+- Checks for all required documentation files
+- Checks for all required directory structure
+- Reports missing documentation
 
 6. **Mermaid Validation** - Validates diagram syntax
-   - Checks Mermaid diagram blocks
-   - Ensures valid syntax
+
+- Checks Mermaid diagram blocks
+- Ensures valid syntax
 
 **When It Runs:**
 
@@ -62,20 +68,24 @@ The MI Digital Twin Management Service includes several GitHub Actions workflows
 **Checks:**
 
 1. **Code Change Detection**
-   - Detects changes to routes, components, hooks, and models
-   - Checks if documentation was updated
+
+- Detects changes to routes, components, hooks, and models
+- Checks if documentation was updated
 
 2. **API Documentation**
-   - Warns if API routes changed without updating `docs/API.md`
-   - Provides checklist of what should be documented
+
+- Warns if API routes changed without updating `docs/API.md`
+- Provides checklist of what should be documented
 
 3. **Component Documentation**
-   - Warns if components changed without updating `docs/COMPONENTS.md`
-   - Lists required documentation items
+
+- Warns if components changed without updating `docs/COMPONENTS.md`
+- Lists required documentation items
 
 4. **PR Comment**
-   - Adds helpful comment with links to documentation
-   - Guides new contributors to relevant docs
+
+- Adds helpful comment with links to documentation
+- Guides new contributors to relevant docs
 
 **When It Runs:**
 
@@ -126,28 +136,33 @@ The MI Digital Twin Management Service includes several GitHub Actions workflows
 **Analyzes:**
 
 1. **Metrics**
-   - Total documentation files
-   - Total lines of documentation
-   - Code examples count
-   - Mermaid diagrams count
-   - Internal links count
+
+- Total documentation files
+- Total lines of documentation
+- Code examples count
+- Mermaid diagrams count
+- Internal links count
 
 2. **Coverage**
-   - Verifies all required documentation files exist
-   - Checks file completeness
+
+- Verifies all required documentation files exist
+- Checks file completeness
 
 3. **Freshness**
-   - Reports when documentation was last updated
-   - Warns if not updated in 30+ days
-   - Suggests updates if needed
+
+- Reports when documentation was last updated
+- Warns if not updated in 30+ days
+- Suggests updates if needed
 
 4. **Completeness**
-   - Finds TODO/FIXME markers in docs
-   - Reports incomplete sections
+
+- Finds TODO/FIXME markers in docs
+- Reports incomplete sections
 
 5. **Structure**
-   - Validates markdown heading hierarchy
-   - Checks for proper structure
+
+- Validates markdown heading hierarchy
+- Checks for proper structure
 
 **Issues Created:**
 
@@ -218,19 +233,19 @@ Project-specific spelling dictionary includes:
 
 ### Interpreting Results
 
-**Green checkmark (✅):**
+**Green checkmark ():**
 
 - All validation passed
 - Documentation is in good shape
 - No action required
 
-**Yellow warning (⚠️):**
+**Yellow warning ():**
 
 - Non-blocking issues found
 - Should review and address
 - Doesn't prevent merge
 
-**Red error (❌):**
+**Red error ():**
 
 - Blocking issues found
 - Must be fixed before merge
@@ -265,9 +280,9 @@ markdownlint --fix docs/API.md
 ```bash
 # Review flagged word in context
 # If legitimate project term:
-#   - Add to .github/workflows/spelling-dictionary.txt
-#   - Commit change
-#   - Re-run workflow
+# - Add to .github/workflows/spelling-dictionary.txt
+# - Commit change
+# - Re-run workflow
 ```
 
 ## Best Practices
@@ -276,40 +291,45 @@ markdownlint --fix docs/API.md
 
 1. **Run locally before pushing:**
 
-   ```bash
-   # Check markdown
-   markdownlint docs/**/*.md
+```bash
+# Check markdown
+markdownlint docs/**/*.md
 
-   # Check links manually
-   # Spell check (use IDE extension or local tool)
-   ```
+# Check links manually
+# Spell check (use IDE extension or local tool)
+```
 
 2. **Verify structure:**
-   - Check headings are properly hierarchical
-   - Ensure required sections exist
-   - Validate relative links
+
+- Check headings are properly hierarchical
+- Ensure required sections exist
+- Validate relative links
 
 3. **Update when code changes:**
-   - Changes to API routes → Update `docs/API.md`
-   - Changes to components → Update `docs/COMPONENTS.md`
-   - Setup/architecture changes → Update relevant guide
+
+- Changes to API routes → Update `docs/API.md`
+- Changes to components → Update `docs/COMPONENTS.md`
+- Setup/architecture changes → Update relevant guide
 
 ### Maintaining Documentation Quality
 
 1. **Respond to workflow warnings:**
-   - Fix reported issues promptly
-   - Don't ignore link validation warnings
-   - Keep documentation current
+
+- Fix reported issues promptly
+- Don't ignore link validation warnings
+- Keep documentation current
 
 2. **Regular reviews:**
-   - Check daily quality reports
-   - Update dated examples
-   - Remove TODO/FIXME markers
+
+- Check daily quality reports
+- Update dated examples
+- Remove TODO/FIXME markers
 
 3. **Test documentation:**
-   - Verify code examples work
-   - Test all step-by-step guides
-   - Validate all links quarterly
+
+- Verify code examples work
+- Test all step-by-step guides
+- Validate all links quarterly
 
 ## Workflow Status Dashboard
 
@@ -385,16 +405,20 @@ To add new validation:
 
 1. **Edit workflow file** (e.g., `docs-validate.yml`)
 2. **Add new job step:**
-   ```yaml
-   - name: Your check name
-     run: |
-       # Your validation script here
-   ```
+
+```yaml
+- name: Your check name
+run: |
+# Your validation script here
+```
+
 3. **Test locally:**
-   ```bash
-   # Install dependencies
-   # Run validation command
-   ```
+
+```bash
+# Install dependencies
+# Run validation command
+```
+
 4. **Commit and push** to trigger workflow
 
 ### Updating Spelling Dictionary
@@ -413,9 +437,11 @@ To customize markdown style:
 1. **Edit** `.markdownlintrc`
 2. **Adjust rules** (see markdownlint docs)
 3. **Test locally:**
-   ```bash
-   markdownlint --config .markdownlintrc docs/
-   ```
+
+```bash
+markdownlint --config .markdownlintrc docs/
+```
+
 4. **Commit** changes
 
 ## Integration with Development

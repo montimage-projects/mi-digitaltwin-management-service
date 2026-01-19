@@ -8,13 +8,13 @@ The application uses `.env` files for configuration:
 
 ```
 /
-├── client/
-│   ├── .env              # Client development config
-│   └── .env.example      # Client template
-├── server/
-│   ├── .env              # Server development config
-│   └── .env.example      # Server template
-└── .env.prod             # Production config (optional)
+ client/
+ .env # Client development config
+ .env.example # Client template
+ server/
+ .env # Server development config
+ .env.example # Server template
+ .env.prod # Production config (optional)
 ```
 
 ## Server Configuration
@@ -118,12 +118,12 @@ NODE_ENV=production
 # docker-compose.prod.yml
 services:
   server:
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - MONGODB_URI=${MONGODB_URI}
-      - JWT_SECRET=${JWT_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+  environment:
+    - NODE_ENV=production
+    - PORT=3000
+    - MONGODB_URI=${MONGODB_URI}
+    - JWT_SECRET=${JWT_SECRET}
+    - ENCRYPTION_KEY=${ENCRYPTION_KEY}
 ```
 
 ## Configuration Schema

@@ -107,14 +107,14 @@ The frontend will be available at `http://localhost:5173`.
 
 ```mermaid
 flowchart LR
-    A[Create Branch] --> B[Make Changes]
-    B --> C[Run Tests]
-    C --> D{Tests Pass?}
-    D -->|Yes| E[Commit]
-    D -->|No| B
-    E --> F[Push & Create PR]
-    F --> G[Code Review]
-    G --> H[Merge]
+ A[Create Branch] --> B[Make Changes]
+ B --> C[Run Tests]
+ C --> D{Tests Pass?}
+ D -->|Yes| E[Commit]
+ D -->|No| B
+ E --> F[Push & Create PR]
+ F --> G[Code Review]
+ G --> H[Merge]
 ```
 
 ### Branch Naming

@@ -6,31 +6,31 @@ Document reference patterns and relationship management in MongoDB.
 
 ```mermaid
 graph TD
-    subgraph Users
-        U[User]
-    end
+ subgraph Users
+ U[User]
+ end
 
-    subgraph Projects
-        P[Project]
-        S[Scenario]
-    end
+ subgraph Projects
+ P[Project]
+ S[Scenario]
+ end
 
-    subgraph Services
-        SV[Service]
-        C[Category]
-        SC[Sector]
-    end
+ subgraph Services
+ SV[Service]
+ C[Category]
+ SC[Sector]
+ end
 
-    subgraph Infrastructure
-        I[Infrastructure]
-    end
+ subgraph Infrastructure
+ I[Infrastructure]
+ end
 
-    U -->|createdBy| P
-    P -->|projectId| S
-    S -->|infrastructureId| I
-    SV -->|categoryId| C
-    SV -->|sectorId| SC
-    S -.->|topology refs| SV
+ U -->|createdBy| P
+ P -->|projectId| S
+ S -->|infrastructureId| I
+ SV -->|categoryId| C
+ SV -->|sectorId| SC
+ S -.->|topology refs| SV
 ```
 
 ## Reference Patterns
@@ -83,11 +83,11 @@ A user can create multiple projects.
 ```typescript
 // Project schema
 {
-  createdBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  }
+ createdBy: {
+ type: Schema.Types.ObjectId,
+ ref: 'User',
+ required: true
+ }
 }
 
 // Query projects by user
@@ -101,11 +101,11 @@ A project contains multiple scenarios.
 ```typescript
 // Scenario schema
 {
-  projectId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Project',
-    required: true
-  }
+ projectId: {
+ type: Schema.Types.ObjectId,
+ ref: 'Project',
+ required: true
+ }
 }
 
 // Query scenarios by project
@@ -123,11 +123,11 @@ Services are grouped by categories.
 ```typescript
 // Service schema
 {
-  categoryId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Category',
-    required: true
-  }
+ categoryId: {
+ type: Schema.Types.ObjectId,
+ ref: 'Category',
+ required: true
+ }
 }
 
 // Query services by category
@@ -135,7 +135,7 @@ const categoryServices = await Service.find({ categoryId });
 
 // Get services with category details
 const services = await Service.find()
-  .populate('categoryId', 'name description color');
+ .populate('categoryId', 'name description color');
 ```
 
 ### Service → Sector (Many-to-One, Optional)
@@ -145,11 +145,11 @@ Services may belong to a specific sector.
 ```typescript
 // Service schema
 {
-  sectorId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Sector',
-    required: false
-  }
+ sectorId: {
+ type: Schema.Types.ObjectId,
+ ref: 'Sector',
+ required: false
+ }
 }
 
 // Query services by sector
@@ -163,15 +163,15 @@ Scenarios target a deployment infrastructure.
 ```typescript
 // Scenario schema
 {
-  infrastructureId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Infrastructure'
-  }
+ infrastructureId: {
+ type: Schema.Types.ObjectId,
+ ref: 'Infrastructure'
+ }
 }
 
 // Get scenario with infrastructure details
 const scenario = await Scenario.findById(id)
-  .populate('infrastructureId', 'name type endpoint status');
+ .populate('infrastructureId', 'name type endpoint status');
 ```
 
 ### Scenario ↔ Service (Embedded Reference)
@@ -181,11 +181,11 @@ Scenarios reference services via the topology YAML:
 ```yaml
 # Topology structure
 nodes:
-  - id: node-1
-    type: service
-    data:
-      serviceId: '507f1f77bcf86cd799439013'
-      label: 'MMT Probe'
+ - id: node-1
+ type: service
+ data:
+ serviceId: '507f1f77bcf86cd799439013'
+ label: 'MMT Probe'
 ```
 
 Resolving service references:

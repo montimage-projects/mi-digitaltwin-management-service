@@ -146,16 +146,16 @@ Run these commands to verify your setup:
 
 ```bash
 # Runtime
-bun --version     # Should be 1.0+
-node --version    # Should be 18+ (optional)
+bun --version # Should be 1.0+
+node --version # Should be 18+ (optional)
 
 # Docker
-docker --version          # Should be 24.0+
-docker-compose --version  # Should be 2.0+
-docker ps                 # Should work without errors
+docker --version # Should be 24.0+
+docker-compose --version # Should be 2.0+
+docker ps # Should work without errors
 
 # Git
-git --version     # Should be 2.0+
+git --version # Should be 2.0+
 ```
 
 ## Quick Setup Script
@@ -168,15 +168,15 @@ For macOS/Linux:
 
 # Install Bun
 if ! command -v bun &> /dev/null; then
-  echo "Installing Bun..."
-  curl -fsSL https://bun.sh/install | bash
+ echo "Installing Bun..."
+ curl -fsSL https://bun.sh/install | bash
 fi
 
 # Check Docker
 if ! command -v docker &> /dev/null; then
-  echo "Docker not found. Please install Docker Desktop."
-  echo "https://docs.docker.com/get-docker/"
-  exit 1
+ echo "Docker not found. Please install Docker Desktop."
+ echo "https://docs.docker.com/get-docker/"
+ exit 1
 fi
 
 # Verify

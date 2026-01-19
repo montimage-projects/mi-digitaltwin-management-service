@@ -27,8 +27,8 @@ Choose one based on your infrastructure:
 
 ```bash
 # Verify Docker is installed
-docker --version        # 20.10+
-docker-compose --version  # 2.0+
+docker --version # 20.10+
+docker-compose --version # 2.0+
 ```
 
 ### Step 1: Prepare Environment
@@ -96,44 +96,44 @@ Use **Nginx** to route traffic and handle SSL:
 
 ```nginx
 upstream backend {
-    server localhost:3000;
+ server localhost:3000;
 }
 
 server {
-    listen 80;
-    server_name yourdomain.com;
-    return 301 https://$server_name$request_uri;
+ listen 80;
+ server_name yourdomain.com;
+ return 301 https://$server_name$request_uri;
 }
 
 server {
-    listen 443 ssl http2;
-    server_name yourdomain.com;
+ listen 443 ssl http2;
+ server_name yourdomain.com;
 
-    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+ ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+ ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
 
-    # Security headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
+ # Security headers
+ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+ add_header X-Content-Type-Options "nosniff" always;
+ add_header X-Frame-Options "SAMEORIGIN" always;
 
-    # Frontend
-    location / {
-        proxy_pass http://localhost:5173;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+ # Frontend
+ location / {
+ proxy_pass http://localhost:5173;
+ proxy_set_header Host $host;
+ proxy_set_header X-Real-IP $remote_addr;
+ proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+ proxy_set_header X-Forwarded-Proto $scheme;
+ }
 
-    # API
-    location /api/ {
-        proxy_pass http://backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+ # API
+ location /api/ {
+ proxy_pass http://backend;
+ proxy_set_header Host $host;
+ proxy_set_header X-Real-IP $remote_addr;
+ proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+ proxy_set_header X-Forwarded-Proto $scheme;
+ }
 }
 ```
 
@@ -265,33 +265,33 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: intact-server
-  namespace: intact
+ name: intact-server
+ namespace: intact
 spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: intact-server
-  template:
-    metadata:
-      labels:
-        app: intact-server
-    spec:
-      containers:
-        - name: server
-          image: myregistry.azurecr.io/intact-server:latest
-          ports:
-            - containerPort: 3000
-          envFrom:
-            - configMapRef:
-                name: intact-config
-          resources:
-            requests:
-              memory: '512Mi'
-              cpu: '250m'
-            limits:
-              memory: '1Gi'
-              cpu: '500m'
+ replicas: 2
+ selector:
+ matchLabels:
+ app: intact-server
+ template:
+ metadata:
+ labels:
+ app: intact-server
+ spec:
+ containers:
+ - name: server
+ image: myregistry.azurecr.io/intact-server:latest
+ ports:
+ - containerPort: 3000
+ envFrom:
+ - configMapRef:
+ name: intact-config
+ resources:
+ requests:
+ memory: '512Mi'
+ cpu: '250m'
+ limits:
+ memory: '1Gi'
+ cpu: '500m'
 ```
 
 **`k8s/service.yaml`:**
@@ -304,11 +304,11 @@ metadata:
   namespace: intact
 spec:
   selector:
-    app: intact-server
+  app: intact-server
   ports:
     - protocol: TCP
-      port: 3000
-      targetPort: 3000
+  port: 3000
+  targetPort: 3000
   type: LoadBalancer
 ```
 

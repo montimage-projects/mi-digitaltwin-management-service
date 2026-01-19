@@ -6,47 +6,47 @@ High-level system architecture of the MI Digital Twin Management Service.
 
 ```mermaid
 graph TB
-    subgraph Client["Client (React)"]
-        UI[UI Components]
-        Pages[Pages/Routes]
-        Store[Zustand Store]
-        RQ[React Query]
-        API[API Client]
-    end
+ subgraph Client["Client (React)"]
+ UI[UI Components]
+ Pages[Pages/Routes]
+ Store[Zustand Store]
+ RQ[React Query]
+ API[API Client]
+ end
 
-    subgraph Server["Server (Express)"]
-        Routes[API Routes]
-        MW[Middleware]
-        Valid[Validators]
-        Models[Mongoose Models]
-    end
+ subgraph Server["Server (Express)"]
+ Routes[API Routes]
+ MW[Middleware]
+ Valid[Validators]
+ Models[Mongoose Models]
+ end
 
-    subgraph Data["Data Layer"]
-        DB[(MongoDB)]
-    end
+ subgraph Data["Data Layer"]
+ DB[(MongoDB)]
+ end
 
-    subgraph External["External Services"]
-        MAESTRO[MAESTRO Orchestrator]
-        K8S[Kubernetes Clusters]
-    end
+ subgraph External["External Services"]
+ MAESTRO[MAESTRO Orchestrator]
+ K8S[Kubernetes Clusters]
+ end
 
-    UI --> Pages
-    Pages --> Store
-    Pages --> RQ
-    RQ --> API
-    API -->|HTTP/JSON| Routes
-    Routes --> MW
-    MW --> Valid
-    Valid --> Models
-    Models --> DB
+ UI --> Pages
+ Pages --> Store
+ Pages --> RQ
+ RQ --> API
+ API -->|HTTP/JSON| Routes
+ Routes --> MW
+ MW --> Valid
+ Valid --> Models
+ Models --> DB
 
-    Pages -.->|iFrame| MAESTRO
-    MAESTRO --> K8S
+ Pages -.->|iFrame| MAESTRO
+ MAESTRO --> K8S
 
-    style Client fill:#e3f2fd
-    style Server fill:#e8f5e9
-    style Data fill:#fff3e0
-    style External fill:#fce4ec
+ style Client fill:#e3f2fd
+ style Server fill:#e8f5e9
+ style Data fill:#fff3e0
+ style External fill:#fce4ec
 ```
 
 ## Component Overview
@@ -79,59 +79,59 @@ graph TB
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant C as React Client
-    participant RQ as React Query
-    participant A as API Client
-    participant S as Express Server
-    participant MW as Middleware
-    participant M as Mongoose
-    participant DB as MongoDB
+ participant U as User
+ participant C as React Client
+ participant RQ as React Query
+ participant A as API Client
+ participant S as Express Server
+ participant MW as Middleware
+ participant M as Mongoose
+ participant DB as MongoDB
 
-    U->>C: Interact with UI
-    C->>RQ: Trigger query/mutation
-    RQ->>A: Call API function
-    A->>S: HTTP Request + JWT
-    S->>MW: Auth + Validation
-    MW->>M: Database operation
-    M->>DB: Query/Update
-    DB-->>M: Result
-    M-->>MW: Document(s)
-    MW-->>S: Response data
-    S-->>A: JSON response
-    A-->>RQ: Parse response
-    RQ-->>C: Update cache
-    C-->>U: Render update
+ U->>C: Interact with UI
+ C->>RQ: Trigger query/mutation
+ RQ->>A: Call API function
+ A->>S: HTTP Request + JWT
+ S->>MW: Auth + Validation
+ MW->>M: Database operation
+ M->>DB: Query/Update
+ DB-->>M: Result
+ M-->>MW: Document(s)
+ MW-->>S: Response data
+ S-->>A: JSON response
+ A-->>RQ: Parse response
+ RQ-->>C: Update cache
+ C-->>U: Render update
 ```
 
 ## Directory Structure
 
 ```
 /
-├── client/                 # React frontend
-│   └── src/
-│       ├── components/     # UI components
-│       │   ├── ui/         # shadcn/ui primitives
-│       │   ├── layout/     # Layout components
-│       │   ├── topology/   # Topology editor
-│       │   └── ...         # Feature components
-│       ├── pages/          # Route pages
-│       ├── lib/            # Utilities and API client
-│       ├── store/          # Zustand stores
-│       ├── hooks/          # Custom React hooks
-│       └── types/          # TypeScript types
-│
-├── server/                 # Express backend
-│   └── src/
-│       ├── routes/         # API endpoints
-│       ├── models/         # Mongoose schemas
-│       ├── middleware/     # Auth, validation, errors
-│       ├── validators/     # Zod schemas
-│       ├── config/         # Environment, database
-│       ├── seed/           # Database seeding
-│       └── utils/          # Encryption, helpers
-│
-└── docs/                   # Technical documentation
+ client/ # React frontend
+ src/
+ components/ # UI components
+ ui/ # shadcn/ui primitives
+ layout/ # Layout components
+ topology/ # Topology editor
+ ... # Feature components
+ pages/ # Route pages
+ lib/ # Utilities and API client
+ store/ # Zustand stores
+ hooks/ # Custom React hooks
+ types/ # TypeScript types
+
+ server/ # Express backend
+ src/
+ routes/ # API endpoints
+ models/ # Mongoose schemas
+ middleware/ # Auth, validation, errors
+ validators/ # Zod schemas
+ config/ # Environment, database
+ seed/ # Database seeding
+ utils/ # Encryption, helpers
+
+ docs/ # Technical documentation
 ```
 
 ## Key Design Decisions
@@ -172,34 +172,34 @@ Separates concerns:
 
 ```mermaid
 flowchart LR
-    subgraph Client
-        A[Login Form]
-    end
+ subgraph Client
+ A[Login Form]
+ end
 
-    subgraph Server
-        B[Auth Route]
-        C[JWT Generation]
-        D[Auth Middleware]
-        E[Protected Routes]
-    end
+ subgraph Server
+ B[Auth Route]
+ C[JWT Generation]
+ D[Auth Middleware]
+ E[Protected Routes]
+ end
 
-    subgraph Storage
-        F[(User Credentials)]
-        G[bcrypt hash]
-    end
+ subgraph Storage
+ F[(User Credentials)]
+ G[bcrypt hash]
+ end
 
-    A -->|credentials| B
-    B --> F
-    F --> G
-    G -->|verify| C
-    C -->|JWT token| A
-    A -->|JWT in header| D
-    D -->|valid| E
-    D -->|invalid| X[401 Unauthorized]
+ A -->|credentials| B
+ B --> F
+ F --> G
+ G -->|verify| C
+ C -->|JWT token| A
+ A -->|JWT in header| D
+ D -->|valid| E
+ D -->|invalid| X[401 Unauthorized]
 
-    style A fill:#e3f2fd
-    style D fill:#fff3e0
-    style X fill:#ffcdd2
+ style A fill:#e3f2fd
+ style D fill:#fff3e0
+ style X fill:#ffcdd2
 ```
 
 ### Security Measures
