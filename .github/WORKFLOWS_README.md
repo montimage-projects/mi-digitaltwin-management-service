@@ -419,16 +419,16 @@ markdownlint docs/**/*.md
 
 ## Related Documentation
 
-- [Workflows Guide](../../docs/WORKFLOWS.md) - Detailed workflow documentation
-- [Development Guide](../../docs/DEVELOPMENT.md) - Development workflow
-- [Documentation Standards](../../docs/README.md) - Documentation conventions
-- [Contributing Guide](../../CLAUDE.md) - Contribution guidelines
+- [Workflows Guide](../docs/WORKFLOWS.md) - Detailed workflow documentation
+- [Development Guide](../docs/DEVELOPMENT.md) - Development workflow
+- [Documentation Standards](../docs/README.md) - Documentation conventions
+- [Contributing Guide](../CLAUDE.md) - Contribution guidelines
 
 ## Quick Links
 
-- **Documentation Index:** [docs/README.md](../../docs/README.md)
+- **Documentation Index:** [docs/README.md](../docs/README.md)
 - **Workflow Status:** GitHub Actions tab
-- **Documentation Portal:** [docs/](../../docs/)
+- **Documentation Portal:** [docs/](../docs/)
 - **Contributing:** See CLAUDE.md
 
 ## Support
@@ -436,7 +436,7 @@ markdownlint docs/**/*.md
 For issues or questions:
 
 1. Check the logs in GitHub Actions
-2. Review [Workflows Guide](../../docs/WORKFLOWS.md)
+2. Review [Workflows Guide](../docs/WORKFLOWS.md)
 3. Check similar issues in repository
 4. Contact documentation team
 
