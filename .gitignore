@@ -9,7 +9,10 @@ dist/
 *.tsbuildinfo
 
 # Keep server/public (client build output for deployment)
-!server/public/
+# !server/public/
+
+# Remove build outputs from server/public
+server/public/assets/
 
 # Environment files
 .env
