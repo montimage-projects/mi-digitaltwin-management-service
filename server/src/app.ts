@@ -19,12 +19,24 @@ import servicesRoutes from './routes/services.routes.js';
 import projectsRoutes from './routes/projects.routes.js';
 import scenariosRoutes from './routes/scenarios.routes.js';
 import infrastructuresRoutes from './routes/infrastructures.routes.js';
+import agentRoutes from './agent/agent.routes.js';
 import { openApiSpec } from './docs/openapi.js';
 
 const app = express();
 
 // Middleware
-app.use(compression()); // gzip compression for responses
+// Skip compression for SSE streams — compression buffers chunks and prevents
+// real-time token streaming to the client.
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (req.headers.accept === 'text/event-stream') {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  })
+);
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -77,6 +89,7 @@ app.use('/api/services', servicesRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api', scenariosRoutes);
 app.use('/api/infrastructures', infrastructuresRoutes);
+app.use('/api/agent', agentRoutes);
 
 // Static file serving - always enabled to serve client build
 const staticServingEnabled = configureStaticServing(app);
@@ -89,11 +102,11 @@ app.use(errorHandler);
 
 // Graceful shutdown
 const gracefulShutdown = async (signal: string): Promise<void> => {
-  console.log(`\n${signal} received. Shutting down gracefully...`);
+  console.info(`\n${signal} received. Shutting down gracefully...`);
 
   try {
     await disconnectDatabase();
-    console.log('Closed all connections');
+    console.info('Closed all connections');
     process.exit(0);
   } catch (error) {
     console.error('Error during shutdown:', error);

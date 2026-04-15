@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Plus, Shield, Server } from 'lucide-react';
 import { servicesApi, categoriesApi, sectorsApi, type Service } from '@/lib/api';
@@ -18,6 +18,7 @@ import { ServiceDrawer } from '@/components/services/ServiceDrawer';
 
 export function Services() {
   const navigate = useNavigate();
+  const { id: serviceIdFromRoute } = useParams();
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -127,6 +128,23 @@ export function Services() {
     infraSector,
     infraProvider
   );
+
+  const allServices = useMemo(
+    () => [...(toolboxData?.services || []), ...(infrastructureData?.services || [])],
+    [toolboxData, infrastructureData]
+  );
+
+  useEffect(() => {
+    if (!serviceIdFromRoute) {
+      return;
+    }
+    const matched = allServices.find((service) => service._id === serviceIdFromRoute);
+    if (!matched) {
+      return;
+    }
+    setSelectedService(matched);
+    setDrawerOpen(true);
+  }, [serviceIdFromRoute, allServices]);
 
   const handleRowClick = (service: Service) => {
     setSelectedService(service);
@@ -283,6 +301,9 @@ export function Services() {
         onClose={() => {
           setDrawerOpen(false);
           setSelectedService(null);
+          if (serviceIdFromRoute) {
+            navigate('/services', { replace: true });
+          }
         }}
       />
     </div>

@@ -280,7 +280,6 @@ export interface Execution {
   status: 'pending' | 'running' | 'completed' | 'failed';
   deployedServices: DeployedService[];
   conclusion?: Conclusion;
-  maestroSessionId?: string;
 }
 
 export interface Scenario {
@@ -334,9 +333,7 @@ export const scenariosApi = {
     const { data } = await api.delete(`/scenarios/${id}`);
     return data;
   },
-  execute: async (
-    id: string
-  ): Promise<{ executionId: string; maestroUrl: string; status: string }> => {
+  execute: async (id: string): Promise<{ executionId: string; status: string }> => {
     const { data } = await api.post(`/scenarios/${id}/execute`);
     return data;
   },

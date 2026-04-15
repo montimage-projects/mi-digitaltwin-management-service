@@ -26,7 +26,7 @@ graph TB
  end
 
  subgraph External["External Services"]
- MAESTRO[MAESTRO Orchestrator]
+ OLLAMA[Ollama]
  K8S[Kubernetes Clusters]
  end
 
@@ -40,8 +40,8 @@ graph TB
  Valid --> Models
  Models --> DB
 
- Pages -.->|iFrame| MAESTRO
- MAESTRO --> K8S
+ Routes --> OLLAMA
+ Routes --> K8S
 
  style Client fill:#e3f2fd
  style Server fill:#e8f5e9
@@ -219,3 +219,4 @@ flowchart LR
 - [Backend Architecture](backend.md)
 - [Data Flow](data-flow.md)
 - [Database Schema](../database/schema.md)
+- [Agent Architecture](agent-architecture.md)

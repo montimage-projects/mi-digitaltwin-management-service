@@ -13,7 +13,13 @@ const envSchema = z.object({
     .string()
     .min(16, 'ENCRYPTION_KEY must be at least 16 characters')
     .default('intact-default-encryption-key-2025'),
-  MAESTRO_BASE_URL: z.string().url().default('https://maestro.intact-project.eu'),
+  OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
+  OLLAMA_MODEL: z.string().default('qwen3:14b'),
+  OLLAMA_EMBED_MODEL: z.string().default('nomic-embed-text'),
+  OLLAMA_NUM_PREDICT: z.string().default('384').transform(Number),
+  OLLAMA_NUM_CTX: z.string().default('4096').transform(Number),
+  OLLAMA_TEMPERATURE: z.string().default('0.2').transform(Number),
+  VECTOR_DB_TYPE: z.enum(['mongodb', 'qdrant']).default('mongodb'),
 });
 
 const parseEnv = () => {

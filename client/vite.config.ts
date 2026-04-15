@@ -20,6 +20,17 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
+        // Long timeout for LLM inference (local models can take 30-120s)
+        timeout: 300000,
+        // Disable proxy response buffering so SSE tokens stream in real time
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            // Signal to the proxy that this is a streaming request
+            if (req.headers.accept === 'text/event-stream') {
+              proxyReq.setHeader('Cache-Control', 'no-cache');
+            }
+          });
+        },
       },
     },
   },

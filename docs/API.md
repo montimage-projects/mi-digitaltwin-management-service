@@ -341,7 +341,7 @@ curl -X DELETE http://localhost:3000/api/scenarios/scen123 \
 - **POST** `/api/scenarios/:id/execute`
 - **Auth:** Required
 - **Body:** `{ infrastructureId: string, ... }`
-- **Response:** `{ executionId: string, maestroUrl: string }`
+- **Response:** `{ executionId: string, status: string }`
 
 ```bash
 curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
@@ -349,6 +349,54 @@ curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
  -H "Content-Type: application/json" \
  -d '{"infrastructureId": "infra123"}'
 ```
+
+### Agent
+
+#### Agent Health
+
+- **GET** `/api/agent/health`
+- **Auth:** Required
+- **Response:**
+  ```json
+  {
+    "status": "healthy|degraded|offline",
+    "ollama": true,
+    "chatModel": { "name": "qwen3:14b", "available": true },
+    "embedModel": { "name": "nomic-embed-text", "available": true },
+    "availableModels": ["qwen3:14b", "nomic-embed-text:latest"]
+  }
+  ```
+
+#### Stream Chat Response
+
+- **POST** `/api/agent/chat`
+- **Auth:** Required
+- **Body:** `{ conversationId?: string, message: string }`
+- **Response:** `text/event-stream` SSE events (`metadata`, `token`, `sources`, `done`, `error`)
+
+#### List Conversations
+
+- **GET** `/api/agent/conversations`
+- **Auth:** Required
+- **Response:** `[{ _id, title, lastMessage, updatedAt, messageCount }]`
+
+#### Get Conversation
+
+- **GET** `/api/agent/conversations/:id`
+- **Auth:** Required
+- **Response:** `{ _id, title, messages: [{ role, content, timestamp, sources? }], updatedAt }`
+
+#### Delete Conversation
+
+- **DELETE** `/api/agent/conversations/:id`
+- **Auth:** Required
+- **Response:** `{ message: "Conversation deleted" }`
+
+#### Reindex Service Embeddings
+
+- **POST** `/api/agent/rag/reindex`
+- **Auth:** Required (`admin`)
+- **Response:** `{ indexed: number, duration: number }`
 
 ### Infrastructures
 

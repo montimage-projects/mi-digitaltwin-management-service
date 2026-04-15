@@ -35,9 +35,23 @@ services:
     networks:
       - intact-network
 
+  # Optional local Ollama service for agent features.
+  # Uncomment if you want Docker-managed Ollama instead of host Ollama.
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: intact-ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - intact-network
+
 volumes:
   mongodb_data:
     name: intact-mongodb-data
+  # ollama_data:
+  #   name: intact-ollama-data
 
 networks:
   intact-network:

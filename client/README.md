@@ -59,10 +59,9 @@ src/
 
 ## Environment Variables
 
-| Variable           | Description              | Default                             |
-| ------------------ | ------------------------ | ----------------------------------- |
-| `VITE_API_URL`     | Backend API URL          | `http://localhost:3000`             |
-| `VITE_MAESTRO_URL` | MAESTRO orchestrator URL | `https://maestro.intact-project.eu` |
+| Variable       | Description     | Default                 |
+| -------------- | --------------- | ----------------------- |
+| `VITE_API_URL` | Backend API URL | `http://localhost:3000` |
 
 ## Technology Stack
 

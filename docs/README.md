@@ -81,10 +81,10 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 
 ### Integration & Extensibility
 
-| Document                                              | Purpose                       |
-| ----------------------------------------------------- | ----------------------------- |
-| [External Services](integration/external-services.md) | Third-party services and APIs |
-| [MAESTRO Integration](integration/maestro.md)         | Orchestrator setup and usage  |
+| Document                                                 | Purpose                       |
+| -------------------------------------------------------- | ----------------------------- |
+| [External Services](integration/external-services.md)    | Third-party services and APIs |
+| [Agent Architecture](architecture/agent-architecture.md) | Boss Agent and RAG design     |
 
 ### Reference
 
@@ -132,6 +132,7 @@ docs/
  backend.md # Backend structure
  frontend.md # Frontend structure
  data-flow.md # Request flow diagrams
+ agent-architecture.md # Agent and RAG architecture
 
  database/ # Data layer documentation
  schema.md # MongoDB collections
@@ -143,7 +144,6 @@ docs/
 
  integration/ # External services
  external-services.md # Third-party integrations
- maestro.md # MAESTRO orchestrator
 
  installation/ # Setup & configuration
  prerequisites.md # System requirements

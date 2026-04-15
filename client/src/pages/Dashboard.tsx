@@ -230,7 +230,7 @@ export function Dashboard() {
               <div>
                 <p className="font-medium">Execute & Document</p>
                 <p className="text-sm text-muted-foreground">
-                  Deploy via MAESTRO, capture conclusions, and export reports
+                  Ask the AI Agent to explore services, plan deployments, and export reports
                 </p>
               </div>
             </li>

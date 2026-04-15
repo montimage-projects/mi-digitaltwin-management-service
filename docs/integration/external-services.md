@@ -13,15 +13,15 @@ graph TD
 
  subgraph External
  C[MongoDB]
- D[MAESTRO]
+ D[Ollama]
  E[Kubernetes]
  F[Docker Registry]
  end
 
  A --> B
  B --> C
- A -->|iFrame| D
- D --> E
+ B --> D
+ B --> E
  E --> F
 
  style Platform fill:#e3f2fd
@@ -184,7 +184,7 @@ graph LR
 ### Topic Configuration
 
 ```yaml
-# MAESTRO handles Kafka setup
+# Example topic setup
 kafka:
   bootstrap.servers: kafka.intact-project.eu:9092
   topics:
@@ -197,12 +197,12 @@ kafka:
 
 ### Required Services
 
-| Service    | Purpose      | Required                |
-| ---------- | ------------ | ----------------------- |
-| MongoDB    | Data storage | Yes                     |
-| MAESTRO    | Deployment   | For execution           |
-| Kubernetes | Runtime      | For execution           |
-| Kafka      | Messaging    | For inter-service comms |
+| Service    | Purpose       | Required                |
+| ---------- | ------------- | ----------------------- |
+| MongoDB    | Data storage  | Yes                     |
+| Ollama     | LLM inference | For agent features      |
+| Kubernetes | Runtime       | For execution           |
+| Kafka      | Messaging     | For inter-service comms |
 
 ### Optional Services
 
@@ -219,7 +219,7 @@ kafka:
 ```bash
 # .env (development)
 MONGODB_URI=mongodb://localhost:27017/intact
-VITE_MAESTRO_URL=https://maestro-dev.intact-project.eu
+OLLAMA_BASE_URL=http://localhost:11434
 ```
 
 ### Production
@@ -227,7 +227,9 @@ VITE_MAESTRO_URL=https://maestro-dev.intact-project.eu
 ```bash
 # .env.prod
 MONGODB_URI=mongodb+srv://prod-user:***@cluster.mongodb.net/intact_prod
-VITE_MAESTRO_URL=https://maestro.intact-project.eu
+OLLAMA_BASE_URL=https://ollama.internal
+OLLAMA_MODEL=qwen3:14b
+OLLAMA_EMBED_MODEL=nomic-embed-text
 ```
 
 ## Health Monitoring
@@ -239,7 +241,7 @@ interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
   services: {
     database: boolean;
-    maestro: boolean;
+    ollama: boolean;
     infrastructure: boolean;
   };
   timestamp: Date;
@@ -250,7 +252,7 @@ app.get('/api/health/detailed', async (req, res) => {
     status: 'healthy',
     services: {
       database: mongoose.connection.readyState === 1,
-      maestro: await checkMAESTRO(),
+      ollama: await checkOllama(),
       infrastructure: await checkInfrastructures(),
     },
     timestamp: new Date(),
@@ -289,11 +291,11 @@ graph TD
  C[nginx]
  end
 
- subgraph Private
- D[Express API]
- E[MongoDB]
- F[MAESTRO]
- end
+  subgraph Private
+  D[Express API]
+  E[MongoDB]
+  F[Ollama]
+  end
 
  A --> B
  B --> C
@@ -315,12 +317,14 @@ See [Common Issues](../troubleshooting/common-issues.md#mongodb-connection-faile
 3. Verify service account permissions
 4. Test with `kubectl` directly
 
-### MAESTRO Integration
+### Ollama Integration
 
-See [MAESTRO Integration](maestro.md#troubleshooting)
+1. Verify Ollama service is reachable
+2. Verify `OLLAMA_MODEL` and `OLLAMA_EMBED_MODEL` are pulled
+3. Check `/api/agent/health` response
 
 ## Related Documentation
 
-- [MAESTRO Integration](maestro.md)
+- [Agent Architecture](../architecture/agent-architecture.md)
 - [Configuration Guide](../installation/configuration.md)
 - [Deployment Playbook](../playbooks/deployment.md)

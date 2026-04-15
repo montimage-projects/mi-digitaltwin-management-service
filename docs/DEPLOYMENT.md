@@ -56,9 +56,11 @@ MONGODB_PASSWORD=secure_password_here
 JWT_SECRET=your-very-secure-random-secret-key
 CORS_ORIGIN=https://yourdomain.com
 
-# Optional
-MAESTRO_URL=https://maestro-orchestrator-url
-MAESTRO_API_KEY=your-api-key
+# Agent / Ollama
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3:14b
+OLLAMA_EMBED_MODEL=nomic-embed-text
+VECTOR_DB_TYPE=mongodb
 ```
 
 ### Step 2: Update Docker Compose

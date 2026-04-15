@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Play, ExternalLink, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Play, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { scenariosApi, Execution } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,7 +21,7 @@ interface ExecutionPanelProps {
   executions: Execution[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onExecutionStart?: (maestroUrl: string, executionId: string) => void;
+  onExecutionStart?: (executionId: string) => void;
 }
 
 const statusIcons: Record<string, React.ReactNode> = {
@@ -49,14 +49,9 @@ export function ExecutionPanel({
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['scenario', scenarioId] });
       toast.success('Execution started');
-      // Open MAESTRO in iframe or new tab
-      if (result.maestroUrl) {
-        if (onExecutionStart) {
-          onExecutionStart(result.maestroUrl, result.executionId);
-          onOpenChange(false); // Close dialog
-        } else {
-          window.open(result.maestroUrl, '_blank');
-        }
+      if (onExecutionStart) {
+        onExecutionStart(result.executionId);
+        onOpenChange(false);
       }
     },
     onError: (error: Error) => {
@@ -107,7 +102,7 @@ export function ExecutionPanel({
             <div className="flex-1">
               <h3 className="font-medium">Start New Execution</h3>
               <p className="text-sm text-muted-foreground">
-                Deploy the scenario to MAESTRO and open the orchestrator interface
+                Start an execution and track status in the scenario workspace
               </p>
             </div>
             <Button onClick={handleExecute} disabled={executeMutation.isPending}>
@@ -154,18 +149,6 @@ export function ExecutionPanel({
                           <Badge variant="outline" className="text-xs">
                             Has Conclusion
                           </Badge>
-                        )}
-                        {execution.maestroSessionId && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Open MAESTRO session
-                            }}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
                         )}
                       </div>
                     </div>

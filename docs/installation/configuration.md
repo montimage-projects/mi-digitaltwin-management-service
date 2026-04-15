@@ -53,17 +53,42 @@ NODE_ENV=development
 
 ### Available Variables
 
-| Variable           | Description              | Default                             |
-| ------------------ | ------------------------ | ----------------------------------- |
-| `VITE_API_URL`     | Backend API URL          | `http://localhost:3000`             |
-| `VITE_MAESTRO_URL` | MAESTRO orchestrator URL | `https://maestro.intact-project.eu` |
+| Variable       | Description     | Default                 |
+| -------------- | --------------- | ----------------------- |
+| `VITE_API_URL` | Backend API URL | `http://localhost:3000` |
 
 ### Example Client .env
 
 ```bash
 # client/.env
 VITE_API_URL=http://localhost:3000
-VITE_MAESTRO_URL=https://maestro.intact-project.eu
+```
+
+## Agent / Ollama Configuration
+
+### Optional Variables
+
+| Variable             | Description                             | Default                  |
+| -------------------- | --------------------------------------- | ------------------------ |
+| `OLLAMA_BASE_URL`    | Ollama server endpoint                  | `http://localhost:11434` |
+| `OLLAMA_MODEL`       | Chat generation model                   | `qwen3:14b`              |
+| `OLLAMA_EMBED_MODEL` | Embedding model for retrieval           | `nomic-embed-text`       |
+| `OLLAMA_NUM_PREDICT` | Max generated tokens per response       | `384`                    |
+| `OLLAMA_NUM_CTX`     | Context window size for chat generation | `4096`                   |
+| `OLLAMA_TEMPERATURE` | Sampling temperature                    | `0.2`                    |
+| `VECTOR_DB_TYPE`     | Vector backend (`mongodb` or `qdrant`)  | `mongodb`                |
+
+### Example Server .env (with Agent)
+
+```bash
+# server/.env
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3:14b
+OLLAMA_EMBED_MODEL=nomic-embed-text
+OLLAMA_NUM_PREDICT=384
+OLLAMA_NUM_CTX=4096
+OLLAMA_TEMPERATURE=0.2
+VECTOR_DB_TYPE=mongodb
 ```
 
 ### Accessing Variables in Code

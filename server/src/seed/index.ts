@@ -3,6 +3,7 @@ import { seedCategories } from './categories.seed.js';
 import { seedSectors } from './sectors.seed.js';
 import { seedServices } from './services.seed.js';
 import { seedAdmin } from './admin.seed.js';
+import { seedEmbeddings } from './embeddings.seed.js';
 
 const runSeeds = async (): Promise<void> => {
   console.log('Starting database seeding...\n');
@@ -21,6 +22,9 @@ const runSeeds = async (): Promise<void> => {
     console.log('');
 
     await seedAdmin();
+    console.log('');
+
+    await seedEmbeddings();
     console.log('');
 
     console.log('All seeds completed successfully!');

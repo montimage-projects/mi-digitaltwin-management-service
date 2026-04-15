@@ -5,7 +5,6 @@ import { Project } from '../models/Project.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateBody, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { env } from '../config/env.js';
 
 const router: RouterType = Router();
 
@@ -231,12 +230,8 @@ router.post('/scenarios/:id/execute', authMiddleware, async (req, res, next) => 
 
     const executionId = scenario.executions[scenario.executions.length - 1]._id;
 
-    // Construct MAESTRO URL
-    const maestroUrl = `${env.MAESTRO_BASE_URL}?scenarioId=${id}&executionId=${executionId}`;
-
     res.json({
       executionId,
-      maestroUrl,
       status: 'pending',
     });
   } catch (error) {

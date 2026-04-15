@@ -11,6 +11,7 @@ import { seedCategories } from './categories.seed.js';
 import { seedSectors } from './sectors.seed.js';
 import { seedServices } from './services.seed.js';
 import { seedAdmin } from './admin.seed.js';
+import { seedEmbeddings } from './embeddings.seed.js';
 
 // ANSI color codes
 const colors = {
@@ -65,6 +66,7 @@ async function runAllSeeds(): Promise<void> {
   await seedSectors();
   await seedServices();
   await seedAdmin();
+  await seedEmbeddings();
 }
 
 /**

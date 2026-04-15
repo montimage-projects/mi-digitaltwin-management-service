@@ -18,12 +18,12 @@ const colors = {
 };
 
 const log = {
-  info: (msg: string) => console.log(`${colors.blue}[INFO]${colors.reset} ${msg}`),
-  success: (msg: string) => console.log(`${colors.green}[OK]${colors.reset} ${msg}`),
-  warn: (msg: string) => console.log(`${colors.yellow}[WARN]${colors.reset} ${msg}`),
-  error: (msg: string) => console.log(`${colors.red}[ERROR]${colors.reset} ${msg}`),
-  header: (msg: string) => console.log(`\n${colors.bright}${colors.cyan}${msg}${colors.reset}`),
-  dim: (msg: string) => console.log(`${colors.dim}${msg}${colors.reset}`),
+  info: (msg: string) => console.info(`${colors.blue}[INFO]${colors.reset} ${msg}`),
+  success: (msg: string) => console.info(`${colors.green}[OK]${colors.reset} ${msg}`),
+  warn: (msg: string) => console.info(`${colors.yellow}[WARN]${colors.reset} ${msg}`),
+  error: (msg: string) => console.info(`${colors.red}[ERROR]${colors.reset} ${msg}`),
+  header: (msg: string) => console.info(`\n${colors.bright}${colors.cyan}${msg}${colors.reset}`),
+  dim: (msg: string) => console.info(`${colors.dim}${msg}${colors.reset}`),
 };
 
 interface ValidationResult {
@@ -179,7 +179,7 @@ async function testMongoDBConnection(): Promise<ValidationResult> {
  * Print startup banner
  */
 export function printBanner(): void {
-  console.log(`
+  console.info(`
 ${colors.cyan}╔══════════════════════════════════════════════════════════════╗
 ║                                                                ║
 ║   ${colors.bright}INTACT Digital Twin Management Platform${colors.reset}${colors.cyan}                   ║
@@ -198,13 +198,15 @@ export function printEnvironmentInfo(): void {
     ? env.MONGODB_URI.replace(/:([^:@]+)@/, ':****@')
     : env.MONGODB_URI;
 
-  console.log(`
+  console.info(`
   ${colors.dim}NODE_ENV:${colors.reset}        ${env.NODE_ENV}
   ${colors.dim}PORT:${colors.reset}            ${env.PORT}
   ${colors.dim}MONGODB_URI:${colors.reset}     ${mongoDisplay}
   ${colors.dim}CORS_ORIGIN:${colors.reset}     ${env.CORS_ORIGIN}
   ${colors.dim}JWT_EXPIRES_IN:${colors.reset}  ${env.JWT_EXPIRES_IN}
-  ${colors.dim}MAESTRO_URL:${colors.reset}     ${env.MAESTRO_BASE_URL}
+  ${colors.dim}OLLAMA_URL:${colors.reset}      ${env.OLLAMA_BASE_URL}
+  ${colors.dim}OLLAMA_MODEL:${colors.reset}    ${env.OLLAMA_MODEL}
+  ${colors.dim}VECTOR_DB_TYPE:${colors.reset}  ${env.VECTOR_DB_TYPE}
 `);
 }
 
@@ -255,11 +257,11 @@ export async function runStartupChecks(): Promise<boolean> {
   }
 
   // Summary
-  console.log('');
+  console.info('');
   if (hasErrors) {
     log.header('Startup Failed');
     log.error('Please fix the errors above before starting the server.');
-    console.log(`
+    console.info(`
 ${colors.dim}Common fixes:
   1. Copy .env.example to .env: cp .env.example .env
   2. Start MongoDB: docker-compose up -d mongodb
@@ -284,7 +286,7 @@ ${colors.dim}Common fixes:
 export function printServerReady(port: number, staticEnabled: boolean): void {
   log.header('Server Ready');
 
-  console.log(`
+  console.info(`
   ${colors.green}API:${colors.reset}     http://localhost:${port}/api
   ${colors.green}Health:${colors.reset}  http://localhost:${port}/api/health${
     staticEnabled

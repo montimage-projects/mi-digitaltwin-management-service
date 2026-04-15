@@ -168,23 +168,35 @@ sequenceDiagram
  participant U as User
  participant C as Client
  participant S as Server
- participant M as MAESTRO
- participant K as Kubernetes
 
  U->>C: Click "Execute"
  C->>S: POST /api/scenarios/:id/execute
  S->>S: Validate scenario
- S->>S: Prepare execution params
- S-->>C: { executionId, maestroUrl }
+ S->>S: Create execution record
+ S-->>C: { executionId, status }
+ C->>S: PUT /api/scenarios/:id/executions/:executionId/status
+ S-->>C: Updated execution status
+```
 
- C->>C: Open MAESTRO iFrame
- C->>M: Load with params
- M->>K: Deploy services
- K-->>M: Deployment status
- M-->>C: Execution progress
+## Agent Chat Flow
 
- U->>C: Close iFrame
- C->>S: Update execution status
+```mermaid
+sequenceDiagram
+ participant U as User
+ participant C as Client
+ participant S as Server
+ participant O as Ollama
+ participant DB as MongoDB
+
+ U->>C: Send chat message
+ C->>S: POST /api/agent/chat (SSE)
+ S-->>C: metadata event
+ S->>DB: Store user message
+ S->>O: Chat + embeddings
+ O-->>S: token stream
+ S-->>C: token events
+ S->>DB: Store assistant message + sources
+ S-->>C: sources + done events
 ```
 
 ## Infrastructure Credential Flow

@@ -1,8 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Info, Users, FolderTree, Server } from 'lucide-react';
+import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { categoriesApi } from '@/lib/api';
+import { agentApi } from '@/lib/agent-api';
 import { UserManagement } from './UserManagement';
 
 export function Settings() {
@@ -10,6 +13,25 @@ export function Settings() {
     queryKey: ['categories'],
     queryFn: categoriesApi.list,
   });
+
+  const {
+    data: agentHealth,
+    refetch: refetchAgentHealth,
+    isFetching: checkingAgentHealth,
+  } = useQuery({
+    queryKey: ['agent-health'],
+    queryFn: agentApi.checkAgentHealth,
+    retry: false,
+  });
+
+  const handleReindex = async () => {
+    try {
+      const result = await agentApi.triggerReindex();
+      toast.success(`Reindex completed: ${result.indexed} services in ${result.duration}ms`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Reindex failed');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -61,17 +83,60 @@ export function Settings() {
           <div className="rounded-lg border bg-background p-6">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Server className="h-5 w-5" />
-              MAESTRO Configuration
+              Agent Configuration
             </h2>
             <div className="space-y-4">
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Orchestrator URL</p>
+                <p className="text-sm text-muted-foreground">Ollama status</p>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className={
+                      agentHealth?.status === 'healthy'
+                        ? 'border-green-400 text-green-700'
+                        : agentHealth?.status === 'degraded'
+                          ? 'border-yellow-400 text-yellow-700'
+                          : 'border-red-400 text-red-700'
+                    }
+                  >
+                    {(agentHealth?.status || 'offline').toUpperCase()}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void refetchAgentHealth()}
+                    disabled={checkingAgentHealth}
+                  >
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">API URL</p>
                 <p className="font-mono text-sm bg-muted px-3 py-2 rounded">
-                  {import.meta.env.VITE_MAESTRO_URL || 'https://maestro.intact-project.eu'}
+                  {import.meta.env.VITE_API_URL || '/api'}
                 </p>
               </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Chat model</p>
+                <p className="font-mono text-sm bg-muted px-3 py-2 rounded">
+                  {agentHealth?.chatModel?.name || 'unknown'}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Embedding model</p>
+                <p className="font-mono text-sm bg-muted px-3 py-2 rounded">
+                  {agentHealth?.embedModel?.name || 'unknown'}
+                </p>
+              </div>
+              <div className="pt-2">
+                <Button type="button" onClick={handleReindex}>
+                  Reindex Services
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                MAESTRO URL is configured via environment variables and cannot be changed here.
+                Agent connection settings are configured on the backend environment.
               </p>
             </div>
           </div>

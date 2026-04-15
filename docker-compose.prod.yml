@@ -38,7 +38,10 @@ services:
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
-      - MAESTRO_BASE_URL=${MAESTRO_BASE_URL:-https://maestro.intact-project.eu}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3:14b}
+      - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-mongodb}
       - SERVE_STATIC=true
       - SEED_ON_STARTUP=${SEED_ON_STARTUP:-true}
     depends_on:

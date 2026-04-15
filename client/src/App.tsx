@@ -9,6 +9,11 @@ import '@/store/theme-store';
 
 import { MainLayout } from '@/components/layout/MainLayout';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
+import { ChatPanel } from '@/components/agent/ChatPanel';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ChatFab } from '@/components/agent/ChatFab';
+import { useAgentStore } from '@/store/agent-store';
+import { useAuthStore } from '@/store/auth-store';
 import { Login } from '@/pages/Login';
 import { Dashboard } from '@/pages/Dashboard';
 
@@ -64,128 +69,151 @@ function PageLoader() {
 }
 
 function App() {
+  const isOpen = useAgentStore((state) => state.isOpen);
+  const togglePanel = useAgentStore((state) => state.togglePanel);
+  const isStreaming = useAgentStore((state) => state.isStreaming);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            element={
-              <ProtectedRoute>
-                <MainLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/" element={<Dashboard />} />
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
             <Route
-              path="/services"
               element={
-                <Suspense fallback={<PageLoader />}>
-                  <Services />
-                </Suspense>
+                <ProtectedRoute>
+                  <MainLayout />
+                </ProtectedRoute>
               }
-            />
-            <Route
-              path="/services/add"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <AddService />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/services/:id/edit"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <EditService />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/projects"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <Projects />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/projects/add"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <AddProject />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/projects/:id"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <ProjectDetail />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/projects/:id/edit"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <EditProject />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/projects/:projectId/scenarios/add"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <AddScenario />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/scenarios/:id"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <ScenarioDetail />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/scenarios/:id/edit"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <EditScenario />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/infrastructure"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <Infrastructure />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/analytics"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <Analytics />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <Settings />
-                </Suspense>
-              }
-            />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-      <Toaster position="top-right" richColors />
-    </QueryClientProvider>
+            >
+              <Route path="/" element={<Dashboard />} />
+              <Route
+                path="/services"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <Services />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/services/:id"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <Services />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/services/add"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <AddService />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/services/:id/edit"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <EditService />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/projects"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <Projects />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/projects/add"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <AddProject />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/projects/:id"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProjectDetail />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/projects/:id/edit"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <EditProject />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/projects/:projectId/scenarios/add"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <AddScenario />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/scenarios/:id"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ScenarioDetail />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/scenarios/:id/edit"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <EditScenario />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/infrastructure"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <Infrastructure />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/analytics"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <Analytics />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <Settings />
+                  </Suspense>
+                }
+              />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+        {isAuthenticated && (
+          <>
+            <ChatPanel />
+            {!isOpen && (
+              <ChatFab open={isOpen} onClick={togglePanel} attention={isStreaming && !isOpen} />
+            )}
+          </>
+        )}
+        <Toaster position="top-right" richColors />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -204,7 +204,7 @@ Markdown link checker configuration:
 
 Project-specific spelling dictionary includes:
 
-- Project names (INTACT, MAESTRO, UBITECH)
+- Project names (INTACT, UBITECH)
 - Technology terms (Bun, Vite, Tailwind, etc.)
 - Architecture terms (microservices, monorepo, API)
 - Common abbreviations (CLI, SDK, IDE, etc.)

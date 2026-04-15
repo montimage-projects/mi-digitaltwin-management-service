@@ -62,6 +62,24 @@ node --version
 npm --version
 ```
 
+### Ollama
+
+[Ollama](https://ollama.com) is required for Boss Agent chat and RAG embedding features.
+
+**Version:** 0.16+
+
+```bash
+# Verify installation
+ollama --version
+
+# Pull required models
+ollama pull qwen3:14b
+ollama pull nomic-embed-text
+
+# Optional faster chat model for local development
+ollama pull qwen2.5:7b
+```
+
 ## System Requirements
 
 ### Development Machine
@@ -105,7 +123,7 @@ npm --version
 
 Required for external integrations:
 
-- MAESTRO orchestrator (configurable URL)
+- Ollama server (local or remote)
 - Docker Hub or private registry (for images)
 - MongoDB Atlas (if using cloud database)
 

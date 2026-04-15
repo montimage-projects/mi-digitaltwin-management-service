@@ -6,8 +6,17 @@ import { Sector } from '../models/Sector.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateQuery, validateBody, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { getRAGRetriever } from '../agent/index.js';
 
 const router: RouterType = Router();
+
+function triggerAsyncIndex(serviceId: string): void {
+  getRAGRetriever()
+    .indexServiceById(serviceId)
+    .catch((_error) => {
+      // Keep service APIs non-blocking even if indexing fails.
+    });
+}
 
 // Validation schemas
 const inputOutputSchema = z.object({
@@ -204,6 +213,8 @@ router.post('/', authMiddleware, validateBody(createServiceSchema), async (req, 
       .populate('sectorId', 'name slug category')
       .lean();
 
+    triggerAsyncIndex(String(service._id));
+
     res.status(201).json(populatedService);
   } catch (error) {
     next(error);
@@ -261,6 +272,8 @@ router.put('/:id', authMiddleware, validateBody(updateServiceSchema), async (req
     if (!service) {
       throw new AppError('Service not found', 404);
     }
+
+    triggerAsyncIndex(id);
 
     res.json(service);
   } catch (error) {

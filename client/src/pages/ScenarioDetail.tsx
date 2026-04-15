@@ -85,7 +85,6 @@ export function ScenarioDetail() {
   const [selectedInfrastructure, setSelectedInfrastructure] = useState<string | null>(null);
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
   const [executionTabs, setExecutionTabs] = useState<{
-    maestroUrl: string | null;
     serviceUrls: {
       id: string;
       name: string;
@@ -95,7 +94,7 @@ export function ScenarioDetail() {
       url: string;
       interfaceType: 'terminal' | 'web';
     }[];
-  }>({ maestroUrl: null, serviceUrls: [] });
+  }>({ serviceUrls: [] });
   const [deploymentProgress, setDeploymentProgress] = useState(0);
   const [deploymentComplete, setDeploymentComplete] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
@@ -122,9 +121,9 @@ export function ScenarioDetail() {
     }
   }, [searchParams, executionPanelOpen, selectedInfrastructure]);
 
-  // Handle execution start - set up tabs for MAESTRO and services
+  // Handle execution start - set up tabs for service interfaces
   const handleExecutionStart = useCallback(
-    (maestroUrl: string, executionId: string) => {
+    (executionId: string) => {
       // Store the execution ID for status updates
       setCurrentExecutionId(executionId);
       // Validate topology before proceeding
@@ -166,24 +165,22 @@ export function ScenarioDetail() {
             title: node.data.serviceTitle || node.data.label,
             type: node.data.type || 'server',
             serviceId: node.data.serviceId!,
-            // URL pattern - adjust based on your actual service URL structure
-            url: `${maestroUrl.replace('/orchestrator', '')}/service/${node.data.serviceId}`,
+            url: `/services/${node.data.serviceId}`,
             interfaceType,
           };
         });
 
       setExecutionTabs({
-        maestroUrl,
         serviceUrls,
       });
-      setActiveTab('maestro');
+      setActiveTab('deployment');
 
       // Start deployment simulation
       setIsDeploying(true);
       setDeploymentProgress(0);
       setDeploymentComplete(false);
     },
-    [nodes, selectedInfrastructure]
+    [edges, nodes, selectedInfrastructure]
   );
 
   // Simulate deployment progress over 10 seconds
@@ -432,17 +429,21 @@ export function ScenarioDetail() {
                   <Settings2 className="h-4 w-4" />
                   Editor
                 </TabsTrigger>
-                {executionTabs.maestroUrl && (
-                  <TabsTrigger value="maestro" className="gap-2 data-[state=active]:bg-muted">
+                {(isDeploying || deploymentComplete) && (
+                  <TabsTrigger value="deployment" className="gap-2 data-[state=active]:bg-muted">
                     <Play className="h-4 w-4 text-green-500" />
-                    MAESTRO
+                    Deployment
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-4 w-4 ml-1 hover:bg-destructive/20"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setExecutionTabs({ maestroUrl: null, serviceUrls: [] });
+                        setExecutionTabs({ serviceUrls: [] });
+                        setIsDeploying(false);
+                        setDeploymentComplete(false);
+                        setDeploymentProgress(0);
+                        setCurrentExecutionId(null);
                         setActiveTab('editor');
                       }}
                     >
@@ -504,133 +505,113 @@ export function ScenarioDetail() {
                 />
               </TabsContent>
 
-              {/* MAESTRO Tab */}
-              {executionTabs.maestroUrl && (
-                <TabsContent value="maestro" className="h-full m-0 data-[state=inactive]:hidden">
-                  <div className="h-full flex flex-col">
-                    <div className="flex items-center justify-between border-b px-4 py-2 bg-muted/30">
-                      <div className="flex items-center gap-2">
-                        <Play className="h-4 w-4 text-green-500" />
-                        <span className="font-medium text-sm">MAESTRO Orchestrator</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(executionTabs.maestroUrl!, '_blank')}
-                        title="Open in new tab"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
+              {/* Deployment Tab */}
+              {(isDeploying || deploymentComplete) && (
+                <TabsContent value="deployment" className="h-full m-0 data-[state=inactive]:hidden">
+                  {!deploymentComplete ? (
+                    <div className="h-full flex flex-col items-center justify-center p-8">
+                      <div className="w-full max-w-md space-y-6">
+                        <div className="text-center space-y-2">
+                          <Rocket className="h-16 w-16 mx-auto text-blue-500 animate-bounce" />
+                          <h3 className="text-xl font-semibold">Deploying Services</h3>
+                          <p className="text-muted-foreground">
+                            Please wait while we deploy your services to the infrastructure...
+                          </p>
+                        </div>
 
-                    {/* Deployment Progress / Completion View */}
-                    {!deploymentComplete ? (
-                      <div className="flex-1 flex flex-col items-center justify-center p-8">
-                        <div className="w-full max-w-md space-y-6">
-                          <div className="text-center space-y-2">
-                            <Rocket className="h-16 w-16 mx-auto text-blue-500 animate-bounce" />
-                            <h3 className="text-xl font-semibold">Deploying Services</h3>
-                            <p className="text-muted-foreground">
-                              Please wait while we deploy your services to the infrastructure...
-                            </p>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Progress value={deploymentProgress} className="h-3" />
-                            <div className="flex justify-between text-sm text-muted-foreground">
-                              <span>Progress</span>
-                              <span>{deploymentProgress}%</span>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            {executionTabs.serviceUrls.map((service, index) => {
-                              const serviceProgress = Math.min(
-                                100,
-                                deploymentProgress -
-                                  index * (100 / executionTabs.serviceUrls.length)
-                              );
-                              const isComplete =
-                                serviceProgress >= 100 / executionTabs.serviceUrls.length;
-                              const isDeployingService = serviceProgress > 0 && !isComplete;
-
-                              return (
-                                <div
-                                  key={service.id}
-                                  className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
-                                >
-                                  {isComplete ? (
-                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                  ) : isDeployingService ? (
-                                    <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
-                                  ) : (
-                                    <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
-                                  )}
-                                  <span
-                                    className={
-                                      isComplete ? 'text-foreground' : 'text-muted-foreground'
-                                    }
-                                  >
-                                    {service.name}
-                                  </span>
-                                </div>
-                              );
-                            })}
+                        <div className="space-y-2">
+                          <Progress value={deploymentProgress} className="h-3" />
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>Progress</span>
+                            <span>{deploymentProgress}%</span>
                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex-1 flex flex-col items-center justify-center p-8">
-                        <div className="w-full max-w-md space-y-6 text-center">
-                          <div className="space-y-2">
-                            <CheckCircle2 className="h-20 w-20 mx-auto text-green-500" />
-                            <h3 className="text-2xl font-semibold text-green-600">
-                              Deployment Complete!
-                            </h3>
-                            <p className="text-muted-foreground">
-                              All {executionTabs.serviceUrls.length} services have been successfully
-                              deployed to the infrastructure.
-                            </p>
-                          </div>
 
-                          <div className="space-y-3 pt-4">
-                            <p className="text-sm text-muted-foreground">
-                              Click below to access individual service interfaces:
-                            </p>
-                            <div className="flex flex-wrap justify-center gap-2">
-                              {executionTabs.serviceUrls.map((service) => (
-                                <Button
-                                  key={service.id}
-                                  variant="outline"
-                                  onClick={() => setActiveTab(`service-${service.id}`)}
-                                  className="gap-2"
+                        <div className="space-y-2">
+                          {executionTabs.serviceUrls.map((service, index) => {
+                            const serviceProgress = Math.min(
+                              100,
+                              deploymentProgress - index * (100 / executionTabs.serviceUrls.length)
+                            );
+                            const isComplete =
+                              serviceProgress >= 100 / executionTabs.serviceUrls.length;
+                            const isDeployingService = serviceProgress > 0 && !isComplete;
+
+                            return (
+                              <div
+                                key={service.id}
+                                className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
+                              >
+                                {isComplete ? (
+                                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                ) : isDeployingService ? (
+                                  <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+                                ) : (
+                                  <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
+                                )}
+                                <span
+                                  className={
+                                    isComplete ? 'text-foreground' : 'text-muted-foreground'
+                                  }
                                 >
-                                  <Shield className="h-4 w-4 text-blue-500" />
                                   {service.name}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="pt-4">
-                            <Button
-                              size="lg"
-                              onClick={() => {
-                                // Open the first service tab
-                                if (executionTabs.serviceUrls.length > 0) {
-                                  setActiveTab(`service-${executionTabs.serviceUrls[0].id}`);
-                                }
-                              }}
-                              className="gap-2"
-                            >
-                              <Play className="h-4 w-4" />
-                              Open Service Interfaces
-                            </Button>
-                          </div>
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center p-8">
+                      <div className="w-full max-w-md space-y-6 text-center">
+                        <div className="space-y-2">
+                          <CheckCircle2 className="h-20 w-20 mx-auto text-green-500" />
+                          <h3 className="text-2xl font-semibold text-green-600">
+                            Deployment Complete!
+                          </h3>
+                          <p className="text-muted-foreground">
+                            All {executionTabs.serviceUrls.length} services have been successfully
+                            deployed to the infrastructure.
+                          </p>
+                        </div>
+
+                        <div className="space-y-3 pt-4">
+                          <p className="text-sm text-muted-foreground">
+                            Click below to access individual service interfaces:
+                          </p>
+                          <div className="flex flex-wrap justify-center gap-2">
+                            {executionTabs.serviceUrls.map((service) => (
+                              <Button
+                                key={service.id}
+                                variant="outline"
+                                onClick={() => setActiveTab(`service-${service.id}`)}
+                                className="gap-2"
+                              >
+                                <Shield className="h-4 w-4 text-blue-500" />
+                                {service.name}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="pt-4">
+                          <Button
+                            size="lg"
+                            onClick={() => {
+                              if (executionTabs.serviceUrls.length > 0) {
+                                setActiveTab(`service-${executionTabs.serviceUrls[0].id}`);
+                              }
+                            }}
+                            className="gap-2"
+                          >
+                            <Play className="h-4 w-4" />
+                            Open Service Interfaces
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </TabsContent>
               )}
 

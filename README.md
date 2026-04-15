@@ -9,6 +9,7 @@ A centralized platform for managing a comprehensive cybersecurity service reposi
 - **Bun** v1.0+ (primary runtime)
 - **Docker & Docker Compose** (for MongoDB)
 - **Node.js** 18+ (optional fallback)
+- **Ollama** (local LLM runtime for Boss Agent)
 
 ### Setup (3 steps)
 
@@ -21,7 +22,11 @@ cd server
 cp .env.example .env
 bun install && bun run seed && bun run dev
 
-# 3. Start frontend in new terminal (React on :5173)
+# 3. Ensure Ollama models are ready
+ollama pull qwen3:14b
+ollama pull nomic-embed-text
+
+# 4. Start frontend in new terminal (React on :5173)
 cd client
 cp .env.example .env
 bun install && bun run dev
@@ -128,7 +133,8 @@ Root Documentation
 - **Digital Twin Projects** - Manage projects across critical infrastructure sectors (Telecom, Healthcare, Transportation, Nuclear) (Base on proposal + deliverable)
 - **Visual Topology Editor** - Drag-and-drop scenario design with real-time YAML synchronization
 - **Infrastructure Management** - Configure Kubernetes, Docker, and VM deployment targets (MOCKUP - TO BE COMPLETED)
-- **MAESTRO Integration** - Execute scenarios via the UBITECH orchestrator (MOCKUP - TO BE COMPLETED)
+- **Boss Agent Chat** - AI assistant with streaming responses, conversation history, and service references
+- **RAG Retrieval Pipeline** - Embedding-based semantic search over the service repository
 - **Comprehensive Analytics** - Project reports and scenario execution insights
 
 ## Tech Stack
@@ -150,6 +156,8 @@ Root Documentation
 - **Mongoose** ODM
 - **Zod** schema validation
 - **JWT** authentication with bcrypt
+- **Ollama** local inference runtime (`qwen3:14b`, `nomic-embed-text`)
+- **MongoDB Vector Search / Cosine fallback** for service retrieval
 
 ## Workflows
 
