@@ -2,7 +2,7 @@ import type { IConversationSource } from '../models/Conversation.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { logger } from '../utils/logger.js';
 import { ConversationManager } from './conversation-manager.js';
-import { getRAGRetriever, getLLMGateway } from './index.js';
+import { getRAGRetriever, getLLMGateway, getIntentClassifier } from './index.js';
 import { BOSS_AGENT_SYSTEM_PROMPT, buildRagContextPrompt } from './prompts.js';
 import type { ChatMessage } from './types.js';
 
@@ -44,7 +44,10 @@ export class AgentService {
     const retriever = getRAGRetriever();
     let retrieved: Awaited<ReturnType<typeof retriever.retrieveSimilar>> = [];
     try {
-      retrieved = await retriever.retrieveSimilar(trimmedMessage, 4);
+      const isServiceQuery = await getIntentClassifier().isServiceQuery(trimmedMessage);
+      if (isServiceQuery) {
+        retrieved = await retriever.retrieveSimilar(trimmedMessage, 4);
+      }
     } catch (error) {
       logger.warn('RAG retrieval failed; continuing with chat-only mode', {
         error: error instanceof Error ? error.message : String(error),
@@ -60,15 +63,39 @@ export class AgentService {
       throw new AppError('Conversation not found', 404);
     }
 
+    const historyMessages = historyAfterUserMessage.messages
+      .filter((item) => item.role === 'user' || item.role === 'assistant')
+      .map((item) => ({
+        role: item.role,
+        content: item.content,
+      }));
+
+    // Find the last user message index so we can inject fresh RAG context
+    // right before it — this prevents the LLM from trusting stale context
+    // from earlier turns.
+    let lastUserIndex = -1;
+    for (let i = historyMessages.length - 1; i >= 0; i--) {
+      if (historyMessages[i].role === 'user') {
+        lastUserIndex = i;
+        break;
+      }
+    }
+
+    if (lastUserIndex > 0) {
+      historyMessages.splice(lastUserIndex, 0, {
+        role: 'system',
+        content: buildRagContextPrompt(ragContext),
+      });
+    }
+
     const llmMessages: ChatMessage[] = [
       { role: 'system', content: BOSS_AGENT_SYSTEM_PROMPT },
-      { role: 'system', content: buildRagContextPrompt(ragContext) },
-      ...historyAfterUserMessage.messages
-        .filter((item) => item.role === 'user' || item.role === 'assistant')
-        .map((item) => ({
-          role: item.role,
-          content: item.content,
-        })),
+      ...(lastUserIndex <= 0
+        ? [
+            { role: 'system' as const, content: buildRagContextPrompt(ragContext) },
+            ...historyMessages,
+          ]
+        : historyMessages),
     ];
 
     const response = await getLLMGateway().chat(llmMessages, onToken);

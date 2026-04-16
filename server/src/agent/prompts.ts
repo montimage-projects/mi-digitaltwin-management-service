@@ -14,5 +14,5 @@ Rules:
 `;
 
 export function buildRagContextPrompt(context: string): string {
-  return `Repository context:\n${context}`;
+  return `The following repository context was freshly retrieved for the user's latest question. Use this context to answer — it supersedes any earlier context from the conversation.\n\nRepository context:\n${context}`;
 }

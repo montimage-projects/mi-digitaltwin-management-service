@@ -5,11 +5,12 @@ import { MongoVectorStore } from './stores/mongo-vector-store.js';
 import { QdrantVectorStore } from './stores/qdrant-vector-store.js';
 import type { AgentConfig } from './types.js';
 import type { VectorStore } from './vector-store.js';
-import { RAGRetriever } from './rag-retriever.js';
+import { RAGRetriever, IntentClassifier } from './rag-retriever.js';
 
 let gatewayInstance: LLMGateway | null = null;
 let vectorStoreInstance: VectorStore | null = null;
 let ragRetrieverInstance: RAGRetriever | null = null;
+let intentClassifierInstance: IntentClassifier | null = null;
 let healthCheckTriggered = false;
 
 function getAgentConfig(): AgentConfig {
@@ -67,4 +68,12 @@ export function getRAGRetriever(): RAGRetriever {
   }
 
   return ragRetrieverInstance;
+}
+
+export function getIntentClassifier(): IntentClassifier {
+  if (!intentClassifierInstance) {
+    intentClassifierInstance = new IntentClassifier(getLLMGateway());
+  }
+
+  return intentClassifierInstance;
 }

@@ -7,6 +7,119 @@ import { logger } from '../utils/logger.js';
 import type { LLMGateway } from './llm-gateway.js';
 import type { VectorSearchResult, VectorStore } from './vector-store.js';
 
+// ---------------------------------------------------------------------------
+// Intent classification via embedding similarity
+// Compares user message against two cached reference clusters to decide
+// whether to run RAG. Uses the already-loaded embed model — no extra model.
+// ---------------------------------------------------------------------------
+
+const SERVICE_QUERY_REFERENCES = [
+  'Which services support threat detection?',
+  'Tell me about cybersecurity tools for network monitoring.',
+  'What services are available for intrusion detection?',
+  'Show me tools that work with telecom infrastructure.',
+  'Compare the available firewall and filtering solutions.',
+  'What does the MMT probe do?',
+  'List services from Montimage.',
+  'Which tools can I deploy for anomaly detection?',
+  'Please tell me about MMT.',
+  'Give me information about the probe tool.',
+  'What is Suricata used for?',
+  'Describe the capabilities of this service.',
+];
+
+const CASUAL_REFERENCES = [
+  'Hello',
+  'Hi there',
+  'How are you?',
+  'Good morning',
+  'Good afternoon',
+  'Thank you very much',
+  'Thanks a lot',
+  'Goodbye',
+  'See you later',
+  'Nice to meet you',
+];
+
+// Minimum margin by which casual must exceed service similarity to skip RAG.
+// When the decision is borderline, we default to running RAG.
+const CASUAL_MARGIN = 0.08;
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
+export class IntentClassifier {
+  private serviceVectors: number[][] | null = null;
+  private casualVectors: number[][] | null = null;
+  private initPromise: Promise<void> | null = null;
+
+  constructor(private readonly gateway: LLMGateway) {}
+
+  private async init(): Promise<void> {
+    if (this.serviceVectors && this.casualVectors) return;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = (async () => {
+      logger.info('IntentClassifier: embedding reference sentences…');
+      const [serviceVecs, casualVecs] = await Promise.all([
+        Promise.all(SERVICE_QUERY_REFERENCES.map((s) => this.gateway.embed(s))),
+        Promise.all(CASUAL_REFERENCES.map((s) => this.gateway.embed(s))),
+      ]);
+      this.serviceVectors = serviceVecs;
+      this.casualVectors = casualVecs;
+      logger.info('IntentClassifier: reference embeddings cached.');
+    })();
+
+    return this.initPromise;
+  }
+
+  async isServiceQuery(message: string): Promise<boolean> {
+    try {
+      await this.init();
+    } catch (error) {
+      // If classifier fails, default to running RAG so we don't silently degrade
+      logger.warn('IntentClassifier init failed; defaulting to RAG', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return true;
+    }
+
+    let queryVec: number[];
+    try {
+      queryVec = await this.gateway.embed(message);
+    } catch {
+      return true;
+    }
+
+    const maxServiceSim = Math.max(
+      ...this.serviceVectors!.map((v) => cosineSimilarity(queryVec, v))
+    );
+    const maxCasualSim = Math.max(...this.casualVectors!.map((v) => cosineSimilarity(queryVec, v)));
+
+    // Only skip RAG if casual wins by a comfortable margin — when borderline,
+    // default to running RAG so we don't silently miss relevant services.
+    const isService = maxCasualSim < maxServiceSim + CASUAL_MARGIN;
+    logger.debug('IntentClassifier result', {
+      message,
+      maxServiceSim: maxServiceSim.toFixed(3),
+      maxCasualSim: maxCasualSim.toFixed(3),
+      margin: (maxCasualSim - maxServiceSim).toFixed(3),
+      isService,
+    });
+    return isService;
+  }
+}
+
 interface ServiceDoc {
   _id: Types.ObjectId;
   shortName: string;
