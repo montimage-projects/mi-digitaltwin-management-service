@@ -177,9 +177,7 @@ export function Login() {
           </form>
 
           <div className="login-footer">
-            <p>
-              {ORG_NAME} &copy; {new Date().getFullYear()}
-            </p>
+            <p>INTACT Consortium &copy; {new Date().getFullYear()}</p>
             <p className="login-footer-sub">Funded by the European Union</p>
           </div>
         </div>
@@ -291,7 +289,6 @@ export function Login() {
         .login-logo {
           height: 56px;
           width: auto;
-          filter: brightness(0) invert(1);
         }
 
         @keyframes fadeSlideUp {
@@ -446,7 +443,6 @@ export function Login() {
         .login-mobile-logo img {
           height: 40px;
           width: auto;
-          filter: brightness(0) invert(1);
         }
 
         @media (min-width: 1024px) {
