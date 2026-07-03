@@ -1,5 +1,34 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
+
+const WORKSPACE_STORAGE_KEY = 'montimage-workspace';
+const LEGACY_WORKSPACE_STORAGE_KEY = 'intact-workspace';
+
+/**
+ * Rebrand migration: the persist key was renamed from 'intact-workspace' to
+ * 'montimage-workspace'. On first read under the new key, fall back to the
+ * old key (if present) so existing users don't silently lose their open
+ * tabs, then copy the data over and clean up the legacy entry.
+ */
+const workspaceStorage: StateStorage = {
+  getItem: (name) => {
+    const value = localStorage.getItem(name);
+    if (value !== null) {
+      return value;
+    }
+
+    const legacyValue = localStorage.getItem(LEGACY_WORKSPACE_STORAGE_KEY);
+    if (legacyValue === null) {
+      return null;
+    }
+
+    localStorage.setItem(name, legacyValue);
+    localStorage.removeItem(LEGACY_WORKSPACE_STORAGE_KEY);
+    return legacyValue;
+  },
+  setItem: (name, value) => localStorage.setItem(name, value),
+  removeItem: (name) => localStorage.removeItem(name),
+};
 
 export interface WorkspaceTab {
   id: string;
@@ -83,7 +112,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
     }),
     {
-      name: 'intact-workspace',
+      name: WORKSPACE_STORAGE_KEY,
+      storage: createJSONStorage(() => workspaceStorage),
       partialize: (state) => ({
         tabs: state.tabs.map((t) => ({ ...t, isDirty: false })),
         activeTabId: state.activeTabId,
