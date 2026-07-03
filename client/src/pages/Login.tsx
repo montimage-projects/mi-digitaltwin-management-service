@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Loader2, Shield, Network, Lock } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { authApi } from '@/lib/api';
+import { ORG_NAME } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,7 +60,7 @@ export function Login() {
 
           {/* Logo */}
           <div className="login-logo-wrapper">
-            <img src="/intact_logo.png" alt="INTACT" className="login-logo" />
+            <img src="/montimage_logo.png" alt={ORG_NAME} className="login-logo" />
           </div>
 
           {/* Tagline */}
@@ -113,7 +114,7 @@ export function Login() {
         <div className="login-form-wrapper">
           {/* Mobile logo */}
           <div className="login-mobile-logo">
-            <img src="/intact_logo.png" alt="INTACT" />
+            <img src="/montimage_logo.png" alt={ORG_NAME} />
           </div>
 
           <div className="login-form-header">
@@ -176,7 +177,9 @@ export function Login() {
           </form>
 
           <div className="login-footer">
-            <p>INTACT Consortium &copy; {new Date().getFullYear()}</p>
+            <p>
+              {ORG_NAME} &copy; {new Date().getFullYear()}
+            </p>
             <p className="login-footer-sub">Funded by the European Union</p>
           </div>
         </div>

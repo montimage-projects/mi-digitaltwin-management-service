@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Scenario, Execution } from './api';
+import { APP_NAME, ORG_NAME } from './branding';
 
 interface ScenarioReportData {
   scenario: Scenario;
@@ -20,7 +21,7 @@ export function exportScenarioToPdf(data: ScenarioReportData) {
   // Title
   doc.setFontSize(20);
   doc.setTextColor(33, 37, 41);
-  doc.text('INTACT Scenario Report', 14, 22);
+  doc.text(`${ORG_NAME} Scenario Report`, 14, 22);
 
   // Subtitle
   doc.setFontSize(12);
@@ -233,7 +234,7 @@ export function exportScenarioToPdf(data: ScenarioReportData) {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(150, 150, 150);
-    doc.text(`INTACT Digital Twin Management Platform - Page ${i} of ${pageCount}`, 14, 290);
+    doc.text(`${APP_NAME} - Page ${i} of ${pageCount}`, 14, 290);
   }
 
   // Download
