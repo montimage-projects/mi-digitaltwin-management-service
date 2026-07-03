@@ -59,7 +59,7 @@ export function Settings() {
             </div>
 
             <div className="mt-6 flex items-start gap-4 border-t pt-6">
-              <img src="/montimage_logo.png" alt={ORG_NAME} className="h-10 w-auto dark:invert" />
+              <img src="/montimage_logo.png" alt={ORG_NAME} className="h-10 w-auto" />
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">
                   About{' '}

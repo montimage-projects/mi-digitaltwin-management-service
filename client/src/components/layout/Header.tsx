@@ -24,7 +24,7 @@ export function Header() {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-6">
       <div className="flex items-center gap-3">
-        <img src="/montimage_logo.png" alt={ORG_NAME} className="h-6 w-auto dark:invert" />
+        <img src="/montimage_logo.png" alt={ORG_NAME} className="h-6 w-auto" />
         <h1 className="text-lg font-semibold">{APP_NAME}</h1>
       </div>
 

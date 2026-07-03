@@ -39,9 +39,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     >
       {/* Logo */}
       <div className="flex h-16 items-center justify-between border-b px-4">
-        {!collapsed && (
-          <img src="/montimage_logo.png" alt={ORG_NAME} className="h-10 w-auto dark:invert" />
-        )}
+        {!collapsed && <img src="/montimage_logo.png" alt={ORG_NAME} className="h-10 w-auto" />}
         <Button
           variant="ghost"
           size="icon"
