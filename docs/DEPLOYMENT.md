@@ -2,6 +2,25 @@
 
 Complete guide to deploying the MI Digital Twin Management Service to production environments.
 
+## Upgrade Note: Montimage Rebrand (Docker Volume Names)
+
+The Docker Compose files (`docker-compose.yml`, `docker-compose.prod.yml`, `docker-compose.atlas.yml`)
+were updated as part of the Montimage rebrand: container names, the network name, and the named
+volumes (e.g. `intact-mongodb-data` → `montimage-mongodb-data`) all changed. If you have an
+existing deployment, Docker will **not** reuse your old volume under the new name — it will
+silently provision a fresh, empty volume instead. Before (or immediately after) upgrading,
+migrate your MongoDB data volume, for example:
+
+```bash
+docker run --rm \
+  -v intact-mongodb-data:/from \
+  -v montimage-mongodb-data:/to \
+  alpine sh -c "cd /from && cp -a . /to"
+```
+
+Adjust the source/target volume names above to match the compose file you use (e.g. append
+`-prod` or `-atlas`), then restart the stack.
+
 ## Prerequisites
 
 Before deploying, ensure you have:
