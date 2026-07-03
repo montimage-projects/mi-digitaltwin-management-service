@@ -124,8 +124,8 @@ jobs:
 
           # Create a summary
           cat > docs-summary.txt << EOF
-          INTACT Digital Twin Management Platform - Documentation Build
-          ==============================================================
+          MI Digital Twin Management Platform - Documentation Build
+          ==========================================================
 
           Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
           Git Commit: ${{ github.sha }}

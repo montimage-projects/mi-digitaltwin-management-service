@@ -165,3 +165,7 @@ bunx tsc --noEmit
 - [Styling Guide](../docs/design/styling.md) - CSS/Tailwind guidelines
 - [Development Guide](../docs/DEVELOPMENT.md) - Full development workflow
 - [Development Playbook](../docs/playbooks/development.md) - Step-by-step setup
+
+---
+
+Maintained by [Montimage](https://montimage.eu).
