@@ -1,8 +1,16 @@
 {
-  "name": "intact-digital-twin-platform",
+  "name": "mi-digitaltwin-management-service",
   "version": "0.1.0",
+  "description": "MI Digital Twin Management Platform - a Montimage product for modeling digital twins and simulating cybersecurity scenarios.",
   "private": true,
   "type": "module",
+  "author": "Montimage",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/montimage-projects/mi-digitaltwin-management-service.git"
+  },
+  "homepage": "https://montimage.eu",
   "workspaces": [
     "client",
     "server"
