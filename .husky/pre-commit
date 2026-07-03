@@ -6,8 +6,10 @@
 echo "Running pre-commit checks..."
 
 # Run lint-staged for staged files (format + lint)
+# --shell is required because our lint-staged commands use shell syntax
+# (e.g. "cd server && bunx eslint ..."), which needs a shell to interpret.
 echo "Checking staged files..."
-bunx lint-staged
+bunx lint-staged --shell
 
 # Check for security vulnerabilities (warning only, doesn't block)
 echo "Checking for security vulnerabilities..."
