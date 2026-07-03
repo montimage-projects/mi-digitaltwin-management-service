@@ -79,7 +79,7 @@ main() {
     run_seed
 
     # Execute the main command
-    echo "Starting INTACT server..."
+    echo "Starting MI Digital Twin Management Platform server..."
     exec "$@"
 }
 

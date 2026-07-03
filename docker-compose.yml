@@ -4,7 +4,7 @@
 services:
   mongodb:
     image: mongo:7
-    container_name: intact-mongodb
+    container_name: montimage-mongodb
     ports:
       - "27017:27017"
     volumes:
@@ -18,11 +18,11 @@ services:
       retries: 5
       start_period: 10s
     networks:
-      - intact-network
+      - montimage-network
 
   mongo-express:
     image: mongo-express:latest
-    container_name: intact-mongo-express
+    container_name: montimage-mongo-express
     ports:
       - "8081:8081"
     environment:
@@ -33,12 +33,12 @@ services:
       mongodb:
         condition: service_healthy
     networks:
-      - intact-network
+      - montimage-network
 
 volumes:
   mongodb_data:
-    name: intact-mongodb-data
+    name: montimage-mongodb-data
 
 networks:
-  intact-network:
+  montimage-network:
     driver: bridge
