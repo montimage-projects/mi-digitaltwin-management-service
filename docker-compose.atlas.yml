@@ -14,9 +14,9 @@ services:
     container_name: montimage-app
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - '${PORT:-3000}:3000'
     volumes:
-      - app_data:/app/server/data  # Persist seed marker
+      - app_data:/app/server/data # Persist seed marker
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -33,7 +33,7 @@ services:
       - SERVE_STATIC=true
       - SEED_ON_STARTUP=${SEED_ON_STARTUP:-true}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
       interval: 30s
       timeout: 10s
       retries: 3
