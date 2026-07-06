@@ -116,12 +116,22 @@ function toAppError(err: unknown, action: string): AppError {
   return new AppError(`Failed while ${action}: ${message}`, 500);
 }
 
+/**
+ * Maximum characters kept from an id when forming a namespace segment. Sized to
+ * fit a full 24-char MongoDB ObjectId so the trailing counter bytes — which are
+ * what distinguish ids minted in the same second/process — are preserved rather
+ * than sliced off (slicing to 12 hex chars discarded the counter and let two
+ * executions of one scenario collide on an identical namespace). Two
+ * `secsim-<24>-<24>` segments plus separators stay within the 63-char limit.
+ */
+const MAX_ID_SEGMENT = 24;
+
 /** Lowercase a string into a DNS label suitable for a Kubernetes name segment. */
 function toLabelSegment(input: string): string {
   return input
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '')
-    .slice(0, 12);
+    .slice(0, MAX_ID_SEGMENT);
 }
 
 /**

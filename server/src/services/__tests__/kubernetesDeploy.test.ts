@@ -110,8 +110,26 @@ describe('deriveNamespace', () => {
     const ns = deriveNamespace('a'.repeat(200), 'b'.repeat(200));
     expect(ns.length).toBeLessThanOrEqual(63);
     expect(ns).toMatch(/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/);
-    // Each id contributes at most a 12-char segment.
-    expect(ns).toBe(`secsim-${'a'.repeat(12)}-${'b'.repeat(12)}`);
+    // Each id contributes at most a 24-char segment (a full MongoDB ObjectId).
+    expect(ns).toBe(`secsim-${'a'.repeat(24)}-${'b'.repeat(24)}`);
+  });
+
+  test('does not collide for ids that differ only in their trailing bytes', () => {
+    // Two MongoDB ObjectIds minted in the same second/process share their
+    // timestamp + random prefix and differ only in the trailing counter bytes.
+    // Truncating each id to 12 hex chars discarded that counter and produced an
+    // identical namespace for two distinct executions — this asserts it no
+    // longer does.
+    const scenario = '507f1f77bcf86cd799439011';
+    const exec1 = '6a4c3d771006abcdef000001';
+    const exec2 = '6a4c3d771006abcdef000002';
+    const ns1 = deriveNamespace(scenario, exec1);
+    const ns2 = deriveNamespace(scenario, exec2);
+    expect(ns1).not.toBe(ns2);
+    expect(ns1.length).toBeLessThanOrEqual(63);
+    expect(ns2.length).toBeLessThanOrEqual(63);
+    expect(ns1).toMatch(/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/);
+    expect(ns2).toMatch(/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/);
   });
 
   test('falls back to scn/exec segments when ids have no usable characters', () => {
