@@ -16,6 +16,7 @@ import usersRoutes from './routes/users.routes.js';
 import categoriesRoutes from './routes/categories.routes.js';
 import sectorsRoutes from './routes/sectors.routes.js';
 import servicesRoutes from './routes/services.routes.js';
+import partnersRoutes from './routes/partners.routes.js';
 import projectsRoutes from './routes/projects.routes.js';
 import scenariosRoutes from './routes/scenarios.routes.js';
 import infrastructuresRoutes from './routes/infrastructures.routes.js';
@@ -74,6 +75,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/sectors', sectorsRoutes);
 app.use('/api/services', servicesRoutes);
+app.use('/api/partners', partnersRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api', scenariosRoutes);
 app.use('/api/infrastructures', infrastructuresRoutes);
@@ -89,11 +91,11 @@ app.use(errorHandler);
 
 // Graceful shutdown
 const gracefulShutdown = async (signal: string): Promise<void> => {
-  console.log(`\n${signal} received. Shutting down gracefully...`);
+  console.info(`\n${signal} received. Shutting down gracefully...`);
 
   try {
     await disconnectDatabase();
-    console.log('Closed all connections');
+    console.info('Closed all connections');
     process.exit(0);
   } catch (error) {
     console.error('Error during shutdown:', error);
