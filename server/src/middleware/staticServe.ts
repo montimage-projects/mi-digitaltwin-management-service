@@ -27,7 +27,7 @@ export const configureStaticServing = (app: Express): boolean => {
   if (!fs.existsSync(clientDistPath)) {
     console.warn(`[Static] Warning: Client dist directory not found at ${clientDistPath}`);
     console.warn(
-      '[Static] Running in API-only mode. Build client with: cd client && bun run build'
+      '[Static] Running in API-only mode. Build client with: cd client && npm run build'
     );
     return false;
   }
@@ -35,12 +35,12 @@ export const configureStaticServing = (app: Express): boolean => {
   if (!fs.existsSync(indexPath)) {
     console.warn(`[Static] Warning: index.html not found at ${indexPath}`);
     console.warn(
-      '[Static] Running in API-only mode. Build client with: cd client && bun run build'
+      '[Static] Running in API-only mode. Build client with: cd client && npm run build'
     );
     return false;
   }
 
-  console.log(`[Static] Serving client build from: ${clientDistPath}`);
+  console.info(`[Static] Serving client build from: ${clientDistPath}`);
 
   // Serve static files with caching headers
   app.use(

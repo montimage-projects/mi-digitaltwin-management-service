@@ -42,7 +42,7 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
 
     console.info(`Found ${sectors.length} sectors in database`);
     if (sectors.length === 0) {
-      console.info('\nNo sectors found. Please run "bun run seed" first to seed sectors.');
+      console.info('\nNo sectors found. Please run "npm run seed" first to seed sectors.');
       return;
     }
 
