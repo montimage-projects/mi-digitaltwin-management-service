@@ -58,7 +58,7 @@ run_seed() {
             wait_for_mongodb
 
             # Run the seed script
-            if npx tsx src/seed/index.ts; then
+            if node dist/seed/index.js; then
                 # Create marker file to prevent re-seeding
                 touch "$SEED_MARKER" 2>/dev/null || true
                 echo "Database seeding completed successfully!"
