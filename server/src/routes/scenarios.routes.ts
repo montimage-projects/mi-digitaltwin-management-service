@@ -2,10 +2,18 @@ import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { Scenario } from '../models/Scenario.js';
 import { Project } from '../models/Project.js';
+import { Infrastructure } from '../models/Infrastructure.js';
+import { Service } from '../models/Service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateBody, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { env } from '../config/env.js';
+import {
+  buildClientFromInfrastructure,
+  deployTopology,
+  deriveNamespace,
+  teardownDeployment,
+  type ServiceImageSource,
+} from '../services/kubernetesDeploy.js';
 
 const router: RouterType = Router();
 
@@ -218,26 +226,114 @@ router.post('/scenarios/:id/execute', authMiddleware, async (req, res, next) => 
       throw new AppError('Scenario has no infrastructure assigned', 400);
     }
 
-    // Create execution record
-    const execution = {
+    const infrastructure = await Infrastructure.findById(scenario.infrastructureId);
+    if (!infrastructure) {
+      throw new AppError('Assigned infrastructure not found', 400);
+    }
+
+    // Resolve the services referenced by the topology nodes.
+    const nodes = scenario.topology?.nodes ?? [];
+    const serviceIds = [
+      ...new Set(
+        nodes
+          .map((n) => (n as { data?: { serviceId?: string } }).data?.serviceId)
+          .filter((sid): sid is string => Boolean(sid))
+      ),
+    ];
+    const services = await Service.find({ _id: { $in: serviceIds } }).lean();
+
+    // Create the execution record up front so we have an id for the namespace.
+    scenario.executions.push({
       executedAt: new Date(),
       executedBy: user?.username || 'admin',
-      status: 'pending' as const,
+      status: 'pending',
       deployedServices: [],
-    };
-
-    scenario.executions.push(execution);
+    });
     await scenario.save();
 
-    const executionId = scenario.executions[scenario.executions.length - 1]._id;
+    const execution = scenario.executions[scenario.executions.length - 1];
+    const executionId = execution._id!.toString();
+    const namespace = deriveNamespace(id, executionId);
 
-    // Construct MAESTRO URL
-    const maestroUrl = `${env.MAESTRO_BASE_URL}?scenarioId=${id}&executionId=${executionId}`;
+    try {
+      const clients = buildClientFromInfrastructure(infrastructure);
+      const result = await deployTopology(clients, {
+        namespace,
+        nodes,
+        services: services as unknown as ServiceImageSource[],
+        endpoint: infrastructure.endpoint,
+      });
+
+      execution.namespace = result.namespace;
+      execution.status = 'running';
+      execution.deployedServices = result.services.map((s) => ({
+        serviceId:
+          s.serviceId as unknown as (typeof execution.deployedServices)[number]['serviceId'],
+        nodeId: s.nodeId,
+        name: s.name,
+        uiType: s.uiType,
+        status: s.status,
+        dashboardUrl: s.dashboardUrl,
+      }));
+      await scenario.save();
+
+      res.json({
+        executionId,
+        namespace: result.namespace,
+        status: execution.status,
+        services: result.services,
+      });
+    } catch (deployError) {
+      // Surface the deploy failure but leave a durable, failed execution record.
+      execution.namespace = namespace;
+      execution.status = 'failed';
+      await scenario.save();
+      throw deployError;
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /api/scenarios/:id/executions/:executionId - Tear down a deployment
+router.delete('/scenarios/:id/executions/:executionId', authMiddleware, async (req, res, next) => {
+  try {
+    const { id, executionId } = req.params;
+
+    const parseResult1 = objectIdSchema.safeParse(id);
+    const parseResult2 = objectIdSchema.safeParse(executionId);
+    if (!parseResult1.success || !parseResult2.success) {
+      throw new AppError('Invalid ID', 400);
+    }
+
+    const scenario = await Scenario.findById(id);
+    if (!scenario) {
+      throw new AppError('Scenario not found', 404);
+    }
+
+    const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
+    if (!execution) {
+      throw new AppError('Execution not found', 404);
+    }
+
+    // Only reach the cluster when something was actually deployed.
+    if (execution.namespace) {
+      const infrastructure = await Infrastructure.findById(scenario.infrastructureId);
+      if (!infrastructure) {
+        throw new AppError('Assigned infrastructure not found', 400);
+      }
+      const clients = buildClientFromInfrastructure(infrastructure);
+      await teardownDeployment(clients, execution.namespace);
+    }
+
+    execution.status = 'completed';
+    await scenario.save();
 
     res.json({
       executionId,
-      maestroUrl,
-      status: 'pending',
+      namespace: execution.namespace,
+      status: execution.status,
+      message: 'Deployment torn down',
     });
   } catch (error) {
     next(error);
