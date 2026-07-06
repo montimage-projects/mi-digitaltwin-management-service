@@ -220,6 +220,35 @@ describe('POST /api/scenarios/:id/execute (Kubernetes deploy)', () => {
   });
 });
 
+describe('POST /api/scenarios/:id/execute deploy failure', () => {
+  test('marks the execution failed and surfaces 502 when the cluster rejects the deploy', async () => {
+    if (!mongoAvailable) return;
+
+    const original = clusterCalls.createNamespace;
+    clusterCalls.createNamespace = mock(async () => {
+      throw new ApiException(403, 'forbidden', { message: 'namespace quota exceeded' });
+    });
+
+    try {
+      const res = await fetch(`${baseUrl}/api/scenarios/${scenarioId}/execute`, {
+        method: 'POST',
+        headers: authHeader,
+      });
+      expect(res.status).toBe(502);
+
+      // A durable, failed execution record is left behind with its namespace.
+      const scenario = await Scenario.findById(scenarioId).lean();
+      const failed = scenario?.executions.filter((e) => e.status === 'failed') ?? [];
+      expect(failed.length).toBeGreaterThan(0);
+      const latestFailed = failed[failed.length - 1];
+      expect(latestFailed.namespace).toMatch(/^secsim-/);
+      expect(latestFailed.deployedServices).toHaveLength(0);
+    } finally {
+      clusterCalls.createNamespace = original;
+    }
+  });
+});
+
 describe('POST /api/scenarios/:id/execute validation', () => {
   test('rejects a scenario with no infrastructure assigned', async () => {
     if (!mongoAvailable) return;

@@ -96,8 +96,10 @@ async function makeExecution(overrides: {
   status?: 'pending' | 'running' | 'completed' | 'failed';
   namespace?: string;
   withService?: boolean;
+  serviceNames?: string[];
 }): Promise<string> {
   const scenario = await Scenario.findById(scenarioId);
+  const names = overrides.serviceNames ?? ['svc-a'];
   scenario!.executions.push({
     executedAt: new Date(),
     executedBy: 'tester',
@@ -106,15 +108,13 @@ async function makeExecution(overrides: {
     deployedServices:
       overrides.withService === false
         ? []
-        : [
-            {
-              serviceId,
-              nodeId: 'n1',
-              name: 'svc-a',
-              uiType: 'web',
-              status: 'pending',
-            },
-          ],
+        : names.map((name, i) => ({
+            serviceId,
+            nodeId: `n${i + 1}`,
+            name,
+            uiType: 'web',
+            status: 'pending',
+          })),
   });
   await scenario!.save();
   return scenario!.executions[scenario!.executions.length - 1]._id!.toString();
@@ -267,6 +267,82 @@ describe('GET /api/scenarios/:id/executions/:executionId/events (SSE)', () => {
     expect(text).toContain('event: log');
     expect(text).toContain('"line":"hello"');
     expect(text).toContain('"service":"svc-a"');
+    expect(text).toContain('event: end');
+    expect(text).toContain('"status":"completed"');
+
+    // reset shared impl for other tests
+    impl.readNamespacedDeployment = async () => ({
+      spec: { replicas: 1 },
+      status: { availableReplicas: 0 },
+    });
+    impl.listNamespacedPod = async () => ({ items: [] });
+    impl.readNamespacedPodLog = async () => '';
+  });
+
+  test('emits an error event and closes when the cluster fails mid-stream', async () => {
+    if (!mongoAvailable) return;
+    // The status read fails with a non-404 cluster error -> engine wraps it ->
+    // poll catches it -> the stream reports an `error` event and cleans up.
+    impl.readNamespacedDeployment = async () => {
+      throw new ApiException(500, 'internal server error', { message: 'etcd unavailable' });
+    };
+
+    const executionId = await makeExecution({ status: 'running' });
+
+    const res = await fetch(
+      `${baseUrl}/api/scenarios/${scenarioId}/executions/${executionId}/events`,
+      { headers: authHeader }
+    );
+    expect(res.status).toBe(200);
+
+    const text = await drain(res);
+    expect(text).toContain('event: error');
+    expect(text).toContain('etcd unavailable');
+    expect(text).not.toContain('event: end');
+
+    // reset shared impl for other tests
+    impl.readNamespacedDeployment = async () => ({
+      spec: { replicas: 1 },
+      status: { availableReplicas: 0 },
+    });
+  });
+
+  test('tags streamed log lines with their originating service across multiple services', async () => {
+    if (!mongoAvailable) return;
+    impl.readNamespacedDeployment = async () => ({
+      spec: { replicas: 1 },
+      status: { availableReplicas: 1 }, // both ready -> settled
+    });
+    // Return a distinct pod per service based on the label selector.
+    impl.listNamespacedPod = async (...args: unknown[]) => {
+      const { labelSelector } = (args[0] as { labelSelector?: string }) ?? {};
+      if (labelSelector === 'app=svc-a') return { items: [{ metadata: { name: 'svc-a-pod' } }] };
+      if (labelSelector === 'app=svc-b') return { items: [{ metadata: { name: 'svc-b-pod' } }] };
+      return { items: [] };
+    };
+    impl.readNamespacedPodLog = async (...args: unknown[]) => {
+      const { name } = (args[0] as { name?: string }) ?? {};
+      return name === 'svc-a-pod' ? 'from-a\n' : 'from-b\n';
+    };
+
+    const executionId = await makeExecution({
+      status: 'running',
+      serviceNames: ['svc-a', 'svc-b'],
+    });
+
+    const res = await fetch(
+      `${baseUrl}/api/scenarios/${scenarioId}/executions/${executionId}/events`,
+      { headers: authHeader }
+    );
+    expect(res.status).toBe(200);
+
+    const text = await drain(res);
+    expect(text).toContain('event: log');
+    expect(text).toContain('"service":"svc-a"');
+    expect(text).toContain('"line":"from-a"');
+    expect(text).toContain('"service":"svc-b"');
+    expect(text).toContain('"line":"from-b"');
+    expect(text).toContain('"progress":100');
     expect(text).toContain('event: end');
     expect(text).toContain('"status":"completed"');
 
