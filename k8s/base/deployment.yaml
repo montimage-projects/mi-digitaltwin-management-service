@@ -15,6 +15,14 @@ spec:
   # follow-up work, not part of this change. See "Scaling Considerations" in
   # docs/playbooks/kubernetes-deployment.md.
   replicas: 1
+  # Recreate (not the RollingUpdate default) terminates the existing Pod
+  # before creating its replacement, releasing the ReadWriteOnce app-data
+  # PVC attachment first. Without this, a rolling update tries to schedule
+  # the new Pod (needing the same RWO volume) before the old one exits,
+  # which hangs indefinitely on multi-node clusters if the surge Pod lands
+  # on a different node.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: app
