@@ -338,17 +338,32 @@ curl -X DELETE http://localhost:3000/api/scenarios/scen123 \
 
 #### Execute Scenario
 
+Deploys the scenario's topology directly to the assigned infrastructure's
+Kubernetes cluster. See [Kubernetes Execution](integration/kubernetes-execution.md).
+
 - **POST** `/api/scenarios/:id/execute`
 - **Auth:** Required
-- **Body:** `{ infrastructureId: string, ... }`
-- **Response:** `{ executionId: string, maestroUrl: string }`
+- **Body:** None (the target infrastructure comes from the scenario)
+- **Response:** `{ executionId: string, namespace: string, status: string, services: DeployedService[] }`
 
 ```bash
 curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
- -H "Authorization: Bearer $TOKEN" \
- -H "Content-Type: application/json" \
- -d '{"infrastructureId": "infra123"}'
+ -H "Authorization: Bearer $TOKEN"
 ```
+
+#### Stream Execution Events (SSE)
+
+- **GET** `/api/scenarios/:id/executions/:executionId/events`
+- **Auth:** Required
+- **Content-Type:** `text/event-stream`
+- **Events:** `progress`, `log`, `end`, `error` — see
+  [SSE Events Protocol](integration/kubernetes-execution.md#sse-events-protocol)
+
+#### Tear Down Execution
+
+- **DELETE** `/api/scenarios/:id/executions/:executionId`
+- **Auth:** Required
+- **Response:** `{ executionId, namespace, status: "completed", message }`
 
 ### Infrastructures
 

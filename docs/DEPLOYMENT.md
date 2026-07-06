@@ -81,9 +81,6 @@ MONGODB_PASSWORD=secure_password_here
 JWT_SECRET=your-very-secure-random-secret-key
 CORS_ORIGIN=https://yourdomain.com
 
-# Optional
-MAESTRO_URL=https://maestro-orchestrator-url
-MAESTRO_API_KEY=your-api-key
 ```
 
 > **Branding in the Compose path.** `BRANDING_PROFILE`, `APP_NAME`, `ORG_NAME`, and
