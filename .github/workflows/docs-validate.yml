@@ -222,7 +222,15 @@ jobs:
   summary:
     name: Validation Summary
     runs-on: ubuntu-latest
-    needs: [markdown-lint, link-check, yaml-validation, spelling-check, docs-structure, mermaid-validation]
+    needs:
+      [
+        markdown-lint,
+        link-check,
+        yaml-validation,
+        spelling-check,
+        docs-structure,
+        mermaid-validation,
+      ]
     if: always()
 
     steps:

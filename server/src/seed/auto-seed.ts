@@ -113,6 +113,6 @@ export async function autoSeedIfEmpty(): Promise<void> {
   } catch (error) {
     console.error(`${colors.yellow}[SEED]${colors.reset} Seeding failed:`, error);
     // Don't throw - allow server to start even if seeding fails
-    // The user can manually run `bun run seed` later
+    // The user can manually run `npm run seed` later
   }
 }

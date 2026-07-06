@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'bun:test';
+import { describe, test, expect } from 'vitest';
 import type { Model, Document } from 'mongoose';
 import { upsertRecord, deprecateStale } from '../sync-helpers.js';
 

@@ -6,15 +6,14 @@ Complete guide to setting up your development environment and contributing to th
 
 Install these before starting:
 
-- **Bun** v1.0+ - Download from [bun.sh](https://bun.sh)
+- **Node.js** 20+ - Download from [nodejs.org](https://nodejs.org)
 - **Docker & Docker Compose** - Download from [docker.com](https://www.docker.com)
-- **Node.js** 18+ (optional fallback) - Download from [nodejs.org](https://nodejs.org)
 - **Git** - For version control
 
 **Verify installation:**
 
 ```bash
-bun --version # Should be 1.0 or higher
+node --version # Should be 20.0 or higher
 docker --version # Should be 20.0 or higher
 docker-compose --version
 ```
@@ -29,7 +28,7 @@ git clone <repo-url>
 cd service-repository-digitaltwin-management-platform
 
 # Install root dependencies (optional, for monorepo scripts)
-bun install
+npm install
 ```
 
 ### 2. Start Database
@@ -49,13 +48,13 @@ cd server
 cp .env.example .env
 
 # Install dependencies
-bun install
+npm install
 
 # Seed database with initial data
-bun run seed
+npm run seed
 
 # Start development server (port 3000)
-bun run dev
+npm run dev
 ```
 
 ### 4. Setup Frontend (Terminal 2)
@@ -65,10 +64,10 @@ cd client
 cp .env.example .env
 
 # Install dependencies
-bun install
+npm install
 
 # Start Vite dev server (port 5173)
-bun run dev
+npm run dev
 ```
 
 ### 5. Access Application
@@ -86,15 +85,15 @@ bun run dev
 
 ```bash
 cd server
-bun run dev # Start with hot reload
-bun run lint # Check code style
-bun run format # Fix formatting
+npm run dev # Start with hot reload
+npm run lint # Check code style
+npm run format # Fix formatting
 ```
 
 **Key Commands:**
 
-- `bun run seed` - Reset database with initial data
-- `bun run start` - Production build
+- `npm run seed` - Reset database with initial data
+- `npm run start` - Production build
 
 **Structure:**
 
@@ -108,7 +107,7 @@ bun run format # Fix formatting
 
 ```bash
 # Run tests (if available)
-bun test
+npm test
 ```
 
 See [Backend Architecture](architecture/backend.md) for detailed structure.
@@ -119,17 +118,17 @@ See [Backend Architecture](architecture/backend.md) for detailed structure.
 
 ```bash
 cd client
-bun run dev # Start with HMR hot reload
-bun run lint # Check code style
-bun run format # Fix formatting
-bun run build # Production build
-bun run preview # Preview production build
+npm run dev # Start with HMR hot reload
+npm run lint # Check code style
+npm run format # Fix formatting
+npm run build # Production build
+npm run preview # Preview production build
 ```
 
 **Key Commands:**
 
-- `bun run build` - TypeScript check + Vite build
-- `bun run preview` - Serve production build locally
+- `npm run build` - TypeScript check + Vite build
+- `npm run preview` - Serve production build locally
 
 **Structure:**
 
@@ -149,20 +148,20 @@ All code must follow project conventions before committing.
 
 ```bash
 # Format all files in a module
-cd server && bun run format
-cd client && bun run format
+cd server && npm run format
+cd client && npm run format
 ```
 
 ### Code Quality Checks
 
 ```bash
 # Lint code
-cd server && bun run lint
-cd client && bun run lint
+cd server && npm run lint
+cd client && npm run lint
 
 # Fix lint issues automatically
-cd server && bun run lint -- --fix
-cd client && bun run lint -- --fix
+cd server && npm run lint -- --fix
+cd client && npm run lint -- --fix
 ```
 
 ### Style Guidelines
@@ -219,11 +218,11 @@ git pull origin main
 git checkout -b feature/your-feature-name
 
 # 3. Make your changes and test locally
-bun run dev # Test in both client and server terminals
+npm run dev # Test in both client and server terminals
 
 # 4. Format and lint
-cd server && bun run format && bun run lint -- --fix
-cd client && bun run format && bun run lint -- --fix
+cd server && npm run format && npm run lint -- --fix
+cd client && npm run format && npm run lint -- --fix
 
 # 5. Stage and commit
 git add .
@@ -259,26 +258,26 @@ test: Add unit tests for authentication middleware
 
 ```bash
 # Run all tests
-cd server && bun test
+cd server && npm test
 
 # Run specific test file
-cd server && bun test path/to/test.ts
+cd server && npm test path/to/test.ts
 
 # Watch mode
-cd server && bun test --watch
+cd server && npm test --watch
 ```
 
 ### Frontend Testing
 
 ```bash
 # Run all tests
-cd client && bun test
+cd client && npm test
 
 # Run specific test file
-cd client && bun test path/to/test.ts
+cd client && npm test path/to/test.ts
 
 # Watch mode
-cd client && bun test --watch
+cd client && npm test --watch
 ```
 
 ### Manual Testing
@@ -302,7 +301,7 @@ See [API Reference](API.md) for all endpoints.
 
 ```bash
 # Start with V8 debugger
-bun run --inspect-wait dev
+npm run --inspect-wait dev
 
 # Then connect debugger in VS Code or Chrome DevTools
 # chrome://inspect or VS Code debugger
@@ -367,16 +366,16 @@ docker-compose logs mongodb
 
 ```bash
 # Update all dependencies
-cd server && bun upgrade
-cd client && bun upgrade
+cd server && npm update
+cd client && npm update
 ```
 
 **Strange behavior after git pull?**
 
 ```bash
 # Clean install dependencies
-cd server && rm -rf node_modules && bun install
-cd client && rm -rf node_modules && bun install
+cd server && rm -rf node_modules && npm install
+cd client && rm -rf node_modules && npm install
 ```
 
 See [Troubleshooting Guide](troubleshooting/common-issues.md) for more solutions.
@@ -410,7 +409,7 @@ See [Troubleshooting Guide](troubleshooting/common-issues.md) for more solutions
 
 - Built-in ESLint and Prettier support
 - Enable React and TypeScript plugins
-- Configure run configurations for `bun run dev`
+- Configure run configurations for `npm run dev`
 
 ## Architecture Overview
 

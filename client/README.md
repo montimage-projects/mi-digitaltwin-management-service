@@ -8,20 +8,20 @@ The client is a single-page application (SPA) built with React, TypeScript, and 
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) 1.0+ (or Node.js 18+)
+- [Node.js](https://nodejs.org/) 20+
 - Backend server running (see [server/README.md](../server/README.md))
 
 ## Quick Start
 
 ```bash
 # Install dependencies
-bun install
+npm install
 
 # Configure environment
 cp .env.example .env
 
 # Start development server
-bun run dev
+npm run dev
 ```
 
 The application will be available at `http://localhost:5173`.
@@ -30,11 +30,11 @@ The application will be available at `http://localhost:5173`.
 
 | Script               | Description                                        |
 | -------------------- | -------------------------------------------------- |
-| `bun run dev`        | Start Vite development server with HMR             |
-| `bun run build`      | Build for production (runs TypeScript check first) |
-| `bun run preview`    | Preview production build locally                   |
-| `bun run lint`       | Run ESLint                                         |
-| `bun run lint --fix` | Fix auto-fixable lint issues                       |
+| `npm run dev`        | Start Vite development server with HMR             |
+| `npm run build`      | Build for production (runs TypeScript check first) |
+| `npm run preview`    | Preview production build locally                   |
+| `npm run lint`       | Run ESLint                                         |
+| `npm run lint --fix` | Fix auto-fixable lint issues                       |
 
 ## Project Structure
 
@@ -82,17 +82,17 @@ src/
 
 ```bash
 # Run tests
-bun test
+npm test
 
 # Run tests with coverage
-bun test --coverage
+npm test --coverage
 ```
 
 ## Building for Production
 
 ```bash
 # Build
-bun run build
+npm run build
 
 # Output will be in dist/
 ```
@@ -139,14 +139,14 @@ Check browser console for errors. Common causes:
 
 ```bash
 # Restart dev server
-bun run dev
+npm run dev
 ```
 
 ### Type Errors
 
 ```bash
 # Run type check
-bunx tsc --noEmit
+npx tsc --noEmit
 ```
 
 ## Next Steps

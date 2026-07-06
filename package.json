@@ -16,26 +16,26 @@
     "server"
   ],
   "scripts": {
-    "dev": "concurrently \"bun run dev:server\" \"bun run dev:client\"",
-    "dev:server": "cd server && bun run dev",
-    "dev:client": "cd client && bun run dev",
-    "build": "bun run build:client && bun run build:server",
-    "build:client": "cd client && bun run build",
-    "build:server": "cd server && bunx tsc --noEmit",
-    "lint": "bun run lint:client && bun run lint:server",
-    "lint:client": "cd client && bun run lint",
-    "lint:server": "cd server && bun run lint",
-    "lint:fix": "bun run lint:fix:client && bun run lint:fix:server",
-    "lint:fix:client": "cd client && bun run lint --fix",
-    "lint:fix:server": "cd server && bun run lint --fix",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "cd client && npm run build",
+    "build:server": "cd server && npx tsc --noEmit",
+    "lint": "npm run lint:client && npm run lint:server",
+    "lint:client": "cd client && npm run lint",
+    "lint:server": "cd server && npm run lint",
+    "lint:fix": "npm run lint:fix:client && npm run lint:fix:server",
+    "lint:fix:client": "cd client && npm run lint --fix",
+    "lint:fix:server": "cd server && npm run lint --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore --ignore-path .prettierignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\" --ignore-path .gitignore --ignore-path .prettierignore",
-    "security": "bun pm scan",
-    "typecheck": "bun run typecheck:client && bun run typecheck:server",
-    "typecheck:client": "cd client && bunx tsc --noEmit",
-    "typecheck:server": "cd server && bunx tsc --noEmit",
-    "test": "bun run test:server",
-    "test:server": "cd server && bun run test",
+    "security": "npm audit",
+    "typecheck": "npm run typecheck:client && npm run typecheck:server",
+    "typecheck:client": "cd client && npx tsc --noEmit",
+    "typecheck:server": "cd server && npx tsc --noEmit",
+    "test": "npm run test:server",
+    "test:server": "cd server && npm run test",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -47,17 +47,17 @@
   "lint-staged": {
     "client/src/**/*.{ts,tsx}": [
       "prettier --write",
-      "cd client && bunx eslint --fix --max-warnings=0"
+      "cd client && npx eslint --fix --max-warnings=0"
     ],
     "server/src/**/*.ts": [
       "prettier --write",
-      "cd server && bunx eslint --fix --max-warnings=0"
+      "cd server && npx eslint --fix --max-warnings=0"
     ],
     "*.{js,json,md,css}": [
       "prettier --write"
     ]
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

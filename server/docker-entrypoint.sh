@@ -23,7 +23,7 @@ wait_for_mongodb() {
 
     while [ $attempt -lt $max_attempts ]; do
         # Try to connect to MongoDB using a simple health check
-        if bun -e "
+        if node -e "
             const mongoose = require('mongoose');
             mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/intact', {
                 serverSelectionTimeoutMS: 2000
@@ -58,7 +58,7 @@ run_seed() {
             wait_for_mongodb
 
             # Run the seed script
-            if bun src/seed/index.ts; then
+            if node dist/seed/index.js; then
                 # Create marker file to prevent re-seeding
                 touch "$SEED_MARKER" 2>/dev/null || true
                 echo "Database seeding completed successfully!"
