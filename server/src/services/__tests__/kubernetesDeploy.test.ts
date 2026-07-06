@@ -23,9 +23,10 @@ class ApiException extends Error {
 }
 
 // Records how `buildClientFromInfrastructure` loaded the KubeConfig.
-const kubeconfigCalls: { fromString: string[]; fromOptions: unknown[] } = {
+const kubeconfigCalls: { fromString: string[]; fromOptions: unknown[]; throwOnLoad: boolean } = {
   fromString: [],
   fromOptions: [],
+  throwOnLoad: false,
 };
 
 class CoreV1Api {}
@@ -33,6 +34,11 @@ class AppsV1Api {}
 
 class KubeConfig {
   loadFromString(config: string): void {
+    if (kubeconfigCalls.throwOnLoad) {
+      throw new Error(
+        'Error: unable to parse kubeconfig: yaml: line 2: mapping values not allowed'
+      );
+    }
     kubeconfigCalls.fromString.push(config);
   }
   loadFromOptions(options: unknown): void {
@@ -99,6 +105,19 @@ describe('deriveNamespace', () => {
     expect(ns).toMatch(/^[a-z0-9-]+$/);
     expect(ns).toBe('secsim-abc123-xyz');
   });
+
+  test('truncates very long ids and stays a valid, <=63-char DNS-1123 label', () => {
+    const ns = deriveNamespace('a'.repeat(200), 'b'.repeat(200));
+    expect(ns.length).toBeLessThanOrEqual(63);
+    expect(ns).toMatch(/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/);
+    // Each id contributes at most a 12-char segment.
+    expect(ns).toBe(`secsim-${'a'.repeat(12)}-${'b'.repeat(12)}`);
+  });
+
+  test('falls back to scn/exec segments when ids have no usable characters', () => {
+    const ns = deriveNamespace('!!!', '@@@');
+    expect(ns).toBe('secsim-scn-exec');
+  });
 });
 
 describe('resolveTopologyNodes', () => {
@@ -125,6 +144,40 @@ describe('resolveTopologyNodes', () => {
   test('generates an RFC-1035-safe resource name from an unfriendly node id', () => {
     const resolved = resolveTopologyNodes([makeNode('1_Weird.Node')], [makeService()]);
     expect(resolved[0].name).toMatch(/^[a-z]([-a-z0-9]*[a-z0-9])?$/);
+  });
+
+  test('resolves a multi-node topology, one entry per node in order', () => {
+    const resolved = resolveTopologyNodes(
+      [makeNode('web-a'), makeNode('web-b'), makeNode('web-c')],
+      [makeService()]
+    );
+    expect(resolved.map((r) => r.name)).toEqual(['web-a', 'web-b', 'web-c']);
+  });
+
+  test('falls back to the last version when neither node nor currentVersion match', () => {
+    const service = makeService({
+      currentVersion: 'nonexistent',
+      versions: [
+        { version: '1.0.0', dockerImage: 'registry.example/app:1.0.0' },
+        { version: '2.0.0', dockerImage: 'registry.example/app:2.0.0' },
+      ],
+    });
+    const resolved = resolveTopologyNodes([makeNode('n1')], [service]);
+    expect(resolved[0].image).toBe('registry.example/app:2.0.0');
+  });
+
+  test('assigns an index-based node id and name when a node has none', () => {
+    const resolved = resolveTopologyNodes([{ data: { serviceId: SERVICE_ID } }], [makeService()]);
+    expect(resolved[0].nodeId).toBe('node-0');
+    // "node-0" starts with a letter, so it is a valid resource name as-is.
+    expect(resolved[0].name).toBe('node-0');
+  });
+
+  test('does not deduplicate colliding node ids (caller owns uniqueness)', () => {
+    const resolved = resolveTopologyNodes([makeNode('dup'), makeNode('dup')], [makeService()]);
+    expect(resolved).toHaveLength(2);
+    expect(resolved[0].name).toBe('dup');
+    expect(resolved[1].name).toBe('dup');
   });
 
   test('throws AppError(400) when a node has no serviceId', () => {
@@ -201,6 +254,47 @@ describe('deployTopology', () => {
     expect(result.services[0].dashboardUrl).toBe('http://10.0.0.1:31567');
   });
 
+  test('creates a deployment + service for every node in a multi-node topology', async () => {
+    const clients = makeClients();
+    const result = await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [makeNode('web-a'), makeNode('web-b')],
+      services: [makeService()],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    expect(clients.apps.createNamespacedDeployment).toHaveBeenCalledTimes(2);
+    expect(clients.core.createNamespacedService).toHaveBeenCalledTimes(2);
+    expect(result.services).toHaveLength(2);
+    expect(result.services.map((s) => s.name)).toEqual(['web-a', 'web-b']);
+  });
+
+  test('derives the dashboard host from a non-URL endpoint (fallback path)', async () => {
+    const clients = makeClients();
+    const result = await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [makeNode('web-a')],
+      services: [makeService()],
+      endpoint: 'my-cluster-host',
+    });
+    expect(result.services[0].dashboardUrl).toBe('http://my-cluster-host:31567');
+  });
+
+  test('omits the dashboard url when the service has no assigned nodePort', async () => {
+    const clients = makeClients();
+    clients.core.createNamespacedService = mock(async () => ({
+      spec: { ports: [{}] },
+    })) as unknown as typeof clients.core.createNamespacedService;
+    const result = await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [makeNode('web-a')],
+      services: [makeService()],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    expect(result.services[0].nodePort).toBeUndefined();
+    expect(result.services[0].dashboardUrl).toBeUndefined();
+  });
+
   test('surfaces a Kubernetes API failure as AppError(502)', async () => {
     const clients = makeClients();
     clients.core.createNamespace = mock(async () => {
@@ -256,6 +350,68 @@ describe('getDeploymentStatus', () => {
       { name: 'broken', status: 'failed' },
     ]);
     expect(progress).toBe(50);
+  });
+
+  test('reports failed when a pod has reached the Failed phase', async () => {
+    const clients = {
+      core: {
+        listNamespacedPod: mock(async () => ({ items: [{ status: { phase: 'Failed' } }] })),
+      },
+      apps: {
+        readNamespacedDeployment: mock(async () => ({
+          spec: { replicas: 1 },
+          status: { availableReplicas: 0 },
+        })),
+      },
+    };
+
+    const { statuses, progress } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['boom'],
+    });
+    expect(statuses).toEqual([{ name: 'boom', status: 'failed' }]);
+    expect(progress).toBe(0);
+  });
+
+  test('reports pending while a deployment has no available replicas and healthy pods', async () => {
+    const clients = {
+      core: {
+        listNamespacedPod: mock(async () => ({
+          items: [{ status: { phase: 'Pending', containerStatuses: [{ state: {} }] } }],
+        })),
+      },
+      apps: {
+        readNamespacedDeployment: mock(async () => ({
+          spec: { replicas: 1 },
+          status: { availableReplicas: 0 },
+        })),
+      },
+    };
+
+    const { statuses, progress } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['warming-up'],
+    });
+    expect(statuses).toEqual([{ name: 'warming-up', status: 'pending' }]);
+    expect(progress).toBe(0);
+  });
+
+  test('surfaces a non-404 status read failure as AppError(502)', async () => {
+    const clients = {
+      core: { listNamespacedPod: mock(async () => ({ items: [] })) },
+      apps: {
+        readNamespacedDeployment: mock(async () => {
+          throw new ApiException(500, 'boom');
+        }),
+      },
+    };
+    try {
+      await getDeploymentStatus(clients as never, { namespace: 'secsim-a-b', names: ['x'] });
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppError);
+      expect((err as AppError).statusCode).toBe(502);
+    }
   });
 
   test('treats a not-found deployment as pending', async () => {
@@ -372,6 +528,57 @@ describe('collectNewPodLogs', () => {
     expect(out).toEqual([]);
   });
 
+  test('skips a pod whose logs have already been removed (404)', async () => {
+    const clients = {
+      core: {
+        listNamespacedPod: mock(async () => ({ items: [{ metadata: { name: 'p' } }] })),
+        readNamespacedPodLog: mock(async () => {
+          throw new ApiException(404, 'pod not found');
+        }),
+      },
+      apps: {},
+    };
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['svc-a'],
+      seen: new Map(),
+    });
+    expect(out).toEqual([]);
+  });
+
+  test('emits a final line that has no trailing newline', async () => {
+    const clients = {
+      core: {
+        listNamespacedPod: mock(async () => ({ items: [{ metadata: { name: 'svc-a-pod' } }] })),
+        readNamespacedPodLog: mock(async () => 'only-line'),
+      },
+      apps: {},
+    };
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['svc-a'],
+      seen: new Map(),
+    });
+    expect(out).toEqual([{ name: 'svc-a', pod: 'svc-a-pod', line: 'only-line' }]);
+  });
+
+  test('ignores pods without a metadata name', async () => {
+    const clients = {
+      core: {
+        listNamespacedPod: mock(async () => ({ items: [{ metadata: {} }] })),
+        readNamespacedPodLog: mock(async () => 'unreachable'),
+      },
+      apps: {},
+    };
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['svc-a'],
+      seen: new Map(),
+    });
+    expect(out).toEqual([]);
+    expect(clients.core.readNamespacedPodLog).not.toHaveBeenCalled();
+  });
+
   test('wraps an unexpected cluster error as AppError(502)', async () => {
     const clients = {
       core: {
@@ -422,6 +629,7 @@ describe('buildClientFromInfrastructure', () => {
   beforeEach(() => {
     kubeconfigCalls.fromString = [];
     kubeconfigCalls.fromOptions = [];
+    kubeconfigCalls.throwOnLoad = false;
   });
 
   function infra(credential: string, endpoint = 'https://10.0.0.1:6443'): IInfrastructure {
@@ -435,6 +643,29 @@ describe('buildClientFromInfrastructure', () => {
     buildClientFromInfrastructure(infra('apiVersion: v1\nclusters: []'));
     expect(kubeconfigCalls.fromString).toHaveLength(1);
     expect(kubeconfigCalls.fromOptions).toHaveLength(0);
+  });
+
+  test('loads JSON-shaped kubeconfig content directly', () => {
+    buildClientFromInfrastructure(infra('{"apiVersion":"v1","clusters":[]}'));
+    expect(kubeconfigCalls.fromString).toHaveLength(1);
+    expect(kubeconfigCalls.fromOptions).toHaveLength(0);
+  });
+
+  test('treats content mentioning clusters: as kubeconfig even without a leading key', () => {
+    buildClientFromInfrastructure(infra('# my cluster\nclusters:\n- name: c'));
+    expect(kubeconfigCalls.fromString).toHaveLength(1);
+    expect(kubeconfigCalls.fromOptions).toHaveLength(0);
+  });
+
+  test('wraps a malformed kubeconfig parse failure in an AppError(500)', () => {
+    kubeconfigCalls.throwOnLoad = true;
+    try {
+      buildClientFromInfrastructure(infra('apiVersion: v1\n\tbad: indent'));
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppError);
+      expect((err as AppError).statusCode).toBe(500);
+    }
   });
 
   test('builds a token-based config from a bearer token credential', () => {
