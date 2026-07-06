@@ -1,0 +1,69 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: montimage-dev
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+# In-cluster MongoDB (StatefulSet + headless Service) — same as prod, just
+# with smaller resource requests/limits below (dev clusters are typically
+# resource-constrained: kind, minikube, k3d, ...).
+components:
+  - ../../components/mongodb
+
+patches:
+  # Same reasoning as ../prod/kustomization.yaml: point the app at the
+  # in-cluster MongoDB bundled via the component instead of the Secret-
+  # sourced value used for the atlas overlay's external database.
+  # NOTE: index 3 assumes the containers[0].env order defined in
+  # ../../base/deployment.yaml — keep in sync if that order changes.
+  - target:
+      kind: Deployment
+      name: app
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/3
+        value:
+          name: MONGODB_URI
+          value: mongodb://mongodb:27017/intact
+
+  # NODE_ENV=development for the app.
+  - target:
+      kind: ConfigMap
+      name: app-config
+    patch: |-
+      - op: replace
+        path: /data/NODE_ENV
+        value: development
+
+  # Smaller footprint for the app container.
+  - target:
+      kind: Deployment
+      name: app
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 250m
+            memory: 512Mi
+
+  # Smaller footprint for the bundled MongoDB.
+  - target:
+      kind: StatefulSet
+      name: mongodb
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 250m
+            memory: 512Mi

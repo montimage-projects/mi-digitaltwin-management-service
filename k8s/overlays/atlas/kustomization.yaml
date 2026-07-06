@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: montimage-atlas
+
+# No mongodb component here: this overlay uses an external MongoDB (e.g.
+# MongoDB Atlas) rather than an in-cluster one. ../../base/deployment.yaml
+# already sources MONGODB_URI from the Secret by default — supply your real
+# Atlas connection string as MONGODB_URI in your k8s/base/secret.yaml
+# (copied from secret.example.yaml) before deploying this overlay.
+resources:
+  - namespace.yaml
+  - ../../base

@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: montimage-prod
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+# In-cluster MongoDB (StatefulSet + headless Service).
+components:
+  - ../../components/mongodb
+
+# Point the app at the in-cluster MongoDB Service bundled via the component
+# above, instead of the Secret-sourced value ../../base/deployment.yaml uses
+# by default (that default is for the atlas overlay's external, credential-
+# bearing connection string). This replaces the whole env entry so the
+# container doesn't end up with both `value` and `valueFrom` set.
+# NOTE: index 3 assumes the containers[0].env order defined in
+# ../../base/deployment.yaml (JWT_SECRET, ADMIN_PASSWORD, ENCRYPTION_KEY,
+# MONGODB_URI) — keep this patch's index in sync if that order changes.
+patches:
+  - target:
+      kind: Deployment
+      name: app
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/3
+        value:
+          name: MONGODB_URI
+          value: mongodb://mongodb:27017/intact
