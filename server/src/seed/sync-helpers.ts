@@ -82,7 +82,18 @@ export async function upsertRecord<TDoc extends Document>(
   filter: Record<string, unknown>,
   desiredFields: Record<string, unknown>
 ): Promise<UpsertAction> {
-  const existing = await model.findOne(filter as FilterQuery<TDoc>);
+  // `.lean()` is required here: without it, `findOne` returns a hydrated
+  // Mongoose Document, and hydration applies each field's schema `default`
+  // (e.g. `seedManaged: { type: Boolean, default: false }` on Category/
+  // Service/Partner) to any path absent from the stored document. That makes
+  // a legacy record that never had `seedManaged` stored read back identically
+  // to a record with an explicit `seedManaged: false`, so the guard below
+  // couldn't tell "truly missing" from "explicitly false" and silently
+  // skipped backfilling legacy records. `.lean()` returns the plain,
+  // truly-stored value instead (`undefined` when the field was never
+  // written), matching the convention already used for read-only queries
+  // across `server/src/routes/*.routes.ts`.
+  const existing = await model.findOne(filter as FilterQuery<TDoc>).lean();
 
   if (!existing) {
     // `filter` carries the match key (e.g. `shortName`/`slug`), which may or
