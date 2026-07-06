@@ -1,4 +1,4 @@
-import { LogOut, User, Sun, Moon } from 'lucide-react';
+import { LogOut, User, Sun, Moon, Menu } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useThemeStore } from '@/store/theme-store';
 import { APP_NAME, APP_NAME_SHORT, LOGO_SRC, LOGO_ALT, LOGO_BACKDROP } from '@/lib/branding';
@@ -12,7 +12,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-export function Header() {
+interface HeaderProps {
+  /** Opens the mobile navigation drawer; only rendered below the lg breakpoint. */
+  onMenuClick?: () => void;
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
 
@@ -24,6 +29,18 @@ export function Header() {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-6">
       <div className="flex min-w-0 items-center gap-3">
+        {onMenuClick && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={onMenuClick}
+            title="Open navigation"
+            aria-label="Open navigation"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        )}
         <img
           src={LOGO_SRC}
           alt={LOGO_ALT}

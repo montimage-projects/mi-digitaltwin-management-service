@@ -25,9 +25,11 @@ const navigation = [
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  /** Invoked when a nav link is activated — lets the mobile drawer close itself. */
+  onNavigate?: () => void;
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const location = useLocation();
 
   return (
@@ -69,6 +71,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <Link
               key={item.name}
               to={item.href}
+              onClick={onNavigate}
               title={collapsed ? item.name : undefined}
               className={cn(
                 'flex items-center rounded-md text-sm font-medium transition-colors',
