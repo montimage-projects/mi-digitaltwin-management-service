@@ -87,6 +87,13 @@ Branding resolves at **build time** on the client (`VITE_*` values are baked int
 the bundle) and at **boot time** on the server. Changing a value therefore
 requires rebuilding the client and restarting the server.
 
+In the Docker Compose deployment path, the server-side `BRANDING_PROFILE`,
+`APP_NAME`, `ORG_NAME`, and `ORG_URL` variables are now forwarded from the root
+`.env` into the container by `docker-compose.prod.yml` and
+`docker-compose.atlas.yml`; client-side `VITE_*` branding still requires building
+the client with a matching `VITE_BRANDING_PROFILE`, which the unified image's
+client-builder stage does not currently forward.
+
 ### Shipped Profiles
 
 | Profile      | App name                          | Logo / Favicon                                              |
