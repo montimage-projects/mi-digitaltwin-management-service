@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Play, ExternalLink, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { scenariosApi, Execution } from '@/lib/api';
+import { Rocket, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { scenariosApi, Execution, ExecuteResult } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -21,7 +21,7 @@ interface ExecutionPanelProps {
   executions: Execution[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onExecutionStart?: (maestroUrl: string, executionId: string) => void;
+  onExecutionStart?: (result: ExecuteResult) => void;
 }
 
 const statusIcons: Record<string, React.ReactNode> = {
@@ -48,19 +48,12 @@ export function ExecutionPanel({
     mutationFn: () => scenariosApi.execute(scenarioId),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['scenario', scenarioId] });
-      toast.success('Execution started');
-      // Open MAESTRO in iframe or new tab
-      if (result.maestroUrl) {
-        if (onExecutionStart) {
-          onExecutionStart(result.maestroUrl, result.executionId);
-          onOpenChange(false); // Close dialog
-        } else {
-          window.open(result.maestroUrl, '_blank');
-        }
-      }
+      toast.success('Deployment started');
+      onExecutionStart?.(result);
+      onOpenChange(false); // Close dialog and hand off to the live console
     },
     onError: (error: Error) => {
-      toast.error(`Failed to start execution: ${error.message}`);
+      toast.error(`Failed to start deployment: ${error.message}`);
     },
   });
 
@@ -95,28 +88,29 @@ export function ExecutionPanel({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Execute Scenario</DialogTitle>
+          <DialogTitle>Deploy Scenario</DialogTitle>
           <DialogDescription>
             {scenarioTitle} - Target: {infrastructureName || 'Not configured'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Execute Button */}
+          {/* Deploy Button */}
           <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/30">
             <div className="flex-1">
-              <h3 className="font-medium">Start New Execution</h3>
+              <h3 className="font-medium">Start New Deployment</h3>
               <p className="text-sm text-muted-foreground">
-                Deploy the scenario to MAESTRO and open the orchestrator interface
+                Deploy this topology to the target Kubernetes cluster and stream live progress and
+                logs.
               </p>
             </div>
             <Button onClick={handleExecute} disabled={executeMutation.isPending}>
               {executeMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Play className="mr-2 h-4 w-4" />
+                <Rocket className="mr-2 h-4 w-4" />
               )}
-              Execute
+              Deploy
             </Button>
           </div>
 
@@ -154,18 +148,6 @@ export function ExecutionPanel({
                           <Badge variant="outline" className="text-xs">
                             Has Conclusion
                           </Badge>
-                        )}
-                        {execution.maestroSessionId && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Open MAESTRO session
-                            }}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
                         )}
                       </div>
                     </div>
