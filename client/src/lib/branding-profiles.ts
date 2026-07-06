@@ -11,6 +11,7 @@ export interface BrandingProfile {
   appName: string;
   appNameShort: string;
   logoSrc: string;
+  logoAlt: string;
   faviconSrc: string;
 }
 
@@ -19,18 +20,21 @@ export const BRANDING_PROFILES: Record<BrandingProfileName, BrandingProfile> = {
     appName: 'DigitalTwin Management Platform',
     appNameShort: 'Digital Twin Platform',
     logoSrc: '/montimage_logo.png',
+    logoAlt: 'Montimage logo',
     faviconSrc: '/montimage_favicon.png',
   },
   intact: {
     appName: 'DigitalTwin Management Platform',
     appNameShort: 'Digital Twin Platform',
     logoSrc: '/intact_logo.png',
+    logoAlt: 'INTACT logo',
     faviconSrc: '/intact_logo.png',
   },
   secassured: {
     appName: 'secSIM',
     appNameShort: 'secSIM',
     logoSrc: '/secassured_logo.png',
+    logoAlt: 'SecAssured logo',
     faviconSrc: '/secassured_logo.png',
   },
 };
@@ -43,7 +47,9 @@ export const DEFAULT_BRANDING_PROFILE: BrandingProfileName = 'default';
  */
 export function resolveBrandingProfile(name: string | undefined): BrandingProfile {
   const key = (
-    name && name in BRANDING_PROFILES ? name : DEFAULT_BRANDING_PROFILE
+    name && Object.prototype.hasOwnProperty.call(BRANDING_PROFILES, name)
+      ? name
+      : DEFAULT_BRANDING_PROFILE
   ) as BrandingProfileName;
   return BRANDING_PROFILES[key];
 }

@@ -116,6 +116,7 @@ logo/favicon assets referenced must exist in `client/public/`.
 | `VITE_APP_NAME`        | `APP_NAME`      | Application display name                    |
 | `VITE_APP_NAME_SHORT`  | —               | Short app name (tight UI spaces)            |
 | `VITE_LOGO_SRC`        | —               | Logo image path (under `client/public/`)    |
+| `VITE_LOGO_ALT`        | —               | Logo alt text (accessibility)               |
 | `VITE_FAVICON_SRC`     | —               | Favicon image path (under `client/public/`) |
 | `VITE_ORG_NAME`        | `ORG_NAME`      | Owning organization name                    |
 | `VITE_ORG_URL`         | `ORG_URL`       | Owning organization URL                     |

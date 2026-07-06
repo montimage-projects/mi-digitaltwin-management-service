@@ -17,7 +17,7 @@ const envSchema = z.object({
   BRANDING_PROFILE: z.enum(['default', 'intact', 'secassured']).default('default'),
   APP_NAME: z.string().optional(),
   ORG_NAME: z.string().optional(),
-  ORG_URL: z.string().url().optional(),
+  ORG_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
 });
 
 const parseEnv = () => {

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Loader2, Shield, Network, Lock } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { authApi } from '@/lib/api';
-import { APP_NAME, ORG_NAME, LOGO_SRC } from '@/lib/branding';
+import { APP_NAME, LOGO_SRC, LOGO_ALT } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,7 +60,7 @@ export function Login() {
 
           {/* Logo */}
           <div className="login-logo-wrapper">
-            <img src={LOGO_SRC} alt={ORG_NAME} className="login-logo" />
+            <img src={LOGO_SRC} alt={LOGO_ALT} className="login-logo" />
           </div>
 
           {/* Tagline */}
@@ -114,7 +114,7 @@ export function Login() {
         <div className="login-form-wrapper">
           {/* Mobile logo */}
           <div className="login-mobile-logo">
-            <img src={LOGO_SRC} alt={ORG_NAME} />
+            <img src={LOGO_SRC} alt={LOGO_ALT} />
           </div>
 
           <div className="login-form-header">
@@ -289,6 +289,8 @@ export function Login() {
         .login-logo {
           height: 56px;
           width: auto;
+          max-width: 220px;
+          object-fit: contain;
         }
 
         @keyframes fadeSlideUp {
@@ -443,6 +445,8 @@ export function Login() {
         .login-mobile-logo img {
           height: 40px;
           width: auto;
+          max-width: 200px;
+          object-fit: contain;
         }
 
         @media (min-width: 1024px) {

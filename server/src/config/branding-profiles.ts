@@ -15,7 +15,9 @@ const APP_NAMES: Record<BrandingProfileName, string> = {
 
 export function resolveAppName(profileName: string | undefined): string {
   const key = (
-    profileName && profileName in APP_NAMES ? profileName : 'default'
+    profileName && Object.prototype.hasOwnProperty.call(APP_NAMES, profileName)
+      ? profileName
+      : 'default'
   ) as BrandingProfileName;
   return APP_NAMES[key];
 }

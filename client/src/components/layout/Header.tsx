@@ -1,7 +1,7 @@
 import { LogOut, User, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useThemeStore } from '@/store/theme-store';
-import { APP_NAME, APP_NAME_SHORT, ORG_NAME, LOGO_SRC } from '@/lib/branding';
+import { APP_NAME, APP_NAME_SHORT, LOGO_SRC, LOGO_ALT } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,7 +24,11 @@ export function Header() {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-6">
       <div className="flex min-w-0 items-center gap-3">
-        <img src={LOGO_SRC} alt={ORG_NAME} className="h-6 w-auto shrink-0" />
+        <img
+          src={LOGO_SRC}
+          alt={LOGO_ALT}
+          className="h-6 w-auto max-w-[160px] object-contain shrink-0"
+        />
         <h1 className="truncate text-lg font-semibold">
           <span className="hidden sm:inline">{APP_NAME}</span>
           <span className="sm:hidden">{APP_NAME_SHORT}</span>

@@ -18,6 +18,9 @@ export const APP_NAME_SHORT = import.meta.env.VITE_APP_NAME_SHORT || profile.app
 
 export const LOGO_SRC = import.meta.env.VITE_LOGO_SRC || profile.logoSrc;
 
+/** Accessible alt text describing the rendered logo (profile-specific). */
+export const LOGO_ALT = import.meta.env.VITE_LOGO_ALT || profile.logoAlt;
+
 export const FAVICON_SRC = import.meta.env.VITE_FAVICON_SRC || profile.faviconSrc;
 
 export const ORG_NAME = import.meta.env.VITE_ORG_NAME || 'Montimage';
