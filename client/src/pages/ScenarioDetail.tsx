@@ -258,7 +258,7 @@ export function ScenarioDetail() {
       <WorkspaceTabs onTabClick={handleTabClick} />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -276,7 +276,7 @@ export function ScenarioDetail() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -343,17 +343,25 @@ export function ScenarioDetail() {
                   <TabsTrigger value="execution" className="gap-2 data-[state=active]:bg-muted">
                     <Rocket className="h-4 w-4 text-primary" />
                     Execution
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-4 w-4 ml-1 hover:bg-destructive/20"
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Close execution tab"
+                      className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-destructive/20 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleCloseExecution();
                       }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleCloseExecution();
+                        }
+                      }}
                     >
-                      <X className="h-3 w-3" />
-                    </Button>
+                      <X className="h-3.5 w-3.5" />
+                    </span>
                   </TabsTrigger>
                 )}
               </TabsList>
