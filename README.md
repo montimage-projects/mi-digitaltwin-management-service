@@ -128,7 +128,7 @@ Root Documentation
 - **Digital Twin Projects** - Manage projects across critical infrastructure sectors (Telecom, Healthcare, Transportation, Nuclear) (Base on proposal + deliverable)
 - **Visual Topology Editor** - Drag-and-drop scenario design with real-time YAML synchronization
 - **Infrastructure Management** - Configure Kubernetes, Docker, and VM deployment targets (MOCKUP - TO BE COMPLETED)
-- **MAESTRO Integration** - Execute scenarios via the UBITECH orchestrator (MOCKUP - TO BE COMPLETED)
+- **Kubernetes Execution** - Deploy a scenario topology directly to a Kubernetes cluster, with live progress and pod logs streamed over SSE and one-click teardown
 - **Comprehensive Analytics** - Project reports and scenario execution insights
 
 ## Tech Stack

@@ -81,10 +81,10 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 
 ### Integration & Extensibility
 
-| Document                                              | Purpose                       |
-| ----------------------------------------------------- | ----------------------------- |
-| [External Services](integration/external-services.md) | Third-party services and APIs |
-| [MAESTRO Integration](integration/maestro.md)         | Orchestrator setup and usage  |
+| Document                                                    | Purpose                                  |
+| ----------------------------------------------------------- | ---------------------------------------- |
+| [External Services](integration/external-services.md)       | Third-party services and APIs            |
+| [Kubernetes Execution](integration/kubernetes-execution.md) | Direct scenario deployment to Kubernetes |
 
 ### Reference
 
@@ -143,7 +143,7 @@ docs/
 
  integration/ # External services
  external-services.md # Third-party integrations
- maestro.md # MAESTRO orchestrator
+ kubernetes-execution.md # Direct scenario deployment to Kubernetes
 
  installation/ # Setup & configuration
  prerequisites.md # System requirements
