@@ -75,6 +75,87 @@ const apiUrl = import.meta.env.VITE_API_URL;
 // Note: Only VITE_ prefixed variables are exposed to client
 ```
 
+## Branding
+
+The application name, logo, and favicon are configurable per deployment, so the
+same codebase can be relaunched under a different brand without editing hardcoded
+values across source files. Branding is selected with a single env var that names
+one of the shipped **profiles**; individual fields can then be overridden with
+per-field escape-hatch variables.
+
+Branding resolves at **build time** on the client (`VITE_*` values are baked into
+the bundle) and at **boot time** on the server. Changing a value therefore
+requires rebuilding the client and restarting the server.
+
+In the Docker Compose deployment path, the server-side `BRANDING_PROFILE`,
+`APP_NAME`, `ORG_NAME`, and `ORG_URL` variables are now forwarded from the root
+`.env` into the container by `docker-compose.prod.yml` and
+`docker-compose.atlas.yml`; client-side `VITE_*` branding still requires building
+the client with a matching `VITE_BRANDING_PROFILE`, which the unified image's
+client-builder stage does not currently forward.
+
+### Shipped Profiles
+
+| Profile      | App name                          | Logo / Favicon                                              |
+| ------------ | --------------------------------- | ----------------------------------------------------------- |
+| `default`    | `DigitalTwin Management Platform` | Montimage (`/montimage_logo.png`, `/montimage_favicon.png`) |
+| `intact`     | `DigitalTwin Management Platform` | INTACT (`/intact_logo.png`)                                 |
+| `secassured` | `secSIM`                          | SecAssured (`/secassured_logo.png`)                         |
+
+Select a profile with one variable on each side:
+
+| Variable                | Side   | Values                                | Default   |
+| ----------------------- | ------ | ------------------------------------- | --------- |
+| `VITE_BRANDING_PROFILE` | Client | `default` \| `intact` \| `secassured` | `default` |
+| `BRANDING_PROFILE`      | Server | `default` \| `intact` \| `secassured` | `default` |
+
+The client falls back to `default` on an unrecognized profile name; the server
+rejects an invalid `BRANDING_PROFILE` at startup (zod enum validation).
+
+### Per-Field Overrides
+
+To tweak a single field without defining a whole new profile, set the matching
+override variable. An override always wins over the active profile's value. The
+logo/favicon assets referenced must exist in `client/public/`.
+
+| Client variable        | Server variable | Overrides                                   |
+| ---------------------- | --------------- | ------------------------------------------- |
+| `VITE_APP_NAME`        | `APP_NAME`      | Application display name                    |
+| `VITE_APP_NAME_SHORT`  | —               | Short app name (tight UI spaces)            |
+| `VITE_LOGO_SRC`        | —               | Logo image path (under `client/public/`)    |
+| `VITE_LOGO_ALT`        | —               | Logo alt text (accessibility)               |
+| `VITE_FAVICON_SRC`     | —               | Favicon image path (under `client/public/`) |
+| `VITE_ORG_NAME`        | `ORG_NAME`      | Owning organization name                    |
+| `VITE_ORG_URL`         | `ORG_URL`       | Owning organization URL                     |
+| `VITE_ORG_DESCRIPTION` | —               | Organization description (Settings "About") |
+| `VITE_LOGO_BACKDROP`   | —               | Logo backdrop chip toggle (`true`/`false`)  |
+
+> **Note:** The organization fields (`ORG_NAME`, `ORG_URL`, `ORG_DESCRIPTION`)
+> default to Montimage for **all** profiles — including `intact` and
+> `secassured` — and only change if you set their override variables. Only the
+> app name, logo, and favicon vary per profile.
+
+### Relaunching Under a Different Brand
+
+1. Set the profile on both sides, e.g. in `client/.env` and `server/.env`:
+
+   ```bash
+   # client/.env
+   VITE_BRANDING_PROFILE=secassured
+
+   # server/.env
+   BRANDING_PROFILE=secassured
+   ```
+
+2. (Optional) Add any per-field overrides, e.g. `VITE_ORG_NAME=SecAssured`.
+3. Rebuild the client so the new title/favicon/logo are baked in:
+
+   ```bash
+   cd client && npm run build
+   ```
+
+4. Restart the server to pick up the new server-side app name.
+
 ## Generating Secure Keys
 
 ### JWT Secret

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Loader2, Shield, Network, Lock } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { authApi } from '@/lib/api';
-import { ORG_NAME } from '@/lib/branding';
+import { APP_NAME, LOGO_SRC, LOGO_ALT, LOGO_BACKDROP } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,12 +60,21 @@ export function Login() {
 
           {/* Logo */}
           <div className="login-logo-wrapper">
-            <img src="/montimage_logo.png" alt={ORG_NAME} className="login-logo" />
+            <img
+              src={LOGO_SRC}
+              alt={LOGO_ALT}
+              className="login-logo"
+              style={
+                LOGO_BACKDROP
+                  ? { background: '#fff', borderRadius: 4, padding: '2px 6px' }
+                  : undefined
+              }
+            />
           </div>
 
           {/* Tagline */}
           <div className="login-tagline">
-            <h2 className="login-tagline-title">Digital Twin Management Platform</h2>
+            <h2 className="login-tagline-title">{APP_NAME}</h2>
             <p className="login-tagline-subtitle">
               Secure infrastructure modeling for critical systems
             </p>
@@ -114,7 +123,15 @@ export function Login() {
         <div className="login-form-wrapper">
           {/* Mobile logo */}
           <div className="login-mobile-logo">
-            <img src="/montimage_logo.png" alt={ORG_NAME} />
+            <img
+              src={LOGO_SRC}
+              alt={LOGO_ALT}
+              style={
+                LOGO_BACKDROP
+                  ? { background: '#fff', borderRadius: 4, padding: '2px 6px' }
+                  : undefined
+              }
+            />
           </div>
 
           <div className="login-form-header">
@@ -289,6 +306,8 @@ export function Login() {
         .login-logo {
           height: 56px;
           width: auto;
+          max-width: 220px;
+          object-fit: contain;
         }
 
         @keyframes fadeSlideUp {
@@ -443,6 +462,8 @@ export function Login() {
         .login-mobile-logo img {
           height: 40px;
           width: auto;
+          max-width: 200px;
+          object-fit: contain;
         }
 
         @media (min-width: 1024px) {

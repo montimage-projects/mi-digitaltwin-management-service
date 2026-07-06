@@ -58,6 +58,7 @@ Create `.env.prod` in project root:
 # General
 NODE_ENV=production
 LOG_LEVEL=info
+BRANDING_PROFILE=default
 
 # Backend
 PORT=3000
@@ -79,6 +80,18 @@ CORS_ORIGIN=https://yourdomain.com
 MAESTRO_URL=https://maestro-orchestrator-url
 MAESTRO_API_KEY=your-api-key
 ```
+
+> **Branding in the Compose path.** `BRANDING_PROFILE`, `APP_NAME`, `ORG_NAME`, and
+> `ORG_URL` are forwarded from this `.env` into the container by
+> `docker-compose.prod.yml` / `docker-compose.atlas.yml`, so **server-rendered**
+> branding (OpenAPI docs title, startup boot banner) follows the profile you set
+> here. **Client-rendered** branding (logo, favicon, browser tab title) is baked
+> into the client bundle at build time from `VITE_BRANDING_PROFILE`, which the
+> unified single-container image's client-builder stage in
+> `server/Dockerfile.unified` does not currently forward — a pre-existing,
+> unrelated limitation that this branding wiring does not address. To rebrand the
+> client UI today, build the client separately with a matching
+> `VITE_BRANDING_PROFILE`.
 
 ### Step 2: Update Docker Compose
 
