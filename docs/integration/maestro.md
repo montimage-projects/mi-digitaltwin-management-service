@@ -56,8 +56,8 @@ graph LR
 ### Environment Variables
 
 ```bash
-# client/.env
-VITE_MAESTRO_URL=https://maestro.intact-project.eu
+# server .env
+MAESTRO_BASE_URL=https://maestro.intact-project.eu
 ```
 
 ### CORS Configuration
@@ -270,7 +270,7 @@ const recordExecution = async (result: ExecutionResult) => {
 ### iFrame Not Loading
 
 1. Check CORS/CSP headers on MAESTRO
-2. Verify `VITE_MAESTRO_URL` is correct
+2. Verify `MAESTRO_BASE_URL` is correct
 3. Check browser console for blocking errors
 
 ### Deployment Hangs
