@@ -20,8 +20,20 @@ class FakeModel<TDoc extends FakeDoc> {
   public docs: TDoc[] = [];
   private nextId = 1;
 
-  async findOne(filter: Record<string, unknown>): Promise<TDoc | null> {
-    return this.docs.find((doc) => matches(doc, filter)) ?? null;
+  findOne(filter: Record<string, unknown>): {
+    lean: () => Promise<TDoc | null>;
+  } & Promise<TDoc | null> {
+    const result = this.docs.find((doc) => matches(doc, filter)) ?? null;
+    const promise = Promise.resolve(result) as Promise<TDoc | null> & {
+      lean: () => Promise<TDoc | null>;
+    };
+    // `upsertRecord` now chains `.lean()` off `findOne()` (see sync-helpers.ts)
+    // to get the truly-stored value instead of a hydrated document with
+    // schema defaults applied. FakeModel already stores/returns plain
+    // objects with no defaulting, so `.lean()` here is a pure passthrough —
+    // it exists only so the stub stays chainable, not to change behavior.
+    promise.lean = () => Promise.resolve(result);
+    return promise;
   }
 
   async create(data: Record<string, unknown>): Promise<TDoc> {
