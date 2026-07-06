@@ -14,7 +14,9 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
-    "typecheck": "bunx tsc --noEmit"
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test",
+    "test:unit": "bun test src/seed/__tests__/sync-helpers.test.ts"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -38,6 +40,7 @@
     "@types/node": "^22.7.4",
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",
+    "bun-types": "^1.3.14",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",

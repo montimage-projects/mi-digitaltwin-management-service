@@ -1,6 +1,7 @@
 import { Service } from '../models/Service.js';
 import { Category } from '../models/Category.js';
 import { Sector } from '../models/Sector.js';
+import { upsertRecord, deprecateStale } from './sync-helpers.js';
 
 interface ServiceSeed {
   shortName: string;
@@ -20,820 +21,825 @@ interface ServiceSeed {
   repositoryTable: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
 }
 
-// Table 1: INTACT Toolbox Services
+// ---------------------------------------------------------------------------
+// Table 1: Cybersecurity Services catalog (INTACT_TOOLBOX)
+//
+// Refreshed from the SECASSURED source of truth (Horizon Europe Grant
+// Agreement GAP-101225858, "Cybersecurity Services Catalogue"). The 12
+// services below are the R1-R5.4 entries from that catalogue's Summary
+// Table, grouped into the "Dev Services" (R1-R3.5) and "Ops Services" (R5)
+// categories the source document defines. Resolves issue #5.
+// ---------------------------------------------------------------------------
 const intactToolboxServices: ServiceSeed[] = [
   {
-    shortName: 'ULANCS-PTI',
-    title: 'Joint Security-vs-QoS Modelling/Game Optimisation Tool',
-    categorySlug: 'predictive-threat-intelligence',
-    provider: 'ULANCS',
+    shortName: 'CSAM',
+    title: 'Reference Architecture & Compliance and Security Assurance Model (CSAM)',
+    categorySlug: 'dev-services',
+    provider: 'Fraunhofer Fokus (FF)',
     description:
-      'Intelligent selection of countermeasures balancing security effectiveness and QoS impact using game-theoretic optimization.',
+      'A holistic, modular assurance model integrating both cybersecurity and regulatory aspects, with a focus on interactions and dependencies between the two. Built with extensible components to adapt to diverse stakeholder needs and hardware/software supply chain requirements. Provides a unified methodology for aligning with certification schemes, standards and regulations including GDPR, the AI Act, and ISO 8000 for data quality.',
+    type: 'Software',
+    trl: { current: 5, expected: 7 },
+    license: 'TBD',
+    standards: [
+      'ISO/IEC 15408',
+      'EUCC',
+      'EN 17927',
+      'EN 17640',
+      'Cyber Security Act',
+      'Cyber Resilience Act',
+      'AI Act',
+    ],
+    inputs: [
+      {
+        name: 'Stakeholder Requirements',
+        description: 'Cybersecurity and regulatory requirements from stakeholders',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Assurance Model',
+        description: 'Modular compliance & security assurance model artefacts',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: [
+      'Covers 1+ EU regulation, 3+ recommendations to standards, 1+ organisational policy per use case',
+    ],
+    repositoryTable: 'INTACT_TOOLBOX',
+  },
+  {
+    shortName: 'SECINTERP',
+    title: 'Assurance-driven Standard Interpretation Service (secInterp)',
+    categorySlug: 'dev-services',
+    provider: 'Tecnalia (TEC)',
+    description:
+      'A two-level LLM-based assistant (prioritising open-source models) for the automated extraction and interpretation of cybersecurity requirements. Level 1 (Cybersecurity Standard Mapping Assistant) advises non-cybersecurity experts on relevant norms and standards based on their role and industry sector. Level 2 (Cybersecurity Technical Requirements Assistant) assists software developers in industrial sectors during functional requirements specification, ensuring technical requirements align with industry standards.',
     type: 'Software',
     trl: { current: 4, expected: 7 },
     license: 'TBD',
-    standards: ['STIX', 'MITRE ATT&CK'],
-    inputs: [{ name: 'Threat Data', description: 'STIX-formatted threat intelligence' }],
-    outputs: [{ name: 'Countermeasure Plan', description: 'Optimized security configuration' }],
-    interactsWith: ['MONT-MMT', 'UBI-MAESTRO'],
-    potentialUseCases: ['Network security optimization', 'QoS-aware threat mitigation'],
+    standards: ['IEC 62443-4-2', 'IEEE 1686', 'IEC 62351'],
+    inputs: [
+      { name: 'Regulatory Corpus', description: 'Cybersecurity standards and regulatory texts' },
+    ],
+    outputs: [
+      {
+        name: 'Requirement Mapping',
+        description: 'Interpreted, role-tailored cybersecurity requirements',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['>=25% reduction in time to derive and interpret security requirements'],
     repositoryTable: 'INTACT_TOOLBOX',
   },
   {
-    shortName: 'MONT-NFZ',
-    title: 'Montimage Network Fuzzer',
-    categorySlug: 'ai-attack-defence-emulation',
-    provider: 'MONT',
+    shortName: 'SECSAC',
+    title: 'Security Assurance Case Tool (secSAC)',
+    categorySlug: 'dev-services',
+    provider: 'Tecnalia (TEC)',
     description:
-      'Generates malicious traffic by mutating nominal traffic patterns for security testing.',
+      'An LLM-based assistant capable of identifying Security Assurance Cases (SACs) and mapping the necessary information to fulfil and enrich them: extracting data from requirements lists, company-provided system/product information and the assurance patterns catalogue, then synthesising it into a cohesive, structured document guiding the assurance process. Uses OSCAL for representing security controls and assessment results.',
+    type: 'Software',
+    trl: { current: 3, expected: 7 },
+    license: 'TBD',
+    standards: ['OSCAL'],
+    inputs: [
+      {
+        name: 'Requirements & System Information',
+        description: 'Requirements lists and product/system descriptions',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Security Assurance Case',
+        description: 'Structured OSCAL-based assurance case document',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: [
+      '>=25% reduction in time to create assurance cases for selected regulations/standards',
+    ],
+    repositoryTable: 'INTACT_TOOLBOX',
+  },
+  {
+    shortName: 'SECDEVTWIN',
+    title: 'Assurance-driven Security Development Twin (SecDevTwin)',
+    categorySlug: 'dev-services',
+    provider: 'SINTEF (STF)',
+    description:
+      'A specialised, federated digital twin that continuously supports the software development phase, enabling virtual representation of software components or modules susceptible to vulnerabilities. Integrates the assurance model with Digital Twins for DevOps/TechDebt management, supporting wide collaboration and coordination for multiple assurance tasks and stakeholders within "Security Engineering Workspaces".',
+    type: 'Software',
+    trl: { current: 3, expected: 7 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'Software Component Model',
+        description: 'Representation of software components/modules under development',
+      },
+    ],
+    outputs: [
+      { name: 'Digital Twin State', description: 'Synchronised development-phase security twin' },
+    ],
+    interactsWith: [],
+    potentialUseCases: [
+      '>=25% reduction in time to identify non-compliance issues with security standards',
+    ],
+    repositoryTable: 'INTACT_TOOLBOX',
+  },
+  {
+    shortName: 'SECNCD',
+    title: 'AI-based Non-Compliance Detector (secNCD)',
+    categorySlug: 'dev-services',
+    provider: 'CERTH',
+    description:
+      'An AI-based Non-Compliance Detector that identifies regulatory and security gaps at design time (and even at runtime). Enhances LLMs to act as digital assistants guiding reviewers on checking compliance with security requirements, assisting security and compliance experts in assessing system compliance with complex regulations and standards, identifying non-compliance issues and recommending changes.',
+    type: 'Software',
+    trl: { current: 5, expected: 7 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'System & Compliance Requirements',
+        description: 'Design-time system artefacts and applicable regulations/standards',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Non-Compliance Report',
+        description: 'Identified regulatory/security gaps and recommended changes',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: [
+      '>=25% reduction in time/effort to detect and repair vulnerabilities at design time',
+    ],
+    repositoryTable: 'INTACT_TOOLBOX',
+  },
+  {
+    shortName: 'SECVDR',
+    title: 'Vulnerability Discovery and Repair (secVDR)',
+    categorySlug: 'dev-services',
+    provider: 'CERTH',
+    description:
+      'Detects vulnerabilities residing in the source and configuration code of software programs. Fine-tunes the CodeBERT model for vulnerability detection, covering a wide range of programming languages and considering additional context and system-specific characteristics to increase detection accuracy. Provides proper vulnerability fixes using advanced ML/GenAI models.',
+    type: 'Software',
+    trl: { current: 5, expected: 7 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'Source & Configuration Code',
+        description: 'Software source code and configuration files',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Vulnerability Fixes',
+        description: 'Detected vulnerabilities with automated fix suggestions',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['50% of vulnerabilities repaired with minimum human intervention'],
+    repositoryTable: 'INTACT_TOOLBOX',
+  },
+  {
+    shortName: 'SECASSURE4AI',
+    title: 'Security Assurance Service for AI Components (secAssure4AI)',
+    categorySlug: 'dev-services',
+    provider: 'Tecnalia (TEC)',
+    description:
+      'Elevates security by integrating a holistic view encompassing not only security but also key dimensions of AI trustworthiness: explainability, fairness and robustness. Enhances the integration and automation of tests with AML tools and adds tests for LLM-based services.',
     type: 'Software',
     trl: { current: 4, expected: 7 },
-    license: 'Open Source (MIT)',
-    standards: ['MITRE ATT&CK'],
-    inputs: [{ name: 'Network Traffic', description: 'PCAP or live traffic capture' }],
-    outputs: [{ name: 'Fuzzed Traffic', description: 'Mutated malicious traffic patterns' }],
-    interactsWith: ['MONT-MMT', 'AIRBUS-ORION'],
-    potentialUseCases: ['Protocol fuzzing', 'Security testing', 'Attack simulation'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'SBA-SPLIT',
-    title: 'SPLIT - Security Protocol Testing Toolkit',
-    categorySlug: 'ai-attack-defence-emulation',
-    provider: 'SBA',
-    description: 'Automated security protocol analysis and vulnerability testing toolkit.',
-    type: 'Software',
-    trl: { current: 5, expected: 7 },
-    license: 'Proprietary',
-    standards: ['CVE', 'CWE'],
-    inputs: [{ name: 'Protocol Specification', description: 'Protocol definition files' }],
-    outputs: [{ name: 'Vulnerability Report', description: 'Security analysis results' }],
-    interactsWith: ['SBA-CAST'],
-    potentialUseCases: ['Protocol security testing', 'Vulnerability assessment'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'SBA-CAST',
-    title: 'CAST - Combinatorial API Security Testing Tool',
-    categorySlug: 'ai-attack-defence-emulation',
-    provider: 'SBA',
-    description: 'Automated combinatorial testing for API security vulnerabilities.',
-    type: 'Software',
-    trl: { current: 5, expected: 7 },
-    license: 'Proprietary',
-    standards: ['OWASP', 'CVE'],
-    inputs: [{ name: 'API Specification', description: 'OpenAPI/Swagger specification' }],
-    outputs: [{ name: 'Security Report', description: 'API vulnerability findings' }],
-    interactsWith: ['SBA-SPLIT'],
-    potentialUseCases: ['API security testing', 'Penetration testing'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'AIRBUS-ORION',
-    title: 'Orion Malware Detection',
-    categorySlug: 'automated-threat-inspection',
-    provider: 'AIRBUS',
-    description: 'Advanced malware detection system using machine learning techniques.',
-    type: 'Software',
-    trl: { current: 5, expected: 7 },
-    license: 'Proprietary',
-    standards: ['MITRE ATT&CK', 'YARA'],
-    inputs: [{ name: 'Binary Files', description: 'Executable files for analysis' }],
-    outputs: [{ name: 'Detection Results', description: 'Malware classification and IOCs' }],
-    interactsWith: ['MONT-MMT', 'HMU-DASH'],
-    potentialUseCases: ['Malware analysis', 'Threat hunting', 'Incident response'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'BEYOND-DD',
-    title: 'Data Diode',
-    categorySlug: 'automated-threat-inspection',
-    provider: 'BEYOND',
-    description: 'Hardware-based unidirectional data transfer for air-gapped network protection.',
-    type: 'Hardware',
-    trl: { current: 7, expected: 9 },
-    license: 'Proprietary',
-    standards: ['IEC 62443', 'NERC CIP'],
-    inputs: [{ name: 'Network Data', description: 'Data stream for secure transfer' }],
-    outputs: [{ name: 'Secured Data', description: 'Unidirectionally transferred data' }],
-    interactsWith: ['MONT-MMT'],
-    potentialUseCases: ['Critical infrastructure protection', 'OT/IT segregation'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'MONT-MMT',
-    title: 'Montimage Monitoring Tool (MMT)',
-    categorySlug: 'automated-threat-inspection',
-    provider: 'MONT',
-    description:
-      'Real-time network traffic analysis and security monitoring with deep packet inspection.',
-    type: 'Software',
-    trl: { current: 8, expected: 9 },
-    license: 'Open Source (MIT)',
-    standards: ['MITRE ATT&CK', 'Zeek'],
-    inputs: [{ name: 'Network Traffic', description: 'Live or captured network traffic' }],
-    outputs: [
-      { name: 'Security Events', description: 'Detected threats and anomalies' },
-      { name: 'Network Metrics', description: 'Traffic statistics and KPIs' },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      { name: 'AI/ML Component', description: 'AI/ML models and components under assessment' },
     ],
-    interactsWith: ['MONT-NFZ', 'AIRBUS-ORION', 'UBI-MAESTRO', 'AEGIS-COS'],
-    potentialUseCases: ['Network monitoring', 'Intrusion detection', 'Traffic analysis'],
+    outputs: [
+      {
+        name: 'AI Assurance Report',
+        description: 'Security, explainability, fairness and robustness assessment results',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: [
+      '>=50% of AI/ML relevant attacks tested automatically for at least 2 use cases',
+    ],
     repositoryTable: 'INTACT_TOOLBOX',
   },
   {
-    shortName: 'SIEMENS-ROSCO',
-    title: 'Runtime Security Pipeline (ROSCO-eBPF)',
-    categorySlug: 'automated-threat-inspection',
-    provider: 'SIEMENS',
-    description: 'eBPF-based runtime security monitoring for containerized environments.',
+    shortName: 'SECSIM',
+    title: 'Assurance-driven Simulator (secSIM)',
+    categorySlug: 'dev-services',
+    provider: 'Montimage (MTI)',
+    description:
+      'An assurance-driven simulator supporting proactive and predictive analysis of emerging security impacts for evolving hardware/software changes and hybrid AI-enabled systems. Covers IoT security simulation with SOAR capabilities to automate detection, analysis and response to security incidents during the design phase, plus zero-trust networking and AI service architecture deployment simulation. Covers 3 simulation layers: architecture, functional and non-functional.',
     type: 'Software',
-    trl: { current: 7, expected: 8 },
-    license: 'Apache 2.0/MIT',
-    standards: ['MITRE ATT&CK', 'CIS Benchmarks'],
-    inputs: [{ name: 'System Events', description: 'Kernel and container events' }],
-    outputs: [{ name: 'Security Alerts', description: 'Runtime security violations' }],
-    interactsWith: ['UBI-MAESTRO', 'HMU-DASH'],
-    potentialUseCases: ['Container security', 'Runtime protection', 'Kubernetes security'],
+    trl: { current: 4, expected: 7 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'Architecture Changes',
+        description: 'Proposed hardware/software architecture modifications',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Simulation Results',
+        description:
+          'Predicted security impacts across architecture, functional and non-functional layers',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['3 simulation layers covered (architecture, functional, non-functional)'],
     repositoryTable: 'INTACT_TOOLBOX',
   },
   {
-    shortName: 'TUC-NIDS',
-    title: 'FPGA-NIDS (Network Intrusion Detection System)',
-    categorySlug: 'automated-threat-inspection',
-    provider: 'TUC',
-    description: 'Hardware-accelerated network intrusion detection using FPGA technology.',
-    type: 'Software/Hardware',
-    trl: { current: 5, expected: 6 },
-    license: 'Open Source',
-    standards: ['Snort', 'Suricata'],
-    inputs: [{ name: 'Network Traffic', description: 'High-speed network packets' }],
-    outputs: [{ name: 'Intrusion Alerts', description: 'Detected network attacks' }],
-    interactsWith: ['MONT-MMT'],
-    potentialUseCases: ['High-speed intrusion detection', 'Line-rate packet inspection'],
+    shortName: 'SECOPSTWIN',
+    title: 'Assurance-driven Security Operation Twin (SecOpsTwin)',
+    categorySlug: 'ops-services',
+    provider: 'SINTEF (STF)',
+    description:
+      'A Digital Twin for continuous security monitoring and management, enabling real-time connections to deployed software systems across use cases. Allows human operators to interact with and gain insight into assessment processes using natural language guidance over evaluation results, and includes AI-supported automatic and continuous detection, analysis, evaluation and mitigation of cybersecurity attacks and privacy risks during operation.',
+    type: 'Software',
+    trl: { current: 4, expected: 7 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      { name: 'Operational Telemetry', description: 'Real-time data from deployed systems' },
+    ],
+    outputs: [
+      {
+        name: 'Security Assessment Insights',
+        description: 'Continuous risk/attack assessment and mitigation guidance',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: [
+      '>=80% accuracy of predicted attack data in simulation for at least 2 use cases',
+    ],
     repositoryTable: 'INTACT_TOOLBOX',
   },
   {
-    shortName: 'K3Y-K3CR',
-    title: 'K3CyberRadar (K3CR) Probes',
-    categorySlug: 'automated-threat-inspection',
-    provider: 'K3Y',
-    description: 'Distributed probes for network security monitoring and threat detection.',
+    shortName: 'SECATTSIM',
+    title: 'Attack and Incident Simulator (secAttSIM)',
+    categorySlug: 'ops-services',
+    provider: 'Tecnalia (TEC)',
+    description:
+      'Provides new attack simulation tools with white-box and black-box adversarial AI attacks for different operation scenarios. Develops reinforcement learning-guided and LLM-generated attack controls to simulate emerging AI-era attack scenarios, operating in parallel with physical, real IoT-edge-cloud systems and their software components.',
+    type: 'Software',
+    trl: { current: 4, expected: 7 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      { name: 'Operation Scenario', description: 'IoT-edge-cloud system and scenario definitions' },
+    ],
+    outputs: [
+      { name: 'Simulated Attacks', description: 'Adversarial AI attack and incident simulations' },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['>=80% accuracy of attack/anomaly detection'],
+    repositoryTable: 'INTACT_TOOLBOX',
+  },
+  {
+    shortName: 'SECANOD',
+    title: 'AI-based Attack/Anomaly Detection (secAnoD)',
+    categorySlug: 'ops-services',
+    provider: 'Montimage (MTI)',
+    description:
+      'Develops explainable LLM-based models for anomaly detection and prediction, extending MMT (Multi-modal Model) with LLMs to automatically generate new detection mechanisms and facilitate operator reporting via an adaptive GUI. Learns from up-to-date threat intelligence (e.g. through RAG), recommends security solutions and autonomously mitigates vulnerabilities identified by security experts.',
+    type: 'Software',
+    trl: { current: 3, expected: 7 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'Threat Intelligence & Telemetry',
+        description: 'Up-to-date threat intelligence feeds and monitoring data',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Anomaly Predictions',
+        description: 'Explainable attack/anomaly detections and mitigation recommendations',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: [
+      '>=80% accuracy of incident prediction; >=70% of studied attacks where the SOAR learns the response solution',
+    ],
+    repositoryTable: 'INTACT_TOOLBOX',
+  },
+  {
+    shortName: 'SECAISOAR',
+    title: 'AI-driven Security Control Orchestration (secAISOAR)',
+    categorySlug: 'ops-services',
+    provider: 'Montimage (MTI)',
+    description:
+      'Handles intelligent selection of optimal responses to security incidents, building on an enhancement of the "Shuffle automation" open-source solution. Analyses real-time data and threat intelligence to improve decision-making, integrating resilience mechanisms within its playbooks that focus on both immediate threat remediation and system recovery/adaptation, with reinforcement learning for better playbook adaptation.',
     type: 'Software',
     trl: { current: 6, expected: 7 },
     license: 'TBD',
-    standards: ['MITRE ATT&CK'],
-    inputs: [{ name: 'Network Interfaces', description: 'Network tap points' }],
-    outputs: [{ name: 'Security Telemetry', description: 'Network security data' }],
-    interactsWith: ['HMU-DASH', 'K3Y-TRUSTEE'],
-    potentialUseCases: ['Distributed monitoring', 'Network visibility'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'SIEMENS-LLM',
-    title: 'LLM Threat Modelling Tool',
-    categorySlug: 'automated-threat-inspection',
-    provider: 'SIEMENS',
-    description: 'Large Language Model-based automated threat modeling and analysis.',
-    type: 'Software',
-    trl: { current: 7, expected: 8 },
-    license: 'Apache 2.0/MIT',
-    standards: ['STRIDE', 'MITRE ATT&CK'],
-    inputs: [{ name: 'System Description', description: 'Architecture and design documents' }],
-    outputs: [{ name: 'Threat Model', description: 'Identified threats and mitigations' }],
-    interactsWith: ['K3Y-TRUSTEE'],
-    potentialUseCases: ['Automated threat modeling', 'Security assessment'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'SBA-DID',
-    title: 'Zero-trust Distributed Computing (DID/SSI)',
-    categorySlug: 'zero-trust-architecture',
-    provider: 'SBA',
-    description: 'Decentralized identity management for zero-trust architectures.',
-    type: 'Software',
-    trl: { current: 4, expected: 7 },
-    license: 'Proprietary',
-    standards: ['W3C DID', 'W3C VC'],
-    inputs: [{ name: 'Identity Claims', description: 'Verifiable credentials' }],
-    outputs: [{ name: 'Identity Verification', description: 'Verified identity assertions' }],
-    interactsWith: ['BEYOND-HSM'],
-    potentialUseCases: ['Zero-trust access control', 'Decentralized authentication'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'BEYOND-HSM',
-    title: 'Distributed Hardware Security Module',
-    categorySlug: 'zero-trust-architecture',
-    provider: 'BEYOND',
-    description: 'Distributed Hardware Security Module for key management.',
-    type: 'Software/Hardware',
-    trl: { current: 3, expected: 7 },
-    license: 'Proprietary',
-    standards: ['PKCS#11', 'FIPS 140-2'],
-    inputs: [{ name: 'Cryptographic Requests', description: 'Key operations' }],
-    outputs: [{ name: 'Cryptographic Results', description: 'Signed/encrypted data' }],
-    interactsWith: ['SBA-DID'],
-    potentialUseCases: ['Secure key management', 'Distributed cryptography'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'FRAUNHOFER-TA',
-    title: 'Twinning Agents',
-    categorySlug: 'digital-twin-construction',
-    provider: 'FRAUNHOFER',
-    description: 'Agents for digital twin data synchronization and lifecycle management.',
-    type: 'Software',
-    trl: { current: 4, expected: 7 },
-    license: 'Varies',
-    standards: ['OPC UA', 'MQTT'],
-    inputs: [{ name: 'Physical System Data', description: 'Sensor and operational data' }],
-    outputs: [{ name: 'Digital Twin State', description: 'Synchronized twin representation' }],
-    interactsWith: ['SIEMENS-PAC', 'UBI-MAESTRO'],
-    potentialUseCases: ['Digital twin synchronization', 'Asset management'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'SIEMENS-PAC',
-    title: 'PAC2200 Digital Shadow',
-    categorySlug: 'digital-twin-construction',
-    provider: 'SIEMENS',
-    description: 'Digital shadow implementation for Siemens PAC2200 power meters.',
-    type: 'Software',
-    trl: { current: 5, expected: 7 },
-    license: 'Proprietary',
-    standards: ['IEC 61850', 'Modbus'],
-    inputs: [{ name: 'Power Meter Data', description: 'PAC2200 measurements' }],
-    outputs: [{ name: 'Digital Shadow', description: 'Real-time device representation' }],
-    interactsWith: ['FRAUNHOFER-TA'],
-    potentialUseCases: ['Energy monitoring', 'Grid security'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'HMU-DASH',
-    title: 'Interactive HITL Dashboard',
-    categorySlug: 'user-interface',
-    provider: 'HMU',
-    description: 'Human-in-the-loop dashboard for security monitoring and decision support.',
-    type: 'Software',
-    trl: { current: 4, expected: 6 },
-    license: 'TBD',
-    standards: ['WCAG 2.1'],
-    inputs: [{ name: 'Security Events', description: 'Alerts and metrics from tools' }],
-    outputs: [{ name: 'Visualization', description: 'Interactive security dashboards' }],
-    interactsWith: ['AIRBUS-ORION', 'MONT-MMT', 'K3Y-K3CR', 'SIEMENS-ROSCO'],
-    potentialUseCases: ['Security operations center', 'Incident response'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'K3Y-TRUSTEE',
-    title: 'TRUSTEE Explainable AI Tool',
-    categorySlug: 'explainable-ai',
-    provider: 'K3Y',
-    description: 'Explainable AI tool for interpreting security ML model decisions.',
-    type: 'Software',
-    trl: { current: 5, expected: 7 },
-    license: 'TBD',
-    standards: ['IEEE P7001'],
-    inputs: [{ name: 'ML Predictions', description: 'Model outputs and features' }],
-    outputs: [{ name: 'Explanations', description: 'Human-readable decision rationale' }],
-    interactsWith: ['AIRBUS-ORION', 'SIEMENS-LLM', 'K3Y-K3CR'],
-    potentialUseCases: ['Model transparency', 'Audit compliance'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'AXON-OSSR',
-    title: 'Open Security Service Repository (OSSR)',
-    categorySlug: 'service-management',
-    provider: 'AXON',
-    description: 'Central repository for security service catalog and management.',
-    type: 'Software',
-    trl: { current: 5, expected: 7 },
-    license: 'Apache 2.0/MIT',
-    standards: ['OpenAPI'],
-    inputs: [{ name: 'Service Metadata', description: 'Service descriptions and configs' }],
-    outputs: [{ name: 'Service Catalog', description: 'Searchable service registry' }],
-    interactsWith: ['UBI-MAESTRO'],
-    potentialUseCases: ['Service discovery', 'Security toolbox management'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'THALES-CR',
-    title: 'CyberRange',
-    categorySlug: 'training-simulation',
-    provider: 'THALES',
-    description: 'Cyber range platform for security training and exercises.',
-    type: 'Software',
-    trl: { current: 5, expected: 7 },
-    license: 'Proprietary',
-    standards: ['NICE Framework'],
-    inputs: [{ name: 'Training Scenarios', description: 'Exercise configurations' }],
-    outputs: [{ name: 'Training Results', description: 'Performance metrics and reports' }],
-    interactsWith: ['UBI-MAESTRO'],
-    potentialUseCases: ['Security training', 'Red team exercises', 'Skill assessment'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'UBI-MAESTRO',
-    title: 'MAESTRO Service Orchestrator',
-    categorySlug: 'orchestration',
-    provider: 'UBI',
-    description: 'Central orchestrator for deploying and managing security services.',
-    type: 'Software',
-    trl: { current: 5, expected: 7 },
-    license: 'Open (Model TBD)',
-    standards: ['Kubernetes', 'Helm'],
-    inputs: [{ name: 'Deployment Specs', description: 'Service topology definitions' }],
-    outputs: [{ name: 'Deployed Services', description: 'Running service instances' }],
-    interactsWith: ['MONT-MMT', 'AXON-OSSR', 'FRAUNHOFER-TA', 'THALES-CR', 'AEGIS-COS'],
-    potentialUseCases: ['Service deployment', 'Scenario orchestration'],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
-    shortName: 'AEGIS-COS',
-    title: 'COS - Cyber Orchestration Service (Message Broker)',
-    categorySlug: 'infrastructure',
-    provider: 'AEGIS',
-    description: 'Central message broker for inter-service communication.',
-    type: 'Software',
-    trl: { current: 4, expected: 6 },
-    license: 'Proprietary',
-    standards: ['Apache Kafka', 'AMQP'],
-    inputs: [{ name: 'Messages', description: 'Events and data from services' }],
-    outputs: [{ name: 'Routed Messages', description: 'Delivered messages to subscribers' }],
-    interactsWith: ['MONT-MMT', 'UBI-MAESTRO'],
-    potentialUseCases: ['Event streaming', 'Service integration'],
+    standards: [],
+    inputs: [
+      {
+        name: 'Incident & Threat Data',
+        description: 'Real-time security incident and threat intelligence data',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Orchestrated Response Playbook',
+        description: 'Automated remediation and recovery actions',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['>=15% improvement in system resilience from proposed remediations'],
     repositoryTable: 'INTACT_TOOLBOX',
   },
 ];
 
-// Table 2: Related Infrastructure & Use Case Services (Critical Infrastructure)
-// These services are mapped to NIS2 sectors for Critical Infrastructure classification
+// ---------------------------------------------------------------------------
+// Table 2: Infrastructure list (OTHER_SERVICES)
+//
+// Refreshed from the SECASSURED source of truth (Grant Agreement
+// GAP-101225858, Part B page 41, section "Infrastructure"). Each entry is a
+// piece of partner-operated infrastructure supporting the project's use
+// cases; `sectorSlug` maps it to the closest NIS2 sector already seeded in
+// `sectors.seed.ts`. Resolves issue #7.
+//
+// The source document's separate "Cybersecurity Infrastructure" section
+// explicitly lists none ("*None listed in the Grant Agreement.*"), so no
+// entries are seeded for that classification — see issue #6, resolved by the
+// deprecate-stale mechanism in `seedServices()`/`seedCategories()` retiring
+// whatever legacy entries previously stood in for it (e.g. the old
+// `infrastructure` category and its `AEGIS-COS` message-broker tool).
+// ---------------------------------------------------------------------------
 const infrastructureServices: ServiceSeed[] = [
   {
-    shortName: 'CORE-01',
-    title: 'Free5GC',
-    categorySlug: '5g-core',
+    shortName: 'ORO-5GLAB',
+    title: 'Orange 5G Lab',
+    categorySlug: '5g-testbeds',
     sectorSlug: 'digital-infrastructure',
-    provider: 'Open Source',
-    description: '5G Core functions (NRF, AMF, SMF, UDM, etc.)',
-    type: 'Software',
-    trl: { current: 7, expected: 8 },
-    license: 'Apache-2.0',
+    provider: 'ORO (Orange Romania)',
+    description:
+      '5G Full-Stack Development, Testing, And Validation Laboratory with state-of-the-art equipment and access to current 3GPP and future 3GPP-specification technologies.',
+    type: 'Software/Hardware',
+    trl: { current: 9, expected: 9 },
+    license: 'N/A (Partner Infrastructure)',
     standards: ['3GPP'],
-    inputs: [{ name: '5G NAS', description: '5G NAS signaling' }],
-    outputs: [{ name: 'Core Services', description: '5G core network services' }],
-    interactsWith: ['RAN-01'],
-    potentialUseCases: ['PUC1 - 5G Security'],
+    inputs: [
+      {
+        name: 'RF & Network Configuration',
+        description: '5G lab equipment configuration for full-stack testing',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Validated 5G Test Results',
+        description: 'Development, testing and validation results across the 5G stack',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['UC1 - Telecom Software Development Life Cycle'],
     repositoryTable: 'OTHER_SERVICES',
   },
   {
-    shortName: 'CORE-02',
-    title: 'Open5GS',
-    categorySlug: '5g-core',
+    shortName: 'ORO-3GPP16',
+    title: '3GPP Rel 16 Commercial Facility',
+    categorySlug: '5g-testbeds',
     sectorSlug: 'digital-infrastructure',
-    provider: 'Open Source',
-    description: 'Alternative 5G Core Stack',
-    type: 'Software',
-    trl: { current: 7, expected: 8 },
-    license: 'AGPL-3.0',
-    standards: ['3GPP'],
-    inputs: [{ name: '5G NAS', description: '5G NAS signaling' }],
-    outputs: [{ name: 'Core Services', description: '5G core network services' }],
-    interactsWith: ['RAN-01'],
-    potentialUseCases: ['PUC1 - 5G Security'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'RAN-01',
-    title: 'srsRAN + UERANSIM',
-    categorySlug: '5g-ran',
-    sectorSlug: 'digital-infrastructure',
-    provider: 'Open Source',
-    description: 'Simulated gNodeB and UE behavior',
-    type: 'Software',
-    trl: { current: 7, expected: 8 },
-    license: 'AGPL-3.0',
-    standards: ['3GPP'],
-    inputs: [{ name: 'RF Signals', description: 'Radio frequency signals' }],
-    outputs: [{ name: 'RAN Services', description: 'Radio access network services' }],
-    interactsWith: ['CORE-01', 'CORE-02'],
-    potentialUseCases: ['PUC1 - 5G Security'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'RAN-02',
-    title: 'USRP',
-    categorySlug: '5g-ran',
-    sectorSlug: 'digital-infrastructure',
-    provider: 'Open Source',
-    description: 'Universal Software Radio Peripheral',
-    type: 'Hardware',
-    trl: { current: 8, expected: 9 },
-    license: 'Various',
-    standards: ['SDR'],
-    inputs: [{ name: 'RF Signals', description: 'Radio frequency input' }],
-    outputs: [{ name: 'Digital Samples', description: 'Digitized radio samples' }],
-    interactsWith: ['RAN-01'],
-    potentialUseCases: ['PUC1 - 5G Security'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'UE-01',
-    title: 'Android UE',
-    categorySlug: 'user-equipment',
-    sectorSlug: 'digital-infrastructure',
-    provider: 'Commercial',
-    description: 'Mobile phone as UE',
+    provider: 'ORO (Orange Romania)',
+    description:
+      '5G infrastructure deployed in 45 cities, providing agility for new 5G communication systems with dedicated/customised network slices (e.g. MEC capabilities).',
     type: 'Hardware',
     trl: { current: 9, expected: 9 },
-    license: 'Commercial',
+    license: 'N/A (Partner Infrastructure)',
     standards: ['3GPP'],
-    inputs: [{ name: 'User Input', description: 'User interactions' }],
-    outputs: [{ name: 'Network Traffic', description: 'Mobile network traffic' }],
-    interactsWith: ['RAN-01'],
-    potentialUseCases: ['PUC1 - 5G Security'],
+    inputs: [
+      {
+        name: 'Network Slice Requests',
+        description: 'Requests for dedicated/customised 5G network slices',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Commercial 5G Network Slices',
+        description: 'MEC-capable network slices across 45 deployed cities',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['UC1 - Telecom Software Development Life Cycle'],
     repositoryTable: 'OTHER_SERVICES',
   },
   {
-    shortName: 'TOOL-01',
-    title: '5Greplay',
-    categorySlug: 'attack-emulation',
+    shortName: 'ITPAERO-CLUSTER',
+    title: 'Computer Cluster',
+    categorySlug: 'hpc-compute',
+    sectorSlug: 'manufacturing',
+    provider: 'ITP Aero',
+    description:
+      'Capacity within the world top 500; optimised for CFD simulations, FEM, materials, aerothermal, design optimisation, manufacturing processes and highly complex coupled models.',
+    type: 'Hardware',
+    trl: { current: 9, expected: 9 },
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      {
+        name: 'Simulation Jobs',
+        description: 'CFD/FEM/materials/aerothermal simulation workloads',
+      },
+    ],
+    outputs: [
+      { name: 'Simulation Results', description: 'High-fidelity engineering simulation outputs' },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['UC2 - Aerospace Digitalization Platform'],
+    repositoryTable: 'OTHER_SERVICES',
+  },
+  {
+    shortName: 'ITPAERO-CFAA',
+    title: 'CFAA (Basque Country University)',
+    categorySlug: 'manufacturing-labs',
+    sectorSlug: 'manufacturing',
+    provider: 'ITP Aero',
+    description:
+      'Equipped with advanced manufacturing equipment for joint R&T manufacturing projects.',
+    type: 'Hardware',
+    trl: { current: 9, expected: 9 },
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      {
+        name: 'Manufacturing Process Specs',
+        description: 'Joint R&T manufacturing project requirements',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Manufactured Components',
+        description: 'R&T manufacturing outputs from advanced equipment',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['UC2 - Aerospace Digitalization Platform'],
+    repositoryTable: 'OTHER_SERVICES',
+  },
+  {
+    shortName: 'SAVVY-DEVSRV',
+    title: 'Development Servers & Operational Networks',
+    categorySlug: 'data-center-hosting',
     sectorSlug: 'digital-infrastructure',
-    provider: 'Open Source',
-    description: '5G network traffic replay for attack simulation',
-    type: 'Software',
-    trl: { current: 6, expected: 7 },
-    license: 'MIT',
-    standards: ['PCAP'],
-    inputs: [{ name: 'PCAP Files', description: 'Captured 5G traffic' }],
-    outputs: [{ name: 'Replayed Traffic', description: 'Simulated attack traffic' }],
-    interactsWith: ['MONT-MMT'],
-    potentialUseCases: ['PUC1 - 5G Security'],
+    provider: 'SAVVY (Savvy Data Systems)',
+    description:
+      'Core distributed network in Logroño on a TIER III Data Centre; provides real-time, big data, massive infrastructure for machines and gateways worldwide.',
+    type: 'Software/Hardware',
+    trl: { current: 9, expected: 9 },
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      {
+        name: 'Device & Gateway Telemetry',
+        description: 'Global machine and gateway data streams',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Distributed Network Services',
+        description: 'Real-time big-data infrastructure services',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Cross-cutting infrastructure support'],
     repositoryTable: 'OTHER_SERVICES',
   },
   {
-    shortName: 'TOOL-02',
-    title: 'Cybel CyberRange',
-    categorySlug: 'training-simulation',
-    sectorSlug: 'digital-infrastructure',
-    provider: 'THALES',
-    description: 'Comprehensive cyber range platform',
-    type: 'Software',
-    trl: { current: 7, expected: 8 },
-    license: 'Proprietary',
-    standards: ['NICE Framework'],
-    inputs: [{ name: 'Scenarios', description: 'Training scenario definitions' }],
-    outputs: [{ name: 'Training Environment', description: 'Simulated cyber environment' }],
-    interactsWith: ['THALES-CR'],
-    potentialUseCases: ['PUC1 - 5G Security'],
+    shortName: 'IDEKO-CNC',
+    title: 'Industry 4.0 CNC Controller Digital Laboratory',
+    categorySlug: 'manufacturing-labs',
+    sectorSlug: 'manufacturing',
+    provider: 'IDEKO',
+    description: 'For testing and demonstration purposes where a digital factory can be simulated.',
+    type: 'Software/Hardware',
+    trl: { current: 9, expected: 9 },
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      { name: 'Factory Process Model', description: 'Digital factory simulation configuration' },
+    ],
+    outputs: [
+      {
+        name: 'Digital Factory Simulation',
+        description: 'Simulated Industry 4.0 CNC factory environment',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Cross-cutting infrastructure support'],
     repositoryTable: 'OTHER_SERVICES',
   },
   {
-    shortName: 'HE-01',
-    title: 'Radiology Medical VM',
-    categorySlug: 'healthcare-equipment',
+    shortName: 'UIH-PROSUMER',
+    title: 'Prosumer Cell',
+    categorySlug: 'energy-grid-infrastructure',
+    sectorSlug: 'energy',
+    provider: 'UIH (Urban Institute Magyarorszag)',
+    description:
+      '3.5kW peak capacity solar powered (DER - distributed energy resource) at Balatonfüred site; 5kWh energy storage capacity; connected to local power grid and internet for remote control.',
+    type: 'Hardware',
+    trl: { current: 9, expected: 9 },
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      {
+        name: 'Solar Irradiance & Grid Signals',
+        description: 'Solar generation input and grid connection signals',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Distributed Energy Resource Data',
+        description: 'Prosumer generation, storage and remote-control telemetry',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['UC3 - Renewable Prosumer Energy'],
+    repositoryTable: 'OTHER_SERVICES',
+  },
+  {
+    shortName: 'SPS-DEVSECOPS',
+    title: 'DevSecOps Architecture',
+    categorySlug: 'devsecops-platforms',
+    sectorSlug: 'energy',
+    provider: 'SPS (Safepay Systems)',
+    description: 'Three system platforms providing a solid background for development activities.',
+    type: 'Software',
+    trl: { current: 9, expected: 9 },
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      { name: 'Development Pipelines', description: 'Application build/test/deploy pipelines' },
+    ],
+    outputs: [
+      { name: 'DevSecOps Environment', description: 'Secure development and operations platform' },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['UC3 - Renewable Prosumer Energy'],
+    repositoryTable: 'OTHER_SERVICES',
+  },
+  {
+    shortName: 'TELLU-CARE',
+    title: 'TelluCare Product Family',
+    categorySlug: 'healthcare-iot-platforms',
     sectorSlug: 'health',
-    provider: '5YPE',
-    description: 'DICOM traffic simulation (MRI/CT scans)',
+    provider: 'TELLU AS',
+    description:
+      'IPR software product line enabling remote healthcare as SaaS; Personal Health Gateway for managing and operating IoT and Edge infrastructure distributed in patient homes.',
     type: 'Software',
-    trl: { current: 6, expected: 7 },
-    license: 'Proprietary',
-    standards: ['DICOM', 'HL7'],
-    inputs: [{ name: 'Medical Images', description: 'DICOM image data' }],
-    outputs: [{ name: 'DICOM Traffic', description: 'Medical imaging network traffic' }],
-    interactsWith: ['MONT-MMT'],
-    potentialUseCases: ['PUC2 - Healthcare Security'],
+    trl: { current: 9, expected: 9 },
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      {
+        name: 'Patient Health Device Data',
+        description: 'IoT/Edge health device data from patient homes',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Remote Healthcare Services',
+        description: 'SaaS-delivered remote healthcare monitoring and management',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['UC4 - Healthcare (eHealth SaaS)'],
     repositoryTable: 'OTHER_SERVICES',
   },
   {
-    shortName: 'HE-02',
-    title: 'Withings Wearable VM',
-    categorySlug: 'healthcare-equipment',
-    sectorSlug: 'health',
-    provider: '5YPE',
-    description: 'ECG and SpO2 monitoring simulation',
-    type: 'Software',
-    trl: { current: 6, expected: 7 },
-    license: 'Proprietary',
-    standards: ['HL7 FHIR'],
-    inputs: [{ name: 'Vital Signs', description: 'ECG and SpO2 data' }],
-    outputs: [{ name: 'Health Data', description: 'Wearable health metrics' }],
-    interactsWith: ['MONT-MMT'],
-    potentialUseCases: ['PUC2 - Healthcare Security'],
+    shortName: 'PPC-EMOB',
+    title: 'E-mobility Testing Facilities',
+    categorySlug: 'e-mobility-iiot',
+    sectorSlug: 'energy',
+    provider: 'PPC',
+    description:
+      'A number of charging stations with technological diversity from various vendors; exploited for testing new technologies and services for CPOs and eMSPs.',
+    type: 'Hardware',
+    trl: { current: 9, expected: 9 },
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      {
+        name: 'Charging Session Requests',
+        description: 'EV charging protocol/session test requests',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Charging Test Results',
+        description: 'Interoperability and technology test results for CPOs/eMSPs',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['UC5 - Smart Charging Stations'],
     repositoryTable: 'OTHER_SERVICES',
   },
   {
-    shortName: 'HE-03',
-    title: 'Anaesthesia Machine VM',
-    categorySlug: 'healthcare-equipment',
-    sectorSlug: 'health',
-    provider: '5YPE',
-    description: 'Operating room anaesthesia machine simulation',
-    type: 'Software',
-    trl: { current: 6, expected: 7 },
-    license: 'Proprietary',
-    standards: ['IEC 62443'],
-    inputs: [{ name: 'Patient Data', description: 'Anaesthesia parameters' }],
-    outputs: [{ name: 'Machine Data', description: 'Anaesthesia machine telemetry' }],
-    interactsWith: ['MONT-MMT'],
-    potentialUseCases: ['PUC2 - Healthcare Security'],
+    shortName: 'PPC-IIOT',
+    title: 'PPC IIoT Lab',
+    categorySlug: 'e-mobility-iiot',
+    sectorSlug: 'energy',
+    provider: 'PPC',
+    description:
+      'Two virtualisation nodes and a number of IIoT devices for cybersecurity experiments; used for evaluating cybersecurity platforms and products.',
+    type: 'Software/Hardware',
+    trl: { current: 9, expected: 9 },
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      {
+        name: 'IIoT Device Traffic',
+        description: 'Industrial IoT device network traffic and telemetry',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Cybersecurity Evaluation Results',
+        description: 'Evaluation results for cybersecurity platforms and products',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['UC5 - Smart Charging Stations'],
     repositoryTable: 'OTHER_SERVICES',
   },
   {
-    shortName: 'VIRT-01',
-    title: 'Kubernetes',
-    categorySlug: 'virtualization',
+    shortName: 'AST-DEDISRV',
+    title: 'Dedicated Server',
+    categorySlug: 'data-center-hosting',
     sectorSlug: 'ict-service-management-b2b',
-    provider: 'Open Source',
-    description: 'Container orchestration platform',
-    type: 'Software',
+    provider: 'AST (Assist Software)',
+    description:
+      'For hosting development environments, version control systems, and CI/CD pipelines.',
+    type: 'Hardware',
     trl: { current: 9, expected: 9 },
-    license: 'Apache-2.0',
-    standards: ['OCI', 'CRI'],
-    inputs: [{ name: 'Container Specs', description: 'Kubernetes manifests' }],
-    outputs: [{ name: 'Running Containers', description: 'Orchestrated containers' }],
-    interactsWith: ['UBI-MAESTRO'],
-    potentialUseCases: ['All Use Cases'],
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      { name: 'CI/CD Jobs', description: 'Build, version control and deployment pipeline jobs' },
+    ],
+    outputs: [
+      {
+        name: 'Hosted Dev Environments',
+        description: 'Hosted development, VCS and CI/CD services',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Cross-cutting infrastructure support'],
     repositoryTable: 'OTHER_SERVICES',
   },
   {
-    shortName: 'VIRT-02',
-    title: 'Proxmox',
-    categorySlug: 'virtualization',
-    sectorSlug: 'energy',
-    provider: 'Open Source',
-    description: 'VM and LXC container platform',
-    type: 'Software',
+    shortName: 'AALTO-LUMI',
+    title: 'LUMI Supercomputer',
+    categorySlug: 'hpc-compute',
+    sectorSlug: 'research',
+    provider: 'AALTO',
+    description: 'Top green supercomputer in EU for AI training.',
+    type: 'Hardware',
     trl: { current: 9, expected: 9 },
-    license: 'AGPL-3.0',
-    standards: ['KVM', 'LXC'],
-    inputs: [{ name: 'VM Configs', description: 'Virtual machine configurations' }],
-    outputs: [{ name: 'Running VMs', description: 'Virtual machines and containers' }],
-    interactsWith: ['VIRT-01'],
-    potentialUseCases: ['PUC4 - Smart Grid'],
+    license: 'N/A (Partner Infrastructure)',
+    standards: [],
+    inputs: [
+      { name: 'AI Training Workloads', description: 'Large-scale AI/ML model training jobs' },
+    ],
+    outputs: [
+      {
+        name: 'Trained AI Models',
+        description: 'AI training results from high-performance computing',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Research infrastructure support'],
     repositoryTable: 'OTHER_SERVICES',
   },
   {
-    shortName: 'NET-01',
-    title: 'GNS3',
-    categorySlug: 'network-simulation',
-    sectorSlug: 'energy',
-    provider: 'Open Source',
-    description: 'Switching and routing simulation',
-    type: 'Software',
-    trl: { current: 8, expected: 9 },
-    license: 'GPL-3.0',
-    standards: ['Various'],
-    inputs: [{ name: 'Network Topology', description: 'Network design' }],
-    outputs: [{ name: 'Simulated Network', description: 'Virtual network environment' }],
-    interactsWith: ['NET-02'],
-    potentialUseCases: ['PUC4 - Smart Grid'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'NET-02',
-    title: 'Mininet',
-    categorySlug: 'network-simulation',
-    sectorSlug: 'energy',
-    provider: 'Open Source',
-    description: 'Network emulation',
-    type: 'Software',
-    trl: { current: 8, expected: 9 },
-    license: 'BSD-3-Clause',
-    standards: ['OpenFlow'],
-    inputs: [{ name: 'Topology Script', description: 'Python topology definition' }],
-    outputs: [{ name: 'Emulated Network', description: 'Software-defined network' }],
-    interactsWith: ['NET-01'],
-    potentialUseCases: ['PUC4 - Smart Grid'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'MON-01',
-    title: 'Grafana',
-    categorySlug: 'monitoring',
-    sectorSlug: 'ict-service-management-b2b',
-    provider: 'Open Source',
-    description: 'Data visualization platform',
-    type: 'Software',
+    shortName: 'AALTO-EDGE5G',
+    title: 'Edge Devices & 5G Testbed',
+    categorySlug: '5g-testbeds',
+    sectorSlug: 'research',
+    provider: 'AALTO',
+    description: 'For IIoT and edge computing.',
+    type: 'Software/Hardware',
     trl: { current: 9, expected: 9 },
-    license: 'AGPL-3.0',
-    standards: ['Prometheus', 'InfluxDB'],
-    inputs: [{ name: 'Metrics', description: 'Time-series metrics data' }],
-    outputs: [{ name: 'Dashboards', description: 'Interactive visualizations' }],
-    interactsWith: ['MON-02', 'MONT-MMT'],
-    potentialUseCases: ['All Use Cases'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'MON-02',
-    title: 'InfluxDB',
-    categorySlug: 'monitoring',
-    sectorSlug: 'ict-service-management-b2b',
-    provider: 'Open Source',
-    description: 'Metrics storage',
-    type: 'Software',
-    trl: { current: 9, expected: 9 },
-    license: 'MIT',
-    standards: ['InfluxQL', 'Flux'],
-    inputs: [{ name: 'Metrics', description: 'Time-series data points' }],
-    outputs: [{ name: 'Query Results', description: 'Aggregated metrics' }],
-    interactsWith: ['MON-01'],
-    potentialUseCases: ['All Use Cases'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'SEC-01',
-    title: 'Kafka',
-    categorySlug: 'security-tools',
-    sectorSlug: 'ict-service-management-b2b',
-    provider: 'Open Source',
-    description: 'Event streaming platform',
-    type: 'Software',
-    trl: { current: 9, expected: 9 },
-    license: 'Apache-2.0',
-    standards: ['Apache Kafka'],
-    inputs: [{ name: 'Events', description: 'Event messages' }],
-    outputs: [{ name: 'Streams', description: 'Event streams to consumers' }],
-    interactsWith: ['AEGIS-COS'],
-    potentialUseCases: ['All Use Cases'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'SEC-02',
-    title: 'OpenVPN',
-    categorySlug: 'security-tools',
-    sectorSlug: 'energy',
-    provider: 'Open Source',
-    description: 'Secure remote access',
-    type: 'Software',
-    trl: { current: 9, expected: 9 },
-    license: 'GPL-2.0',
-    standards: ['OpenVPN'],
-    inputs: [{ name: 'Network Traffic', description: 'Traffic to tunnel' }],
-    outputs: [{ name: 'Encrypted Traffic', description: 'VPN-encapsulated traffic' }],
-    interactsWith: ['SEC-03'],
-    potentialUseCases: ['PUC4 - Smart Grid'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'SEC-03',
-    title: 'WireGuard',
-    categorySlug: 'security-tools',
-    sectorSlug: 'energy',
-    provider: 'Open Source',
-    description: 'Modern VPN protocol',
-    type: 'Software',
-    trl: { current: 9, expected: 9 },
-    license: 'GPL-2.0',
-    standards: ['WireGuard'],
-    inputs: [{ name: 'Network Traffic', description: 'Traffic to tunnel' }],
-    outputs: [{ name: 'Encrypted Traffic', description: 'VPN-encapsulated traffic' }],
-    interactsWith: ['SEC-02'],
-    potentialUseCases: ['PUC4 - Smart Grid'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'TEST-01',
-    title: 'AVL TestGuard',
-    categorySlug: 'testing-tools',
-    sectorSlug: 'manufacturing',
-    provider: 'AVL',
-    description: 'Automotive security testing platform',
-    type: 'Software',
-    trl: { current: 6, expected: 7 },
-    license: 'Proprietary',
-    standards: ['ISO 21434', 'SAE J3061'],
-    inputs: [{ name: 'Vehicle Data', description: 'Automotive network traffic' }],
-    outputs: [{ name: 'Test Results', description: 'Security test findings' }],
-    interactsWith: ['TEST-02'],
-    potentialUseCases: ['PUC3 - Automotive'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'TEST-02',
-    title: 'AVL ThreatGuard',
-    categorySlug: 'testing-tools',
-    sectorSlug: 'manufacturing',
-    provider: 'AVL',
-    description: 'TARA and threat analysis tool',
-    type: 'Software',
-    trl: { current: 6, expected: 7 },
-    license: 'Proprietary',
-    standards: ['ISO 21434', 'STRIDE'],
-    inputs: [{ name: 'System Model', description: 'Vehicle architecture' }],
-    outputs: [{ name: 'Threat Model', description: 'TARA analysis results' }],
-    interactsWith: ['TEST-01'],
-    potentialUseCases: ['PUC3 - Automotive'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'TEST-03',
-    title: 'LearnLib',
-    categorySlug: 'testing-tools',
-    sectorSlug: 'manufacturing',
-    provider: 'Open Source',
-    description: 'Model learning toolkit',
-    type: 'Software',
-    trl: { current: 7, expected: 8 },
-    license: 'Apache-2.0',
-    standards: ['Automata Learning'],
-    inputs: [{ name: 'System Traces', description: 'Execution traces' }],
-    outputs: [{ name: 'Learned Model', description: 'Inferred automaton' }],
-    interactsWith: ['TEST-04'],
-    potentialUseCases: ['PUC3 - Automotive'],
-    repositoryTable: 'OTHER_SERVICES',
-  },
-  {
-    shortName: 'TEST-04',
-    title: 'mCRL2',
-    categorySlug: 'testing-tools',
-    sectorSlug: 'manufacturing',
-    provider: 'Open Source',
-    description: 'Formal verification toolkit',
-    type: 'Software',
-    trl: { current: 7, expected: 8 },
-    license: 'Boost',
-    standards: ['mCRL2'],
-    inputs: [{ name: 'System Spec', description: 'Process algebra specification' }],
-    outputs: [{ name: 'Verification Results', description: 'Model checking results' }],
-    interactsWith: ['TEST-03'],
-    potentialUseCases: ['PUC3 - Automotive'],
+    license: 'N/A (Partner Infrastructure)',
+    standards: ['3GPP'],
+    inputs: [{ name: 'Edge Workloads', description: 'IIoT and edge computing workloads' }],
+    outputs: [
+      {
+        name: 'Edge Computing Results',
+        description: 'Processed IIoT/edge computing outputs over the 5G testbed',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Research infrastructure support'],
     repositoryTable: 'OTHER_SERVICES',
   },
 ];
 
 const servicesData: ServiceSeed[] = [...intactToolboxServices, ...infrastructureServices];
+const activeServiceShortNames = servicesData.map((s) => s.shortName.toUpperCase());
 
 export const seedServices = async (): Promise<void> => {
-  console.log('Seeding services...');
+  console.info('Seeding services...');
 
   // Get all categories for lookup
   const categories = await Category.find();
   const categoryMap = new Map(categories.map((c) => [c.slug, c._id]));
 
-  // Get all sectors for lookup (for Critical Infrastructure Services migration)
+  // Get all sectors for lookup (for Critical Infrastructure Services)
   const sectors = await Sector.find();
   const sectorMap = new Map(sectors.map((s) => [s.slug, s._id]));
 
+  let created = 0;
+  let updated = 0;
+  let unchanged = 0;
+  let skipped = 0;
+
   for (const serviceData of servicesData) {
-    const existing = await Service.findOne({ shortName: serviceData.shortName });
+    const categoryId = categoryMap.get(serviceData.categorySlug);
 
-    if (!existing) {
-      const categoryId = categoryMap.get(serviceData.categorySlug);
+    if (!categoryId) {
+      console.error(
+        `  Category not found for ${serviceData.shortName}: ${serviceData.categorySlug}`
+      );
+      skipped++;
+      continue;
+    }
 
-      if (!categoryId) {
-        console.error(
-          `  Category not found for ${serviceData.shortName}: ${serviceData.categorySlug}`
-        );
-        continue;
+    let sectorId = undefined;
+    if (serviceData.sectorSlug) {
+      sectorId = sectorMap.get(serviceData.sectorSlug);
+      if (!sectorId) {
+        console.warn(`  Sector not found for ${serviceData.shortName}: ${serviceData.sectorSlug}`);
       }
+    }
 
-      // Look up sector if provided (for Critical Infrastructure Services)
-      let sectorId = undefined;
-      if (serviceData.sectorSlug) {
-        sectorId = sectorMap.get(serviceData.sectorSlug);
-        if (!sectorId) {
-          console.warn(
-            `  Sector not found for ${serviceData.shortName}: ${serviceData.sectorSlug}`
-          );
-        }
-      }
+    const desiredFields: Record<string, unknown> = {
+      title: serviceData.title,
+      categoryId,
+      sectorId,
+      provider: serviceData.provider,
+      description: serviceData.description,
+      type: serviceData.type,
+      trl: serviceData.trl,
+      license: serviceData.license,
+      standards: serviceData.standards,
+      inputs: serviceData.inputs,
+      outputs: serviceData.outputs,
+      interactsWith: serviceData.interactsWith,
+      potentialUseCases: serviceData.potentialUseCases,
+      repositoryTable: serviceData.repositoryTable,
+    };
 
-      await Service.create({
-        ...serviceData,
-        categoryId,
-        sectorId,
-        currentVersion: '1.0.0',
-        versions: [
-          {
-            version: '1.0.0',
-            dockerImage: `registry.intact-project.eu/${serviceData.provider.toLowerCase().replace(/\s+/g, '-')}/${serviceData.shortName.toLowerCase()}:v1.0.0`,
-            releaseNotes: 'Initial release',
-            releasedAt: new Date(),
+    const action = await upsertRecord(Service, { shortName: serviceData.shortName }, desiredFields);
+
+    if (action === 'created') {
+      created++;
+      // A brand-new service needs an initial version entry; upsertRecord only
+      // manages the tracked fields above, so set it separately.
+      await Service.updateOne(
+        { shortName: serviceData.shortName },
+        {
+          $set: {
+            currentVersion: '1.0.0',
+            versions: [
+              {
+                version: '1.0.0',
+                dockerImage: `registry.montimage.eu/${serviceData.provider.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/${serviceData.shortName.toLowerCase()}:v1.0.0`,
+                releaseNotes: 'Initial release',
+                releasedAt: new Date(),
+              },
+            ],
           },
-        ],
-      });
-      const sectorInfo = sectorId ? ` (sector: ${serviceData.sectorSlug})` : '';
-      console.log(`  Created service: ${serviceData.shortName}${sectorInfo}`);
-    } else {
-      // Migration: Update existing services with sectorId if they don't have one
-      if (serviceData.sectorSlug && !existing.sectorId) {
-        const sectorId = sectorMap.get(serviceData.sectorSlug);
-        if (sectorId) {
-          await Service.updateOne({ _id: existing._id }, { sectorId });
-          console.log(
-            `  Migrated service: ${serviceData.shortName} -> sector: ${serviceData.sectorSlug}`
-          );
-        } else {
-          console.warn(
-            `  Sector not found for migration ${serviceData.shortName}: ${serviceData.sectorSlug}`
-          );
         }
-      } else {
-        console.log(`  Service exists: ${serviceData.shortName}`);
-      }
+      );
+      const sectorInfo = sectorId ? ` (sector: ${serviceData.sectorSlug})` : '';
+      console.info(`  Created service: ${serviceData.shortName}${sectorInfo}`);
+    } else if (action === 'updated') {
+      updated++;
+      console.info(`  Updated service: ${serviceData.shortName}`);
+    } else {
+      unchanged++;
+      console.info(`  Service up to date: ${serviceData.shortName}`);
     }
   }
 
-  console.log('Services seeded successfully');
+  const deprecatedCount = await deprecateStale(Service, {}, 'shortName', activeServiceShortNames);
+  if (deprecatedCount > 0) {
+    console.info(`  Deprecated ${deprecatedCount} services no longer in the source catalog`);
+  }
+
+  console.info(
+    `Services seeded successfully (${created} created, ${updated} updated, ${unchanged} unchanged, ${skipped} skipped, ${deprecatedCount} deprecated)`
+  );
 };
