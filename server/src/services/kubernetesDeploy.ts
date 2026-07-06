@@ -412,6 +412,98 @@ export async function getDeploymentStatus(
 }
 
 /**
+ * True once every service has left `pending` (all `running` or `failed`), i.e.
+ * the deploy has settled and there is nothing left to poll for. An empty list
+ * is trivially settled (nothing was deployed).
+ */
+export function isDeploymentSettled(statuses: { status: DeployStatus }[]): boolean {
+  return statuses.every((s) => s.status !== 'pending');
+}
+
+/** A single line of pod log output tagged with its originating service/pod. */
+export interface PodLogLine {
+  /** Service resource name (shared Deployment/Service name) the pod belongs to. */
+  name: string;
+  /** Concrete pod name the line came from. */
+  pod: string;
+  /** One line of container log output (no trailing newline). */
+  line: string;
+}
+
+/**
+ * Collect pod log output for the given service names and return only the lines
+ * not yet emitted. `seen` is a caller-owned map of pod name -> count of lines
+ * already surfaced; it is mutated in place so successive calls yield only new
+ * output. The full log is re-read each call (scenario pods are short-lived and
+ * low-volume) so the line-count offset is always relative to a stable base.
+ *
+ * Pods that are missing or not yet ready to serve logs (404 / 400) are skipped
+ * rather than throwing, so a transient state does not tear down a tail loop.
+ * Any other cluster error is wrapped in an `AppError` and surfaced to the
+ * caller so the stream can report it and clean up.
+ */
+export async function collectNewPodLogs(
+  clients: K8sClients,
+  opts: { namespace: string; names: string[]; seen: Map<string, number> }
+): Promise<PodLogLine[]> {
+  const out: PodLogLine[] = [];
+  try {
+    for (const name of opts.names) {
+      const pods = await clients.core.listNamespacedPod({
+        namespace: opts.namespace,
+        labelSelector: `app=${name}`,
+      });
+      for (const pod of pods.items ?? []) {
+        const podName = pod.metadata?.name;
+        if (!podName) continue;
+
+        let raw: string;
+        try {
+          raw = await clients.core.readNamespacedPodLog({
+            name: podName,
+            namespace: opts.namespace,
+          });
+        } catch (err) {
+          // A pod that has not started its container yet (400) or has already
+          // been removed (404) simply has no readable logs — skip it.
+          if (err instanceof ApiException && (err.code === 400 || err.code === 404)) {
+            continue;
+          }
+          throw err;
+        }
+
+        const lines = raw.split('\n');
+        if (lines.length && lines[lines.length - 1] === '') {
+          lines.pop();
+        }
+        const already = opts.seen.get(podName) ?? 0;
+        for (let i = already; i < lines.length; i++) {
+          out.push({ name, pod: podName, line: lines[i] });
+        }
+        opts.seen.set(podName, lines.length);
+      }
+    }
+    return out;
+  } catch (err) {
+    throw toAppError(err, `reading pod logs in namespace ${opts.namespace}`);
+  }
+}
+
+/**
+ * Lightweight liveness probe against a cluster: list a single namespace. A
+ * successful call means the API server answered and authorized the request.
+ * Any transport / auth / TLS failure is wrapped in an `AppError` so callers can
+ * report a failed connection test instead of crashing.
+ */
+export async function pingCluster(clients: K8sClients): Promise<void> {
+  try {
+    await clients.core.listNamespace({ limit: 1 });
+  } catch (err) {
+    throw toAppError(err, 'testing the cluster connection');
+  }
+}
+
+/**
  * Tear down a deployed execution by deleting its namespace, which cascades to
  * the Deployments, Services and Pods within it. Deleting an already-gone
  * namespace is treated as success (idempotent).
