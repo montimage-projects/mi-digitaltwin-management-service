@@ -13,7 +13,9 @@ function brandingHtmlPlugin(env: Record<string, string>): Plugin {
   return {
     name: 'branding-html',
     transformIndexHtml(html) {
-      return html.replace('__APP_NAME__', () => appName).replace('__FAVICON_SRC__', () => faviconSrc);
+      return html
+        .replace('__APP_NAME__', () => appName)
+        .replace('__FAVICON_SRC__', () => faviconSrc);
     },
   };
 }
