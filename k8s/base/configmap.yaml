@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  # Mirrors the non-secret env vars set by docker-compose.prod.yml /
+  # docker-compose.atlas.yml. Secret-bearing vars (JWT_SECRET, ADMIN_PASSWORD,
+  # ENCRYPTION_KEY, MONGODB_URI) live in the Secret instead — see
+  # secret.example.yaml.
+  NODE_ENV: 'production'
+  PORT: '3000'
+  JWT_EXPIRES_IN: '24h'
+  CORS_ORIGIN: 'http://localhost:3000'
+  ADMIN_USERNAME: 'admin'
+  MAESTRO_BASE_URL: 'https://maestro.intact-project.eu'
+  BRANDING_PROFILE: 'default'
+  APP_NAME: ''
+  ORG_NAME: ''
+  ORG_URL: ''
+  SERVE_STATIC: 'true'
+  SEED_ON_STARTUP: 'true'
+  # NOTE: server/docker-entrypoint.sh defaults DATA_DIR to /app/data, which
+  # does not match the /app/server/data path the Dockerfile actually creates
+  # and the Compose files actually mount (a pre-existing, latent mismatch in
+  # the Compose setup that is out of scope to fix there). Set it explicitly
+  # here so it matches the PVC mount path below and in deployment.yaml.
+  DATA_DIR: '/app/server/data'

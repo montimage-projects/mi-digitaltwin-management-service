@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+spec:
+  # No separate seed Job: server/docker-entrypoint.sh (the container's
+  # ENTRYPOINT, baked into server/Dockerfile.unified) already does
+  # seed-once-then-exec logic gated by a .seeded marker file on the PVC
+  # mounted below — exactly like Docker Compose does today. That gating is
+  # per-Pod, not distributed, so this first increment ships with a single
+  # replica. Scaling beyond 1 would need a different seed-gating strategy
+  # (e.g. an initContainer/Job decoupled from a per-replica PVC) — legitimate
+  # follow-up work, not part of this change. See "Scaling Considerations" in
+  # docs/playbooks/kubernetes-deployment.md.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      securityContext:
+        # Matches the non-root `intact` user (uid 1001, gid 1001) already
+        # baked into server/Dockerfile.unified. fsGroup ensures the PVC
+        # mounted below is group-writable by that user on cluster-provisioned
+        # volumes (Docker Compose's named volume gets this ownership for free
+        # by copying it from the image on first mount; PVCs generally do not).
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+        - name: app
+          # TODO: replace with your built/pushed image. There is no CI
+          # image-publish pipeline in this repo yet (tracked as follow-up
+          # work) — build and push it yourself first:
+          #   docker build -f server/Dockerfile.unified -t <your-registry>/<image>:<tag> .
+          #   docker push <your-registry>/<image>:<tag>
+          image: ghcr.io/montimage-projects/mi-digitaltwin-management-service:latest # TODO: replace with your built/pushed image
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: app-config
+          env:
+            # Order matters: overlays/{prod,dev}/kustomization.yaml patch the
+            # MONGODB_URI entry below by array index (currently 3) to point at
+            # the in-cluster mongodb component instead of the Secret. Keep
+            # those patches in sync if this order changes.
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: JWT_SECRET
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: ADMIN_PASSWORD
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: ENCRYPTION_KEY
+            - name: MONGODB_URI
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: MONGODB_URI
+          volumeMounts:
+            - name: app-data
+              mountPath: /app/server/data
+          # Same endpoint as the Dockerfile's own HEALTHCHECK (server/src/app.ts).
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+      volumes:
+        - name: app-data
+          persistentVolumeClaim:
+            claimName: app-data

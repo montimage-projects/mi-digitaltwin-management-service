@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # Only needs to hold the seed marker file (.seeded) and any other small
+      # persistent app state. Increase if your cluster's default StorageClass
+      # requires a larger minimum, or if you plan to store more here.
+      storage: 1Gi
