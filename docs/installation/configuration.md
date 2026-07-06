@@ -53,17 +53,15 @@ NODE_ENV=development
 
 ### Available Variables
 
-| Variable           | Description              | Default                             |
-| ------------------ | ------------------------ | ----------------------------------- |
-| `VITE_API_URL`     | Backend API URL          | `http://localhost:3000`             |
-| `VITE_MAESTRO_URL` | MAESTRO orchestrator URL | `https://maestro.intact-project.eu` |
+| Variable       | Description     | Default                 |
+| -------------- | --------------- | ----------------------- |
+| `VITE_API_URL` | Backend API URL | `http://localhost:3000` |
 
 ### Example Client .env
 
 ```bash
 # client/.env
 VITE_API_URL=http://localhost:3000
-VITE_MAESTRO_URL=https://maestro.intact-project.eu
 ```
 
 ### Accessing Variables in Code

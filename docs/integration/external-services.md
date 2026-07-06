@@ -219,7 +219,7 @@ kafka:
 ```bash
 # .env (development)
 MONGODB_URI=mongodb://localhost:27017/intact
-VITE_MAESTRO_URL=https://maestro-dev.intact-project.eu
+MAESTRO_BASE_URL=https://maestro-dev.intact-project.eu
 ```
 
 ### Production
@@ -227,7 +227,7 @@ VITE_MAESTRO_URL=https://maestro-dev.intact-project.eu
 ```bash
 # .env.prod
 MONGODB_URI=mongodb+srv://prod-user:***@cluster.mongodb.net/intact_prod
-VITE_MAESTRO_URL=https://maestro.intact-project.eu
+MAESTRO_BASE_URL=https://maestro.intact-project.eu
 ```
 
 ## Health Monitoring
