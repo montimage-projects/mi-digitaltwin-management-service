@@ -47,7 +47,7 @@ spec:
           # work) — build and push it yourself first:
           #   docker build -f server/Dockerfile.unified -t <your-registry>/<image>:<tag> .
           #   docker push <your-registry>/<image>:<tag>
-          image: ghcr.io/montimage-projects/mi-digitaltwin-management-service:latest # TODO: replace with your built/pushed image
+          image: ghcr.io/montimage-projects/mi-digitaltwin-management-service:latest # TODO: replace with your built/pushed image (node:20-slim based)
           ports:
             - name: http
               containerPort: 3000

@@ -247,7 +247,7 @@ docker-compose -f docker-compose.atlas.yml up -d
 
 ```bash
 # Seed Atlas database with initial data
-docker-compose exec server bun run seed
+docker-compose exec server npm run seed
 ```
 
 ## Option 3: Kubernetes Deployment (Recommended)

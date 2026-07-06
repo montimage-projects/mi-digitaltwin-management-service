@@ -1,5 +1,5 @@
 # Development Docker Compose - MongoDB and admin tools only
-# Application runs locally with: bun run dev
+# Application runs locally with: npm run dev
 
 services:
   mongodb:

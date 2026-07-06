@@ -171,7 +171,7 @@ kubectl delete pod "$POD" -n montimage-prod   # Deployment recreates it, entrypo
 Or run the seed script directly without removing the marker:
 
 ```bash
-kubectl exec "$POD" -n montimage-prod -- bun src/seed/index.ts
+kubectl exec "$POD" -n montimage-prod -- npx tsx src/seed/index.ts
 ```
 
 ## Backup and Restore

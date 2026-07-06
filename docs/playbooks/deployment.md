@@ -163,7 +163,7 @@ docker compose -f docker-compose.prod.yml restart app
 Or manually run the seed:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec app bun src/seed/index.ts
+docker compose -f docker-compose.prod.yml exec app npx tsx src/seed/index.ts
 ```
 
 ## Backup and Restore
@@ -257,7 +257,7 @@ docker compose -f docker-compose.prod.yml exec app \
 
 ```bash
 # Re-run seed script (resets to default credentials)
-docker compose -f docker-compose.prod.yml exec app bun src/seed/index.ts
+docker compose -f docker-compose.prod.yml exec app npx tsx src/seed/index.ts
 ```
 
 ## Security Recommendations

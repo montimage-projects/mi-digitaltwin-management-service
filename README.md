@@ -6,9 +6,8 @@ A centralized platform for managing a comprehensive cybersecurity service reposi
 
 ### Prerequisites
 
-- **Bun** v1.0+ (primary runtime)
+- **Node.js** 20+ (runtime)
 - **Docker & Docker Compose** (for MongoDB)
-- **Node.js** 18+ (optional fallback)
 
 ### Setup (3 steps)
 
@@ -19,12 +18,12 @@ docker-compose up -d mongodb
 # 2. Start backend (Express API on :3000)
 cd server
 cp .env.example .env
-bun install && bun run seed && bun run dev
+npm install && npm run seed && npm run dev
 
 # 3. Start frontend in new terminal (React on :5173)
 cd client
 cp .env.example .env
-bun install && bun run dev
+npm install && npm run dev
 ```
 
 **Access:** http://localhost:5173 | **Login:** admin / intact2025
@@ -110,7 +109,7 @@ Configuration Files
   .markdownlintrc
   .prettierrc
   .prettierignore
-  bun.lock
+  package-lock.json
   docker-compose.yml
   docker-compose.prod.yml
   docker-compose.atlas.yml
@@ -144,7 +143,7 @@ Root Documentation
 
 ### Backend
 
-- **Bun** runtime with TypeScript
+- **Node.js** runtime with TypeScript
 - **Express.js** HTTP framework
 - **MongoDB** document database
 - **Mongoose** ODM
