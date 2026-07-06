@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
+import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import mongoose from 'mongoose';
 import { Category } from '../../models/Category.js';
 import { Service } from '../../models/Service.js';

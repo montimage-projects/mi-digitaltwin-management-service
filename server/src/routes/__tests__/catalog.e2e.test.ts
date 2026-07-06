@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
+import { describe, test, expect, beforeAll, afterAll } from 'vitest';
 import express, { type Express } from 'express';
 import type { AddressInfo } from 'node:net';
 import jwt from 'jsonwebtoken';
