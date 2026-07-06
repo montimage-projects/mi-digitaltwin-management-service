@@ -25,8 +25,7 @@ graph TB
  DB[(MongoDB)]
  end
 
- subgraph External["External Services"]
- MAESTRO[MAESTRO Orchestrator]
+ subgraph External["Infrastructure"]
  K8S[Kubernetes Clusters]
  end
 
@@ -35,13 +34,13 @@ graph TB
  Pages --> RQ
  RQ --> API
  API -->|HTTP/JSON| Routes
+ API -.->|SSE progress + logs| Routes
  Routes --> MW
  MW --> Valid
  Valid --> Models
  Models --> DB
 
- Pages -.->|iFrame| MAESTRO
- MAESTRO --> K8S
+ Routes -->|deploy topology| K8S
 
  style Client fill:#e3f2fd
  style Server fill:#e8f5e9
