@@ -3,7 +3,7 @@ import { Info, Users, FolderTree, Server } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { categoriesApi } from '@/lib/api';
-import { ORG_NAME, ORG_URL, ORG_DESCRIPTION } from '@/lib/branding';
+import { ORG_NAME, ORG_URL, ORG_DESCRIPTION, LOGO_SRC } from '@/lib/branding';
 import { UserManagement } from './UserManagement';
 
 export function Settings() {
@@ -59,7 +59,7 @@ export function Settings() {
             </div>
 
             <div className="mt-6 flex items-start gap-4 border-t pt-6">
-              <img src="/montimage_logo.png" alt={ORG_NAME} className="h-10 w-auto" />
+              <img src={LOGO_SRC} alt={ORG_NAME} className="h-10 w-auto" />
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">
                   About{' '}

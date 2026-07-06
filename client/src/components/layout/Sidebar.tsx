@@ -10,7 +10,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { APP_NAME_SHORT, ORG_NAME } from '@/lib/branding';
+import { APP_NAME_SHORT, ORG_NAME, LOGO_SRC } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 
 const navigation = [
@@ -39,7 +39,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     >
       {/* Logo */}
       <div className="flex h-16 items-center justify-between border-b px-4">
-        {!collapsed && <img src="/montimage_logo.png" alt={ORG_NAME} className="h-10 w-auto" />}
+        {!collapsed && <img src={LOGO_SRC} alt={ORG_NAME} className="h-10 w-auto" />}
         <Button
           variant="ghost"
           size="icon"

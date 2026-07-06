@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Loader2, Shield, Network, Lock } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { authApi } from '@/lib/api';
-import { ORG_NAME } from '@/lib/branding';
+import { APP_NAME, ORG_NAME, LOGO_SRC } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,12 +60,12 @@ export function Login() {
 
           {/* Logo */}
           <div className="login-logo-wrapper">
-            <img src="/montimage_logo.png" alt={ORG_NAME} className="login-logo" />
+            <img src={LOGO_SRC} alt={ORG_NAME} className="login-logo" />
           </div>
 
           {/* Tagline */}
           <div className="login-tagline">
-            <h2 className="login-tagline-title">Digital Twin Management Platform</h2>
+            <h2 className="login-tagline-title">{APP_NAME}</h2>
             <p className="login-tagline-subtitle">
               Secure infrastructure modeling for critical systems
             </p>
@@ -114,7 +114,7 @@ export function Login() {
         <div className="login-form-wrapper">
           {/* Mobile logo */}
           <div className="login-mobile-logo">
-            <img src="/montimage_logo.png" alt={ORG_NAME} />
+            <img src={LOGO_SRC} alt={ORG_NAME} />
           </div>
 
           <div className="login-form-header">
