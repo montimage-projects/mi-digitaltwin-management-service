@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base manifests for the MI Digital Twin Management Service app.
+# Intentionally does NOT include secret.example.yaml — it is a template only,
+# copy it to secret.yaml (git-ignored) and apply it separately with
+# `kubectl apply -f`, never through this kustomization. See
+# docs/playbooks/kubernetes-deployment.md for the full procedure.
+# Intentionally does NOT set a namespace — each overlay in ../overlays/*
+# sets its own via `namespace:` + a namespace.yaml resource.
+resources:
+  - deployment.yaml
+  - service.yaml
+  - configmap.yaml
+  - pvc.yaml

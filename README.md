@@ -185,19 +185,29 @@ Root Documentation
 
 ## Deployment
 
-**Development:**
+**Kubernetes (Kustomize) — recommended for new deployments:**
+
+```bash
+kubectl apply -k k8s/overlays/prod # or overlays/dev, overlays/atlas
+```
+
+See the [Kubernetes Deployment Playbook](docs/playbooks/kubernetes-deployment.md) for prerequisites and full setup.
+
+**Docker Compose — fully supported:**
+
+Development:
 
 ```bash
 docker-compose up -d # All services
 ```
 
-**Production:**
+Production:
 
 ```bash
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
-**MongoDB Atlas:**
+MongoDB Atlas:
 
 ```bash
 docker-compose -f docker-compose.atlas.yml up -d
