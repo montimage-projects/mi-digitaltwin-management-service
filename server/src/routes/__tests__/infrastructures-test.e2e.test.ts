@@ -154,6 +154,25 @@ describe('POST /api/infrastructures/:id/test (real connection test)', () => {
     expect(infra?.status).toBe('error');
   });
 
+  test('404s when the infrastructure does not exist', async () => {
+    if (!mongoAvailable) return;
+    const missing = new mongoose.Types.ObjectId().toString();
+    const res = await fetch(`${baseUrl}/api/infrastructures/${missing}/test`, {
+      method: 'POST',
+      headers: authHeader,
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test('400s for a malformed infrastructure id', async () => {
+    if (!mongoAvailable) return;
+    const res = await fetch(`${baseUrl}/api/infrastructures/not-an-object-id/test`, {
+      method: 'POST',
+      headers: authHeader,
+    });
+    expect(res.status).toBe(400);
+  });
+
   test('reports failure when the credentials are rejected (401)', async () => {
     if (!mongoAvailable) return;
     impl.listNamespace = async () => {
