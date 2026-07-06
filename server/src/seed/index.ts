@@ -2,28 +2,32 @@ import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { seedCategories } from './categories.seed.js';
 import { seedSectors } from './sectors.seed.js';
 import { seedServices } from './services.seed.js';
+import { seedPartners } from './partners.seed.js';
 import { seedAdmin } from './admin.seed.js';
 
 const runSeeds = async (): Promise<void> => {
-  console.log('Starting database seeding...\n');
+  console.info('Starting database seeding...\n');
 
   try {
     await connectDatabase();
 
     // Run seeds in order (categories and sectors must be first for services)
     await seedCategories();
-    console.log('');
+    console.info('');
 
     await seedSectors();
-    console.log('');
+    console.info('');
 
     await seedServices();
-    console.log('');
+    console.info('');
+
+    await seedPartners();
+    console.info('');
 
     await seedAdmin();
-    console.log('');
+    console.info('');
 
-    console.log('All seeds completed successfully!');
+    console.info('All seeds completed successfully!');
   } catch (error) {
     console.error('Seeding failed:', error);
     process.exit(1);
