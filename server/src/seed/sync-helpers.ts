@@ -97,8 +97,20 @@ export async function upsertRecord<TDoc extends Document>(
     return 'created';
   }
 
+  const seedManagedValue = readField(existing, 'seedManaged');
+
+  // Explicitly `false` means an operator created/owns this record outside
+  // the seed mechanism (e.g. via `POST /api/services`). Unlike a missing
+  // value (a legacy record seeded before this flag existed, which is still
+  // safe to backfill/update below), an explicit `false` must never be
+  // touched — not its fields, not its `deprecated`/`seedManaged` flags —
+  // even if its match key collides with a seed-source entry.
+  if (seedManagedValue === false) {
+    return 'unchanged';
+  }
+
   const wasDeprecated = readField(existing, 'deprecated') === true;
-  const wasSeedManaged = readField(existing, 'seedManaged') === true;
+  const wasSeedManaged = seedManagedValue === true;
   const fieldsChanged = Object.entries(desiredFields).some(
     ([key, value]) => !valuesEqual(readField(existing, key), value)
   );

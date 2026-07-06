@@ -225,6 +225,36 @@ describe('upsertRecord', () => {
     expect(action).toBe('updated');
     expect(fake.docs[0].seedManaged).toBe(true);
   });
+
+  test('never overwrites or reclassifies a record explicitly marked seedManaged=false, even when its key collides with a seed entry', async () => {
+    const fake = new FakeModel<Widget>();
+    // Simulates a service an operator created by hand via the API — its key
+    // (slug) happens to collide with a seed-source entry, and its fields
+    // differ from what the seed data would set.
+    await fake.create({
+      slug: 'a',
+      name: 'Operator Widget',
+      tags: ['operator-tag'],
+      deprecated: false,
+      seedManaged: false,
+    });
+
+    const model = asModel(fake);
+    const action = await upsertRecord(
+      model,
+      { slug: 'a' },
+      { slug: 'a', name: 'Seed Widget', tags: ['seed-tag'] }
+    );
+
+    expect(action).toBe('unchanged');
+    expect(fake.docs[0]).toMatchObject({
+      slug: 'a',
+      name: 'Operator Widget',
+      tags: ['operator-tag'],
+      deprecated: false,
+      seedManaged: false,
+    });
+  });
 });
 
 describe('deprecateStale', () => {
