@@ -6,6 +6,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { validateBody, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { encrypt } from '../utils/encryption.js';
+import { buildClientFromInfrastructure, pingCluster } from '../services/kubernetesDeploy.js';
 
 const router: RouterType = Router();
 
@@ -198,17 +199,22 @@ router.post('/:id/test', authMiddleware, async (req, res, next) => {
       throw new AppError('Infrastructure not found', 404);
     }
 
-    // For now, simulate a successful connection test
-    // In production, this would decrypt credentials and test actual connectivity
-    const success = true; // Placeholder for actual connection test
-
-    if (success) {
-      infrastructure.status = 'active';
-      infrastructure.lastHealthCheck = new Date();
-    } else {
-      infrastructure.status = 'error';
-      infrastructure.lastHealthCheck = new Date();
+    // Decrypt credentials, build a cluster client and make a lightweight real
+    // call (list a single namespace). Expected connection failures — an
+    // unreachable endpoint, bad credentials or a TLS error — must not 500 the
+    // route: they resolve to `success: false` with a descriptive message.
+    let success = false;
+    let message = 'Connection successful';
+    try {
+      const clients = buildClientFromInfrastructure(infrastructure);
+      await pingCluster(clients);
+      success = true;
+    } catch (err) {
+      message = err instanceof Error ? err.message : 'Connection failed';
     }
+
+    infrastructure.status = success ? 'active' : 'error';
+    infrastructure.lastHealthCheck = new Date();
 
     await infrastructure.save();
 
@@ -216,7 +222,7 @@ router.post('/:id/test', authMiddleware, async (req, res, next) => {
       success,
       status: infrastructure.status,
       lastHealthCheck: infrastructure.lastHealthCheck,
-      message: success ? 'Connection successful' : 'Connection failed',
+      message,
     });
   } catch (error) {
     next(error);
