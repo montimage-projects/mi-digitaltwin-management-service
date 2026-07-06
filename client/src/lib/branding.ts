@@ -28,7 +28,7 @@ export const FAVICON_SRC = import.meta.env.VITE_FAVICON_SRC || profile.faviconSr
  * wordmark stays legible on the app's dark chrome (profile-specific).
  */
 export const LOGO_BACKDROP =
-  (import.meta.env.VITE_LOGO_BACKDROP ?? String(profile.logoBackdrop)) === 'true';
+  (import.meta.env.VITE_LOGO_BACKDROP || String(profile.logoBackdrop)) === 'true';
 
 export const ORG_NAME = import.meta.env.VITE_ORG_NAME || 'Montimage';
 

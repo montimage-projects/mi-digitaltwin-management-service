@@ -128,6 +128,7 @@ logo/favicon assets referenced must exist in `client/public/`.
 | `VITE_ORG_NAME`        | `ORG_NAME`      | Owning organization name                    |
 | `VITE_ORG_URL`         | `ORG_URL`       | Owning organization URL                     |
 | `VITE_ORG_DESCRIPTION` | —               | Organization description (Settings "About") |
+| `VITE_LOGO_BACKDROP`   | —               | Logo backdrop chip toggle (`true`/`false`)  |
 
 > **Note:** The organization fields (`ORG_NAME`, `ORG_URL`, `ORG_DESCRIPTION`)
 > default to Montimage for **all** profiles — including `intact` and
