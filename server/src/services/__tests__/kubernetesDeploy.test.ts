@@ -55,6 +55,9 @@ const {
   resolveTopologyNodes,
   deployTopology,
   getDeploymentStatus,
+  isDeploymentSettled,
+  collectNewPodLogs,
+  pingCluster,
   teardownDeployment,
   buildClientFromInfrastructure,
 } = await import('../kubernetesDeploy.js');
@@ -301,6 +304,116 @@ describe('teardownDeployment', () => {
     } catch (err) {
       expect(err).toBeInstanceOf(AppError);
       expect((err as AppError).statusCode).toBe(502);
+    }
+  });
+});
+
+describe('isDeploymentSettled', () => {
+  test('is settled once every service has left pending', () => {
+    expect(isDeploymentSettled([{ status: 'running' }, { status: 'failed' }])).toBe(true);
+  });
+
+  test('is not settled while any service is still pending', () => {
+    expect(isDeploymentSettled([{ status: 'running' }, { status: 'pending' }])).toBe(false);
+  });
+
+  test('treats an empty deployment as trivially settled', () => {
+    expect(isDeploymentSettled([])).toBe(true);
+  });
+});
+
+describe('collectNewPodLogs', () => {
+  test('emits only unseen lines, tagged by service and pod', async () => {
+    let log = 'line-1\nline-2\n';
+    const clients = {
+      core: {
+        listNamespacedPod: mock(async () => ({ items: [{ metadata: { name: 'svc-a-pod' } }] })),
+        readNamespacedPodLog: mock(async () => log),
+      },
+      apps: {},
+    };
+    const seen = new Map<string, number>();
+
+    const first = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['svc-a'],
+      seen,
+    });
+    expect(first).toEqual([
+      { name: 'svc-a', pod: 'svc-a-pod', line: 'line-1' },
+      { name: 'svc-a', pod: 'svc-a-pod', line: 'line-2' },
+    ]);
+
+    // A subsequent poll surfaces only the newly appended line.
+    log = 'line-1\nline-2\nline-3\n';
+    const second = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['svc-a'],
+      seen,
+    });
+    expect(second).toEqual([{ name: 'svc-a', pod: 'svc-a-pod', line: 'line-3' }]);
+  });
+
+  test('skips a pod that is not yet ready to serve logs (400/404)', async () => {
+    const clients = {
+      core: {
+        listNamespacedPod: mock(async () => ({ items: [{ metadata: { name: 'p' } }] })),
+        readNamespacedPodLog: mock(async () => {
+          throw new ApiException(400, 'container is waiting to start');
+        }),
+      },
+      apps: {},
+    };
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['svc-a'],
+      seen: new Map(),
+    });
+    expect(out).toEqual([]);
+  });
+
+  test('wraps an unexpected cluster error as AppError(502)', async () => {
+    const clients = {
+      core: {
+        listNamespacedPod: mock(async () => {
+          throw new ApiException(500, 'boom');
+        }),
+        readNamespacedPodLog: mock(async () => ''),
+      },
+      apps: {},
+    };
+    try {
+      await collectNewPodLogs(clients as never, {
+        namespace: 'ns',
+        names: ['svc-a'],
+        seen: new Map(),
+      });
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppError);
+      expect((err as AppError).statusCode).toBe(502);
+    }
+  });
+});
+
+describe('pingCluster', () => {
+  test('resolves when the cluster answers a namespace listing', async () => {
+    const listNamespace = mock(async () => ({ items: [] }));
+    await expect(
+      pingCluster({ core: { listNamespace }, apps: {} } as never)
+    ).resolves.toBeUndefined();
+    expect(listNamespace).toHaveBeenCalledTimes(1);
+  });
+
+  test('wraps a transport/auth failure as AppError', async () => {
+    const listNamespace = mock(async () => {
+      throw new Error('ECONNREFUSED 10.0.0.1:6443');
+    });
+    try {
+      await pingCluster({ core: { listNamespace }, apps: {} } as never);
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppError);
     }
   });
 });
