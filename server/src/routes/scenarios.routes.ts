@@ -9,11 +9,17 @@ import { validateBody, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
 import {
   buildClientFromInfrastructure,
+  collectNewPodLogs,
   deployTopology,
   deriveNamespace,
+  getDeploymentStatus,
+  isDeploymentSettled,
   teardownDeployment,
   type ServiceImageSource,
 } from '../services/kubernetesDeploy.js';
+
+/** Interval between cluster status/log polls for the SSE progress stream. */
+const SSE_POLL_INTERVAL_MS = 2000;
 
 const router: RouterType = Router();
 
@@ -339,6 +345,130 @@ router.delete('/scenarios/:id/executions/:executionId', authMiddleware, async (r
     next(error);
   }
 });
+
+// GET /api/scenarios/:id/executions/:executionId/events - Stream deploy progress + logs (SSE)
+router.get(
+  '/scenarios/:id/executions/:executionId/events',
+  authMiddleware,
+  async (req, res, next) => {
+    try {
+      const { id, executionId } = req.params;
+
+      const parseResult1 = objectIdSchema.safeParse(id);
+      const parseResult2 = objectIdSchema.safeParse(executionId);
+      if (!parseResult1.success || !parseResult2.success) {
+        throw new AppError('Invalid ID', 400);
+      }
+
+      const scenario = await Scenario.findById(id);
+      if (!scenario) {
+        throw new AppError('Scenario not found', 404);
+      }
+
+      const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
+      if (!execution) {
+        throw new AppError('Execution not found', 404);
+      }
+
+      const namespace = execution.namespace;
+      const names = (execution.deployedServices ?? [])
+        .map((s) => s.name)
+        .filter((n): n is string => Boolean(n));
+
+      // Nothing was deployed, or the execution has already reached a terminal
+      // state — there is nothing to poll for. Emit a single snapshot and close.
+      const terminal =
+        !namespace ||
+        names.length === 0 ||
+        execution.status === 'completed' ||
+        execution.status === 'failed';
+
+      // Build the cluster client (may throw on bad credentials) *before*
+      // switching the response to an event stream, so a failure returns a
+      // normal JSON error rather than a half-open SSE connection.
+      const infrastructure = terminal
+        ? null
+        : await Infrastructure.findById(scenario.infrastructureId);
+      if (!terminal && !infrastructure) {
+        throw new AppError('Assigned infrastructure not found', 400);
+      }
+      const clients = infrastructure ? buildClientFromInfrastructure(infrastructure) : null;
+
+      // Switch to a Server-Sent Events stream. `no-transform` opts this response
+      // out of the global compression() middleware's buffering; `X-Accel-Buffering`
+      // disables buffering in reverse proxies (e.g. nginx).
+      res.status(200).set({
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
+      res.flushHeaders();
+
+      let closed = false;
+      let timer: ReturnType<typeof setInterval> | undefined;
+
+      const send = (event: string, data: unknown): void => {
+        if (closed) return;
+        res.write(`event: ${event}\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      const cleanup = (): void => {
+        if (closed) return;
+        closed = true;
+        if (timer) clearInterval(timer);
+        timer = undefined;
+        res.end();
+      };
+
+      // Client disconnect: stop polling and close any pending work.
+      req.on('close', cleanup);
+
+      if (terminal || !clients || !namespace) {
+        send('progress', { status: execution.status, progress: 0, services: [] });
+        send('end', { status: execution.status });
+        cleanup();
+        return;
+      }
+
+      const seen = new Map<string, number>();
+
+      const poll = async (): Promise<void> => {
+        if (closed) return;
+        try {
+          const { statuses, progress } = await getDeploymentStatus(clients, { namespace, names });
+          send('progress', { progress, services: statuses });
+
+          const logs = await collectNewPodLogs(clients, { namespace, names, seen });
+          for (const entry of logs) {
+            send('log', { service: entry.name, pod: entry.pod, line: entry.line });
+          }
+
+          if (isDeploymentSettled(statuses)) {
+            const status = statuses.some((s) => s.status === 'failed') ? 'failed' : 'completed';
+            send('end', { status, services: statuses });
+            cleanup();
+          }
+        } catch (err) {
+          send('error', { message: err instanceof Error ? err.message : String(err) });
+          cleanup();
+        }
+      };
+
+      // Emit an immediate snapshot, then poll on an interval until settled or
+      // the client disconnects.
+      await poll();
+      if (!closed) {
+        timer = setInterval(() => {
+          void poll();
+        }, SSE_POLL_INTERVAL_MS);
+      }
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 // PUT /api/scenarios/:id/executions/:executionId/status - Update execution status
 router.put(
