@@ -1,22 +1,25 @@
 # Server Dockerfile - Multi-stage build for production
 
 # Build stage
-FROM oven/bun:1 AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
 # Copy package files
-COPY package.json bun.lockb* ./
+COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN npm ci
 
 # Copy source code
 COPY src ./src
 COPY tsconfig.json ./
 
+# Compile TypeScript
+RUN npm run build
+
 # Production stage
-FROM oven/bun:1-slim AS production
+FROM node:20-slim AS production
 
 WORKDIR /app
 
@@ -27,9 +30,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && groupadd --system --gid 1001 nodejs \
     && useradd --system --uid 1001 --gid nodejs intact
 
-# Copy dependencies and source from builder
+# Copy dependencies and compiled output from builder
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/src ./src
+COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 
 # Copy entrypoint script and set permissions
@@ -58,4 +61,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
 
 # Use entrypoint for startup logic
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["bun", "src/app.ts"]
+CMD ["node", "dist/app.js"]

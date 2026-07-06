@@ -2,39 +2,42 @@
 # Use this for simplified deployments (demos, staging, single-server hosting)
 
 # Stage 1: Build client
-FROM oven/bun:1 AS client-builder
+FROM node:20-slim AS client-builder
 
 WORKDIR /app/client
 
 # Copy client package files
-COPY client/package.json client/bun.lockb* ./
+COPY client/package.json client/package-lock.json ./
 
 # Install client dependencies
-RUN bun install --frozen-lockfile
+RUN npm ci
 
 # Copy client source
 COPY client/ ./
 
 # Build client for production
-RUN bun run build
+RUN npm run build
 
 # Stage 2: Build server
-FROM oven/bun:1 AS server-builder
+FROM node:20-slim AS server-builder
 
 WORKDIR /app/server
 
 # Copy server package files
-COPY server/package.json server/bun.lockb* ./
+COPY server/package.json server/package-lock.json ./
 
 # Install server dependencies
-RUN bun install --frozen-lockfile
+RUN npm ci
 
 # Copy server source
 COPY server/src ./src
 COPY server/tsconfig.json ./
 
+# Compile TypeScript
+RUN npm run build
+
 # Stage 3: Production image
-FROM oven/bun:1-slim AS production
+FROM node:20-slim AS production
 
 WORKDIR /app
 
@@ -47,7 +50,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 
 # Copy server
 COPY --from=server-builder /app/server/node_modules ./server/node_modules
-COPY --from=server-builder /app/server/src ./server/src
+COPY --from=server-builder /app/server/dist ./server/dist
 COPY --from=server-builder /app/server/package.json ./server/
 
 # Copy client build
@@ -82,4 +85,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 # Use entrypoint for startup logic (seeds database on first run)
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["bun", "src/app.ts"]
+CMD ["node", "dist/app.js"]
