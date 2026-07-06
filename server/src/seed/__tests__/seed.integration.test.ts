@@ -113,6 +113,71 @@ describe('seed catalog refresh (integration)', () => {
     expect(await Service.countDocuments({ shortName: 'CSAM' })).toBe(1);
   });
 
+  test('resolves issue #12 — backfills seedManaged and updates a legacy record missing the flag entirely', async () => {
+    if (!mongoAvailable) return;
+
+    // Simulate a legacy category seeded before `seedManaged` existed: delete
+    // the properly-seeded 'dev-services' category and replace it, via the
+    // raw driver (bypassing Mongoose — and therefore its schema defaults),
+    // with a document that has a drifted `description` and NO `seedManaged`
+    // key stored at all. Before the fix, `model.findOne(filter)` returned a
+    // hydrated Document whose `seedManaged` path was defaulted to `false` by
+    // the schema, which was indistinguishable from an explicit
+    // `seedManaged: false` — so `upsertRecord` wrongly left this record
+    // `unchanged` (stale description, never backfilled) instead of updating
+    // it. `.lean()` reads the truly-stored value (`undefined`), so this must
+    // now be corrected on the next catalog refresh.
+    await Category.deleteOne({ slug: 'dev-services' });
+    await Category.collection.insertOne({
+      name: 'Dev Services',
+      slug: 'dev-services',
+      description: 'stale legacy description, predates seedManaged',
+      deprecated: false,
+    } as never);
+
+    const legacyBefore = await Category.collection.findOne({ slug: 'dev-services' });
+    expect(legacyBefore && 'seedManaged' in legacyBefore).toBe(false);
+
+    await seedCategories();
+
+    const refreshed = await Category.findOne({ slug: 'dev-services' });
+    expect(refreshed).not.toBeNull();
+    expect(refreshed?.description).not.toBe('stale legacy description, predates seedManaged');
+    expect(refreshed?.seedManaged).toBe(true);
+    expect(refreshed?.deprecated).toBe(false);
+    expect(await Category.countDocuments({ slug: 'dev-services' })).toBe(1);
+  });
+
+  test('resolves issue #12 — never overwrites an operator record with explicit seedManaged=false, even on a real Mongoose document', async () => {
+    if (!mongoAvailable) return;
+
+    // Companion regression proof for the fix above: an explicit
+    // `seedManaged: false` must still be respected against a real hydrated
+    // Mongoose Document (not just the in-memory FakeModel in
+    // sync-helpers.test.ts). Delete the properly-seeded 'ops-services'
+    // category and replace it, via the raw driver, with a record whose key
+    // collides with an active seed entry but is explicitly operator-owned
+    // and has drifted fields.
+    await Category.deleteOne({ slug: 'ops-services' });
+    await Category.collection.insertOne({
+      name: 'Operator Ops Category',
+      slug: 'ops-services',
+      description: 'Operator-owned description, not from seed data',
+      deprecated: false,
+      seedManaged: false,
+    } as never);
+
+    await seedCategories();
+
+    const refreshed = await Category.findOne({ slug: 'ops-services' });
+    expect(refreshed).not.toBeNull();
+    expect(refreshed?.name).toBe('Operator Ops Category');
+    expect(refreshed?.description).toBe('Operator-owned description, not from seed data');
+    expect(refreshed?.deprecated).toBe(false);
+    expect(refreshed?.seedManaged).toBe(false);
+    expect(await Category.countDocuments({ slug: 'ops-services' })).toBe(1);
+  });
+
   test('resolves issue #6 — legacy "Cybersecurity Infrastructure"-era entries are deprecated, not deleted', async () => {
     if (!mongoAvailable) return;
 
