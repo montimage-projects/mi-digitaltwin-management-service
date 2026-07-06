@@ -6,21 +6,24 @@ import mongoose from 'mongoose';
 import { env } from '../../config/env.js';
 import { Category } from '../../models/Category.js';
 import { Service } from '../../models/Service.js';
+import { Partner } from '../../models/Partner.js';
 import { seedSectors } from '../../seed/sectors.seed.js';
 import { seedCategories } from '../../seed/categories.seed.js';
 import { seedServices } from '../../seed/services.seed.js';
+import { seedPartners } from '../../seed/partners.seed.js';
 import { errorHandler } from '../../middleware/errorHandler.js';
 import categoriesRoutes from '../categories.routes.js';
 import servicesRoutes from '../services.routes.js';
+import partnersRoutes from '../partners.routes.js';
 
 /**
  * End-to-end tests driving the real Express routers over HTTP.
  *
- * Exercises `GET /api/categories` and `GET /api/services` against a live
- * MongoDB (a dedicated, disposable test database — never the app's own
- * `MONGODB_URI`) to confirm that deprecated catalog entries introduced by
- * the seed refresh (issues #5, #6, #7) are excluded by default and only
- * returned with `?includeDeprecated=true`.
+ * Exercises `GET /api/categories`, `GET /api/services` and `GET /api/partners`
+ * against a live MongoDB (a dedicated, disposable test database — never the
+ * app's own `MONGODB_URI`) to confirm that deprecated catalog entries
+ * introduced by the seed refresh (issues #5, #6, #7, #8) are excluded by
+ * default and only returned with `?includeDeprecated=true`.
  *
  * Requires a MongoDB reachable at `mongodb://127.0.0.1:27017` (or
  * `SEED_TEST_MONGODB_URI` override). If unavailable, all tests are skipped.
@@ -46,16 +49,19 @@ beforeAll(async () => {
   await seedSectors();
   await seedCategories();
   await seedServices();
+  await seedPartners();
 
-  // Fixture: a category and service that a catalog refresh has deprecated,
-  // to verify the list endpoints hide them by default.
+  // Fixture: a category, service and partner that a catalog refresh has
+  // deprecated, to verify the list endpoints hide them by default.
   await Category.updateOne({ slug: 'dev-services' }, { $set: { deprecated: true } });
   await Service.updateOne({ shortName: 'CSAM' }, { $set: { deprecated: true } });
+  await Partner.updateOne({ shortName: 'MI' }, { $set: { deprecated: true } });
 
   const app = express();
   app.use(express.json());
   app.use('/api/categories', categoriesRoutes);
   app.use('/api/services', servicesRoutes);
+  app.use('/api/partners', partnersRoutes);
   app.use(errorHandler);
 
   server = app.listen(0);
@@ -145,5 +151,39 @@ describe('GET /api/services (e2e)', () => {
 
     expect(body.total).toBeGreaterThan(0);
     expect(body.services.some((s) => s.shortName === 'ORO-5GLAB')).toBe(true);
+  });
+});
+
+describe('GET /api/partners (e2e)', () => {
+  test('excludes deprecated partners by default', async () => {
+    if (!mongoAvailable) return;
+
+    const res = await fetch(`${baseUrl}/api/partners`, { headers: authHeader });
+    expect(res.status).toBe(200);
+    const partners = (await res.json()) as Array<{ shortName: string }>;
+
+    expect(partners.some((p) => p.shortName === 'MI')).toBe(false);
+    expect(partners.some((p) => p.shortName === 'SINTEF')).toBe(true);
+    expect(partners.length).toBe(18);
+  });
+
+  test('includes deprecated partners when includeDeprecated=true', async () => {
+    if (!mongoAvailable) return;
+
+    const res = await fetch(`${baseUrl}/api/partners?includeDeprecated=true`, {
+      headers: authHeader,
+    });
+    expect(res.status).toBe(200);
+    const partners = (await res.json()) as Array<{ shortName: string }>;
+
+    expect(partners.some((p) => p.shortName === 'MI')).toBe(true);
+    expect(partners.length).toBe(19);
+  });
+
+  test('rejects unauthenticated requests', async () => {
+    if (!mongoAvailable) return;
+
+    const res = await fetch(`${baseUrl}/api/partners`);
+    expect(res.status).toBe(401);
   });
 });
