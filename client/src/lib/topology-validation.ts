@@ -32,7 +32,7 @@ export interface ValidationResult {
  * Checks that:
  * 1. Target infrastructure is selected
  * 2. At least one Critical Infrastructure Service (Target from OTHER_SERVICES) exists
- * 3. At least one INTACT tool (INTACT_TOOLBOX) exists
+ * 3. At least one Security Tool (INTACT_TOOLBOX) exists
  * 4. At least one edge (connection between services) exists
  *
  * @param infrastructure - Selected infrastructure ID or null
@@ -63,14 +63,14 @@ export function validateTopology(
     errors.push('Add at least one Critical Infrastructure Service (Target) to the topology');
   }
 
-  // Rule 3: At least one INTACT tool must exist
-  const intactTools = (nodes || []).filter((node) => {
+  // Rule 3: At least one Security Tool (from the Toolbox) must exist
+  const toolboxTools = (nodes || []).filter((node) => {
     const typedNode = node as TopologyNode;
     return typedNode.data?.repositoryTable === 'INTACT_TOOLBOX';
   });
 
-  if (intactTools.length === 0) {
-    errors.push('Add at least one INTACT tool to the topology');
+  if (toolboxTools.length === 0) {
+    errors.push('Add at least one Security Tool (Toolbox) to the topology');
   }
 
   // Rule 4: At least one edge must exist

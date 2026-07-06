@@ -331,7 +331,7 @@ function TopologyCanvasInner({
       {/* Toolbar */}
       {!readOnly && (
         <div className="absolute top-2 left-2 z-10 flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg border p-1 shadow-sm">
-          {/* Add Security Tool (INTACT Toolbox) */}
+          {/* Add Security Tool (Toolbox) */}
           <Popover open={toolboxOpen} onOpenChange={setToolboxOpen}>
             <PopoverTrigger asChild>
               <Button

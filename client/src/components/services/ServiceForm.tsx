@@ -1368,7 +1368,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
                       {toolboxServices.length > 0 && (
                         <div className="mb-3">
                           <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Security Tools (INTACT Toolbox)
+                            Security Tools (Toolbox)
                           </div>
                           {toolboxServices.map((svc) => {
                             const isSelected = interactsWith.includes(svc.shortName);

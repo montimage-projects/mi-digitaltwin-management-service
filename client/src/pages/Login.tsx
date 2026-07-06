@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Loader2, Shield, Network, Lock } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { authApi } from '@/lib/api';
-import { APP_NAME, LOGO_SRC, LOGO_ALT, LOGO_BACKDROP } from '@/lib/branding';
+import { APP_NAME, LOGO_SRC, LOGO_ALT, LOGO_BACKDROP, ORG_NAME } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -194,7 +194,9 @@ export function Login() {
           </form>
 
           <div className="login-footer">
-            <p>INTACT Consortium &copy; {new Date().getFullYear()}</p>
+            <p>
+              {ORG_NAME} &copy; {new Date().getFullYear()}
+            </p>
             <p className="login-footer-sub">Funded by the European Union</p>
           </div>
         </div>

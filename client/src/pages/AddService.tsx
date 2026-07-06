@@ -44,7 +44,7 @@ export function AddService() {
           </h1>
           <p className="text-muted-foreground">
             {isToolbox
-              ? 'Register a new security tool in the INTACT Toolbox'
+              ? 'Register a new security tool in the Security Toolbox'
               : 'Register a new service in Critical Infrastructure'}
           </p>
         </div>

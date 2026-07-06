@@ -8,7 +8,7 @@ interface YamlEditorProps {
   readOnly?: boolean;
 }
 
-const defaultYaml = `# INTACT Scenario Topology
+const defaultYaml = `# Scenario Topology
 # Define your network topology here
 
 version: "1.0"

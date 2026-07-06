@@ -177,7 +177,7 @@ export function Dashboard() {
               <div>
                 <p className="font-medium">Browse the Service Repository</p>
                 <p className="text-sm text-muted-foreground">
-                  Explore available cybersecurity tools from the INTACT Toolbox
+                  Explore available cybersecurity tools from the Security Toolbox
                 </p>
               </div>
             </li>
