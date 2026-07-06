@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# Optional in-cluster MongoDB, included by overlays that want a self-hosted
+# database (dev, prod). The atlas overlay omits this component entirely and
+# points MONGODB_URI at an external MongoDB Atlas cluster instead.
+resources:
+  - statefulset.yaml
+  - service.yaml
