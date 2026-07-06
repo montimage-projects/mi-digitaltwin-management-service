@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Info, Users, FolderTree, Server } from 'lucide-react';
+import { Info, Users, FolderTree } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { categoriesApi } from '@/lib/api';
@@ -85,24 +85,6 @@ export function Settings() {
                 </p>
                 <p className="text-sm text-muted-foreground">{ORG_DESCRIPTION}</p>
               </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border bg-background p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Server className="h-5 w-5" />
-              MAESTRO Configuration
-            </h2>
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Orchestrator URL</p>
-                <p className="font-mono text-sm bg-muted px-3 py-2 rounded">
-                  {import.meta.env.VITE_MAESTRO_URL || 'https://maestro.intact-project.eu'}
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                MAESTRO URL is configured via environment variables and cannot be changed here.
-              </p>
             </div>
           </div>
         </TabsContent>
