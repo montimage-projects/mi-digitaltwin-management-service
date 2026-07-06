@@ -10,7 +10,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { APP_NAME_SHORT, LOGO_SRC, LOGO_ALT } from '@/lib/branding';
+import { APP_NAME_SHORT, LOGO_SRC, LOGO_ALT, LOGO_BACKDROP } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 
 const navigation = [
@@ -40,7 +40,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Logo */}
       <div className="flex h-16 items-center justify-between border-b px-4">
         {!collapsed && (
-          <img src={LOGO_SRC} alt={LOGO_ALT} className="h-10 w-auto max-w-[160px] object-contain" />
+          <img
+            src={LOGO_SRC}
+            alt={LOGO_ALT}
+            className={`h-10 w-auto max-w-[160px] object-contain${LOGO_BACKDROP ? ' bg-white rounded px-1.5 py-0.5' : ''}`}
+          />
         )}
         <Button
           variant="ghost"

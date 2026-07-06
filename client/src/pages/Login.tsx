@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Loader2, Shield, Network, Lock } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { authApi } from '@/lib/api';
-import { APP_NAME, LOGO_SRC, LOGO_ALT } from '@/lib/branding';
+import { APP_NAME, LOGO_SRC, LOGO_ALT, LOGO_BACKDROP } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,7 +60,16 @@ export function Login() {
 
           {/* Logo */}
           <div className="login-logo-wrapper">
-            <img src={LOGO_SRC} alt={LOGO_ALT} className="login-logo" />
+            <img
+              src={LOGO_SRC}
+              alt={LOGO_ALT}
+              className="login-logo"
+              style={
+                LOGO_BACKDROP
+                  ? { background: '#fff', borderRadius: 4, padding: '2px 6px' }
+                  : undefined
+              }
+            />
           </div>
 
           {/* Tagline */}
@@ -114,7 +123,15 @@ export function Login() {
         <div className="login-form-wrapper">
           {/* Mobile logo */}
           <div className="login-mobile-logo">
-            <img src={LOGO_SRC} alt={LOGO_ALT} />
+            <img
+              src={LOGO_SRC}
+              alt={LOGO_ALT}
+              style={
+                LOGO_BACKDROP
+                  ? { background: '#fff', borderRadius: 4, padding: '2px 6px' }
+                  : undefined
+              }
+            />
           </div>
 
           <div className="login-form-header">

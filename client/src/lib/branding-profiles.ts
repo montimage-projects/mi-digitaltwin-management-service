@@ -13,6 +13,12 @@ export interface BrandingProfile {
   logoSrc: string;
   logoAlt: string;
   faviconSrc: string;
+  /**
+   * Whether the logo needs a light backdrop chip to stay legible on the app's
+   * dark chrome (e.g. a dark/transparent wordmark). Profiles whose logo already
+   * reads well on dark leave this false.
+   */
+  logoBackdrop: boolean;
 }
 
 export const BRANDING_PROFILES: Record<BrandingProfileName, BrandingProfile> = {
@@ -22,20 +28,23 @@ export const BRANDING_PROFILES: Record<BrandingProfileName, BrandingProfile> = {
     logoSrc: '/montimage_logo.png',
     logoAlt: 'Montimage logo',
     faviconSrc: '/montimage_favicon.png',
+    logoBackdrop: false,
   },
   intact: {
     appName: 'DigitalTwin Management Platform',
     appNameShort: 'Digital Twin Platform',
     logoSrc: '/intact_logo.png',
     logoAlt: 'INTACT logo',
-    faviconSrc: '/intact_logo.png',
+    faviconSrc: '/intact_favicon.png',
+    logoBackdrop: true,
   },
   secassured: {
     appName: 'secSIM',
     appNameShort: 'secSIM',
     logoSrc: '/secassured_logo.png',
     logoAlt: 'SecAssured logo',
-    faviconSrc: '/secassured_logo.png',
+    faviconSrc: '/secassured_favicon.png',
+    logoBackdrop: false,
   },
 };
 
