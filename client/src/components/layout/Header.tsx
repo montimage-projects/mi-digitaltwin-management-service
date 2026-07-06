@@ -1,6 +1,7 @@
 import { LogOut, User, Sun, Moon } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useThemeStore } from '@/store/theme-store';
+import { APP_NAME, APP_NAME_SHORT, ORG_NAME } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -22,8 +23,12 @@ export function Header() {
 
   return (
     <header className="flex h-16 items-center justify-between border-b bg-background px-6">
-      <div>
-        <h1 className="text-lg font-semibold">Digital Twin Management Platform</h1>
+      <div className="flex min-w-0 items-center gap-3">
+        <img src="/montimage_logo.png" alt={ORG_NAME} className="h-6 w-auto shrink-0" />
+        <h1 className="truncate text-lg font-semibold">
+          <span className="hidden sm:inline">{APP_NAME}</span>
+          <span className="sm:hidden">{APP_NAME_SHORT}</span>
+        </h1>
       </div>
 
       <div className="flex items-center gap-2">

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Server, FolderKanban, Activity, Cloud, ArrowRight, Loader2 } from 'lucide-react';
 import { servicesApi, projectsApi, infrastructuresApi } from '@/lib/api';
+import { APP_NAME } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
@@ -32,9 +33,7 @@ export function Dashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome to the INTACT Digital Twin Management Platform
-        </p>
+        <p className="text-muted-foreground">Welcome to the {APP_NAME}</p>
       </div>
 
       {/* Stats Cards */}

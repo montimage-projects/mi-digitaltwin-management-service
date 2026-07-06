@@ -1,13 +1,15 @@
+import { APP_NAME, ORG_NAME, ORG_URL } from '../config/branding.js';
+
 export const openApiSpec = {
   openapi: '3.0.0',
   info: {
-    title: 'INTACT Digital Twin Management Platform API',
+    title: `${APP_NAME} API`,
     version: '1.0.0',
     description:
       'API for managing cybersecurity services, digital twin projects, scenarios, and infrastructure.',
     contact: {
-      name: 'INTACT Project',
-      url: 'https://intact-project.eu',
+      name: ORG_NAME,
+      url: ORG_URL,
     },
   },
   servers: [

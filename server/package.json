@@ -1,6 +1,8 @@
 {
-  "name": "intact-server",
+  "name": "mi-digitaltwin-server",
   "version": "0.1.0",
+  "description": "MI Digital Twin Management Platform - Express server, a Montimage product.",
+  "author": "Montimage",
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/app.ts",

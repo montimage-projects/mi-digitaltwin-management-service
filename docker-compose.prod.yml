@@ -5,7 +5,7 @@
 services:
   mongodb:
     image: mongo:7
-    container_name: intact-mongodb
+    container_name: montimage-mongodb
     restart: unless-stopped
     volumes:
       - mongodb_data:/data/db
@@ -18,13 +18,13 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - intact-network
+      - montimage-network
 
   app:
     build:
       context: .
       dockerfile: server/Dockerfile.unified
-    container_name: intact-app
+    container_name: montimage-app
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
@@ -51,14 +51,14 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - intact-network
+      - montimage-network
 
 volumes:
   mongodb_data:
-    name: intact-mongodb-data-prod
+    name: montimage-mongodb-data-prod
   app_data:
-    name: intact-app-data-prod
+    name: montimage-app-data-prod
 
 networks:
-  intact-network:
+  montimage-network:
     driver: bridge

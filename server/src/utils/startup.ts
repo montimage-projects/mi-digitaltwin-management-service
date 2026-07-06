@@ -4,6 +4,7 @@
  */
 
 import { env } from '../config/env.js';
+import { APP_NAME } from '../config/branding.js';
 
 // ANSI color codes for terminal output
 const colors = {
@@ -18,12 +19,12 @@ const colors = {
 };
 
 const log = {
-  info: (msg: string) => console.log(`${colors.blue}[INFO]${colors.reset} ${msg}`),
-  success: (msg: string) => console.log(`${colors.green}[OK]${colors.reset} ${msg}`),
-  warn: (msg: string) => console.log(`${colors.yellow}[WARN]${colors.reset} ${msg}`),
-  error: (msg: string) => console.log(`${colors.red}[ERROR]${colors.reset} ${msg}`),
-  header: (msg: string) => console.log(`\n${colors.bright}${colors.cyan}${msg}${colors.reset}`),
-  dim: (msg: string) => console.log(`${colors.dim}${msg}${colors.reset}`),
+  info: (msg: string) => console.info(`${colors.blue}[INFO]${colors.reset} ${msg}`),
+  success: (msg: string) => console.info(`${colors.green}[OK]${colors.reset} ${msg}`),
+  warn: (msg: string) => console.info(`${colors.yellow}[WARN]${colors.reset} ${msg}`),
+  error: (msg: string) => console.info(`${colors.red}[ERROR]${colors.reset} ${msg}`),
+  header: (msg: string) => console.info(`\n${colors.bright}${colors.cyan}${msg}${colors.reset}`),
+  dim: (msg: string) => console.info(`${colors.dim}${msg}${colors.reset}`),
 };
 
 interface ValidationResult {
@@ -179,10 +180,10 @@ async function testMongoDBConnection(): Promise<ValidationResult> {
  * Print startup banner
  */
 export function printBanner(): void {
-  console.log(`
+  console.info(`
 ${colors.cyan}╔══════════════════════════════════════════════════════════════╗
 ║                                                                ║
-║   ${colors.bright}INTACT Digital Twin Management Platform${colors.reset}${colors.cyan}                   ║
+║   ${colors.bright}${APP_NAME}${colors.reset}${colors.cyan}                       ║
 ║                                                                ║
 ╚══════════════════════════════════════════════════════════════╝${colors.reset}
 `);
@@ -198,7 +199,7 @@ export function printEnvironmentInfo(): void {
     ? env.MONGODB_URI.replace(/:([^:@]+)@/, ':****@')
     : env.MONGODB_URI;
 
-  console.log(`
+  console.info(`
   ${colors.dim}NODE_ENV:${colors.reset}        ${env.NODE_ENV}
   ${colors.dim}PORT:${colors.reset}            ${env.PORT}
   ${colors.dim}MONGODB_URI:${colors.reset}     ${mongoDisplay}
@@ -255,11 +256,11 @@ export async function runStartupChecks(): Promise<boolean> {
   }
 
   // Summary
-  console.log('');
+  console.info('');
   if (hasErrors) {
     log.header('Startup Failed');
     log.error('Please fix the errors above before starting the server.');
-    console.log(`
+    console.info(`
 ${colors.dim}Common fixes:
   1. Copy .env.example to .env: cp .env.example .env
   2. Start MongoDB: docker-compose up -d mongodb
@@ -284,7 +285,7 @@ ${colors.dim}Common fixes:
 export function printServerReady(port: number, staticEnabled: boolean): void {
   log.header('Server Ready');
 
-  console.log(`
+  console.info(`
   ${colors.green}API:${colors.reset}     http://localhost:${port}/api
   ${colors.green}Health:${colors.reset}  http://localhost:${port}/api/health${
     staticEnabled

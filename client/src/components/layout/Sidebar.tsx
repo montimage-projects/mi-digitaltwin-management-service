@@ -10,6 +10,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { APP_NAME_SHORT, ORG_NAME } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 
 const navigation = [
@@ -38,9 +39,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     >
       {/* Logo */}
       <div className="flex h-16 items-center justify-between border-b px-4">
-        {!collapsed && (
-          <img src="/intact_logo.png" alt="INTACT" className="h-10 w-auto dark:invert" />
-        )}
+        {!collapsed && <img src="/montimage_logo.png" alt={ORG_NAME} className="h-10 w-auto" />}
         <Button
           variant="ghost"
           size="icon"
@@ -84,7 +83,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className={cn('border-t py-4', collapsed ? 'px-2' : 'px-6')}>
         {!collapsed && (
           <>
-            <p className="text-xs text-muted-foreground">Digital Twin Platform</p>
+            <p className="text-xs text-muted-foreground">{APP_NAME_SHORT}</p>
             <p className="text-xs text-muted-foreground">v1.0.0</p>
           </>
         )}

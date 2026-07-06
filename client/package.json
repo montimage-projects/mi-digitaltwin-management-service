@@ -1,6 +1,8 @@
 {
-  "name": "intact-client",
+  "name": "mi-digitaltwin-client",
   "version": "0.1.0",
+  "description": "MI Digital Twin Management Platform - React client, a Montimage product.",
+  "author": "Montimage",
   "type": "module",
   "scripts": {
     "dev": "vite",

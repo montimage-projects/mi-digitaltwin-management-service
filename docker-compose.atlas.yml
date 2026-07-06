@@ -11,7 +11,7 @@ services:
     build:
       context: .
       dockerfile: server/Dockerfile.unified
-    container_name: intact-app
+    container_name: montimage-app
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
@@ -37,4 +37,4 @@ services:
 
 volumes:
   app_data:
-    name: intact-app-data-atlas
+    name: montimage-app-data-atlas

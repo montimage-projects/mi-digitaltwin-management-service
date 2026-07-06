@@ -13,11 +13,11 @@
   "replacementPatterns": [
     {
       "pattern": "^/",
-      "replacement": "https://github.com/montimage/INTACT/blob/main/"
+      "replacement": "https://github.com/montimage-projects/mi-digitaltwin-management-service/blob/main/"
     }
   ],
   "retry": true,
   "retryOn": [408, 429, 500, 502, 503, 504],
   "timeout": 10000,
-  "getGitHubAbsolutePathPrefix": "https://raw.githubusercontent.com/montimage/INTACT/main/"
+  "getGitHubAbsolutePathPrefix": "https://raw.githubusercontent.com/montimage-projects/mi-digitaltwin-management-service/main/"
 }
