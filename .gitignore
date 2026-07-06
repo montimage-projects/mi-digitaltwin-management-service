@@ -43,6 +43,9 @@ coverage/
 *.pem
 .cache
 
+# Kubernetes: real filled-in secrets (keep k8s/**/secret.example.yaml tracked)
+k8s/**/secret.yaml
+
 # Bun
 bun.lockb
 

@@ -6,6 +6,12 @@ Complete guide for deploying the MI Digital Twin Management Service to productio
 
 This playbook covers Docker-based deployment of the full service stack. The production deployment uses a unified approach where the Express server serves both the API and the client static files, avoiding CORS issues.
 
+> **New deployments:** Consider the
+> [Kubernetes Deployment Playbook](kubernetes-deployment.md) instead — it's
+> now the recommended path for scalable, container-orchestrated deployments.
+> This Docker Compose playbook remains fully supported and is not going away;
+> use whichever fits your infrastructure.
+
 | Configuration     | Containers          | Description                          |
 | ----------------- | ------------------- | ------------------------------------ |
 | **Production**    | 2 (app + MongoDB)   | Server serves API + client (no CORS) |
