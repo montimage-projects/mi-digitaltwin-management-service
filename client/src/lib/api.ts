@@ -57,6 +57,7 @@ export interface Category {
   name: string;
   slug: string;
   description?: string;
+  deprecated?: boolean;
 }
 
 export interface Sector {
@@ -97,6 +98,7 @@ export interface Service {
   interactsWith: string[];
   potentialUseCases: string[];
   repositoryTable: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
+  deprecated?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -114,6 +116,7 @@ export interface ServicesQuery {
   sector?: string;
   provider?: string;
   search?: string;
+  includeDeprecated?: boolean;
   limit?: number;
   skip?: number;
 }
@@ -227,6 +230,7 @@ export const servicesApi = {
     if (query.sector) params.append('sector', query.sector);
     if (query.provider) params.append('provider', query.provider);
     if (query.search) params.append('search', query.search);
+    if (query.includeDeprecated) params.append('includeDeprecated', 'true');
     if (query.limit) params.append('limit', String(query.limit));
     if (query.skip) params.append('skip', String(query.skip));
 

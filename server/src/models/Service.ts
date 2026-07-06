@@ -36,6 +36,21 @@ export interface IService extends Document {
   interactsWith: string[];
   potentialUseCases: string[];
   repositoryTable: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
+  /**
+   * Set when a seed run no longer finds this service (by `shortName`) in its
+   * source data (e.g. after a catalog refresh). Deprecated services are kept
+   * rather than deleted so existing references (e.g. `Scenario.serviceId`)
+   * don't dangle; they are excluded from list responses by default (see
+   * `GET /api/services`).
+   */
+  deprecated: boolean;
+  /**
+   * True for services created/managed by `seedServices()`. Only
+   * seed-managed records are ever auto-deprecated by a catalog refresh —
+   * services created manually through `POST /api/services` are never
+   * touched by the stale-deprecation sweep.
+   */
+  seedManaged: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -127,6 +142,14 @@ const serviceSchema = new Schema<IService>(
       enum: ['INTACT_TOOLBOX', 'OTHER_SERVICES'],
       default: 'INTACT_TOOLBOX',
     },
+    deprecated: {
+      type: Boolean,
+      default: false,
+    },
+    seedManaged: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
@@ -139,6 +162,7 @@ serviceSchema.index({ sectorId: 1 });
 serviceSchema.index({ repositoryTable: 1 });
 serviceSchema.index({ provider: 1 });
 serviceSchema.index({ 'versions.version': 1 });
+serviceSchema.index({ deprecated: 1 });
 
 // Text index for search
 serviceSchema.index(

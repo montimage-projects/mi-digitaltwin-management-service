@@ -4,43 +4,34 @@ import { Sector } from '../models/Sector.js';
 import { Category } from '../models/Category.js';
 
 // Mapping from category slugs to sector slugs for OTHER_SERVICES
+//
+// Refreshed alongside the SECASSURED catalog data in
+// `server/src/seed/categories.seed.ts` / `services.seed.ts` (issues #5, #6,
+// #7). `seedServices()` now sets `sectorId` directly from each seed entry's
+// own `sectorSlug` at create/update time, so this table is only a fallback
+// default per category for this one-off backfill migration — a handful of
+// the categories below legitimately span more than one sector in the seed
+// data (e.g. `5g-testbeds` covers both `digital-infrastructure` and
+// `research` entries); the mapping picks the most common/representative
+// sector for those cases.
 const categoryToSectorMapping: Record<string, string> = {
-  // 5G and Telecom related -> Digital infrastructure
-  '5g-core': 'digital-infrastructure',
-  '5g-ran': 'digital-infrastructure',
-  'user-equipment': 'digital-infrastructure',
-  'network-simulation': 'digital-infrastructure',
+  // Cybersecurity Services catalog (INTACT_TOOLBOX)
+  'dev-services': 'ict-service-management-b2b',
+  'ops-services': 'ict-service-management-b2b',
 
-  // Healthcare related -> Health
-  'healthcare-equipment': 'health',
-
-  // Monitoring and Infrastructure -> ICT service management
-  monitoring: 'ict-service-management-b2b',
-  infrastructure: 'ict-service-management-b2b',
-  virtualization: 'ict-service-management-b2b',
-
-  // Attack/Security related -> Digital providers or ICT
-  'attack-emulation': 'digital-infrastructure',
-
-  // Default mappings for other categories that might be used
-  'predictive-threat-intelligence': 'ict-service-management-b2b',
-  'ai-attack-defence-emulation': 'ict-service-management-b2b',
-  'automated-threat-inspection': 'ict-service-management-b2b',
-  'zero-trust-architecture': 'ict-service-management-b2b',
-  'digital-twin-construction': 'ict-service-management-b2b',
-  'user-interface': 'digital-providers',
-  'explainable-ai': 'research',
-  'service-management': 'ict-service-management-b2b',
-  'training-simulation': 'research',
-  orchestration: 'ict-service-management-b2b',
-
-  // Security and Testing tools
-  'security-tools': 'ict-service-management-b2b',
-  'testing-tools': 'ict-service-management-b2b',
+  // Infrastructure list (OTHER_SERVICES)
+  '5g-testbeds': 'digital-infrastructure',
+  'hpc-compute': 'research',
+  'manufacturing-labs': 'manufacturing',
+  'data-center-hosting': 'digital-infrastructure',
+  'energy-grid-infrastructure': 'energy',
+  'devsecops-platforms': 'energy',
+  'healthcare-iot-platforms': 'health',
+  'e-mobility-iiot': 'energy',
 };
 
 const migrateCategoriesToSectors = async (): Promise<void> => {
-  console.log('Starting migration: Category to Sector for OTHER_SERVICES...\n');
+  console.info('Starting migration: Category to Sector for OTHER_SERVICES...\n');
 
   try {
     await connectDatabase();
@@ -49,9 +40,9 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
     const sectors = await Sector.find();
     const sectorBySlug = new Map(sectors.map((s) => [s.slug, s]));
 
-    console.log(`Found ${sectors.length} sectors in database`);
+    console.info(`Found ${sectors.length} sectors in database`);
     if (sectors.length === 0) {
-      console.log('\nNo sectors found. Please run "bun run seed" first to seed sectors.');
+      console.info('\nNo sectors found. Please run "bun run seed" first to seed sectors.');
       return;
     }
 
@@ -59,14 +50,14 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
     const categories = await Category.find();
     const categoryById = new Map(categories.map((c) => [c._id.toString(), c]));
 
-    console.log(`Found ${categories.length} categories in database\n`);
+    console.info(`Found ${categories.length} categories in database\n`);
 
     // Get all OTHER_SERVICES that don't have a sector assigned
     const services = await Service.find({
       repositoryTable: 'OTHER_SERVICES',
     });
 
-    console.log(`Found ${services.length} services in OTHER_SERVICES table\n`);
+    console.info(`Found ${services.length} services in OTHER_SERVICES table\n`);
 
     let updated = 0;
     let skipped = 0;
@@ -75,7 +66,7 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
     for (const service of services) {
       // Skip if already has a sector
       if (service.sectorId) {
-        console.log(`  [SKIP] ${service.shortName} - already has sector assigned`);
+        console.info(`  [SKIP] ${service.shortName} - already has sector assigned`);
         skipped++;
         continue;
       }
@@ -83,7 +74,7 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
       // Get the category for this service
       const category = categoryById.get(service.categoryId?.toString() || '');
       if (!category) {
-        console.log(`  [WARN] ${service.shortName} - no category found`);
+        console.info(`  [WARN] ${service.shortName} - no category found`);
         noMapping++;
         continue;
       }
@@ -91,7 +82,7 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
       // Find the sector mapping
       const sectorSlug = categoryToSectorMapping[category.slug];
       if (!sectorSlug) {
-        console.log(
+        console.info(
           `  [WARN] ${service.shortName} - no sector mapping for category "${category.slug}"`
         );
         noMapping++;
@@ -100,7 +91,9 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
 
       const sector = sectorBySlug.get(sectorSlug);
       if (!sector) {
-        console.log(`  [WARN] ${service.shortName} - sector "${sectorSlug}" not found in database`);
+        console.info(
+          `  [WARN] ${service.shortName} - sector "${sectorSlug}" not found in database`
+        );
         noMapping++;
         continue;
       }
@@ -108,16 +101,16 @@ const migrateCategoriesToSectors = async (): Promise<void> => {
       // Update the service with the sector
       await Service.updateOne({ _id: service._id }, { $set: { sectorId: sector._id } });
 
-      console.log(`  [OK] ${service.shortName}: ${category.name} -> ${sector.name}`);
+      console.info(`  [OK] ${service.shortName}: ${category.name} -> ${sector.name}`);
       updated++;
     }
 
-    console.log('\n--- Migration Summary ---');
-    console.log(`Total services: ${services.length}`);
-    console.log(`Updated: ${updated}`);
-    console.log(`Skipped (already has sector): ${skipped}`);
-    console.log(`No mapping available: ${noMapping}`);
-    console.log('\nMigration completed!');
+    console.info('\n--- Migration Summary ---');
+    console.info(`Total services: ${services.length}`);
+    console.info(`Updated: ${updated}`);
+    console.info(`Skipped (already has sector): ${skipped}`);
+    console.info(`No mapping available: ${noMapping}`);
+    console.info('\nMigration completed!');
   } catch (error) {
     console.error('Migration failed:', error);
     process.exit(1);

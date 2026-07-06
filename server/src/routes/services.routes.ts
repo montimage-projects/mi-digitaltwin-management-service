@@ -74,6 +74,10 @@ const listServicesSchema = z.object({
   sector: z.string().optional(),
   provider: z.string().optional(),
   search: z.string().optional(),
+  includeDeprecated: z
+    .string()
+    .optional()
+    .transform((val) => val === 'true'),
   limit: z
     .string()
     .optional()
@@ -87,12 +91,19 @@ const listServicesSchema = z.object({
 type ListServicesQuery = z.infer<typeof listServicesSchema>;
 
 // GET /api/services
+// By default, services deprecated by a catalog refresh (see
+// `seed/services.seed.ts`) are excluded. Pass `?includeDeprecated=true` to
+// see the full history, e.g. for admin/audit views.
 router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, res, next) => {
   try {
-    const { table, category, sector, provider, search, limit, skip } =
+    const { table, category, sector, provider, search, includeDeprecated, limit, skip } =
       req.query as unknown as ListServicesQuery;
 
     const query: Record<string, unknown> = {};
+
+    if (!includeDeprecated) {
+      query.deprecated = { $ne: true };
+    }
 
     if (table) {
       query.repositoryTable = table;

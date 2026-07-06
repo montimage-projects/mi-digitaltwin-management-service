@@ -17,7 +17,7 @@
     "strictNullChecks": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "types": ["node"]
+    "types": ["node", "bun-types"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

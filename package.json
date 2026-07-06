@@ -34,6 +34,8 @@
     "typecheck": "bun run typecheck:client && bun run typecheck:server",
     "typecheck:client": "cd client && bunx tsc --noEmit",
     "typecheck:server": "cd server && bunx tsc --noEmit",
+    "test": "bun run test:server",
+    "test:server": "cd server && bun run test",
     "prepare": "husky"
   },
   "devDependencies": {

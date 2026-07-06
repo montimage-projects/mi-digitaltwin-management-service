@@ -5,9 +5,15 @@ import { authMiddleware } from '../middleware/auth.js';
 const router: RouterType = Router();
 
 // GET /api/categories
-router.get('/', authMiddleware, async (_req, res, next) => {
+// By default, categories deprecated by a catalog refresh (see
+// `seed/categories.seed.ts`) are excluded. Pass `?includeDeprecated=true` to
+// see the full history, e.g. for admin/audit views.
+router.get('/', authMiddleware, async (req, res, next) => {
   try {
-    const categories = await Category.find().sort({ name: 1 });
+    const includeDeprecated = req.query.includeDeprecated === 'true';
+    const query = includeDeprecated ? {} : { deprecated: { $ne: true } };
+
+    const categories = await Category.find(query).sort({ name: 1 });
     res.json(categories);
   } catch (error) {
     next(error);
