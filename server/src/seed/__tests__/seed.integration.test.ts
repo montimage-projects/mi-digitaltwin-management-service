@@ -3,12 +3,14 @@ import mongoose from 'mongoose';
 import { Category } from '../../models/Category.js';
 import { Service } from '../../models/Service.js';
 import { Sector } from '../../models/Sector.js';
+import { Partner } from '../../models/Partner.js';
 import { seedSectors } from '../sectors.seed.js';
 import { seedCategories } from '../categories.seed.js';
 import { seedServices } from '../services.seed.js';
+import { seedPartners } from '../partners.seed.js';
 
 /**
- * Integration tests for the catalog refresh (issues #5, #6, #7).
+ * Integration tests for the catalog refresh (issues #5, #6, #7, #8).
  *
  * These connect to a real MongoDB instance using a dedicated, disposable
  * database — never the app's own `MONGODB_URI` (typically `.../intact`) —
@@ -50,6 +52,7 @@ describe('seed catalog refresh (integration)', () => {
     await seedSectors();
     await seedCategories();
     await seedServices();
+    await seedPartners();
 
     const devCategory = await Category.findOne({ slug: 'dev-services' });
     expect(devCategory).not.toBeNull();
@@ -69,6 +72,13 @@ describe('seed catalog refresh (integration)', () => {
 
     const sector = await Sector.findOne({ slug: 'digital-infrastructure' });
     expect(infraService?.sectorId?.toString()).toBe(sector?._id.toString());
+
+    const coordinator = await Partner.findOne({ shortName: 'SINTEF' });
+    expect(coordinator).not.toBeNull();
+    expect(coordinator?.role).toBe('COO');
+    expect(coordinator?.legalName).toBe('SINTEF AS');
+    expect(coordinator?.deprecated).toBe(false);
+    expect(await Partner.countDocuments()).toBe(19);
   });
 
   test('is idempotent — re-running the seeds does not duplicate or drift', async () => {
@@ -76,15 +86,19 @@ describe('seed catalog refresh (integration)', () => {
 
     const beforeCategories = await Category.countDocuments();
     const beforeServices = await Service.countDocuments();
+    const beforePartners = await Partner.countDocuments();
 
     await seedCategories();
     await seedServices();
+    await seedPartners();
 
     const afterCategories = await Category.countDocuments();
     const afterServices = await Service.countDocuments();
+    const afterPartners = await Partner.countDocuments();
 
     expect(afterCategories).toBe(beforeCategories);
     expect(afterServices).toBe(beforeServices);
+    expect(afterPartners).toBe(beforePartners);
   });
 
   test('updates a drifted field on an already-seeded service without duplicating it', async () => {
@@ -177,5 +191,62 @@ describe('seed catalog refresh (integration)', () => {
 
     const devCategory = await Category.findOne({ slug: 'dev-services' });
     expect(devCategory?.deprecated).toBe(false);
+  });
+
+  test('resolves issue #8 — updates a drifted field on an already-seeded partner without duplicating it', async () => {
+    if (!mongoAvailable) return;
+
+    await Partner.updateOne({ shortName: 'MI' }, { $set: { legalName: 'STALE LEGAL NAME' } });
+
+    await seedPartners();
+
+    const mi = await Partner.findOne({ shortName: 'MI' });
+    expect(mi?.legalName).toBe('MONTIMAGE EURL');
+    expect(await Partner.countDocuments({ shortName: 'MI' })).toBe(1);
+  });
+
+  test('resolves issue #8 — deprecates a seed-managed partner no longer in the source list, without deleting it', async () => {
+    if (!mongoAvailable) return;
+
+    // Simulate a partner from a prior grant agreement version that has since
+    // left the consortium: seed-managed, but its `shortName` will never
+    // appear in `partners.seed.ts`'s source data.
+    await Partner.create({
+      shortName: 'FORMER-PARTNER-TEST',
+      legalName: 'Former Partner Ltd',
+      role: 'BEN',
+      country: 'Nowhere',
+      pic: '000000001',
+      maxGrantAmountEur: 1,
+      seedManaged: true,
+    });
+
+    await seedPartners();
+
+    const former = await Partner.findOne({ shortName: 'FORMER-PARTNER-TEST' });
+    expect(former).not.toBeNull();
+    expect(former?.deprecated).toBe(true);
+  });
+
+  test('never deprecates a partner created manually outside the seed mechanism', async () => {
+    if (!mongoAvailable) return;
+
+    // Explicit `seedManaged: false` simulates a partner an operator added by
+    // hand rather than through `seedPartners()`.
+    const manualPartner = await Partner.create({
+      shortName: 'MANUAL-PARTNER-TEST',
+      legalName: 'Manually Added Partner',
+      role: 'BEN',
+      country: 'Nowhere',
+      pic: '000000002',
+      maxGrantAmountEur: 1,
+      seedManaged: false,
+    });
+    expect(manualPartner.seedManaged).toBe(false);
+
+    await seedPartners();
+
+    const refreshed = await Partner.findOne({ shortName: 'MANUAL-PARTNER-TEST' });
+    expect(refreshed?.deprecated).toBe(false);
   });
 });
