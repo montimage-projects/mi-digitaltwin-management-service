@@ -1,0 +1,344 @@
+{
+  "version": 1,
+  "timestamp": "2026-07-06T16:00:00Z",
+  "source": "/issue-analysis",
+  "issue": {
+    "number": 9,
+    "title": "Replace platform deployment with Kubernetes-based MAESTRO deployment",
+    "type": "feature",
+    "reporter": { "login": "luongnv89", "name": "Luong NGUYEN" },
+    "labels": ["enhancement"],
+    "state": "open",
+    "createdAt": "2026-07-06T11:30:17Z",
+    "updatedAt": "2026-07-06T11:30:17Z"
+  },
+  "extraction": {
+    "error_messages": [],
+    "functions": [],
+    "classes": [],
+    "file_refs": [
+      "docker-compose.yml",
+      "docker-compose.prod.yml",
+      "docker-compose.atlas.yml",
+      "docs/DEPLOYMENT.md"
+    ],
+    "modules": ["docker-compose", "Kubernetes", "MAESTRO"],
+    "keywords": [
+      "Kubernetes",
+      "MAESTRO deployment",
+      "Docker Compose",
+      "primary deployment path",
+      "migration path",
+      "deployment documentation"
+    ]
+  },
+  "affected_files": [
+    {
+      "path": "docs/playbooks/deployment.md",
+      "relevance": "critical",
+      "role": "The actual current canonical deployment guide (docs/DEPLOYMENT.md is now just a redirect stub); documents the 3-variant Docker Compose flow that must become the secondary path once Kubernetes is primary",
+      "match_reasons": ["primary deployment documentation target for AC #2"]
+    },
+    {
+      "path": "docs/DEPLOYMENT.md",
+      "relevance": "critical",
+      "role": "1-line redirect stub pointing to docs/playbooks/deployment.md; issue body explicitly names this file",
+      "match_reasons": ["direct file reference in issue body"]
+    },
+    {
+      "path": "docker-compose.yml",
+      "relevance": "critical",
+      "role": "Dev-only compose file (MongoDB + mongo-express)",
+      "match_reasons": ["direct file reference in issue body"]
+    },
+    {
+      "path": "docker-compose.prod.yml",
+      "relevance": "critical",
+      "role": "Current primary production deployment path (unified app container + MongoDB) that Kubernetes must replace or complement",
+      "match_reasons": ["direct file reference in issue body"]
+    },
+    {
+      "path": "docker-compose.atlas.yml",
+      "relevance": "critical",
+      "role": "Single-container variant for MongoDB Atlas backend; the K8s equivalent needs an analogous external-Mongo-URI mode",
+      "match_reasons": ["direct file reference in issue body"]
+    },
+    {
+      "path": "server/Dockerfile.unified",
+      "relevance": "critical",
+      "role": "Multi-stage build producing the single container image any Kubernetes Deployment would run as-is; already has a HEALTHCHECK against /api/health and a non-root user, both reusable as K8s livenessProbe/securityContext",
+      "match_reasons": ["container image K8s manifests would deploy"]
+    },
+    {
+      "path": "server/docker-entrypoint.sh",
+      "relevance": "high",
+      "role": "Entrypoint driving first-run DB seeding before bun src/app.ts; K8s equivalent needs this reworked as an initContainer/Job or left as the pod command",
+      "match_reasons": ["referenced by Dockerfile.unified ENTRYPOINT"]
+    },
+    {
+      "path": "server/Dockerfile",
+      "relevance": "high",
+      "role": "Server-only image (split-container mode); relevant if K8s deployment keeps a split client/server topology",
+      "match_reasons": ["alternate Dockerfile"]
+    },
+    {
+      "path": "client/Dockerfile",
+      "relevance": "high",
+      "role": "Client-only image for split-container mode",
+      "match_reasons": ["alternate Dockerfile"]
+    },
+    {
+      "path": "server/src/config/env.ts",
+      "relevance": "high",
+      "role": "Zod schema defining the full environment-variable contract that any K8s ConfigMap/Secret must reproduce exactly; fails fast with process.exit(1) on invalid/missing vars",
+      "match_reasons": ["env contract K8s ConfigMap/Secret must mirror"]
+    },
+    {
+      "path": "server/src/app.ts",
+      "relevance": "high",
+      "role": "Defines GET /api/health, directly reusable as a K8s liveness/readiness probe",
+      "match_reasons": ["health endpoint referenced by Dockerfile HEALTHCHECK"]
+    },
+    {
+      "path": "README.md",
+      "relevance": "medium",
+      "role": "Top-level Deployment section presents Docker Compose as the only real path and Kubernetes only as a one-line mockup bullet",
+      "match_reasons": ["keyword match: Deployment, Docker Compose, Kubernetes"]
+    },
+    {
+      "path": "docs/architecture/overview.md",
+      "relevance": "medium",
+      "role": "Architecture diagram already shows MAESTRO Orchestrator -> Kubernetes Clusters as the target for scenario execution — an existing K8s-adjacent integration, conceptually distinct from deploying the platform itself",
+      "match_reasons": ["keyword match: Kubernetes, MAESTRO"]
+    },
+    {
+      "path": "docs/integration/maestro.md",
+      "relevance": "medium",
+      "role": "Documents MAESTRO as an external orchestrator that deploys user-authored scenarios onto Kubernetes clusters via iFrame + postMessage — a different concern from packaging this platform's own deployment on Kubernetes; needs disambiguation, not conflation",
+      "match_reasons": ["keyword match: Kubernetes, MAESTRO; issue title's ambiguous phrasing"]
+    },
+    {
+      "path": "docs/installation/prerequisites.md",
+      "relevance": "medium",
+      "role": "Lists Docker/Compose prerequisites; would need a Kubernetes-cluster/kubectl prerequisites section",
+      "match_reasons": ["referenced from deployment.md 'Prerequisites' link"]
+    },
+    {
+      "path": "docs/installation/configuration.md",
+      "relevance": "medium",
+      "role": "Env var/branding-profile configuration reference; needs a K8s ConfigMap/Secret equivalent documented",
+      "match_reasons": ["referenced from deployment.md 'Configuration' link"]
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "relevance": "medium",
+      "role": "No image build/push/deploy step exists at all today; a Kubernetes rollout would likely need a new build-and-push-image (and optionally deploy) job",
+      "match_reasons": ["no existing deploy automation found; net-new CI surface"]
+    },
+    {
+      "path": "docs/troubleshooting/common-issues.md",
+      "relevance": "low",
+      "role": "Docker-Compose-flavored troubleshooting; would need Kubernetes-flavored equivalents",
+      "match_reasons": ["referenced from deployment.md 'Troubleshooting' link"]
+    }
+  ],
+  "analysis": {
+    "type_specific": "architecture_fit",
+    "summary": "The platform's only working deployment path today is Docker Compose (3 variants: dev, prod, atlas); no Kubernetes manifests, Helm chart, or CI build/push/deploy step exist anywhere in the repo. docs/DEPLOYMENT.md's 'Kubernetes' section is illustrative sample YAML, not a real deployable path. This is a net-new infrastructure/documentation build-out, not a bugfix, and the container image (server/Dockerfile.unified) and health endpoint are already containerization-ready and would not need application-code changes.",
+    "details": "Architecture fit: the app is already packaged as a single stateless container image with an externalized env-var contract (server/src/config/env.ts) and a health endpoint (GET /api/health), which map cleanly onto a Kubernetes Deployment + ConfigMap/Secret + liveness/readiness probe. Extension points: the existing 3-variant Docker Compose split (dev/prod/atlas) is a direct precedent for a Kustomize base+overlays structure (or a parameterized Helm chart) covering the same environment variants, including the Atlas-external-Mongo toggle already proven in docker-compose.atlas.yml. Data flow / stateful concerns: the server/data/.seeded marker file (used to gate first-run seeding, persisted via a named volume in Compose) needs a PVC or alternative idempotency mechanism under Kubernetes. Prior art: the recently merged branding-profile feature (PR #10) added BRANDING_PROFILE/APP_NAME/ORG_NAME/ORG_URL env passthrough to docker-compose.prod.yml/atlas.yml — any Kubernetes ConfigMap/Secret scheme must replicate this same passthrough pattern. No genuine code-level dependency was found between this issue and the catalog-data issues (#5-#8); it is orthogonal and could technically be started independently, though it is the largest and most architecturally invasive change of the group."
+  },
+  "options": [
+    {
+      "number": 1,
+      "name": "Plain per-environment manifest sets",
+      "summary": "Hand-write full YAML manifests per environment (k8s/prod/*.yaml, k8s/atlas/*.yaml) with no shared base or templating tool.",
+      "files_to_modify": [
+        {
+          "path": "docs/playbooks/deployment.md",
+          "changes": "Document manual manifest apply steps per environment"
+        }
+      ],
+      "files_to_create": [
+        {
+          "path": "k8s/prod/*.yaml",
+          "purpose": "Prod Deployment/Service/ConfigMap/Secret/StatefulSet manifests"
+        },
+        { "path": "k8s/atlas/*.yaml", "purpose": "Atlas-variant manifests (no in-cluster Mongo)" }
+      ],
+      "pros": ["Zero new tooling, easiest to review line-by-line"],
+      "cons": [
+        "Reproduces the exact env-block duplication problem the Compose files already have across variants",
+        "Highest drift risk as env.ts grows",
+        "Contradicts the repo's own history of consolidating such duplication (branding PRs #3/#10)"
+      ],
+      "complexity": "L",
+      "risk": "Medium",
+      "risk_details": "Manual duplication across environment manifest sets, no shared base to keep them in sync"
+    },
+    {
+      "number": 2,
+      "name": "Kustomize overlays (base + dev/prod/atlas)",
+      "summary": "One base manifest set (Deployment, Service, ConfigMap, Secret, optional StatefulSet+PVC for self-hosted MongoDB) plus overlays mirroring the existing docker-compose.yml/.prod.yml/.atlas.yml split.",
+      "files_to_modify": [
+        {
+          "path": "docs/playbooks/deployment.md",
+          "changes": "Document Kubernetes as the primary deployment path with kustomize apply instructions"
+        },
+        { "path": "docs/DEPLOYMENT.md", "changes": "Point to the new Kubernetes-primary guide" },
+        { "path": "README.md", "changes": "Update Deployment section to lead with Kubernetes" },
+        {
+          "path": ".github/workflows/ci.yml",
+          "changes": "Add build-and-push-image job for the container registry"
+        }
+      ],
+      "files_to_create": [
+        {
+          "path": "k8s/base/*.yaml",
+          "purpose": "Shared Deployment/Service/ConfigMap/Secret base manifests"
+        },
+        {
+          "path": "k8s/overlays/dev,prod,atlas/*.yaml",
+          "purpose": "Environment-specific Kustomize overlays mirroring the 3 Compose variants"
+        }
+      ],
+      "pros": [
+        "kubectl-native, no new templating engine to learn",
+        "Directly mirrors the 3-variant Compose pattern maintainers already reason about",
+        "Lowest operational risk for a team with zero test coverage"
+      ],
+      "cons": [
+        "Less reusable than Helm if the platform needs to be installed as a redistributable chart for third parties"
+      ],
+      "complexity": "XL",
+      "risk": "Medium",
+      "risk_details": "Large surface area (new k8s/ manifests, CI image pipeline, doc rewrite) but follows an existing, well-understood pattern in the repo"
+    },
+    {
+      "number": 3,
+      "name": "Helm chart",
+      "summary": "Package a single parameterized Helm chart (values.yaml) covering the app Deployment/Service/Ingress, optional Mongo subchart or Atlas external-URI toggle, and branding profile as chart values.",
+      "files_to_modify": [
+        {
+          "path": "docs/playbooks/deployment.md",
+          "changes": "Document helm install/upgrade as the primary deployment path"
+        },
+        { "path": ".github/workflows/ci.yml", "changes": "Add chart lint/package/push job" }
+      ],
+      "files_to_create": [
+        {
+          "path": "charts/montimage-digital-twin/*",
+          "purpose": "Helm chart templates + values.yaml covering all deployment variants"
+        }
+      ],
+      "pros": [
+        "Single versioned chart, easy per-deployment overrides",
+        "Aligns naturally with the just-merged branding-profile feature",
+        "Good for distributing to multiple downstream operators"
+      ],
+      "cons": [
+        "Adds a new tool/dependency (Helm) the repo doesn't use anywhere today",
+        "Larger upfront authoring effort",
+        "Harder to review/diff than plain YAML given no CI pipeline validates manifests yet"
+      ],
+      "complexity": "XL",
+      "risk": "High",
+      "risk_details": "New toolchain adopted with no prior art in this repo and no test coverage to validate chart correctness"
+    }
+  ],
+  "recommended_option": 2,
+  "overall_complexity": "XL",
+  "overall_risk": "Medium",
+  "history": {
+    "related_commits": [
+      {
+        "sha": "034e152",
+        "message": "feat: Add unified Docker deployment with static file serving",
+        "author": "",
+        "date": "",
+        "files": ["server/Dockerfile.unified"],
+        "type": "related_change"
+      },
+      {
+        "sha": "3ed8691",
+        "message": "feat: Add automatic database seeding and simplify Docker deployment",
+        "author": "",
+        "date": "",
+        "files": ["server/docker-entrypoint.sh"],
+        "type": "related_change"
+      },
+      {
+        "sha": "59d0f7e",
+        "message": "feat: Add MongoDB Atlas support and startup diagnostics",
+        "author": "",
+        "date": "",
+        "files": ["docker-compose.atlas.yml", "server/src/utils/startup.ts"],
+        "type": "related_change"
+      },
+      {
+        "sha": "86034c8",
+        "message": "refactor(branding): rebrand project as a montimage product (#1) (#3)",
+        "author": "",
+        "date": "",
+        "files": ["docker-compose.prod.yml", "docs/DEPLOYMENT.md"],
+        "type": "related_change"
+      },
+      {
+        "sha": "606dec2",
+        "message": "feat(branding): add configurable per-deployment branding profiles (#4) (#10)",
+        "author": "",
+        "date": "",
+        "files": ["docker-compose.prod.yml", "docker-compose.atlas.yml"],
+        "type": "related_change"
+      }
+    ],
+    "regression_candidate": null,
+    "already_addressed": null,
+    "domain_experts": [{ "author": "Luong NGUYEN", "commit_count": 8 }]
+  },
+  "cross_references": {
+    "blocks": [],
+    "blocked_by": [1, 2, 5, 6, 7, 8],
+    "related_issues": [],
+    "resolved_by": [],
+    "triage_data_available": true,
+    "triage_timestamp": "2026-07-06T12:00:00Z"
+  },
+  "scan_stats": {
+    "files_read": 10,
+    "deps_traced": 6,
+    "keywords_extracted": 7,
+    "file_refs_extracted": 4,
+    "scan_duration_seconds": 95,
+    "scan_timed_out": false
+  },
+  "git_state": {
+    "branch": "main",
+    "commit_sha": "606dec2a5cbca035c7ca7143f8f3f1e7d2e66b08",
+    "commit_sha_short": "606dec2",
+    "captured_at": "2026-07-06T16:00:00Z"
+  },
+  "decision_record": {
+    "root_cause": "The platform's only working deployment path is Docker Compose (3 variants); no Kubernetes manifests, Helm chart, or CI build/push/deploy step exist anywhere, so making Kubernetes the primary deployment path is a net-new infra/documentation build-out, not a fix to broken code.",
+    "options_considered": [
+      { "number": 1, "name": "Plain per-environment manifest sets" },
+      { "number": 2, "name": "Kustomize overlays (base + dev/prod/atlas)" },
+      { "number": 3, "name": "Helm chart" }
+    ],
+    "options_rejected": [
+      {
+        "number": 1,
+        "reason": "Reproduces the env-duplication problem the Compose files already have, contradicting the repo's own consolidation history"
+      },
+      {
+        "number": 3,
+        "reason": "Introduces a new toolchain (Helm) with no prior art or test coverage in this repo"
+      }
+    ],
+    "selected_option": {
+      "number": 2,
+      "name": "Kustomize overlays (base + dev/prod/atlas)",
+      "summary": "Mirror the existing 3-variant Docker Compose split with a Kustomize base + overlays structure, kept kubectl-native."
+    },
+    "residual_risk": "No test coverage or CI validation exists for any manifests; correctness of the K8s ConfigMap/Secret env contract vs. server/src/config/env.ts must be verified manually. Per project decision, this issue is deliberately isolated into its own PR/branch and held for manual merge — it must not be combined with any other issue's changes."
+  }
+}

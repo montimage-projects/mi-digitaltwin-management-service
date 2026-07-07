@@ -39,7 +39,7 @@ services:
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       - MAESTRO_BASE_URL=${MAESTRO_BASE_URL:-https://maestro.intact-project.eu}
-      - BRANDING_PROFILE=${BRANDING_PROFILE:-default}
+      - BRANDING_PROFILE=${BRANDING_PROFILE:-secassured}
       - APP_NAME=${APP_NAME:-}
       - ORG_NAME=${ORG_NAME:-}
       - ORG_URL=${ORG_URL:-}

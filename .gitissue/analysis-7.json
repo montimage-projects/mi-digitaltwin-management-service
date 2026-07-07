@@ -1,0 +1,277 @@
+{
+  "version": 1,
+  "timestamp": "2026-07-06T16:00:00Z",
+  "source": "/issue-analysis",
+  "issue": {
+    "number": 7,
+    "title": "Update Infrastructure list from SECASSURED source",
+    "type": "improvement",
+    "reporter": { "login": "luongnv89", "name": "Luong NGUYEN" },
+    "labels": ["enhancement"],
+    "state": "open",
+    "createdAt": "2026-07-06T11:30:07Z",
+    "updatedAt": "2026-07-06T11:30:07Z"
+  },
+  "extraction": {
+    "error_messages": [],
+    "functions": ["seedServices", "seedCategories", "autoSeedIfEmpty"],
+    "classes": ["Infrastructure", "Service", "Category"],
+    "file_refs": [],
+    "modules": [
+      "server/src/seed/services.seed.ts",
+      "server/src/seed/categories.seed.ts",
+      "server/src/models/Infrastructure.ts",
+      "server/src/models/Service.ts"
+    ],
+    "keywords": [
+      "Infrastructure list",
+      "SECASSURED",
+      "owning partner",
+      "description",
+      "seeded Infrastructure list"
+    ]
+  },
+  "affected_files": [
+    {
+      "path": "server/src/seed/services.seed.ts",
+      "relevance": "critical",
+      "role": "Contains the infrastructureServices array ('Table 2: Related Infrastructure & Use Case Services (Critical Infrastructure)', ~20 entries) with provider and description fields matching the AC wording 'owning partner/description' almost verbatim — this is the actual 'Infrastructure list', not the deployment-target Infrastructure model",
+      "match_reasons": [
+        "keyword match: 'Table 2 ... Infrastructure'",
+        "field match: provider/description == 'owning partner/description'"
+      ]
+    },
+    {
+      "path": "server/src/seed/categories.seed.ts",
+      "relevance": "high",
+      "role": "Defines the category taxonomy the infrastructureServices entries hang off of (shared with issue #6's scope, different data subset)",
+      "match_reasons": ["supplies categorySlug values consumed by infrastructureServices"]
+    },
+    {
+      "path": "server/src/models/Service.ts",
+      "relevance": "high",
+      "role": "Defines IService with provider: string and description?: string — the exact fields the AC says must match the source",
+      "match_reasons": ["schema fields map directly to acceptance criteria wording"]
+    },
+    {
+      "path": "server/src/seed/index.ts",
+      "relevance": "medium",
+      "role": "Manual seed runner (bun run seed), orchestrates seedCategories -> seedSectors -> seedServices -> seedAdmin",
+      "match_reasons": ["orchestrates the seed scripts that must be edited"]
+    },
+    {
+      "path": "server/src/seed/auto-seed.ts",
+      "relevance": "medium",
+      "role": "Auto-seeds only when DB is empty; seedServices() only creates missing services and never overwrites provider/description on existing docs, so already-seeded deployments won't pick up a pure data edit",
+      "match_reasons": ["operational constraint on refresh delivery"]
+    },
+    {
+      "path": "server/src/migrations/migrate-category-to-sector.ts",
+      "relevance": "medium",
+      "role": "Existing precedent for a standalone migration script updating Service fields based on a mapping table — reusable pattern for pushing corrected provider/description values into already-seeded databases",
+      "match_reasons": ["reusable pattern for updating existing records"]
+    },
+    {
+      "path": "server/src/models/Infrastructure.ts",
+      "relevance": "low",
+      "role": "Unrelated domain entity: represents a Kubernetes/Docker/virtual deployment target, not a services/partners catalog; ruled out as this issue's real target despite the name collision",
+      "match_reasons": ["false-positive keyword match: 'Infrastructure'"]
+    },
+    {
+      "path": "server/src/routes/infrastructures.routes.ts",
+      "relevance": "low",
+      "role": "CRUD/connection-test API for the deployment-target Infrastructure model; not in scope",
+      "match_reasons": ["false-positive keyword match"]
+    },
+    {
+      "path": "client/src/pages/Infrastructure.tsx",
+      "relevance": "low",
+      "role": "UI page for managing Kubernetes clusters/deployment targets; confirms this feature is unrelated to the services/partners catalog",
+      "match_reasons": ["false-positive keyword match"]
+    },
+    {
+      "path": "client/src/components/infrastructure/InfrastructureForm.tsx",
+      "relevance": "low",
+      "role": "Form for the deployment-target Infrastructure model (name/type/endpoint/credentials/capacity); no provider/description field, confirming no UI overlap",
+      "match_reasons": ["false-positive keyword match"]
+    },
+    {
+      "path": "client/src/components/infrastructure/InfrastructureTable.tsx",
+      "relevance": "low",
+      "role": "Table listing deployment-target infrastructures; not in scope",
+      "match_reasons": ["false-positive keyword match"]
+    }
+  ],
+  "analysis": {
+    "type_specific": "current_impl",
+    "summary": "The 'Infrastructure list' referenced by this issue is the infrastructureServices array in services.seed.ts (Service records with repositoryTable OTHER_SERVICES), not the unrelated Infrastructure deployment-target model that shares the name. Its provider/description fields are stale relative to the SECASSURED source, and the same create-only seedServices() limitation found in #5 applies here: edits to the seed array alone won't reach already-seeded databases.",
+    "details": "This is effectively the same underlying mechanism as #5 (both are Service records seeded via services.seed.ts) applied to a different data subset (the ~20-entry 'Table 2' infrastructure/use-case services rather than the 44-entry INTACT toolbox list). Because #6's category-taxonomy refresh and #7's service-entry refresh both hang off the same categorySlug values, #7 should land after #6 to avoid referencing categories that #6 is simultaneously renaming/removing."
+  },
+  "options": [
+    {
+      "number": 1,
+      "name": "Direct data edit only",
+      "summary": "Edit provider/description/category fields directly in the infrastructureServices array in services.seed.ts to match the SECASSURED source.",
+      "files_to_modify": [
+        {
+          "path": "server/src/seed/services.seed.ts",
+          "changes": "Update provider/description/categorySlug fields for the infrastructureServices entries"
+        }
+      ],
+      "files_to_create": [],
+      "pros": ["Smallest change, matches the pattern already used for other seed edits"],
+      "cons": [
+        "Only affects fresh databases — seedServices() never updates already-seeded existing Service documents, so deployed instances won't see the refresh without a separate migration"
+      ],
+      "complexity": "S",
+      "risk": "Low",
+      "risk_details": "Safe for new deployments but incomplete for already-seeded ones"
+    },
+    {
+      "number": 2,
+      "name": "Data edit + update-existing-records migration",
+      "summary": "Edit the seed array AND add a one-off migration script (following the migrate-category-to-sector.ts pattern) that updates provider/description on already-seeded Service documents matched by shortName.",
+      "files_to_modify": [
+        {
+          "path": "server/src/seed/services.seed.ts",
+          "changes": "Update provider/description/categorySlug fields for infrastructureServices entries"
+        },
+        {
+          "path": "server/src/migrations/migrate-category-to-sector.ts",
+          "changes": "Reference as pattern; add a sibling migration script for provider/description backfill"
+        }
+      ],
+      "files_to_create": [
+        {
+          "path": "server/src/migrations/refresh-infrastructure-services.ts",
+          "purpose": "One-off migration to update provider/description on existing Service documents matched by shortName"
+        }
+      ],
+      "pros": [
+        "Ensures already-deployed instances actually receive the refreshed data, not just fresh installs"
+      ],
+      "cons": ["One more migration script to maintain and run manually"],
+      "complexity": "M",
+      "risk": "Medium",
+      "risk_details": "Migration script touches production data directly; needs care matching by shortName"
+    },
+    {
+      "number": 3,
+      "name": "Combine with #5's status/update mechanism",
+      "summary": "Reuse the soft-deprecation/upsert mechanism proposed for issue #5 (Option 2) so seedServices() itself updates existing records on every run, then apply the infrastructureServices data refresh through that shared mechanism.",
+      "files_to_modify": [
+        {
+          "path": "server/src/seed/services.seed.ts",
+          "changes": "Update infrastructureServices data; rely on the shared upsert/deprecate seedServices() rework"
+        },
+        { "path": "server/src/models/Service.ts", "changes": "Shared status field from #5" }
+      ],
+      "files_to_create": [],
+      "pros": [
+        "Single reusable mechanism serves both #5 and #7's data-refresh needs, avoiding duplicate migration scripts"
+      ],
+      "cons": [
+        "Only viable if #5 and #7 are resolved in the same PR/timeframe; introduces a dependency on #5's schema decision"
+      ],
+      "complexity": "S",
+      "risk": "Low",
+      "risk_details": "Low risk if #5's mechanism already lands first; otherwise duplicates option 2's migration work"
+    }
+  ],
+  "recommended_option": 3,
+  "overall_complexity": "M",
+  "overall_risk": "Medium",
+  "history": {
+    "related_commits": [
+      {
+        "sha": "3ed8691",
+        "message": "feat: Add automatic database seeding and simplify Docker deployment",
+        "author": "",
+        "date": "2025-12-10",
+        "files": ["server/src/seed/services.seed.ts", "server/src/seed/categories.seed.ts"],
+        "type": "related_change"
+      },
+      {
+        "sha": "ee1c5e8",
+        "message": "feat: Show Sector column for Critical Infrastructure Services",
+        "author": "",
+        "date": "",
+        "files": [],
+        "type": "related_change"
+      },
+      {
+        "sha": "7cf8f5e",
+        "message": "feat: Initial MVP v1.0 - INTACT Digital Twin Management Platform",
+        "author": "",
+        "date": "2025-12-08",
+        "files": ["server/src/seed/services.seed.ts"],
+        "type": "related_change"
+      }
+    ],
+    "regression_candidate": null,
+    "already_addressed": null,
+    "domain_experts": [{ "author": "Luong NGUYEN", "commit_count": 0 }]
+  },
+  "cross_references": {
+    "blocks": [8, 9],
+    "blocked_by": [1, 2, 4, 5, 6],
+    "related_issues": [
+      {
+        "number": 6,
+        "title": "Update Cybersecurity Infrastructure service list from SECASSURED source",
+        "relationship": "shared_files",
+        "shared_keywords": ["categories.seed.ts", "Infrastructure", "SECASSURED"],
+        "confidence": "high"
+      },
+      {
+        "number": 5,
+        "title": "Update Cybersecurity Services catalog from SECASSURED source",
+        "relationship": "shared_files",
+        "shared_keywords": ["services.seed.ts", "same create-only seeding limitation"],
+        "confidence": "high"
+      },
+      {
+        "number": 8,
+        "title": "Update partners/providers list from SECASSURED source",
+        "relationship": "shared_files",
+        "shared_keywords": ["provider", "owning partner"],
+        "confidence": "medium"
+      }
+    ],
+    "resolved_by": [],
+    "triage_data_available": true,
+    "triage_timestamp": "2026-07-06T12:00:00Z"
+  },
+  "scan_stats": {
+    "files_read": 10,
+    "deps_traced": 4,
+    "keywords_extracted": 9,
+    "file_refs_extracted": 1,
+    "scan_duration_seconds": 95,
+    "scan_timed_out": false
+  },
+  "git_state": {
+    "branch": "main",
+    "commit_sha": "606dec2a5cbca035c7ca7143f8f3f1e7d2e66b08",
+    "commit_sha_short": "606dec2",
+    "captured_at": "2026-07-06T16:00:00Z"
+  },
+  "decision_record": {
+    "root_cause": "The infrastructureServices array ('Table 2') inside services.seed.ts holds stale provider/description values for Infrastructure-type services; the same create-only seeding limitation as #5 prevents refreshed data from reaching already-seeded databases, and it shares categorySlug values with #6's taxonomy refresh.",
+    "options_considered": [
+      { "number": 1, "name": "Direct data edit only" },
+      { "number": 2, "name": "Data edit + update-existing-records migration" },
+      { "number": 3, "name": "Combine with #5's status/update mechanism" }
+    ],
+    "options_rejected": [
+      { "number": 1, "reason": "Doesn't reach already-seeded/deployed databases" },
+      { "number": 2, "reason": "Duplicates a migration mechanism better shared with #5" }
+    ],
+    "selected_option": {
+      "number": 3,
+      "name": "Combine with #5's status/update mechanism",
+      "summary": "Reuse the upsert/deprecate rework from #5 so the same code path updates both the toolbox and infrastructure service subsets."
+    },
+    "residual_risk": "Depends on #5's schema decision landing first (or in the same PR); if sequenced separately, a standalone migration (Option 2) would be needed instead."
+  }
+}

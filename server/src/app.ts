@@ -28,7 +28,9 @@ const app = express();
 app.use(compression()); // gzip compression for responses
 app.use(
   helmet({
+    crossOriginOpenerPolicy: false,
     contentSecurityPolicy: {
+      useDefaults: false,
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'cdn.jsdelivr.net'],

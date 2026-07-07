@@ -102,10 +102,10 @@ client-builder stage does not currently forward.
 
 Select a profile with one variable on each side:
 
-| Variable                | Side   | Values                                | Default   |
-| ----------------------- | ------ | ------------------------------------- | --------- |
-| `VITE_BRANDING_PROFILE` | Client | `default` \| `intact` \| `secassured` | `default` |
-| `BRANDING_PROFILE`      | Server | `default` \| `intact` \| `secassured` | `default` |
+| Variable                | Side   | Values                                | Default      |
+| ----------------------- | ------ | ------------------------------------- | ------------ |
+| `VITE_BRANDING_PROFILE` | Client | `default` \| `intact` \| `secassured` | `secassured` |
+| `BRANDING_PROFILE`      | Server | `default` \| `intact` \| `secassured` | `secassured` |
 
 The client falls back to `default` on an unrecognized profile name; the server
 rejects an invalid `BRANDING_PROFILE` at startup (zod enum validation).

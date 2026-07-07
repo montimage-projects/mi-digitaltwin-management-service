@@ -1,0 +1,35 @@
+{
+  "runId": "3db0aa09",
+  "agent": "reviewer",
+  "task": "Review PR #22 in repo /home/montimage/workspace/secsim. Branch: feat/18-replace-maestro-execution-with-k8s, base: main. PR title: feat(scenario): deploy scenarios directly to kubernetes (#18). PR body: Closes #18, replaces the MAESTRO mock execution engine with real Kubernetes deployment. Get the diff by running: cd /home/montimage/workspace/secsim && gh pr diff 22. Also read key files for context — kubernetesDeploy.ts, scenarios.routes.ts, ExecutionConsole.tsx, api.ts. Focus on: correctness (logic, race conditions, off-by-one), security (injection, hardcoded secrets, auth bypass), edge cases (null handling, error paths, empty states), test coverage (are new code paths tested meaningfully), and code quality (dead code, duplication, complexity). Do NOT report style/lint/format issues. Return the JSON output as specified in the code-reviewer format with result, issues_found, fixable_count, issues[], and summary.",
+  "exitCode": 143,
+  "usage": {
+    "input": 263073,
+    "output": 1592,
+    "cacheRead": 0,
+    "cacheWrite": 0,
+    "cost": 0,
+    "turns": 7
+  },
+  "model": "opencode-cli/opencode/deepseek-v4-flash-free:high",
+  "attemptedModels": ["opencode-cli/opencode/deepseek-v4-flash-free:high"],
+  "modelAttempts": [
+    {
+      "model": "opencode-cli/opencode/deepseek-v4-flash-free:high",
+      "success": false,
+      "exitCode": 143,
+      "usage": {
+        "input": 263073,
+        "output": 1592,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "cost": 0,
+        "turns": 7
+      }
+    }
+  ],
+  "durationMs": 122611,
+  "toolCount": 7,
+  "transcriptPath": "/home/montimage/workspace/secsim/.pi-subagents/artifacts/3db0aa09_reviewer_0_transcript.jsonl",
+  "timestamp": 1783402430810
+}

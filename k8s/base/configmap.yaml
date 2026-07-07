@@ -13,7 +13,7 @@ data:
   CORS_ORIGIN: 'http://localhost:3000'
   ADMIN_USERNAME: 'admin'
   MAESTRO_BASE_URL: 'https://maestro.intact-project.eu'
-  BRANDING_PROFILE: 'default'
+  BRANDING_PROFILE: 'secassured'
   APP_NAME: ''
   ORG_NAME: ''
   ORG_URL: ''

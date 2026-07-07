@@ -69,3 +69,7 @@ note.md
 .gemini/
 .windsurf/
 .github/prompts/
+
+# Agent artifacts
+.gitissue/
+.pi-subagents/

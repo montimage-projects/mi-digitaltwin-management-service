@@ -63,7 +63,7 @@ Create `.env.prod` in project root:
 # General
 NODE_ENV=production
 LOG_LEVEL=info
-BRANDING_PROFILE=default
+BRANDING_PROFILE=secassured
 
 # Backend
 PORT=3000
@@ -87,13 +87,14 @@ CORS_ORIGIN=https://yourdomain.com
 > `ORG_URL` are forwarded from this `.env` into the container by
 > `docker-compose.prod.yml` / `docker-compose.atlas.yml`, so **server-rendered**
 > branding (OpenAPI docs title, startup boot banner) follows the profile you set
-> here. **Client-rendered** branding (logo, favicon, browser tab title) is baked
-> into the client bundle at build time from `VITE_BRANDING_PROFILE`, which the
-> unified single-container image's client-builder stage in
-> `server/Dockerfile.unified` does not currently forward — a pre-existing,
-> unrelated limitation that this branding wiring does not address. To rebrand the
-> client UI today, build the client separately with a matching
-> `VITE_BRANDING_PROFILE`.
+> here (defaults to `secassured`). **Client-rendered** branding (logo, favicon,
+> browser tab title) is baked into the client bundle at build time from
+> `VITE_BRANDING_PROFILE` (also defaults to `secassured` via
+> `client/.env.example`). The unified single-container image's client-builder
+> stage in `server/Dockerfile.unified` does not forward `VITE_BRANDING_PROFILE`
+> as a Docker env var — the value is compiled in during the client build stage.
+> To change the client branding, set `VITE_BRANDING_PROFILE` in the client
+> `.env` before building.
 
 ### Step 2: Update Docker Compose
 

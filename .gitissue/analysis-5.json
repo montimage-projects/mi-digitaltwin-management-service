@@ -1,0 +1,290 @@
+{
+  "version": 1,
+  "timestamp": "2026-07-06T16:00:00Z",
+  "source": "/issue-analysis",
+  "issue": {
+    "number": 5,
+    "title": "Update Cybersecurity Services catalog from SECASSURED source",
+    "type": "improvement",
+    "reporter": { "login": "luongnv89", "name": "Luong NGUYEN" },
+    "labels": ["enhancement"],
+    "state": "open",
+    "createdAt": "2026-07-06T11:29:57Z",
+    "updatedAt": "2026-07-06T11:29:57Z"
+  },
+  "extraction": {
+    "error_messages": [],
+    "functions": [
+      "seedServices",
+      "seedCategories",
+      "seedSectors",
+      "autoSeedIfEmpty",
+      "migrateCategoriesToSectors"
+    ],
+    "classes": ["Service", "Category", "Sector", "Scenario"],
+    "file_refs": [],
+    "modules": ["server/src/seed", "server/src/models", "server/src/routes"],
+    "keywords": [
+      "Cybersecurity Services catalog",
+      "SECASSURED",
+      "seeded",
+      "deprecated",
+      "removed",
+      "categories",
+      "descriptions"
+    ]
+  },
+  "affected_files": [
+    {
+      "path": "server/src/seed/services.seed.ts",
+      "relevance": "critical",
+      "role": "Primary seed data (intactToolboxServices + infrastructureServices, 44 entries); seedServices() only creates missing services by shortName, never updates or removes existing ones",
+      "match_reasons": ["direct file reference from triage.json", "primary catalog data source"]
+    },
+    {
+      "path": "server/src/models/Service.ts",
+      "relevance": "high",
+      "role": "Mongoose schema; has no status/deprecated field, needed to satisfy 'removed or clearly deprecated' AC without breaking Scenario references",
+      "match_reasons": ["core data model gap"]
+    },
+    {
+      "path": "server/src/seed/categories.seed.ts",
+      "relevance": "high",
+      "role": "Defines category slugs services are keyed against; new SECASSURED services may need new categories added first or seeding silently skips them",
+      "match_reasons": ["upstream dependency of services.seed.ts"]
+    },
+    {
+      "path": "server/src/seed/sectors.seed.ts",
+      "relevance": "medium",
+      "role": "NIS2 sector slugs used via sectorSlug for Critical-Infrastructure-classified services",
+      "match_reasons": ["upstream dependency"]
+    },
+    {
+      "path": "server/src/migrations/migrate-category-to-sector.ts",
+      "relevance": "medium",
+      "role": "Hardcoded category->sector mapping table that could go stale if categories change",
+      "match_reasons": ["coupling risk"]
+    },
+    {
+      "path": "server/src/routes/services.routes.ts",
+      "relevance": "medium",
+      "role": "CRUD API + Zod validation schemas; would need a new enum/field if a deprecation status is introduced",
+      "match_reasons": ["keyword match: services API"]
+    },
+    {
+      "path": "docs/database/schema.md",
+      "relevance": "medium",
+      "role": "Documents the services collection schema/ERD",
+      "match_reasons": ["direct file reference from triage.json"]
+    },
+    {
+      "path": "README.md",
+      "relevance": "high",
+      "role": "States 'Catalog of 44+ INTACT cybersecurity services' — stale count/description to update",
+      "match_reasons": ["contains a stale hardcoded service count"]
+    },
+    {
+      "path": "server/README.md",
+      "relevance": "low",
+      "role": "Documents services API/seeding commands generically",
+      "match_reasons": ["direct file reference"]
+    },
+    {
+      "path": "client/README.md",
+      "relevance": "low",
+      "role": "Generic client overview mention",
+      "match_reasons": ["direct file reference"]
+    },
+    {
+      "path": "server/src/docs/openapi.ts",
+      "relevance": "low",
+      "role": "OpenAPI schema for Service; would need a new enum value if a status field is added",
+      "match_reasons": ["schema mirror of Service model"]
+    },
+    {
+      "path": "server/src/seed/auto-seed.ts",
+      "relevance": "low",
+      "role": "Only auto-seeds on an empty DB; a refresh in an already-seeded deployment needs a manual reseed or migration",
+      "match_reasons": ["deployment/rollout implication"]
+    }
+  ],
+  "analysis": {
+    "type_specific": "current_impl",
+    "summary": "The service catalog is defined entirely by a static, create-only seed script; seedServices() checks each entry's shortName and inserts it only if missing, so it has no path to update descriptions/categories on existing services or to remove/deprecate ones no longer in the source, and Scenario.deployedServices[].serviceId references Service documents with no cascade-delete handling, making hard deletion unsafe.",
+    "details": "Refreshing the catalog from SECASSURED requires more than editing the seed arrays: (1) changed services need the create-if-missing path extended to also update mutable fields on existing matches, (2) services no longer in the source need a safe removal story given Scenario references, and (3) new categories referenced by new services must be added to categories.seed.ts first or seedServices() silently skips them with a console error. No automated tests exist in this repo to catch regressions from this change."
+  },
+  "options": [
+    {
+      "number": 1,
+      "name": "Hard removal + create-only refresh",
+      "summary": "Delete Service docs no longer in the source list; keep create-only upsert for the rest.",
+      "files_to_modify": [
+        {
+          "path": "server/src/seed/services.seed.ts",
+          "changes": "Replace catalog arrays with refreshed SECASSURED data; add deletion of removed shortNames"
+        }
+      ],
+      "files_to_create": [],
+      "pros": ["Smallest code change"],
+      "cons": [
+        "Orphans Scenario.deployedServices references to deleted services",
+        "No update path for changed descriptions/categories on existing services",
+        "Irreversible data loss"
+      ],
+      "complexity": "S",
+      "risk": "High",
+      "risk_details": "Silent data loss and orphaned scenario references with no automated tests to catch it"
+    },
+    {
+      "number": 2,
+      "name": "Soft-deprecation status field",
+      "summary": "Add a status field ('active'|'deprecated') to Service and rework seedServices() to upsert matched entries and mark missing ones deprecated instead of deleting.",
+      "files_to_modify": [
+        { "path": "server/src/models/Service.ts", "changes": "Add status field, default 'active'" },
+        {
+          "path": "server/src/seed/services.seed.ts",
+          "changes": "Refresh catalog data; rework seedServices() to update existing docs and mark removed ones deprecated"
+        },
+        {
+          "path": "server/src/routes/services.routes.ts",
+          "changes": "Support status in validation/filtering"
+        },
+        {
+          "path": "client/src/components/services/ServiceTable.tsx",
+          "changes": "Show deprecated badge/filter"
+        },
+        { "path": "server/src/docs/openapi.ts", "changes": "Document status field" }
+      ],
+      "files_to_create": [],
+      "pros": [
+        "Satisfies AC's 'removed or clearly deprecated' without breaking Scenario references",
+        "Reusable pattern for future catalog refreshes"
+      ],
+      "cons": ["Touches model + routes + a UI surface, more review surface than option 1"],
+      "complexity": "M",
+      "risk": "Medium",
+      "risk_details": "Multi-file change but no destructive operation; no automated tests to verify"
+    },
+    {
+      "number": 3,
+      "name": "Full re-seed with idempotent 3-way diff",
+      "summary": "Rewrite seedServices() to diff every run against the source (update changed fields, deprecate missing, create new), restructuring the source-of-truth data file.",
+      "files_to_modify": [
+        {
+          "path": "server/src/seed/services.seed.ts",
+          "changes": "Restructure into diff-friendly source arrays + new diffing seed function"
+        },
+        {
+          "path": "server/src/seed/categories.seed.ts",
+          "changes": "Add any new categories required by refreshed services"
+        },
+        {
+          "path": "server/src/migrations/migrate-category-to-sector.ts",
+          "changes": "Extend mapping for any new categories"
+        }
+      ],
+      "files_to_create": [],
+      "pros": ["Most maintainable long-term for future catalog refreshes"],
+      "cons": ["Largest surface area", "More verification effort with zero test coverage"],
+      "complexity": "L",
+      "risk": "Medium",
+      "risk_details": "Broad refactor of seeding logic with no test safety net"
+    }
+  ],
+  "recommended_option": 2,
+  "overall_complexity": "M",
+  "overall_risk": "Medium",
+  "history": {
+    "related_commits": [
+      {
+        "sha": "3ed8691",
+        "message": "feat: Add automatic database seeding and simplify Docker deployment",
+        "author": "",
+        "date": "",
+        "files": ["server/src/seed/services.seed.ts"],
+        "type": "related_change"
+      },
+      {
+        "sha": "7cf8f5e",
+        "message": "feat: Initial MVP v1.0 - INTACT Digital Twin Management Platform",
+        "author": "",
+        "date": "",
+        "files": ["server/src/seed/services.seed.ts", "server/src/models/Service.ts"],
+        "type": "related_change"
+      },
+      {
+        "sha": "93cac23",
+        "message": "feat: Enhance ServiceForm with improved UX and version management",
+        "author": "",
+        "date": "",
+        "files": ["server/src/models/Service.ts"],
+        "type": "related_change"
+      }
+    ],
+    "regression_candidate": null,
+    "already_addressed": null,
+    "domain_experts": [{ "author": "Luong NGUYEN", "commit_count": 0 }]
+  },
+  "cross_references": {
+    "blocks": [6, 7, 8, 9],
+    "blocked_by": [1, 2],
+    "related_issues": [
+      {
+        "number": 6,
+        "title": "Update Cybersecurity Infrastructure service list from SECASSURED source",
+        "relationship": "shared_files",
+        "shared_keywords": ["SECASSURED", "categories"],
+        "confidence": "high"
+      },
+      {
+        "number": 7,
+        "title": "Update Infrastructure list from SECASSURED source",
+        "relationship": "shared_files",
+        "shared_keywords": ["SECASSURED", "services.seed.ts"],
+        "confidence": "high"
+      },
+      {
+        "number": 8,
+        "title": "Update partners/providers list from SECASSURED source",
+        "relationship": "shared_files",
+        "shared_keywords": ["provider", "SECASSURED"],
+        "confidence": "medium"
+      }
+    ],
+    "resolved_by": [],
+    "triage_data_available": true,
+    "triage_timestamp": "2026-07-06T12:00:00Z"
+  },
+  "scan_stats": {
+    "files_read": 8,
+    "deps_traced": 6,
+    "keywords_extracted": 9,
+    "file_refs_extracted": 8,
+    "scan_duration_seconds": 95,
+    "scan_timed_out": false
+  },
+  "git_state": {
+    "branch": "main",
+    "commit_sha": "606dec2a5cbca035c7ca7143f8f3f1e7d2e66b08",
+    "commit_sha_short": "606dec2",
+    "captured_at": "2026-07-06T16:00:00Z"
+  },
+  "decision_record": {
+    "root_cause": "The service catalog seed script is create-only — it never updates or removes existing records — so refreshing from the SECASSURED source needs a new update/deprecate mechanism, not just edited seed data.",
+    "options_considered": [
+      { "number": 1, "name": "Hard removal + create-only refresh" },
+      { "number": 2, "name": "Soft-deprecation status field" },
+      { "number": 3, "name": "Full re-seed with idempotent 3-way diff" }
+    ],
+    "options_rejected": [
+      { "number": 1, "reason": "Orphans Scenario references and causes irreversible data loss" },
+      { "number": 3, "reason": "Broader refactor than needed for this issue's acceptance criteria" }
+    ],
+    "selected_option": {
+      "number": 2,
+      "name": "Soft-deprecation status field",
+      "summary": "Add a status field to Service and rework seedServices() to update/deprecate rather than only create."
+    },
+    "residual_risk": "No automated tests exist to verify the seed refresh doesn't silently break existing scenarios; manual verification required."
+  }
+}

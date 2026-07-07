@@ -10,7 +10,7 @@ WORKDIR /app/client
 COPY client/package.json client/package-lock.json ./
 
 # Install client dependencies
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # Copy client source
 COPY client/ ./
@@ -27,7 +27,7 @@ WORKDIR /app/server
 COPY server/package.json server/package-lock.json ./
 
 # Install server dependencies
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # Copy server source
 COPY server/src ./src
@@ -53,8 +53,8 @@ COPY --from=server-builder /app/server/node_modules ./server/node_modules
 COPY --from=server-builder /app/server/dist ./server/dist
 COPY --from=server-builder /app/server/package.json ./server/
 
-# Copy client build
-COPY --from=client-builder /app/client/dist ./client/dist
+# Copy client build (Vite outputs to ../server/public)
+COPY --from=client-builder /app/server/public ./server/public
 
 # Copy entrypoint script and set permissions
 COPY --chmod=755 server/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

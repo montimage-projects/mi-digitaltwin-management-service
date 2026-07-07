@@ -23,7 +23,7 @@ stages:
 quality:
   stage: quality
   script:
-    - npm ci
+    - HUSKY=0 npm ci
     - npm run format:check
     - npm run lint
   cache:
@@ -35,7 +35,7 @@ quality:
 typecheck:
   stage: typecheck
   script:
-    - npm ci
+    - HUSKY=0 npm ci
     - npm run typecheck
   cache:
     key: $CI_COMMIT_REF_SLUG
@@ -51,8 +51,9 @@ test:
   variables:
     MONGODB_URI: mongodb://mongo:27017/intact-test
     JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
+    ENCRYPTION_KEY: ci-test-encryption-key-16chr
   script:
-    - npm ci
+    - HUSKY=0 npm ci
     - npm run test:server
   cache:
     key: $CI_COMMIT_REF_SLUG
@@ -63,7 +64,7 @@ test:
 security:
   stage: security
   script:
-    - npm ci
+    - HUSKY=0 npm ci
     - npm audit --audit-level=high
   allow_failure: true
   cache:
@@ -78,7 +79,7 @@ build:
     - quality
     - typecheck
   script:
-    - npm ci
+    - HUSKY=0 npm ci
     - npm run build
   cache:
     key: $CI_COMMIT_REF_SLUG
