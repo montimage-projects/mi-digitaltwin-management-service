@@ -240,7 +240,11 @@ export function buildClientFromInfrastructure(infrastructure: IInfrastructure): 
     } else {
       kc.loadFromOptions({
         clusters: [
-          { name: 'secsim-cluster', server: infrastructure.endpoint, skipTLSVerify: true },
+          {
+            name: 'secsim-cluster',
+            server: infrastructure.endpoint,
+            skipTLSVerify: infrastructure.skipTLSVerify ?? false,
+          },
         ],
         users: [{ name: 'secsim-user', token: raw }],
         contexts: [{ name: 'secsim-context', cluster: 'secsim-cluster', user: 'secsim-user' }],

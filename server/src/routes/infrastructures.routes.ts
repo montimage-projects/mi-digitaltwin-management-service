@@ -23,6 +23,7 @@ const createInfrastructureSchema = z.object({
   endpoint: z.string().min(1).max(500).url(),
   credentials: z.string().min(1), // Plaintext credentials to be encrypted
   capacity: capacitySchema.optional(),
+  skipTLSVerify: z.boolean().optional(),
 });
 
 const updateInfrastructureSchema = z.object({
@@ -31,6 +32,7 @@ const updateInfrastructureSchema = z.object({
   endpoint: z.string().min(1).max(500).url().optional(),
   credentials: z.string().min(1).optional(), // Optional - only update if provided
   capacity: capacitySchema.optional(),
+  skipTLSVerify: z.boolean().optional(),
 });
 
 // GET /api/infrastructures - List all infrastructures
@@ -51,7 +53,7 @@ router.post(
   validateBody(createInfrastructureSchema),
   async (req, res, next) => {
     try {
-      const { name, type, endpoint, credentials, capacity } = req.body;
+      const { name, type, endpoint, credentials, capacity, skipTLSVerify } = req.body;
 
       // Check for duplicate name
       const existing = await Infrastructure.findOne({ name });
@@ -69,6 +71,7 @@ router.post(
         credentials: encryptedCredentials,
         capacity: capacity || {},
         status: 'inactive',
+        skipTLSVerify,
       });
 
       await infrastructure.save();
@@ -112,7 +115,7 @@ router.put(
   async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { name, type, endpoint, credentials, capacity } = req.body;
+      const { name, type, endpoint, credentials, capacity, skipTLSVerify } = req.body;
 
       const parseResult = objectIdSchema.safeParse(id);
       if (!parseResult.success) {
@@ -132,6 +135,7 @@ router.put(
       if (type) updateData.type = type;
       if (endpoint) updateData.endpoint = endpoint;
       if (capacity) updateData.capacity = capacity;
+      if (skipTLSVerify !== undefined) updateData.skipTLSVerify = skipTLSVerify;
 
       // Encrypt new credentials if provided
       if (credentials) {

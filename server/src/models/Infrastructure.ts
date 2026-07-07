@@ -19,6 +19,7 @@ export interface IInfrastructure extends Document {
   credentials: ICredentials;
   capacity: ICapacity;
   status: 'active' | 'inactive' | 'error';
+  skipTLSVerify?: boolean;
   lastHealthCheck?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -68,6 +69,10 @@ const infrastructureSchema = new Schema<IInfrastructure>(
     capacity: {
       type: capacitySchema,
       default: {},
+    },
+    skipTLSVerify: {
+      type: Boolean,
+      default: false,
     },
     status: {
       type: String,

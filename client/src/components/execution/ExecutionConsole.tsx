@@ -68,6 +68,7 @@ export function ExecutionConsole({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const logIdRef = useRef(0);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const unsubscribeRef = useRef<() => void>();
 
   // Subscribe to the live event stream for this execution. The subscription is
   // torn down on unmount or whenever the execution identity changes, mirroring
@@ -129,7 +130,11 @@ export function ExecutionConsole({
       },
     });
 
-    return unsubscribe;
+    unsubscribeRef.current = unsubscribe;
+    return () => {
+      unsubscribeRef.current = undefined;
+      unsubscribe();
+    };
   }, [scenarioId, executionId, queryClient]);
 
   // Keep the log viewport pinned to the newest line as logs arrive.
@@ -143,6 +148,7 @@ export function ExecutionConsole({
   const teardownMutation = useMutation({
     mutationFn: () => scenariosApi.teardown(scenarioId, executionId),
     onSuccess: (result) => {
+      unsubscribeRef.current?.();
       toast.success(result.message || 'Deployment torn down');
       setPhase('torn-down');
       queryClient.invalidateQueries({ queryKey: ['scenario', scenarioId] });
