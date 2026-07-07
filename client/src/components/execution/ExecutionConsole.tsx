@@ -44,9 +44,13 @@ interface ExecutionConsoleProps {
 }
 
 const statusMeta: Record<DeployStatus, { label: string; className: string; icon: typeof Clock }> = {
-  pending: { label: 'Pending', className: 'text-yellow-500', icon: Clock },
-  running: { label: 'Running', className: 'text-green-500', icon: CheckCircle2 },
-  failed: { label: 'Failed', className: 'text-red-500', icon: XCircle },
+  pending: { label: 'Pending', className: 'text-yellow-700 dark:text-yellow-400', icon: Clock },
+  running: {
+    label: 'Running',
+    className: 'text-green-700 dark:text-green-400',
+    icon: CheckCircle2,
+  },
+  failed: { label: 'Failed', className: 'text-red-600 dark:text-red-400', icon: XCircle },
 };
 
 export function ExecutionConsole({
@@ -177,7 +181,7 @@ export function ExecutionConsole({
           <Button
             variant="outline"
             size="sm"
-            className="text-red-500 hover:text-red-600"
+            className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
             onClick={() => teardownMutation.mutate()}
             disabled={teardownMutation.isPending || tornDown}
             title="Delete this deployment from the cluster"
@@ -288,12 +292,12 @@ export function ExecutionConsole({
               <Terminal className="h-4 w-4" />
               <span className="text-sm font-medium">Logs</span>
             </div>
-            <span className="text-xs text-zinc-500">{logs.length} lines</span>
+            <span className="text-xs text-zinc-400">{logs.length} lines</span>
           </div>
           <ScrollArea ref={viewportRef} className="min-h-0 flex-1">
             <div className="p-3 font-mono text-xs leading-relaxed">
               {logs.length === 0 ? (
-                <p className="text-zinc-500">
+                <p className="text-zinc-400">
                   {isSettled ? 'No logs were captured.' : 'Waiting for logs…'}
                 </p>
               ) : (
