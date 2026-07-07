@@ -64,7 +64,7 @@ security:
   stage: security
   script:
     - npm ci
-    - npm audit --audit-level=moderate
+    - npm audit --audit-level=high
   allow_failure: true
   cache:
     key: $CI_COMMIT_REF_SLUG
