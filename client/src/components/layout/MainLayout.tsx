@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
     <div className="flex h-screen">
@@ -15,12 +17,31 @@ export function MainLayout() {
       >
         Skip to main content
       </a>
-      <Sidebar
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
+
+      {/* Desktop sidebar — permanent from the lg breakpoint up. */}
+      <div className="hidden lg:flex">
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
+      </div>
+
+      {/* Mobile navigation — off-canvas drawer toggled by the header hamburger. */}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent side="left" className="w-64 p-0">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Navigation</SheetTitle>
+          </SheetHeader>
+          <Sidebar
+            collapsed={false}
+            onToggle={() => setMobileNavOpen(false)}
+            onNavigate={() => setMobileNavOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
+
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Header />
+        <Header onMenuClick={() => setMobileNavOpen(true)} />
         <main id="main-content" className="flex-1 overflow-auto bg-muted/30 p-6" tabIndex={-1}>
           <Outlet />
         </main>

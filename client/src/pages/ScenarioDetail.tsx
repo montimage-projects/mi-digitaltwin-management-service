@@ -11,30 +11,25 @@ import {
   PanelRightClose,
   PanelRightOpen,
   X,
-  ExternalLink,
   Settings2,
-  Shield,
-  CheckCircle2,
   Rocket,
-  Terminal,
-  Globe,
-  Activity,
-  Cpu,
-  HardDrive,
-  Network,
-  Clock,
-  AlertCircle,
-  CheckCircle,
 } from 'lucide-react';
-import { scenariosApi, servicesApi, infrastructuresApi, CreateScenarioData } from '@/lib/api';
+import {
+  scenariosApi,
+  servicesApi,
+  infrastructuresApi,
+  CreateScenarioData,
+  type DeployedServiceResult,
+  type ExecuteResult,
+} from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
 import { TopologyEditor } from '@/components/topology/TopologyEditor';
 import { WorkspaceTabs } from '@/components/workspace/WorkspaceTabs';
 import { ExecutionPanel } from '@/components/execution/ExecutionPanel';
+import { ExecutionConsole } from '@/components/execution/ExecutionConsole';
 import { ScenarioEditorGuidelinesModal } from '@/components/scenarios/ScenarioEditorGuidelinesModal';
 import { useWorkspaceStore } from '@/store/workspace-store';
 import { exportScenarioToPdf } from '@/lib/pdf-export';
@@ -84,22 +79,11 @@ export function ScenarioDetail() {
   const [activeTab, setActiveTab] = useState('editor');
   const [selectedInfrastructure, setSelectedInfrastructure] = useState<string | null>(null);
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
-  const [executionTabs, setExecutionTabs] = useState<{
-    maestroUrl: string | null;
-    serviceUrls: {
-      id: string;
-      name: string;
-      title: string;
-      type: string;
-      serviceId: string;
-      url: string;
-      interfaceType: 'terminal' | 'web';
-    }[];
-  }>({ maestroUrl: null, serviceUrls: [] });
-  const [deploymentProgress, setDeploymentProgress] = useState(0);
-  const [deploymentComplete, setDeploymentComplete] = useState(false);
-  const [isDeploying, setIsDeploying] = useState(false);
-  const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null);
+  const [activeExecution, setActiveExecution] = useState<{
+    executionId: string;
+    namespace: string;
+    services: DeployedServiceResult[];
+  } | null>(null);
 
   // Check if guidelines should auto-open on first load
   useEffect(() => {
@@ -122,97 +106,20 @@ export function ScenarioDetail() {
     }
   }, [searchParams, executionPanelOpen, selectedInfrastructure]);
 
-  // Handle execution start - set up tabs for MAESTRO and services
-  const handleExecutionStart = useCallback(
-    (maestroUrl: string, executionId: string) => {
-      // Store the execution ID for status updates
-      setCurrentExecutionId(executionId);
-      // Validate topology before proceeding
-      const validationResult = validateTopology(selectedInfrastructure, nodes, edges);
-      if (!validationResult.isValid) {
-        const errorMsg = getValidationErrorMessage(validationResult);
-        toast.error(errorMsg || 'Configuration is not valid for deployment');
-        return;
-      }
-
-      // Generate service URLs based on nodes in the topology
-      // Each service gets its own URL (you may need to adjust this based on your infrastructure)
-      const serviceUrls = (
-        nodes as Array<{
-          id: string;
-          data: {
-            label: string;
-            serviceId?: string;
-            serviceTitle?: string;
-            type?: string;
-            uiType?: 'web' | 'terminal' | 'both';
-          };
-        }>
-      )
-        .filter((node) => node.data?.serviceId)
-        .map((node) => {
-          // Determine interface type based on service's uiType
-          let interfaceType: 'terminal' | 'web' = 'web';
-          if (node.data.uiType === 'terminal') {
-            interfaceType = 'terminal';
-          } else if (node.data.uiType === 'both') {
-            // For 'both', default to web for now (could add UI toggle later)
-            interfaceType = 'web';
-          }
-
-          return {
-            id: node.id,
-            name: node.data.label,
-            title: node.data.serviceTitle || node.data.label,
-            type: node.data.type || 'server',
-            serviceId: node.data.serviceId!,
-            // URL pattern - adjust based on your actual service URL structure
-            url: `${maestroUrl.replace('/orchestrator', '')}/service/${node.data.serviceId}`,
-            interfaceType,
-          };
-        });
-
-      setExecutionTabs({
-        maestroUrl,
-        serviceUrls,
-      });
-      setActiveTab('maestro');
-
-      // Start deployment simulation
-      setIsDeploying(true);
-      setDeploymentProgress(0);
-      setDeploymentComplete(false);
-    },
-    [nodes, selectedInfrastructure]
-  );
-
-  // Simulate deployment progress over 10 seconds
-  useEffect(() => {
-    if (!isDeploying || !currentExecutionId || !id) return;
-
-    // Update status to 'running' when deployment starts
-    scenariosApi.updateExecutionStatus(id, currentExecutionId, 'running').then(() => {
-      queryClient.invalidateQueries({ queryKey: ['scenario', id] });
+  // Handle deployment start - open the live execution console for the new run.
+  const handleExecutionStart = useCallback((result: ExecuteResult) => {
+    setActiveExecution({
+      executionId: result.executionId,
+      namespace: result.namespace,
+      services: result.services,
     });
+    setActiveTab('execution');
+  }, []);
 
-    const interval = setInterval(() => {
-      setDeploymentProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsDeploying(false);
-          setDeploymentComplete(true);
-          // Update status to 'completed' when deployment finishes
-          scenariosApi.updateExecutionStatus(id, currentExecutionId, 'completed').then(() => {
-            queryClient.invalidateQueries({ queryKey: ['scenario', id] });
-          });
-          return 100;
-        }
-        return prev + 10; // 10% every second = 100% in 10 seconds
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isDeploying, currentExecutionId, id, queryClient]);
+  const handleCloseExecution = useCallback(() => {
+    setActiveExecution(null);
+    setActiveTab('editor');
+  }, []);
 
   // Add scenario to workspace tabs when loaded
   useEffect(() => {
@@ -351,7 +258,7 @@ export function ScenarioDetail() {
       <WorkspaceTabs onTabClick={handleTabClick} />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -369,7 +276,7 @@ export function ScenarioDetail() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -432,52 +339,31 @@ export function ScenarioDetail() {
                   <Settings2 className="h-4 w-4" />
                   Editor
                 </TabsTrigger>
-                {executionTabs.maestroUrl && (
-                  <TabsTrigger value="maestro" className="gap-2 data-[state=active]:bg-muted">
-                    <Play className="h-4 w-4 text-green-500" />
-                    MAESTRO
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-4 w-4 ml-1 hover:bg-destructive/20"
+                {activeExecution && (
+                  <TabsTrigger value="execution" className="gap-2 data-[state=active]:bg-muted">
+                    <Rocket className="h-4 w-4 text-primary" />
+                    Execution
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Close execution tab"
+                      className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-destructive/20 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setExecutionTabs({ maestroUrl: null, serviceUrls: [] });
-                        setActiveTab('editor');
+                        handleCloseExecution();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleCloseExecution();
+                        }
                       }}
                     >
-                      <X className="h-3 w-3" />
-                    </Button>
+                      <X className="h-3.5 w-3.5" />
+                    </span>
                   </TabsTrigger>
                 )}
-                {deploymentComplete &&
-                  executionTabs.serviceUrls.map((service) => (
-                    <TabsTrigger
-                      key={service.id}
-                      value={`service-${service.id}`}
-                      className="gap-2 data-[state=active]:bg-muted"
-                    >
-                      <Shield className="h-4 w-4 text-blue-500" />
-                      {service.name}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 ml-1 hover:bg-destructive/20"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setExecutionTabs((prev) => ({
-                            ...prev,
-                            serviceUrls: prev.serviceUrls.filter((s) => s.id !== service.id),
-                          }));
-                          if (activeTab === `service-${service.id}`) {
-                            setActiveTab('editor');
-                          }
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </TabsTrigger>
-                  ))}
               </TabsList>
             </div>
 
@@ -504,368 +390,18 @@ export function ScenarioDetail() {
                 />
               </TabsContent>
 
-              {/* MAESTRO Tab */}
-              {executionTabs.maestroUrl && (
-                <TabsContent value="maestro" className="h-full m-0 data-[state=inactive]:hidden">
-                  <div className="h-full flex flex-col">
-                    <div className="flex items-center justify-between border-b px-4 py-2 bg-muted/30">
-                      <div className="flex items-center gap-2">
-                        <Play className="h-4 w-4 text-green-500" />
-                        <span className="font-medium text-sm">MAESTRO Orchestrator</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(executionTabs.maestroUrl!, '_blank')}
-                        title="Open in new tab"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* Deployment Progress / Completion View */}
-                    {!deploymentComplete ? (
-                      <div className="flex-1 flex flex-col items-center justify-center p-8">
-                        <div className="w-full max-w-md space-y-6">
-                          <div className="text-center space-y-2">
-                            <Rocket className="h-16 w-16 mx-auto text-blue-500 animate-bounce" />
-                            <h3 className="text-xl font-semibold">Deploying Services</h3>
-                            <p className="text-muted-foreground">
-                              Please wait while we deploy your services to the infrastructure...
-                            </p>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Progress value={deploymentProgress} className="h-3" />
-                            <div className="flex justify-between text-sm text-muted-foreground">
-                              <span>Progress</span>
-                              <span>{deploymentProgress}%</span>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            {executionTabs.serviceUrls.map((service, index) => {
-                              const serviceProgress = Math.min(
-                                100,
-                                deploymentProgress -
-                                  index * (100 / executionTabs.serviceUrls.length)
-                              );
-                              const isComplete =
-                                serviceProgress >= 100 / executionTabs.serviceUrls.length;
-                              const isDeployingService = serviceProgress > 0 && !isComplete;
-
-                              return (
-                                <div
-                                  key={service.id}
-                                  className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
-                                >
-                                  {isComplete ? (
-                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                  ) : isDeployingService ? (
-                                    <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
-                                  ) : (
-                                    <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
-                                  )}
-                                  <span
-                                    className={
-                                      isComplete ? 'text-foreground' : 'text-muted-foreground'
-                                    }
-                                  >
-                                    {service.name}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex-1 flex flex-col items-center justify-center p-8">
-                        <div className="w-full max-w-md space-y-6 text-center">
-                          <div className="space-y-2">
-                            <CheckCircle2 className="h-20 w-20 mx-auto text-green-500" />
-                            <h3 className="text-2xl font-semibold text-green-600">
-                              Deployment Complete!
-                            </h3>
-                            <p className="text-muted-foreground">
-                              All {executionTabs.serviceUrls.length} services have been successfully
-                              deployed to the infrastructure.
-                            </p>
-                          </div>
-
-                          <div className="space-y-3 pt-4">
-                            <p className="text-sm text-muted-foreground">
-                              Click below to access individual service interfaces:
-                            </p>
-                            <div className="flex flex-wrap justify-center gap-2">
-                              {executionTabs.serviceUrls.map((service) => (
-                                <Button
-                                  key={service.id}
-                                  variant="outline"
-                                  onClick={() => setActiveTab(`service-${service.id}`)}
-                                  className="gap-2"
-                                >
-                                  <Shield className="h-4 w-4 text-blue-500" />
-                                  {service.name}
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="pt-4">
-                            <Button
-                              size="lg"
-                              onClick={() => {
-                                // Open the first service tab
-                                if (executionTabs.serviceUrls.length > 0) {
-                                  setActiveTab(`service-${executionTabs.serviceUrls[0].id}`);
-                                }
-                              }}
-                              className="gap-2"
-                            >
-                              <Play className="h-4 w-4" />
-                              Open Service Interfaces
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+              {/* Execution Tab - live Kubernetes deploy progress + logs */}
+              {activeExecution && (
+                <TabsContent value="execution" className="h-full m-0 data-[state=inactive]:hidden">
+                  <ExecutionConsole
+                    scenarioId={id!}
+                    executionId={activeExecution.executionId}
+                    namespace={activeExecution.namespace}
+                    services={activeExecution.services}
+                    onClose={handleCloseExecution}
+                  />
                 </TabsContent>
               )}
-
-              {/* Service Tabs - Only shown after deployment completes */}
-              {deploymentComplete &&
-                executionTabs.serviceUrls.map((service) => (
-                  <TabsContent
-                    key={service.id}
-                    value={`service-${service.id}`}
-                    className="h-full m-0 data-[state=inactive]:hidden"
-                  >
-                    <div className="h-full flex flex-col">
-                      <div className="flex items-center justify-between border-b px-4 py-2 bg-muted/30">
-                        <div className="flex items-center gap-2">
-                          {service.interfaceType === 'terminal' ? (
-                            <Terminal className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <Globe className="h-4 w-4 text-blue-500" />
-                          )}
-                          <span className="font-medium text-sm">{service.name}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {service.interfaceType === 'terminal' ? 'Terminal' : 'Web UI'}
-                          </Badge>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.open(service.url, '_blank')}
-                          title="Open in new tab"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      {/* Simulated Interface */}
-                      {service.interfaceType === 'terminal' ? (
-                        /* Terminal Interface Simulation */
-                        <div className="flex-1 bg-gray-900 text-green-400 font-mono text-sm p-4 overflow-auto">
-                          <div className="space-y-1">
-                            <div className="text-gray-500">
-                              $ # {service.title} - Terminal Interface
-                            </div>
-                            <div className="text-gray-500">$ # Service ID: {service.serviceId}</div>
-                            <div className="text-gray-500">$ # Type: {service.type}</div>
-                            <div className="mt-4"></div>
-                            <div className="text-cyan-400">
-                              ╔══════════════════════════════════════════════════════════════╗
-                            </div>
-                            <div className="text-cyan-400">║ {service.name.padEnd(60)} ║</div>
-                            <div className="text-cyan-400">
-                              ║ {service.title.substring(0, 60).padEnd(60)} ║
-                            </div>
-                            <div className="text-cyan-400">
-                              ╚══════════════════════════════════════════════════════════════╝
-                            </div>
-                            <div className="mt-4"></div>
-                            <div>$ ./start-service.sh --mode=production</div>
-                            <div className="text-yellow-400">
-                              [INFO] Initializing {service.name}...
-                            </div>
-                            <div className="text-yellow-400">
-                              [INFO] Loading configuration from /etc/{service.name.toLowerCase()}
-                              /config.yaml
-                            </div>
-                            <div className="text-yellow-400">
-                              [INFO] Connecting to infrastructure...
-                            </div>
-                            <div className="text-green-400">
-                              [SUCCESS] Connected to Montimage DGX Spark
-                            </div>
-                            <div className="text-yellow-400">
-                              [INFO] Starting monitoring threads...
-                            </div>
-                            <div className="text-green-400">
-                              [SUCCESS] Service {service.name} is now running
-                            </div>
-                            <div className="mt-4"></div>
-                            <div>$ status</div>
-                            <div className="text-white">
-                              Service Status: <span className="text-green-400">● RUNNING</span>
-                            </div>
-                            <div className="text-white">Uptime: 00:05:32</div>
-                            <div className="text-white">CPU Usage: 12.4%</div>
-                            <div className="text-white">Memory: 256MB / 1024MB</div>
-                            <div className="text-white">Active Connections: 3</div>
-                            <div className="mt-4"></div>
-                            <div>$ tail -f /var/log/{service.name.toLowerCase()}/service.log</div>
-                            <div className="text-gray-400">
-                              [{new Date().toISOString()}] Processing request from 192.168.1.100
-                            </div>
-                            <div className="text-gray-400">
-                              [{new Date().toISOString()}] Analysis complete - 0 threats detected
-                            </div>
-                            <div className="text-gray-400">
-                              [{new Date().toISOString()}] Monitoring network interface eth0
-                            </div>
-                            <div className="text-gray-400">
-                              [{new Date().toISOString()}] Health check passed
-                            </div>
-                            <div className="mt-2 flex items-center">
-                              <span className="text-green-400">$</span>
-                              <span className="ml-2 w-2 h-4 bg-green-400 animate-pulse"></span>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Web Interface Simulation */
-                        <div className="flex-1 bg-background overflow-auto">
-                          <div className="p-6 space-y-6">
-                            {/* Header */}
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h2 className="text-2xl font-bold">{service.title}</h2>
-                                <p className="text-muted-foreground">
-                                  Service Dashboard - {service.name}
-                                </p>
-                              </div>
-                              <Badge className="bg-green-500">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Online
-                              </Badge>
-                            </div>
-
-                            {/* Stats Grid */}
-                            <div className="grid grid-cols-4 gap-4">
-                              <div className="rounded-lg border p-4">
-                                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                                  <Activity className="h-4 w-4" />
-                                  Status
-                                </div>
-                                <div className="mt-2 text-2xl font-bold text-green-500">Active</div>
-                              </div>
-                              <div className="rounded-lg border p-4">
-                                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                                  <Cpu className="h-4 w-4" />
-                                  CPU Usage
-                                </div>
-                                <div className="mt-2 text-2xl font-bold">23%</div>
-                              </div>
-                              <div className="rounded-lg border p-4">
-                                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                                  <HardDrive className="h-4 w-4" />
-                                  Memory
-                                </div>
-                                <div className="mt-2 text-2xl font-bold">512 MB</div>
-                              </div>
-                              <div className="rounded-lg border p-4">
-                                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                                  <Network className="h-4 w-4" />
-                                  Connections
-                                </div>
-                                <div className="mt-2 text-2xl font-bold">7</div>
-                              </div>
-                            </div>
-
-                            {/* Service Info */}
-                            <div className="rounded-lg border p-4">
-                              <h3 className="font-semibold mb-4">Service Information</h3>
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <span className="text-muted-foreground">Service ID:</span>
-                                  <span className="ml-2 font-mono">{service.serviceId}</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Type:</span>
-                                  <span className="ml-2 capitalize">{service.type}</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Started:</span>
-                                  <span className="ml-2">{new Date().toLocaleString()}</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Version:</span>
-                                  <span className="ml-2">1.0.0</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Recent Activity */}
-                            <div className="rounded-lg border p-4">
-                              <h3 className="font-semibold mb-4">Recent Activity</h3>
-                              <div className="space-y-3">
-                                <div className="flex items-center gap-3 text-sm">
-                                  <CheckCircle className="h-4 w-4 text-green-500" />
-                                  <span className="text-muted-foreground">
-                                    <Clock className="h-3 w-3 inline mr-1" />2 min ago
-                                  </span>
-                                  <span>Health check passed successfully</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-sm">
-                                  <Activity className="h-4 w-4 text-blue-500" />
-                                  <span className="text-muted-foreground">
-                                    <Clock className="h-3 w-3 inline mr-1" />5 min ago
-                                  </span>
-                                  <span>Processing network traffic analysis</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-sm">
-                                  <AlertCircle className="h-4 w-4 text-yellow-500" />
-                                  <span className="text-muted-foreground">
-                                    <Clock className="h-3 w-3 inline mr-1" />8 min ago
-                                  </span>
-                                  <span>Configuration reloaded</span>
-                                </div>
-                                <div className="flex items-center gap-3 text-sm">
-                                  <CheckCircle className="h-4 w-4 text-green-500" />
-                                  <span className="text-muted-foreground">
-                                    <Clock className="h-3 w-3 inline mr-1" />
-                                    10 min ago
-                                  </span>
-                                  <span>Service started on infrastructure</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-2">
-                              <Button variant="outline">
-                                <Activity className="h-4 w-4 mr-2" />
-                                View Logs
-                              </Button>
-                              <Button variant="outline">
-                                <Settings2 className="h-4 w-4 mr-2" />
-                                Configure
-                              </Button>
-                              <Button variant="outline" className="text-red-500 hover:text-red-600">
-                                <AlertCircle className="h-4 w-4 mr-2" />
-                                Stop Service
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
-                ))}
             </div>
           </Tabs>
         </div>

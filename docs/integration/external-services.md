@@ -13,15 +13,13 @@ graph TD
 
  subgraph External
  C[MongoDB]
- D[MAESTRO]
  E[Kubernetes]
  F[Docker Registry]
  end
 
  A --> B
  B --> C
- A -->|iFrame| D
- D --> E
+ B -->|deploy topology| E
  E --> F
 
  style Platform fill:#e3f2fd
@@ -117,28 +115,25 @@ users:
 
 ### Connection Testing
 
-```typescript
-// Test infrastructure connection
-app.post('/api/infrastructures/:id/test', async (req, res) => {
-  const infra = await Infrastructure.findById(req.params.id);
-  const credentials = decrypt(infra.credentials);
+`POST /api/infrastructures/:id/test` runs a real liveness probe against the
+cluster: it builds a client from the (decrypted) credentials and lists a single
+namespace. A successful call means the API server answered and authorized the
+request. Expected failures — unreachable endpoint, bad credentials, TLS error —
+resolve to `success: false` with a descriptive message rather than a `500`.
 
-  try {
-    // Attempt to list namespaces as connectivity test
-    const k8sApi = createK8sClient(credentials);
-    await k8sApi.listNamespace();
-
-    await Infrastructure.findByIdAndUpdate(req.params.id, {
-      lastTested: new Date(),
-      status: 'active',
-    });
-
-    res.json({ success: true });
-  } catch (error) {
-    res.json({ success: false, error: error.message });
-  }
-});
+```json
+// Response
+{
+  "success": true,
+  "status": "active",
+  "lastHealthCheck": "2026-07-06T10:00:00.000Z",
+  "message": "Connection successful"
+}
 ```
+
+The infrastructure's `status` is persisted as `active` on success or `error` on
+failure. The probe uses the same client builder as scenario execution — see
+[Kubernetes Execution](kubernetes-execution.md#cluster-credentials).
 
 ## Docker Registry
 
@@ -184,7 +179,7 @@ graph LR
 ### Topic Configuration
 
 ```yaml
-# MAESTRO handles Kafka setup
+# Kafka topics referenced by service topologies
 kafka:
   bootstrap.servers: kafka.intact-project.eu:9092
   topics:
@@ -197,12 +192,11 @@ kafka:
 
 ### Required Services
 
-| Service    | Purpose      | Required                |
-| ---------- | ------------ | ----------------------- |
-| MongoDB    | Data storage | Yes                     |
-| MAESTRO    | Deployment   | For execution           |
-| Kubernetes | Runtime      | For execution           |
-| Kafka      | Messaging    | For inter-service comms |
+| Service    | Purpose              | Required                |
+| ---------- | -------------------- | ----------------------- |
+| MongoDB    | Data storage         | Yes                     |
+| Kubernetes | Deployment + runtime | For execution           |
+| Kafka      | Messaging            | For inter-service comms |
 
 ### Optional Services
 
@@ -219,7 +213,6 @@ kafka:
 ```bash
 # .env (development)
 MONGODB_URI=mongodb://localhost:27017/intact
-MAESTRO_BASE_URL=https://maestro-dev.intact-project.eu
 ```
 
 ### Production
@@ -227,7 +220,6 @@ MAESTRO_BASE_URL=https://maestro-dev.intact-project.eu
 ```bash
 # .env.prod
 MONGODB_URI=mongodb+srv://prod-user:***@cluster.mongodb.net/intact_prod
-MAESTRO_BASE_URL=https://maestro.intact-project.eu
 ```
 
 ## Health Monitoring
@@ -239,7 +231,6 @@ interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
   services: {
     database: boolean;
-    maestro: boolean;
     infrastructure: boolean;
   };
   timestamp: Date;
@@ -250,7 +241,6 @@ app.get('/api/health/detailed', async (req, res) => {
     status: 'healthy',
     services: {
       database: mongoose.connection.readyState === 1,
-      maestro: await checkMAESTRO(),
       infrastructure: await checkInfrastructures(),
     },
     timestamp: new Date(),
@@ -292,7 +282,7 @@ graph TD
  subgraph Private
  D[Express API]
  E[MongoDB]
- F[MAESTRO]
+ F[Kubernetes]
  end
 
  A --> B
@@ -315,12 +305,12 @@ See [Common Issues](../troubleshooting/common-issues.md#mongodb-connection-faile
 3. Verify service account permissions
 4. Test with `kubectl` directly
 
-### MAESTRO Integration
+### Scenario Execution
 
-See [MAESTRO Integration](maestro.md#troubleshooting)
+See [Kubernetes Execution](kubernetes-execution.md#error-handling)
 
 ## Related Documentation
 
-- [MAESTRO Integration](maestro.md)
+- [Kubernetes Execution](kubernetes-execution.md)
 - [Configuration Guide](../installation/configuration.md)
 - [Deployment Playbook](../playbooks/deployment.md)

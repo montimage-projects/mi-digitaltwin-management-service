@@ -6,6 +6,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { validateBody, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { encrypt } from '../utils/encryption.js';
+import { buildClientFromInfrastructure, pingCluster } from '../services/kubernetesDeploy.js';
 
 const router: RouterType = Router();
 
@@ -22,6 +23,7 @@ const createInfrastructureSchema = z.object({
   endpoint: z.string().min(1).max(500).url(),
   credentials: z.string().min(1), // Plaintext credentials to be encrypted
   capacity: capacitySchema.optional(),
+  skipTLSVerify: z.boolean().optional(),
 });
 
 const updateInfrastructureSchema = z.object({
@@ -30,6 +32,7 @@ const updateInfrastructureSchema = z.object({
   endpoint: z.string().min(1).max(500).url().optional(),
   credentials: z.string().min(1).optional(), // Optional - only update if provided
   capacity: capacitySchema.optional(),
+  skipTLSVerify: z.boolean().optional(),
 });
 
 // GET /api/infrastructures - List all infrastructures
@@ -50,7 +53,7 @@ router.post(
   validateBody(createInfrastructureSchema),
   async (req, res, next) => {
     try {
-      const { name, type, endpoint, credentials, capacity } = req.body;
+      const { name, type, endpoint, credentials, capacity, skipTLSVerify } = req.body;
 
       // Check for duplicate name
       const existing = await Infrastructure.findOne({ name });
@@ -68,6 +71,7 @@ router.post(
         credentials: encryptedCredentials,
         capacity: capacity || {},
         status: 'inactive',
+        skipTLSVerify,
       });
 
       await infrastructure.save();
@@ -111,7 +115,7 @@ router.put(
   async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { name, type, endpoint, credentials, capacity } = req.body;
+      const { name, type, endpoint, credentials, capacity, skipTLSVerify } = req.body;
 
       const parseResult = objectIdSchema.safeParse(id);
       if (!parseResult.success) {
@@ -131,6 +135,7 @@ router.put(
       if (type) updateData.type = type;
       if (endpoint) updateData.endpoint = endpoint;
       if (capacity) updateData.capacity = capacity;
+      if (skipTLSVerify !== undefined) updateData.skipTLSVerify = skipTLSVerify;
 
       // Encrypt new credentials if provided
       if (credentials) {
@@ -198,17 +203,22 @@ router.post('/:id/test', authMiddleware, async (req, res, next) => {
       throw new AppError('Infrastructure not found', 404);
     }
 
-    // For now, simulate a successful connection test
-    // In production, this would decrypt credentials and test actual connectivity
-    const success = true; // Placeholder for actual connection test
-
-    if (success) {
-      infrastructure.status = 'active';
-      infrastructure.lastHealthCheck = new Date();
-    } else {
-      infrastructure.status = 'error';
-      infrastructure.lastHealthCheck = new Date();
+    // Decrypt credentials, build a cluster client and make a lightweight real
+    // call (list a single namespace). Expected connection failures — an
+    // unreachable endpoint, bad credentials or a TLS error — must not 500 the
+    // route: they resolve to `success: false` with a descriptive message.
+    let success = false;
+    let message = 'Connection successful';
+    try {
+      const clients = buildClientFromInfrastructure(infrastructure);
+      await pingCluster(clients);
+      success = true;
+    } catch (err) {
+      message = err instanceof Error ? err.message : 'Connection failed';
     }
+
+    infrastructure.status = success ? 'active' : 'error';
+    infrastructure.lastHealthCheck = new Date();
 
     await infrastructure.save();
 
@@ -216,7 +226,7 @@ router.post('/:id/test', authMiddleware, async (req, res, next) => {
       success,
       status: infrastructure.status,
       lastHealthCheck: infrastructure.lastHealthCheck,
-      message: success ? 'Connection successful' : 'Connection failed',
+      message,
     });
   } catch (error) {
     next(error);

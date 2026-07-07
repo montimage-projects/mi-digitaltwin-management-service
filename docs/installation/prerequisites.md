@@ -106,7 +106,7 @@ git --version
 
 Required for external integrations:
 
-- MAESTRO orchestrator (configurable URL)
+- Kubernetes cluster API (per-infrastructure endpoint, for scenario execution)
 - Docker Hub or private registry (for images)
 - MongoDB Atlas (if using cloud database)
 

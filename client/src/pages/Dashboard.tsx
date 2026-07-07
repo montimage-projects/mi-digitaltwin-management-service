@@ -229,7 +229,7 @@ export function Dashboard() {
               <div>
                 <p className="font-medium">Execute & Document</p>
                 <p className="text-sm text-muted-foreground">
-                  Deploy via MAESTRO, capture conclusions, and export reports
+                  Deploy directly to Kubernetes, capture conclusions, and export reports
                 </p>
               </div>
             </li>

@@ -168,24 +168,30 @@ sequenceDiagram
  participant U as User
  participant C as Client
  participant S as Server
- participant M as MAESTRO
  participant K as Kubernetes
 
  U->>C: Click "Execute"
  C->>S: POST /api/scenarios/:id/execute
- S->>S: Validate scenario
- S->>S: Prepare execution params
- S-->>C: { executionId, maestroUrl }
+ S->>S: Validate scenario, resolve node images
+ S->>K: Create namespace + Deployment/Service per node
+ K-->>S: Created (nodePort assigned)
+ S-->>C: { executionId, namespace, status, services }
 
- C->>C: Open MAESTRO iFrame
- C->>M: Load with params
- M->>K: Deploy services
- K-->>M: Deployment status
- M-->>C: Execution progress
+ C->>S: GET .../executions/:id/events (SSE)
+ loop Poll until settled
+ S->>K: Read deployment status + pod logs
+ K-->>S: Replicas, log lines
+ S-->>C: event: progress / event: log
+ end
+ S-->>C: event: end
 
- U->>C: Close iFrame
- C->>S: Update execution status
+ U->>C: Click "Tear Down"
+ C->>S: DELETE .../executions/:id
+ S->>K: Delete namespace (cascades)
 ```
+
+See [Kubernetes Execution](../integration/kubernetes-execution.md) for the full
+resource model and SSE event payloads.
 
 ## Infrastructure Credential Flow
 

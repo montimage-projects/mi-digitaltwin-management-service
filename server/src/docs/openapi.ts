@@ -289,8 +289,68 @@ export const openApiSpec = {
       post: {
         tags: ['Scenarios'],
         summary: 'Execute a scenario',
+        description:
+          'Deploys the scenario topology directly to the assigned Kubernetes infrastructure ' +
+          '(one Deployment + NodePort Service per node) and records a new execution.',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'Execution started' } },
+        responses: {
+          200: {
+            description: 'Execution started',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    executionId: { type: 'string' },
+                    namespace: { type: 'string' },
+                    status: { type: 'string', enum: ['pending', 'running', 'completed', 'failed'] },
+                    services: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          nodeId: { type: 'string' },
+                          serviceId: { type: 'string' },
+                          name: { type: 'string' },
+                          uiType: { type: 'string', enum: ['web', 'terminal', 'both'] },
+                          status: { type: 'string', enum: ['pending', 'running', 'failed'] },
+                          dashboardUrl: { type: 'string' },
+                          nodePort: { type: 'integer' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/scenarios/{id}/executions/{executionId}/events': {
+      get: {
+        tags: ['Scenarios'],
+        summary: 'Stream execution deploy progress and pod logs (SSE)',
+        description:
+          'Server-Sent Events stream (`text/event-stream`, not JSON). The server polls the ' +
+          'cluster and emits named events until the deployment settles or the client ' +
+          'disconnects:\n' +
+          '- `event: progress` — `data` is `{ progress: number, services: [{ name, status }] }`.\n' +
+          '- `event: log` — `data` is `{ service: string, pod: string, line: string }`.\n' +
+          '- `event: end` — `data` is `{ status: "completed" | "failed", services?: [...] }`; ' +
+          'the stream then closes.\n' +
+          '- `event: error` — `data` is `{ message: string }` on a cluster read failure; ' +
+          'the stream then closes.',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'executionId', in: 'path', required: true, schema: { type: 'string' } },
+        ],
+        responses: {
+          200: {
+            description: 'Event stream of progress and log events',
+            content: { 'text/event-stream': { schema: { type: 'string' } } },
+          },
+        },
       },
     },
     '/infrastructures': {
@@ -329,8 +389,30 @@ export const openApiSpec = {
       post: {
         tags: ['Infrastructure'],
         summary: 'Test infrastructure connection',
+        description:
+          'Decrypts the stored credentials, builds a Kubernetes client and makes a lightweight ' +
+          'real call against the cluster. An unreachable endpoint or bad credentials resolve to ' +
+          '`success: false` (the route does not error) and set the infrastructure status to ' +
+          '`error`; a successful probe sets it to `active`.',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { 200: { description: 'Connection test result' } },
+        responses: {
+          200: {
+            description: 'Connection test result',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    success: { type: 'boolean' },
+                    status: { type: 'string', enum: ['active', 'inactive', 'error'] },
+                    lastHealthCheck: { type: 'string', format: 'date-time' },
+                    message: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     '/health': {
