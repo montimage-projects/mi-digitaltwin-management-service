@@ -1,32 +1,144 @@
 # MI Digital Twin Management Service
 
-A centralized platform for managing a comprehensive cybersecurity service repository and orchestrating Digital Twin projects across critical infrastructure. Enables security professionals to design, deploy, and evaluate cybersecurity scenarios in virtualized environments.
-
 [![CI](https://github.com/montimage-projects/mi-digitaltwin-management-service/actions/workflows/ci.yml/badge.svg)](https://github.com/montimage-projects/mi-digitaltwin-management-service/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-blue)]()
 [![Node](https://img.shields.io/badge/node-%3E%3D20.0-brightgreen)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-## Description
+# Design and deploy cybersecurity Digital Twins on Kubernetes
+
+secSIM is a centralized platform for building cybersecurity scenarios against critical infrastructure — Telecom, Healthcare, Transportation, Nuclear — and running them on real Kubernetes clusters. Drag services onto a canvas, wire the topology, deploy, and watch execution stream live.
+
+[**Quick Start ->**](#quick-start) · [**Screenshots ->**](#screenshots)
+
+## How It Works
+
+```mermaid
+graph LR
+    A[Service Repository<br/>26+ cybersecurity tools] --> B[Topology Editor<br/>drag-and-drop + YAML]
+    B --> C[Infrastructure Target<br/>Kubernetes cluster]
+    C --> D[Deploy & Monitor<br/>SSE live logs]
+    D --> E[Export<br/>PDF report]
+```
+
+Services come from a shared catalog, get composed into a scenario graph, and deploy directly to a registered Kubernetes target. Execution status, pod logs, and teardown are all live over server-sent events.
+
+## Screenshots
+
+| Login                           | Dashboard                               |
+| ------------------------------- | --------------------------------------- |
+| ![Login](screenshots/Login.png) | ![Dashboard](screenshots/Dashboard.png) |
+
+| Service Repository                              | Scenario Editor                              |
+| ----------------------------------------------- | -------------------------------------------- |
+| ![Service Repository](screenshots/services.png) | ![Scenario Editor](screenshots/Scenario.png) |
+
+| Infrastructure Targets                   | Analytics                               |
+| ---------------------------------------- | --------------------------------------- |
+| ![Infrastructure](screenshots/infra.png) | ![Analytics](screenshots/Analytics.png) |
+
+## Key Features
+
+| Feature                | What you get                                                               |
+| ---------------------- | -------------------------------------------------------------------------- |
+| Service Repository     | 26+ cybersecurity tools searchable by category, sector, provider, and TRL  |
+| Visual Topology Editor | React Flow canvas with a synced Monaco YAML editor                         |
+| Kubernetes Execution   | One-click deploy, live SSE progress, pod log streaming, one-click teardown |
+| Sector-aware Projects  | Organize scenarios by Telecom, Healthcare, Transportation, Nuclear         |
+| Analytics              | Aggregate stats on services, projects, sectors, and infrastructure status  |
+| Role-based Access      | JWT auth, user CRUD, password reset                                        |
+| PDF Export             | Scenario designs and execution results as shareable reports                |
+| Configurable Branding  | Per-deployment app name, organization, and logo                            |
+
+## Quick Start
+
+Start MongoDB:
+
+```bash
+docker-compose up -d mongodb
+```
+
+Start the backend (Express API on `:3000`):
+
+```bash
+cd server
+cp .env.example .env
+npm install && npm run seed && npm run dev
+```
+
+Start the frontend in a new terminal (React on `:5173`):
+
+```bash
+cd client
+cp .env.example .env
+npm install && npm run dev
+```
+
+Open `http://localhost:5173` — sign in with `admin` / `intact2025`.
+
+### Unified Docker deployment
+
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+For MongoDB Atlas:
+
+```bash
+docker-compose -f docker-compose.atlas.yml up -d
+```
+
+## Usage
+
+1. **Login** at `/login` — JWT tokens expire after 24 hours.
+2. **Dashboard** — aggregate counts for services, projects, infrastructures, and active deployments.
+3. **Service Catalog** — browse the INTACT Toolbox and Critical Infrastructure Services tabs; filter by category, provider, or sector.
+4. **Projects** — create a project under a critical infrastructure sector, then add scenarios.
+5. **Topology Editor** — drag services onto the canvas and connect them; the YAML view updates in real time.
+6. **Deploy** — assign a Kubernetes target, execute, monitor live progress and pod logs, tear down with one click.
+
+## Documentation
+
+| Document                                                         | Description                                           |
+| ---------------------------------------------------------------- | ----------------------------------------------------- |
+| [Documentation Index](docs/README.md)                            | Complete documentation hub with role-based navigation |
+| [Architecture Overview](docs/architecture/overview.md)           | System design, components, request flow               |
+| [API Reference](docs/API.md)                                     | All REST endpoints with request/response examples     |
+| [Component Reference](docs/COMPONENTS.md)                        | UI components, props, and usage patterns              |
+| [Development Guide](docs/DEVELOPMENT.md)                         | Local environment setup and workflow                  |
+| [Deployment Guide](docs/DEPLOYMENT.md)                           | Production deployment, Docker, K8s, monitoring        |
+| [Database Schema](docs/database/schema.md)                       | MongoDB collections and relationships                 |
+| [Kubernetes Execution](docs/integration/kubernetes-execution.md) | Direct deployment to Kubernetes                       |
+| [Troubleshooting](docs/troubleshooting/common-issues.md)         | Common issues and solutions                           |
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for branch strategy, commit conventions (Conventional Commits), pull request process, and coding standards (ESLint, Prettier, TypeScript strict mode).
+
+All contributors are expected to adhere to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Support
+
+- **Issues & Feature Requests** — [GitHub Issues](https://github.com/montimage-projects/mi-digitaltwin-management-service/issues)
+- **Security Vulnerabilities** — see [SECURITY.md](SECURITY.md) for responsible disclosure
+- **Changelog** — see [CHANGELOG.md](CHANGELOG.md)
+
+## License
+
+Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text. Copyright 2026 Montimage.
+
+<details>
+<summary>Full description</summary>
 
 The MI Digital Twin Management Service is a full-stack web application developed by Montimage for the INTACT project. It provides a centralized catalog of 44+ cybersecurity services and tools, enabling security professionals to design Digital Twin scenarios via a drag-and-drop topology editor, deploy them directly to Kubernetes clusters, and monitor execution in real time through server-sent events (SSE).
 
 The platform supports multiple critical infrastructure sectors (Telecom, Healthcare, Transportation, Nuclear) and offers project-based organization, role-based access control, infrastructure targeting, and comprehensive analytics. Built with a modern React frontend and an Express/TypeScript API backed by MongoDB, it serves as the management plane for cybersecurity Digital Twin operations.
 
-## Key Features
+</details>
 
-- **Service Repository** — Searchable catalog of 44+ cybersecurity services organized by category, sector, and provider with tabbed INTACT Toolbox and Critical Infrastructure Services views, version management, and TRL tracking.
-- **Digital Twin Projects** — Project-based organization across critical infrastructure sectors (Telecom, Healthcare, Transportation, Nuclear) with scenario grouping, metadata, and sector-aware analytics.
-- **Visual Topology Editor** — Drag-and-drop scenario design using React Flow with real-time YAML synchronization and Monaco-based YAML editor.
-- **Infrastructure Management** — Register and manage Kubernetes deployment targets with connection testing and status tracking.
-- **Kubernetes Execution** — Deploy scenario topologies directly to Kubernetes clusters with one-click teardown, live progress streaming over SSE, pod log streaming, and per-service status tracking.
-- **Comprehensive Analytics** — Dashboard with aggregate statistics, project/scenario counts, sector distribution, and service category breakdowns.
-- **User Management** — Role-based authentication with JWT, user CRUD, and password reset capabilities.
-- **PDF Export** — Export scenario designs and execution results to PDF.
-- **Configurable Branding** — Per-deployment branding profiles with customizable app name, organization, and logo.
-
-## Tech Stack
+<details>
+<summary>Tech Stack</summary>
 
 ### Frontend
 
@@ -63,55 +175,10 @@ The platform supports multiple critical infrastructure sectors (Telecom, Healthc
 | **Compression**             | gzip response compression  |
 | **Morgan**                  | HTTP request logging       |
 
-## Quick Start
+</details>
 
-### Prerequisites
-
-- **Node.js** 20+ (runtime)
-- **Docker & Docker Compose** (for MongoDB)
-- **npm** (workspaces enabled)
-
-### Setup (3 steps)
-
-```bash
-# 1. Start MongoDB
-docker-compose up -d mongodb
-
-# 2. Start backend (Express API on :3000)
-cd server
-cp .env.example .env
-npm install && npm run seed && npm run dev
-
-# 3. Start frontend in new terminal (React on :5173)
-cd client
-cp .env.example .env
-npm install && npm run dev
-```
-
-**Access:** http://localhost:5173 | **Default credentials:** admin / intact2025
-
-### Docker (unified deployment)
-
-```bash
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-For MongoDB Atlas:
-
-```bash
-docker-compose -f docker-compose.atlas.yml up -d
-```
-
-## Usage
-
-1. **Login** — Authenticate at `/login` with the admin credentials. JWT tokens expire after 24 hours.
-2. **Dashboard** — View aggregate statistics: total services, projects, infrastructures, and active deployments.
-3. **Service Catalog** — Browse the INTACT Toolbox and Critical Infrastructure Services tabs. Filter by category, provider, or sector. View service details including versions, TRL, inputs/outputs, and standards.
-4. **Projects** — Create a project, select a critical infrastructure sector (Telecom, Healthcare, Transportation, Nuclear), and add scenarios.
-5. **Topology Editor** — Drag services from the palette onto the React Flow canvas, connect them to design your Digital Twin scenario. The YAML representation updates in real time in the Monaco editor.
-6. **Deploy** — Assign a Kubernetes infrastructure target and execute the scenario. Monitor live progress and pod logs via SSE. Tear down with one click.
-
-## API Overview
+<details>
+<summary>API Overview</summary>
 
 | Method          | Endpoint                                            | Description                    |
 | --------------- | --------------------------------------------------- | ------------------------------ |
@@ -140,7 +207,10 @@ docker-compose -f docker-compose.atlas.yml up -d
 
 See the full [API Reference](docs/API.md) for request/response schemas.
 
-## Project Structure
+</details>
+
+<details>
+<summary>Project Structure</summary>
 
 ```
 .github/
@@ -188,23 +258,10 @@ k8s/                     # Kubernetes manifests (Kustomize)
   overlays/              # dev, prod, atlas overlays
 ```
 
-## Documentation
+</details>
 
-| Document                                                         | Description                                           |
-| ---------------------------------------------------------------- | ----------------------------------------------------- |
-| [Documentation Index](docs/README.md)                            | Complete documentation hub with role-based navigation |
-| [Architecture Overview](docs/architecture/overview.md)           | System design, components, request flow               |
-| [API Reference](docs/API.md)                                     | All REST endpoints with request/response examples     |
-| [Component Reference](docs/COMPONENTS.md)                        | UI components, props, and usage patterns              |
-| [Development Guide](docs/DEVELOPMENT.md)                         | Local environment setup and workflow                  |
-| [Deployment Guide](docs/DEPLOYMENT.md)                           | Production deployment, Docker, K8s, monitoring        |
-| [Database Schema](docs/database/schema.md)                       | MongoDB collections and relationships                 |
-| [UI Patterns](docs/design/ui-patterns.md)                        | Component patterns and best practices                 |
-| [Kubernetes Execution](docs/integration/kubernetes-execution.md) | Direct deployment to Kubernetes                       |
-| [External Services](docs/integration/external-services.md)       | Third-party integrations                              |
-| [Troubleshooting](docs/troubleshooting/common-issues.md)         | Common issues and solutions                           |
-
-## CI/CD
+<details>
+<summary>CI/CD</summary>
 
 ### GitHub Actions
 
@@ -224,25 +281,11 @@ Additional documentation workflows: validation, quality checks, and build/publis
 
 The [`.gitlab-ci.yml`](.gitlab-ci.yml) mirror pipeline runs on `main`, `develop`, and merge request events with the same stages: quality, typecheck, test, security, and build.
 
-## Contributing
+</details>
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for branch strategy, commit conventions (Conventional Commits), pull request process, and coding standards (ESLint, Prettier, TypeScript strict mode).
+<details>
+<summary>Related Publications</summary>
 
-All contributors are expected to adhere to the [Code of Conduct](CODE_OF_CONDUCT.md).
+This project is developed as part of the INTACT project. Related publications will be listed here.
 
-## Related Publications
-
-_This project is developed as part of the INTACT project. Related publications will be listed here._
-
-## License
-
-This project is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.
-
-Copyright 2026 Montimage.
-
-## Support
-
-- **Issues & Feature Requests** — [GitHub Issues](https://github.com/montimage-projects/mi-digitaltwin-management-service/issues)
-- **Security Vulnerabilities** — See [SECURITY.md](SECURITY.md) for responsible disclosure process
-- **Changelog** — See [CHANGELOG.md](CHANGELOG.md) for release history
-- **Documentation** — Contribute improvements to the [docs/](docs/) directory
+</details>
