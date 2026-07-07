@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll, mock } from 'bun:test';
+import { describe, test, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import type { AddressInfo } from 'node:net';
 import jwt from 'jsonwebtoken';
@@ -11,47 +11,51 @@ import mongoose from 'mongoose';
  * database). If MongoDB is unreachable, all tests skip.
  */
 
-class ApiException extends Error {
-  code: number;
-  body: unknown;
-  constructor(code: number, message: string, body?: unknown) {
-    super(message);
-    this.code = code;
-    this.body = body;
+const { clusterCalls, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hoisted(() => {
+  class ApiException extends Error {
+    code: number;
+    body: unknown;
+    constructor(code: number, message: string, body?: unknown) {
+      super(message);
+      this.code = code;
+      this.body = body;
+    }
   }
-}
 
-// Shared fake cluster clients so the tests can assert on cluster interactions.
-const clusterCalls = {
-  createNamespace: mock(async () => ({})),
-  createNamespacedDeployment: mock(async () => ({})),
-  createNamespacedService: mock(async () => ({ spec: { ports: [{ nodePort: 30080 }] } })),
-  deleteNamespace: mock(async () => ({})),
-};
+  // Shared fake cluster clients so the tests can assert on cluster interactions.
+  const clusterCalls = {
+    createNamespace: vi.fn(async () => ({})),
+    createNamespacedDeployment: vi.fn(async () => ({})),
+    createNamespacedService: vi.fn(async () => ({ spec: { ports: [{ nodePort: 30080 }] } })),
+    deleteNamespace: vi.fn(async () => ({})),
+  };
 
-class CoreV1Api {}
-class AppsV1Api {}
+  class CoreV1Api {}
+  class AppsV1Api {}
 
-class KubeConfig {
-  loadFromString(): void {}
-  loadFromOptions(): void {}
-  makeApiClient(ctor: unknown): unknown {
-    if (ctor === CoreV1Api) {
+  class KubeConfig {
+    loadFromString(): void {}
+    loadFromOptions(): void {}
+    makeApiClient(ctor: unknown): unknown {
+      if (ctor === CoreV1Api) {
+        return {
+          createNamespace: clusterCalls.createNamespace,
+          createNamespacedService: clusterCalls.createNamespacedService,
+          deleteNamespace: clusterCalls.deleteNamespace,
+          listNamespacedPod: async () => ({ items: [] }),
+        };
+      }
       return {
-        createNamespace: clusterCalls.createNamespace,
-        createNamespacedService: clusterCalls.createNamespacedService,
-        deleteNamespace: clusterCalls.deleteNamespace,
-        listNamespacedPod: async () => ({ items: [] }),
+        createNamespacedDeployment: clusterCalls.createNamespacedDeployment,
+        readNamespacedDeployment: async () => ({}),
       };
     }
-    return {
-      createNamespacedDeployment: clusterCalls.createNamespacedDeployment,
-      readNamespacedDeployment: async () => ({}),
-    };
   }
-}
 
-mock.module('@kubernetes/client-node', () => ({
+  return { clusterCalls, CoreV1Api, AppsV1Api, KubeConfig, ApiException };
+});
+
+vi.mock('@kubernetes/client-node', () => ({
   KubeConfig,
   CoreV1Api,
   AppsV1Api,
@@ -225,7 +229,7 @@ describe('POST /api/scenarios/:id/execute deploy failure', () => {
     if (!mongoAvailable) return;
 
     const original = clusterCalls.createNamespace;
-    clusterCalls.createNamespace = mock(async () => {
+    clusterCalls.createNamespace = vi.fn(async () => {
       throw new ApiException(403, 'forbidden', { message: 'namespace quota exceeded' });
     });
 

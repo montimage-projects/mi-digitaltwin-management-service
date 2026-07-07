@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll, mock } from 'bun:test';
+import { describe, test, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import type { AddressInfo } from 'node:net';
 import jwt from 'jsonwebtoken';
@@ -14,36 +14,40 @@ import mongoose from 'mongoose';
  * bad credentials.
  */
 
-class ApiException extends Error {
-  code: number;
-  body: unknown;
-  constructor(code: number, message: string, body?: unknown) {
-    super(message);
-    this.code = code;
-    this.body = body;
-  }
-}
-
-// Per-test-controllable probe behaviour.
-const impl = {
-  listNamespace: async (): Promise<unknown> => ({ items: [] }),
-};
-
-class CoreV1Api {}
-class AppsV1Api {}
-
-class KubeConfig {
-  loadFromString(): void {}
-  loadFromOptions(): void {}
-  makeApiClient(ctor: unknown): unknown {
-    if (ctor === CoreV1Api) {
-      return { listNamespace: (...a: unknown[]) => impl.listNamespace(...(a as [])) };
+const { impl, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hoisted(() => {
+  class ApiException extends Error {
+    code: number;
+    body: unknown;
+    constructor(code: number, message: string, body?: unknown) {
+      super(message);
+      this.code = code;
+      this.body = body;
     }
-    return {};
   }
-}
 
-mock.module('@kubernetes/client-node', () => ({
+  // Per-test-controllable probe behaviour.
+  const impl = {
+    listNamespace: async (): Promise<unknown> => ({ items: [] }),
+  };
+
+  class CoreV1Api {}
+  class AppsV1Api {}
+
+  class KubeConfig {
+    loadFromString(): void {}
+    loadFromOptions(): void {}
+    makeApiClient(ctor: unknown): unknown {
+      if (ctor === CoreV1Api) {
+        return { listNamespace: (...a: unknown[]) => impl.listNamespace(...(a as [])) };
+      }
+      return {};
+    }
+  }
+
+  return { impl, CoreV1Api, AppsV1Api, KubeConfig, ApiException };
+});
+
+vi.mock('@kubernetes/client-node', () => ({
   KubeConfig,
   CoreV1Api,
   AppsV1Api,

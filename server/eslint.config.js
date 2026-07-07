@@ -11,9 +11,6 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
-      parserOptions: {
-        project: './tsconfig.json',
-      },
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],

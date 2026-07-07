@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll, mock } from 'bun:test';
+import { describe, test, expect, beforeAll, afterAll, vi } from 'vitest';
 import express, { type Express } from 'express';
 import compression from 'compression';
 import type { AddressInfo } from 'node:net';
@@ -16,55 +16,59 @@ import mongoose from 'mongoose';
  * connection stays open, so receiving it proves the stream is not buffered.
  */
 
-class ApiException extends Error {
-  code: number;
-  body: unknown;
-  constructor(code: number, message: string, body?: unknown) {
-    super(message);
-    this.code = code;
-    this.body = body;
+const { counts, impl, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hoisted(() => {
+  class ApiException extends Error {
+    code: number;
+    body: unknown;
+    constructor(code: number, message: string, body?: unknown) {
+      super(message);
+      this.code = code;
+      this.body = body;
+    }
   }
-}
 
-// Per-test-controllable cluster behaviour + call counters.
-const counts = { readNamespacedDeployment: 0, listNamespace: 0 };
-const impl = {
-  readNamespacedDeployment: async (): Promise<unknown> => ({
-    spec: { replicas: 1 },
-    status: { availableReplicas: 0 },
-  }),
-  listNamespacedPod: async (): Promise<unknown> => ({ items: [] }),
-  readNamespacedPodLog: async (): Promise<string> => '',
-  listNamespace: async (): Promise<unknown> => ({ items: [] }),
-};
+  // Per-test-controllable cluster behaviour + call counters.
+  const counts = { readNamespacedDeployment: 0, listNamespace: 0 };
+  const impl = {
+    readNamespacedDeployment: async (): Promise<unknown> => ({
+      spec: { replicas: 1 },
+      status: { availableReplicas: 0 },
+    }),
+    listNamespacedPod: async (): Promise<unknown> => ({ items: [] }),
+    readNamespacedPodLog: async (): Promise<string> => '',
+    listNamespace: async (): Promise<unknown> => ({ items: [] }),
+  };
 
-class CoreV1Api {}
-class AppsV1Api {}
+  class CoreV1Api {}
+  class AppsV1Api {}
 
-class KubeConfig {
-  loadFromString(): void {}
-  loadFromOptions(): void {}
-  makeApiClient(ctor: unknown): unknown {
-    if (ctor === CoreV1Api) {
+  class KubeConfig {
+    loadFromString(): void {}
+    loadFromOptions(): void {}
+    makeApiClient(ctor: unknown): unknown {
+      if (ctor === CoreV1Api) {
+        return {
+          listNamespacedPod: (...a: unknown[]) => impl.listNamespacedPod(...(a as [])),
+          readNamespacedPodLog: (...a: unknown[]) => impl.readNamespacedPodLog(...(a as [])),
+          listNamespace: (...a: unknown[]) => {
+            counts.listNamespace += 1;
+            return impl.listNamespace(...(a as []));
+          },
+        };
+      }
       return {
-        listNamespacedPod: (...a: unknown[]) => impl.listNamespacedPod(...(a as [])),
-        readNamespacedPodLog: (...a: unknown[]) => impl.readNamespacedPodLog(...(a as [])),
-        listNamespace: (...a: unknown[]) => {
-          counts.listNamespace += 1;
-          return impl.listNamespace(...(a as []));
+        readNamespacedDeployment: (...a: unknown[]) => {
+          counts.readNamespacedDeployment += 1;
+          return impl.readNamespacedDeployment(...(a as []));
         },
       };
     }
-    return {
-      readNamespacedDeployment: (...a: unknown[]) => {
-        counts.readNamespacedDeployment += 1;
-        return impl.readNamespacedDeployment(...(a as []));
-      },
-    };
   }
-}
 
-mock.module('@kubernetes/client-node', () => ({
+  return { counts, impl, CoreV1Api, AppsV1Api, KubeConfig, ApiException };
+});
+
+vi.mock('@kubernetes/client-node', () => ({
   KubeConfig,
   CoreV1Api,
   AppsV1Api,

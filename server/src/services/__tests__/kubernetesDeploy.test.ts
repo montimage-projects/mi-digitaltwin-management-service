@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { AppError } from '../../middleware/errorHandler.js';
 import { encrypt } from '../../utils/encryption.js';
 import type { IInfrastructure } from '../../models/Infrastructure.js';
@@ -10,46 +10,50 @@ import type { IInfrastructure } from '../../models/Infrastructure.js';
  * environments, so the engine is exercised against fake clients only.
  */
 
-// A stand-in for the client library's ApiException so `instanceof` checks in
-// the module under test match errors thrown by these tests.
-class ApiException extends Error {
-  code: number;
-  body: unknown;
-  constructor(code: number, message: string, body?: unknown) {
-    super(message);
-    this.code = code;
-    this.body = body;
-  }
-}
-
-// Records how `buildClientFromInfrastructure` loaded the KubeConfig.
-const kubeconfigCalls: { fromString: string[]; fromOptions: unknown[]; throwOnLoad: boolean } = {
-  fromString: [],
-  fromOptions: [],
-  throwOnLoad: false,
-};
-
-class CoreV1Api {}
-class AppsV1Api {}
-
-class KubeConfig {
-  loadFromString(config: string): void {
-    if (kubeconfigCalls.throwOnLoad) {
-      throw new Error(
-        'Error: unable to parse kubeconfig: yaml: line 2: mapping values not allowed'
-      );
+const { kubeconfigCalls, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hoisted(() => {
+  // A stand-in for the client library's ApiException so `instanceof` checks in
+  // the module under test match errors thrown by these tests.
+  class ApiException extends Error {
+    code: number;
+    body: unknown;
+    constructor(code: number, message: string, body?: unknown) {
+      super(message);
+      this.code = code;
+      this.body = body;
     }
-    kubeconfigCalls.fromString.push(config);
   }
-  loadFromOptions(options: unknown): void {
-    kubeconfigCalls.fromOptions.push(options);
-  }
-  makeApiClient(ctor: unknown): unknown {
-    return ctor === CoreV1Api ? {} : {};
-  }
-}
 
-mock.module('@kubernetes/client-node', () => ({
+  // Records how `buildClientFromInfrastructure` loaded the KubeConfig.
+  const kubeconfigCalls: { fromString: string[]; fromOptions: unknown[]; throwOnLoad: boolean } = {
+    fromString: [],
+    fromOptions: [],
+    throwOnLoad: false,
+  };
+
+  class CoreV1Api {}
+  class AppsV1Api {}
+
+  class KubeConfig {
+    loadFromString(config: string): void {
+      if (kubeconfigCalls.throwOnLoad) {
+        throw new Error(
+          'Error: unable to parse kubeconfig: yaml: line 2: mapping values not allowed'
+        );
+      }
+      kubeconfigCalls.fromString.push(config);
+    }
+    loadFromOptions(options: unknown): void {
+      kubeconfigCalls.fromOptions.push(options);
+    }
+    makeApiClient(ctor: unknown): unknown {
+      return ctor === CoreV1Api ? {} : {};
+    }
+  }
+
+  return { kubeconfigCalls, CoreV1Api, AppsV1Api, KubeConfig, ApiException };
+});
+
+vi.mock('@kubernetes/client-node', () => ({
   KubeConfig,
   CoreV1Api,
   AppsV1Api,
@@ -70,7 +74,7 @@ const {
 
 type ServiceImageSource = Parameters<typeof resolveTopologyNodes>[1][number];
 
-/** Read the first argument of a bun mock's first call without tuple-type friction. */
+/** Read the first argument of a mock's first call without tuple-type friction. */
 function firstCallArg(fn: unknown): unknown {
   return (fn as { mock: { calls: unknown[][] } }).mock.calls[0]?.[0];
 }
@@ -233,14 +237,14 @@ describe('deployTopology', () => {
   function makeClients() {
     return {
       core: {
-        createNamespace: mock(async () => ({})),
-        createNamespacedService: mock(async () => ({ spec: { ports: [{ nodePort: 31567 }] } })),
-        deleteNamespace: mock(async () => ({})),
-        listNamespacedPod: mock(async () => ({ items: [] })),
+        createNamespace: vi.fn(async () => ({})),
+        createNamespacedService: vi.fn(async () => ({ spec: { ports: [{ nodePort: 31567 }] } })),
+        deleteNamespace: vi.fn(async () => ({})),
+        listNamespacedPod: vi.fn(async () => ({ items: [] })),
       },
       apps: {
-        createNamespacedDeployment: mock(async () => ({})),
-        readNamespacedDeployment: mock(async () => ({})),
+        createNamespacedDeployment: vi.fn(async () => ({})),
+        readNamespacedDeployment: vi.fn(async () => ({})),
       },
     };
   }
@@ -300,7 +304,7 @@ describe('deployTopology', () => {
 
   test('omits the dashboard url when the service has no assigned nodePort', async () => {
     const clients = makeClients();
-    clients.core.createNamespacedService = mock(async () => ({
+    clients.core.createNamespacedService = vi.fn(async () => ({
       spec: { ports: [{}] },
     })) as unknown as typeof clients.core.createNamespacedService;
     const result = await deployTopology(clients as never, {
@@ -315,7 +319,7 @@ describe('deployTopology', () => {
 
   test('surfaces a Kubernetes API failure as AppError(502)', async () => {
     const clients = makeClients();
-    clients.core.createNamespace = mock(async () => {
+    clients.core.createNamespace = vi.fn(async () => {
       throw new ApiException(403, 'forbidden', { message: 'access denied' });
     });
 
@@ -338,7 +342,7 @@ describe('getDeploymentStatus', () => {
   test('reports running/failed per service and computes progress', async () => {
     const clients = {
       core: {
-        listNamespacedPod: mock(async () => ({
+        listNamespacedPod: vi.fn(async () => ({
           items: [
             {
               status: {
@@ -350,7 +354,7 @@ describe('getDeploymentStatus', () => {
         })),
       },
       apps: {
-        readNamespacedDeployment: mock(async ({ name }: { name: string }) =>
+        readNamespacedDeployment: vi.fn(async ({ name }: { name: string }) =>
           name === 'ready'
             ? { spec: { replicas: 1 }, status: { availableReplicas: 1 } }
             : { spec: { replicas: 1 }, status: { availableReplicas: 0 } }
@@ -373,10 +377,10 @@ describe('getDeploymentStatus', () => {
   test('reports failed when a pod has reached the Failed phase', async () => {
     const clients = {
       core: {
-        listNamespacedPod: mock(async () => ({ items: [{ status: { phase: 'Failed' } }] })),
+        listNamespacedPod: vi.fn(async () => ({ items: [{ status: { phase: 'Failed' } }] })),
       },
       apps: {
-        readNamespacedDeployment: mock(async () => ({
+        readNamespacedDeployment: vi.fn(async () => ({
           spec: { replicas: 1 },
           status: { availableReplicas: 0 },
         })),
@@ -394,12 +398,12 @@ describe('getDeploymentStatus', () => {
   test('reports pending while a deployment has no available replicas and healthy pods', async () => {
     const clients = {
       core: {
-        listNamespacedPod: mock(async () => ({
+        listNamespacedPod: vi.fn(async () => ({
           items: [{ status: { phase: 'Pending', containerStatuses: [{ state: {} }] } }],
         })),
       },
       apps: {
-        readNamespacedDeployment: mock(async () => ({
+        readNamespacedDeployment: vi.fn(async () => ({
           spec: { replicas: 1 },
           status: { availableReplicas: 0 },
         })),
@@ -416,9 +420,9 @@ describe('getDeploymentStatus', () => {
 
   test('surfaces a non-404 status read failure as AppError(502)', async () => {
     const clients = {
-      core: { listNamespacedPod: mock(async () => ({ items: [] })) },
+      core: { listNamespacedPod: vi.fn(async () => ({ items: [] })) },
       apps: {
-        readNamespacedDeployment: mock(async () => {
+        readNamespacedDeployment: vi.fn(async () => {
           throw new ApiException(500, 'boom');
         }),
       },
@@ -434,9 +438,9 @@ describe('getDeploymentStatus', () => {
 
   test('treats a not-found deployment as pending', async () => {
     const clients = {
-      core: { listNamespacedPod: mock(async () => ({ items: [] })) },
+      core: { listNamespacedPod: vi.fn(async () => ({ items: [] })) },
       apps: {
-        readNamespacedDeployment: mock(async () => {
+        readNamespacedDeployment: vi.fn(async () => {
           throw new ApiException(404, 'not found');
         }),
       },
@@ -453,14 +457,14 @@ describe('getDeploymentStatus', () => {
 
 describe('teardownDeployment', () => {
   test('deletes the namespace', async () => {
-    const deleteNamespace = mock(async () => ({}));
+    const deleteNamespace = vi.fn(async () => ({}));
     await teardownDeployment({ core: { deleteNamespace }, apps: {} } as never, 'secsim-a-b');
     expect(deleteNamespace).toHaveBeenCalledTimes(1);
     expect((firstCallArg(deleteNamespace) as { name: string }).name).toBe('secsim-a-b');
   });
 
   test('is idempotent when the namespace is already gone (404)', async () => {
-    const deleteNamespace = mock(async () => {
+    const deleteNamespace = vi.fn(async () => {
       throw new ApiException(404, 'not found');
     });
     await expect(
@@ -469,7 +473,7 @@ describe('teardownDeployment', () => {
   });
 
   test('surfaces other cluster errors as AppError(502)', async () => {
-    const deleteNamespace = mock(async () => {
+    const deleteNamespace = vi.fn(async () => {
       throw new ApiException(500, 'boom');
     });
     try {
@@ -501,8 +505,8 @@ describe('collectNewPodLogs', () => {
     let log = 'line-1\nline-2\n';
     const clients = {
       core: {
-        listNamespacedPod: mock(async () => ({ items: [{ metadata: { name: 'svc-a-pod' } }] })),
-        readNamespacedPodLog: mock(async () => log),
+        listNamespacedPod: vi.fn(async () => ({ items: [{ metadata: { name: 'svc-a-pod' } }] })),
+        readNamespacedPodLog: vi.fn(async () => log),
       },
       apps: {},
     };
@@ -531,8 +535,8 @@ describe('collectNewPodLogs', () => {
   test('skips a pod that is not yet ready to serve logs (400/404)', async () => {
     const clients = {
       core: {
-        listNamespacedPod: mock(async () => ({ items: [{ metadata: { name: 'p' } }] })),
-        readNamespacedPodLog: mock(async () => {
+        listNamespacedPod: vi.fn(async () => ({ items: [{ metadata: { name: 'p' } }] })),
+        readNamespacedPodLog: vi.fn(async () => {
           throw new ApiException(400, 'container is waiting to start');
         }),
       },
@@ -549,8 +553,8 @@ describe('collectNewPodLogs', () => {
   test('skips a pod whose logs have already been removed (404)', async () => {
     const clients = {
       core: {
-        listNamespacedPod: mock(async () => ({ items: [{ metadata: { name: 'p' } }] })),
-        readNamespacedPodLog: mock(async () => {
+        listNamespacedPod: vi.fn(async () => ({ items: [{ metadata: { name: 'p' } }] })),
+        readNamespacedPodLog: vi.fn(async () => {
           throw new ApiException(404, 'pod not found');
         }),
       },
@@ -567,8 +571,8 @@ describe('collectNewPodLogs', () => {
   test('emits a final line that has no trailing newline', async () => {
     const clients = {
       core: {
-        listNamespacedPod: mock(async () => ({ items: [{ metadata: { name: 'svc-a-pod' } }] })),
-        readNamespacedPodLog: mock(async () => 'only-line'),
+        listNamespacedPod: vi.fn(async () => ({ items: [{ metadata: { name: 'svc-a-pod' } }] })),
+        readNamespacedPodLog: vi.fn(async () => 'only-line'),
       },
       apps: {},
     };
@@ -583,8 +587,8 @@ describe('collectNewPodLogs', () => {
   test('ignores pods without a metadata name', async () => {
     const clients = {
       core: {
-        listNamespacedPod: mock(async () => ({ items: [{ metadata: {} }] })),
-        readNamespacedPodLog: mock(async () => 'unreachable'),
+        listNamespacedPod: vi.fn(async () => ({ items: [{ metadata: {} }] })),
+        readNamespacedPodLog: vi.fn(async () => 'unreachable'),
       },
       apps: {},
     };
@@ -600,10 +604,10 @@ describe('collectNewPodLogs', () => {
   test('wraps an unexpected cluster error as AppError(502)', async () => {
     const clients = {
       core: {
-        listNamespacedPod: mock(async () => {
+        listNamespacedPod: vi.fn(async () => {
           throw new ApiException(500, 'boom');
         }),
-        readNamespacedPodLog: mock(async () => ''),
+        readNamespacedPodLog: vi.fn(async () => ''),
       },
       apps: {},
     };
@@ -623,7 +627,7 @@ describe('collectNewPodLogs', () => {
 
 describe('pingCluster', () => {
   test('resolves when the cluster answers a namespace listing', async () => {
-    const listNamespace = mock(async () => ({ items: [] }));
+    const listNamespace = vi.fn(async () => ({ items: [] }));
     await expect(
       pingCluster({ core: { listNamespace }, apps: {} } as never)
     ).resolves.toBeUndefined();
@@ -631,7 +635,7 @@ describe('pingCluster', () => {
   });
 
   test('wraps a transport/auth failure as AppError', async () => {
-    const listNamespace = mock(async () => {
+    const listNamespace = vi.fn(async () => {
       throw new Error('ECONNREFUSED 10.0.0.1:6443');
     });
     try {
