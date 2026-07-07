@@ -1,29 +1,26 @@
 #!/bin/sh
 
-# INTACT Digital Twin Platform - Pre-commit Hook
+# MI Digital Twin Management Service - Pre-commit Hook
 # Runs quality checks before allowing commits
 
 echo "Running pre-commit checks..."
 
 # Run lint-staged for staged files (format + lint)
-# --shell is required because our lint-staged commands use shell syntax
-# (e.g. "cd server && bunx eslint ..."), which needs a shell to interpret.
 echo "Checking staged files..."
-bunx lint-staged --shell
+npx lint-staged
 
 # Check for security vulnerabilities (warning only, doesn't block)
 echo "Checking for security vulnerabilities..."
-bun pm scan 2>/dev/null || echo "Security scan: Some vulnerabilities found (review recommended)"
+npm audit --audit-level=moderate 2>/dev/null || echo "Security scan: Some vulnerabilities found (review recommended)"
 
-# Type checking
+# Type checking (test files excluded — tests run via vitest)
 echo "Running type checks..."
-cd client && bunx tsc --noEmit || { echo "Client type check failed!"; exit 1; }
-cd ../server && bunx tsc --noEmit || { echo "Server type check failed!"; exit 1; }
-cd ..
+./node_modules/.bin/tsc --noEmit -p client/tsconfig.json || { echo "Client type check failed!"; exit 1; }
+./node_modules/.bin/tsc --noEmit -p server/tsconfig.json || { echo "Server type check failed!"; exit 1; }
 
 # Build client for deployment
 echo "Building client for deployment..."
-cd client && bun run build || { echo "Client build failed!"; exit 1; }
+cd client && npm run build || { echo "Client build failed!"; exit 1; }
 cd ..
 
 # Stage the client build output (builds to server/public/)

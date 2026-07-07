@@ -493,6 +493,10 @@ For workflow issues or questions:
 3. Check project issues for similar problems
 4. Contact documentation team
 
+## GitLab CI
+
+The project also provides a `.gitlab-ci.yml` at the repository root that mirrors the GitHub Actions CI pipeline. It runs on pushes to `main` and merge requests, executing the same quality, typecheck, test, build, and security audit jobs using GitLab-native CI syntax.
+
 ---
 
 **Last Updated:** January 12, 2026

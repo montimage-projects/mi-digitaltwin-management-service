@@ -1,0 +1,87 @@
+image: node:20-alpine
+
+cache:
+  key: $CI_COMMIT_REF_SLUG
+  paths:
+    - node_modules/
+    - client/node_modules/
+    - server/node_modules/
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+
+stages:
+  - quality
+  - typecheck
+  - test
+  - security
+  - build
+
+quality:
+  stage: quality
+  script:
+    - npm ci
+    - npm run format:check
+    - npm run lint
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - node_modules/
+    policy: pull-push
+
+typecheck:
+  stage: typecheck
+  script:
+    - npm ci
+    - npm run typecheck
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - node_modules/
+    policy: pull-push
+
+test:
+  stage: test
+  services:
+    - name: mongo:7
+      alias: mongo
+  variables:
+    MONGODB_URI: mongodb://mongo:27017/intact-test
+    JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
+  script:
+    - npm ci
+    - npm run test:server
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - node_modules/
+    policy: pull-push
+
+security:
+  stage: security
+  script:
+    - npm ci
+    - npm audit --audit-level=moderate
+  allow_failure: true
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - node_modules/
+    policy: pull-push
+
+build:
+  stage: build
+  needs:
+    - quality
+    - typecheck
+  script:
+    - npm ci
+    - npm run build
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    paths:
+      - node_modules/
+    policy: pull-push

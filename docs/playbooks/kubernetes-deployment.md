@@ -83,7 +83,7 @@ docker push <your-registry>/<image>:<tag>
 ```
 
 Then edit `k8s/base/deployment.yaml` and replace the placeholder image
-reference (marked `# TODO: replace with your built/pushed image`) with
+reference (marked `# REQUIRED: replace with your built/pushed image`) with
 `<your-registry>/<image>:<tag>`.
 
 ## Step 2: Create the Namespace and Configure the Secret
