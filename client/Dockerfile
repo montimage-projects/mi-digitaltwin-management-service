@@ -2,21 +2,21 @@
 # Used by docker-compose.prod.yml (nginx-based deployment)
 
 # Build stage
-FROM oven/bun:1 AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
 # Copy package files
-COPY package.json bun.lockb* ./
+COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN npm ci
 
 # Copy source code
 COPY . .
 
 # Build the application
-RUN bun run build
+RUN npm run build
 
 # Production stage - nginx for static file serving
 FROM nginx:alpine AS production

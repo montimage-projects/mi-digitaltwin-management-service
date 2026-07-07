@@ -9,7 +9,7 @@ import { Sector } from '../models/Sector.js';
  * services with repositoryTable: OTHER_SERVICES that don't have a sectorId.
  */
 const migrate = async (): Promise<void> => {
-  console.log('Starting migration: add-sectors-to-services\n');
+  console.info('Starting migration: add-sectors-to-services\n');
 
   try {
     await connectDatabase();
@@ -19,11 +19,11 @@ const migrate = async (): Promise<void> => {
 
     if (!defaultSector) {
       console.error('Error: "Digital infrastructure" sector not found.');
-      console.log('Please run the seed script first: bun run seed');
+      console.info('Please run the seed script first: npm run seed');
       process.exit(1);
     }
 
-    console.log(`Default sector: ${defaultSector.name} (${defaultSector._id})\n`);
+    console.info(`Default sector: ${defaultSector.name} (${defaultSector._id})\n`);
 
     // Find all OTHER_SERVICES without a sectorId
     const servicesToMigrate = await Service.find({
@@ -31,19 +31,19 @@ const migrate = async (): Promise<void> => {
       sectorId: { $exists: false },
     });
 
-    console.log(`Found ${servicesToMigrate.length} services to migrate\n`);
+    console.info(`Found ${servicesToMigrate.length} services to migrate\n`);
 
     if (servicesToMigrate.length === 0) {
-      console.log('No services need migration.');
+      console.info('No services need migration.');
     } else {
       for (const service of servicesToMigrate) {
         await Service.findByIdAndUpdate(service._id, {
           $set: { sectorId: defaultSector._id },
         });
-        console.log(`  Migrated: ${service.shortName}`);
+        console.info(`  Migrated: ${service.shortName}`);
       }
 
-      console.log(`\nMigrated ${servicesToMigrate.length} services successfully!`);
+      console.info(`\nMigrated ${servicesToMigrate.length} services successfully!`);
     }
 
     // Also ensure all services have uiType (default 'web')
@@ -52,14 +52,14 @@ const migrate = async (): Promise<void> => {
     });
 
     if (servicesWithoutUiType.length > 0) {
-      console.log(`\nFound ${servicesWithoutUiType.length} services without uiType`);
+      console.info(`\nFound ${servicesWithoutUiType.length} services without uiType`);
 
       await Service.updateMany({ uiType: { $exists: false } }, { $set: { uiType: 'web' } });
 
-      console.log(`Updated ${servicesWithoutUiType.length} services with default uiType: 'web'`);
+      console.info(`Updated ${servicesWithoutUiType.length} services with default uiType: 'web'`);
     }
 
-    console.log('\nMigration completed successfully!');
+    console.info('\nMigration completed successfully!');
   } catch (error) {
     console.error('Migration failed:', error);
     process.exit(1);

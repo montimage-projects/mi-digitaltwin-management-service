@@ -8,7 +8,7 @@ The server provides a RESTful API for managing cybersecurity services, digital t
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) 1.0+ (or Node.js 18+)
+- [Node.js](https://nodejs.org/) 20+
 - Docker (for MongoDB)
 - MongoDB running on `localhost:27017`
 
@@ -19,16 +19,16 @@ The server provides a RESTful API for managing cybersecurity services, digital t
 docker-compose up -d mongodb
 
 # Install dependencies
-bun install
+npm install
 
 # Configure environment
 cp .env.example .env
 
 # Seed the database
-bun run seed
+npm run seed
 
 # Start development server
-bun run dev
+npm run dev
 ```
 
 The API will be available at `http://localhost:3000`.
@@ -37,12 +37,12 @@ The API will be available at `http://localhost:3000`.
 
 | Script               | Description                              |
 | -------------------- | ---------------------------------------- |
-| `bun run dev`        | Start development server with hot reload |
-| `bun run start`      | Start production server                  |
-| `bun run seed`       | Seed database with initial data          |
-| `bun run lint`       | Run ESLint                               |
-| `bun run lint --fix` | Fix auto-fixable lint issues             |
-| `bun run format`     | Format code with Prettier                |
+| `npm run dev`        | Start development server with hot reload |
+| `npm run start`      | Start production server                  |
+| `npm run seed`       | Seed database with initial data          |
+| `npm run lint`       | Run ESLint                               |
+| `npm run lint --fix` | Fix auto-fixable lint issues             |
+| `npm run format`     | Format code with Prettier                |
 
 ## Project Structure
 
@@ -138,7 +138,7 @@ src/
 
 | Technology | Purpose            |
 | ---------- | ------------------ |
-| Bun        | JavaScript runtime |
+| Node.js    | JavaScript runtime |
 | Express    | HTTP framework     |
 | MongoDB    | Document database  |
 | Mongoose   | ODM for MongoDB    |
@@ -150,10 +150,10 @@ src/
 
 ```bash
 # Run tests
-bun test
+npm test
 
 # Run specific test file
-bun test src/routes/services.test.ts
+npx vitest run src/routes/services.test.ts
 ```
 
 ## Database
@@ -182,7 +182,7 @@ db.services.find({ categoryId: ObjectId('...') });
 ```bash
 # Clear and reseed
 docker-compose exec mongodb mongosh intact --eval "db.dropDatabase()"
-bun run seed
+npm run seed
 ```
 
 ## Troubleshooting
@@ -212,11 +212,11 @@ The server can serve the client's production build directly, enabling a single-p
 
 ```bash
 # Build the client
-cd client && bun run build
+cd client && npm run build
 
 # Start server with static serving
 cd server
-SERVE_STATIC=true bun run start
+SERVE_STATIC=true npm run start
 ```
 
 The full application will be available at `http://localhost:3000`.

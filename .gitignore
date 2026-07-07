@@ -11,6 +11,9 @@ dist/
 # Keep server/public (client build output for deployment)
 !server/public/
 
+# Compiled TypeScript output
+/server/dist/
+
 # Environment files
 .env
 .env.local
@@ -47,6 +50,7 @@ coverage/
 k8s/**/secret.yaml
 
 # Bun
+bun.lock
 bun.lockb
 
 # MongoDB data (if running locally without Docker)

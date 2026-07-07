@@ -15,12 +15,11 @@ This playbook will help you:
 
 Ensure you have these tools installed:
 
-| Tool                          | Version | Purpose                                |
-| ----------------------------- | ------- | -------------------------------------- |
-| [Bun](https://bun.sh/)        | 1.0+    | JavaScript runtime and package manager |
-| [Docker](https://docker.com/) | 24.0+   | Container runtime for MongoDB          |
-| [Git](https://git-scm.com/)   | 2.0+    | Version control                        |
-| Node.js                       | 18+     | Optional fallback runtime              |
+| Tool                           | Version | Purpose                       |
+| ------------------------------ | ------- | ----------------------------- |
+| [Node.js](https://nodejs.org/) | 20+     | JavaScript runtime            |
+| [Docker](https://docker.com/)  | 24.0+   | Container runtime for MongoDB |
+| [Git](https://git-scm.com/)    | 2.0+    | Version control               |
 
 For detailed prerequisites, see [Prerequisites](../installation/prerequisites.md).
 
@@ -37,15 +36,15 @@ docker-compose up -d mongodb
 # Setup and start server (terminal 1)
 cd server
 cp .env.example .env
-bun install
-bun run seed
-bun run dev
+npm install
+npm run seed
+npm run dev
 
 # Setup and start client (terminal 2)
 cd client
 cp .env.example .env
-bun install
-bun run dev
+npm install
+npm run dev
 ```
 
 Access the application:
@@ -75,13 +74,13 @@ cd server
 cp .env.example .env
 
 # Install dependencies
-bun install
+npm install
 
 # Seed initial data (creates admin user and sample data)
-bun run seed
+npm run seed
 
 # Start development server with hot reload
-bun run dev
+npm run dev
 ```
 
 The API will be available at `http://localhost:3000`.
@@ -95,10 +94,10 @@ cd client
 cp .env.example .env
 
 # Install dependencies
-bun install
+npm install
 
 # Start Vite development server
-bun run dev
+npm run dev
 ```
 
 The frontend will be available at `http://localhost:5173`.
@@ -146,30 +145,30 @@ git commit -m "docs: update API documentation"
 
 | Command          | Description             |
 | ---------------- | ----------------------- |
-| `bun run dev`    | Start with hot reload   |
-| `bun run start`  | Start production server |
-| `bun run seed`   | Seed database           |
-| `bun run lint`   | Run ESLint              |
-| `bun run format` | Format with Prettier    |
+| `npm run dev`    | Start with hot reload   |
+| `npm run start`  | Start production server |
+| `npm run seed`   | Seed database           |
+| `npm run lint`   | Run ESLint              |
+| `npm run format` | Format with Prettier    |
 
 ### Client Commands
 
 | Command           | Description              |
 | ----------------- | ------------------------ |
-| `bun run dev`     | Start Vite dev server    |
-| `bun run build`   | Build for production     |
-| `bun run preview` | Preview production build |
-| `bun run lint`    | Run ESLint               |
+| `npm run dev`     | Start Vite dev server    |
+| `npm run build`   | Build for production     |
+| `npm run preview` | Preview production build |
+| `npm run lint`    | Run ESLint               |
 
 ### Root Commands
 
 | Command             | Description                  |
 | ------------------- | ---------------------------- |
-| `bun run dev`       | Start both client and server |
-| `bun run build`     | Build both modules           |
-| `bun run lint`      | Lint both modules            |
-| `bun run format`    | Format all code              |
-| `bun run typecheck` | Type-check both modules      |
+| `npm run dev`       | Start both client and server |
+| `npm run build`     | Build both modules           |
+| `npm run lint`      | Lint both modules            |
+| `npm run format`    | Format all code              |
+| `npm run typecheck` | Type-check both modules      |
 
 ## Debugging
 
@@ -187,8 +186,8 @@ Add to `.vscode/launch.json`:
       "type": "node",
       "request": "launch",
       "name": "Debug Server",
-      "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "--inspect", "src/app.ts"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "--inspect", "src/app.ts"],
       "cwd": "${workspaceFolder}/server",
       "restart": true,
       "console": "integratedTerminal"
@@ -225,21 +224,21 @@ Use browser DevTools Network tab to inspect API calls.
 ```bash
 # Server tests
 cd server
-bun test
+npm test
 
 # Client tests
 cd client
-bun test
+npm test
 
 # Run all tests
-bun run test
+npm run test
 ```
 
 ### Test Coverage
 
 ```bash
 # Generate coverage report
-bun test --coverage
+npm test --coverage
 ```
 
 ## Code Quality
@@ -259,13 +258,13 @@ The project uses Husky for pre-commit hooks:
 
 ```bash
 # Format code
-bun run format
+npm run format
 
 # Fix lint issues
-bun run lint:fix
+npm run lint:fix
 
 # Type check
-bun run typecheck
+npm run typecheck
 ```
 
 ## Database Operations
@@ -290,7 +289,7 @@ db.services.find().limit(5).pretty()
 
 // Clear and reseed
 // (exit shell, then run)
-// bun run seed
+// npm run seed
 ```
 
 ### Reset Database
@@ -304,7 +303,7 @@ docker volume rm service-repository-digitaltwin-management-platform_mongodb_data
 
 # Restart and reseed
 docker-compose up -d mongodb
-cd server && bun run seed
+cd server && npm run seed
 ```
 
 ## Common Issues
@@ -336,8 +335,8 @@ docker-compose restart mongodb
 
 ```bash
 # Clean install dependencies
-rm -rf node_modules bun.lock
-bun install
+rm -rf node_modules package-lock.json
+npm install
 ```
 
 For more troubleshooting, see [Common Issues](../troubleshooting/common-issues.md).

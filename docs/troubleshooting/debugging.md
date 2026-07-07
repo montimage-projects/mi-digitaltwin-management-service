@@ -120,8 +120,8 @@ app.use(morgan('dev'));
       "type": "node",
       "request": "launch",
       "name": "Debug Server",
-      "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "--inspect", "src/app.ts"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "--inspect", "src/app.ts"],
       "cwd": "${workspaceFolder}/server",
       "restart": true,
       "console": "integratedTerminal"
@@ -256,7 +256,7 @@ cd client
 npx vite-bundle-visualizer
 
 # Check bundle size
-bun run build
+npm run build
 ls -la dist/assets
 ```
 

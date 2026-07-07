@@ -1,18 +1,18 @@
 # Development Docker Compose - MongoDB and admin tools only
-# Application runs locally with: bun run dev
+# Application runs locally with: npm run dev
 
 services:
   mongodb:
     image: mongo:7
     container_name: montimage-mongodb
     ports:
-      - "27017:27017"
+      - '27017:27017'
     volumes:
       - mongodb_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: intact
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,7 +24,7 @@ services:
     image: mongo-express:latest
     container_name: montimage-mongo-express
     ports:
-      - "8081:8081"
+      - '8081:8081'
     environment:
       ME_CONFIG_MONGODB_SERVER: mongodb
       ME_CONFIG_BASICAUTH_USERNAME: admin

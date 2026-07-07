@@ -4,23 +4,36 @@ Required software and system requirements.
 
 ## Required Software
 
-### Bun (Primary Runtime)
+### Node.js
 
-[Bun](https://bun.sh/) is a fast JavaScript runtime and package manager.
+[Node.js](https://nodejs.org/) is the JavaScript runtime for this project.
 
-**Version:** 1.0+
+**Version:** 20+
 
-**Installation:**
+**Installation (via nvm):**
 
 ```bash
-# macOS/Linux
-curl -fsSL https://bun.sh/install | bash
+# Install nvm (if not already installed)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
 
-# Windows (via PowerShell)
-irm bun.sh/install.ps1 | iex
+# Install and use Node.js 20
+nvm install 20
+nvm use 20
 
 # Verify installation
-bun --version
+node --version
+npm --version
+```
+
+**Alternative (via fnm):**
+
+```bash
+# Install fnm (faster Node.js version manager)
+brew install fnm
+
+# Install and use Node.js 20
+fnm install 20
+fnm use 20
 ```
 
 ### Docker
@@ -48,18 +61,6 @@ docker-compose --version
 ```bash
 # Verify installation
 git --version
-```
-
-### Node.js (Optional)
-
-Node.js is an optional fallback runtime.
-
-**Version:** 18+
-
-```bash
-# Verify installation
-node --version
-npm --version
 ```
 
 ## System Requirements
@@ -146,8 +147,8 @@ Run these commands to verify your setup:
 
 ```bash
 # Runtime
-bun --version # Should be 1.0+
-node --version # Should be 18+ (optional)
+node --version # Should be 20+
+npm --version # Should be 10+
 
 # Docker
 docker --version # Should be 24.0+
@@ -166,10 +167,11 @@ For macOS/Linux:
 #!/bin/bash
 # setup-prerequisites.sh
 
-# Install Bun
-if ! command -v bun &> /dev/null; then
- echo "Installing Bun..."
- curl -fsSL https://bun.sh/install | bash
+# Check Node.js
+if ! command -v node &> /dev/null; then
+ echo "Node.js not found. Please install Node.js 20+."
+ echo "https://nodejs.org/"
+ exit 1
 fi
 
 # Check Docker
@@ -180,22 +182,22 @@ if ! command -v docker &> /dev/null; then
 fi
 
 # Verify
-echo "Bun version: $(bun --version)"
+echo "Node.js version: $(node --version)"
+echo "npm version: $(npm --version)"
 echo "Docker version: $(docker --version)"
 echo "Prerequisites OK!"
 ```
 
 ## Troubleshooting
 
-### Bun Installation Fails
+### Node.js Installation Fails
 
 ```bash
-# Try with explicit shell
-curl -fsSL https://bun.sh/install | bash
+# Try with nvm
+nvm install 20
 
-# Add to PATH manually
-export BUN_INSTALL="$HOME/.bun"
-export PATH="$BUN_INSTALL/bin:$PATH"
+# Or use fnm
+fnm install 20
 ```
 
 ### Docker Permission Denied
