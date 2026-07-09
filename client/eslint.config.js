@@ -22,6 +22,7 @@ export default tseslint.config(
           jsx: true,
         },
         project: './tsconfig.json',
+        tsconfigRootDir: import.meta.dirname,
       },
     },
     settings: {

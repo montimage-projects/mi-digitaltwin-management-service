@@ -76,7 +76,7 @@ export function Login() {
           <div className="login-tagline">
             <h2 className="login-tagline-title">{APP_NAME}</h2>
             <p className="login-tagline-subtitle">
-              Secure infrastructure modeling for critical systems
+              Security simulation and digital twin management for critical infrastructure
             </p>
           </div>
 
