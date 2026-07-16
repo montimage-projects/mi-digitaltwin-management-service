@@ -1,7 +1,7 @@
 # Server Dockerfile - Multi-stage build for production
 
 # Build stage
-FROM node:20-slim AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -18,47 +18,31 @@ COPY tsconfig.json ./
 # Compile TypeScript
 RUN npm run build
 
+# Trim dev dependencies from the production image.
+RUN npm prune --omit=dev && npm cache clean --force
+
 # Production stage
-FROM node:20-slim AS production
+FROM gcr.io/distroless/nodejs22-debian13:nonroot AS production
 
 WORKDIR /app
 
-# Install curl for healthcheck (required in slim image)
-# Create non-root user for security (Debian-based image)
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system --gid 1001 nodejs \
-    && useradd --system --uid 1001 --gid nodejs intact
-
-# Copy dependencies and compiled output from builder
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
-
-# Copy entrypoint script and set permissions
-COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-
-# Create data directory for persistent state (seed marker)
-RUN mkdir -p /app/data
-
-# Set ownership (excluding entrypoint which stays root-owned but executable)
-RUN chown -R intact:nodejs /app
-
-# Switch to non-root user
-USER intact
-
-# Environment defaults
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV SEED_ON_STARTUP=false
+
+# Copy dependencies and compiled output from builder
+COPY --from=builder --chown=nonroot:nonroot /app/node_modules ./node_modules
+COPY --from=builder --chown=nonroot:nonroot /app/dist ./dist
+COPY --from=builder --chown=nonroot:nonroot /app/package.json ./
+
+# Run as non-root user
+USER nonroot
 
 # Expose port
 EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
-# Use entrypoint for startup logic
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["node", "dist/app.js"]
+CMD ["dist/bootstrap.js"]
