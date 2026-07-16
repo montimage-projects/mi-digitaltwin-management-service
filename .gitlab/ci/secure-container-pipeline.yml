@@ -1,0 +1,280 @@
+# Shared container pipeline for secsim.
+# Reused by the root .gitlab-ci.yml for build/push and image scanning.
+
+variables:
+  IMAGE_TAG: "$CI_COMMIT_SHORT_SHA"
+  TRIVY_SEVERITY: "CRITICAL,HIGH,MEDIUM"
+  TRIVY_FAIL_ON_SEVERITY: "CRITICAL,HIGH"
+  COSIGN_REQUIRED: "false"
+  COSIGN_VERSION: "v2.4.1"
+  COSIGN_ATTEST_SBOM: "false"
+  PUBLISH_LATEST: "false"
+  SERVICE_ID: "$CI_PROJECT_NAME"
+  METRICS_PREFIX: "$CI_PROJECT_NAME"
+
+.container-build:
+  stage: build
+  image:
+    name: quay.io/buildah/stable:v1.43
+    entrypoint: [""]
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_ISOLATION: chroot
+    BUILDAH_FORMAT: docker
+  script:
+    - |
+      set -eu
+      if [ -z "${SERVICE_NAME:-}" ] || [ -z "${DOCKERFILE_PATH:-}" ] || [ -z "${BUILD_CONTEXT:-}" ]; then
+        echo "SERVICE_NAME, DOCKERFILE_PATH and BUILD_CONTEXT must be set by the matrix entry."
+        exit 2
+      fi
+      if [ ! -f "${CI_PROJECT_DIR}/${DOCKERFILE_PATH}" ]; then
+        echo "Dockerfile not found: ${DOCKERFILE_PATH}"
+        exit 3
+      fi
+
+      mkdir -p reports
+      buildah login --username "$CI_REGISTRY_USER" --password "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+
+      IMAGE_REPO="${CI_REGISTRY_IMAGE}/${SERVICE_NAME}"
+      DIGEST_FILE="reports/${SERVICE_NAME}-image.digest"
+      IMAGE_REF_TAGGED="${IMAGE_REPO}:${IMAGE_TAG}"
+
+      buildah bud --pull \
+        --file "${CI_PROJECT_DIR}/${DOCKERFILE_PATH}" \
+        --tag "${IMAGE_REF_TAGGED}" \
+        "${CI_PROJECT_DIR}/${BUILD_CONTEXT}"
+
+      buildah push --digestfile "${DIGEST_FILE}" \
+        "${IMAGE_REF_TAGGED}" \
+        "docker://${IMAGE_REF_TAGGED}"
+
+      buildah tag "${IMAGE_REF_TAGGED}" "${IMAGE_REPO}:${CI_COMMIT_REF_SLUG}"
+      buildah push "${IMAGE_REPO}:${CI_COMMIT_REF_SLUG}" "docker://${IMAGE_REPO}:${CI_COMMIT_REF_SLUG}"
+
+      if [ "${PUBLISH_LATEST:-false}" = "true" ] && [ "${CI_COMMIT_BRANCH:-}" = "${CI_DEFAULT_BRANCH:-}" ]; then
+        buildah tag "${IMAGE_REF_TAGGED}" "${IMAGE_REPO}:latest"
+        buildah push "${IMAGE_REPO}:latest" "docker://${IMAGE_REPO}:latest"
+      fi
+      if [ -n "${CI_COMMIT_TAG:-}" ]; then
+        buildah tag "${IMAGE_REF_TAGGED}" "${IMAGE_REPO}:${CI_COMMIT_TAG}"
+        buildah push "${IMAGE_REPO}:${CI_COMMIT_TAG}" "docker://${IMAGE_REPO}:${CI_COMMIT_TAG}"
+      fi
+
+      IMAGE_DIGEST="$(tr -d '\n' < "${DIGEST_FILE}")"
+      IMAGE_REF_DIGEST="${IMAGE_REPO}@${IMAGE_DIGEST}"
+
+      {
+        echo "SERVICE_NAME=${SERVICE_NAME}"
+        echo "IMAGE_REPO=${IMAGE_REPO}"
+        echo "IMAGE_TAG=${IMAGE_TAG}"
+        echo "IMAGE_DIGEST=${IMAGE_DIGEST}"
+        echo "IMAGE_REF=${IMAGE_REF_TAGGED}"
+        echo "IMAGE_REF_DIGEST=${IMAGE_REF_DIGEST}"
+      } > "reports/${SERVICE_NAME}-image.env"
+
+      {
+        echo "component: ${SERVICE_NAME}"
+        echo "image:"
+        echo "  repository: ${IMAGE_REPO}"
+        echo "  tag: ${IMAGE_TAG}"
+        echo "  digest: ${IMAGE_DIGEST}"
+      } > "reports/${SERVICE_NAME}-gitops-update.yaml"
+  artifacts:
+    expire_in: 7 days
+    paths:
+      - reports/*-image.env
+      - reports/*-image.digest
+      - reports/*-gitops-update.yaml
+
+.container-scan:
+  stage: security
+  image:
+    name: aquasec/trivy:0.58.1
+    entrypoint: [""]
+  script:
+    - |
+      set -eu
+      mkdir -p reports
+
+      IMAGE_REPO="${CI_REGISTRY_IMAGE}/${SERVICE_NAME}"
+      DIGEST_FILE="reports/${SERVICE_NAME}-image.digest"
+      if [ ! -f "${DIGEST_FILE}" ]; then
+        echo "Missing digest artifact: ${DIGEST_FILE}"
+        exit 4
+      fi
+      IMAGE_DIGEST="$(tr -d '\n' < "${DIGEST_FILE}")"
+      IMAGE_REF_DIGEST="${IMAGE_REPO}@${IMAGE_DIGEST}"
+
+      export TRIVY_USERNAME="${CI_REGISTRY_USER}"
+      export TRIVY_PASSWORD="${CI_REGISTRY_PASSWORD}"
+
+      trivy image --no-progress --ignore-unfixed --severity "${TRIVY_SEVERITY}" \
+        --format table "${IMAGE_REF_DIGEST}" | tee "reports/${SERVICE_NAME}-trivy-table.txt"
+      trivy image --no-progress --ignore-unfixed --severity "${TRIVY_SEVERITY}" \
+        --format json --output "reports/${SERVICE_NAME}-trivy.json" "${IMAGE_REF_DIGEST}"
+      trivy image --no-progress --format cyclonedx \
+        --output "reports/${SERVICE_NAME}-sbom.cdx.json" "${IMAGE_REF_DIGEST}"
+
+      apk add --no-cache jq curl >/dev/null
+
+      COSIGN_STATUS="skipped"
+      if [ -n "${COSIGN_PRIVATE_KEY:-}" ]; then
+        COSIGN_VERSION="${COSIGN_VERSION:-v2.4.1}"
+        curl -fsSL -o /usr/local/bin/cosign \
+          "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+        curl -fsSL -o /tmp/cosign-checksums.txt \
+          "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign_checksums.txt"
+        grep ' cosign-linux-amd64$' /tmp/cosign-checksums.txt | sha256sum -c -
+        chmod +x /usr/local/bin/cosign
+        rm -f /tmp/cosign-checksums.txt
+        printf '%s' "${COSIGN_PRIVATE_KEY}" > cosign.key
+        cosign sign --key cosign.key --yes "${IMAGE_REF_DIGEST}"
+        if [ "${COSIGN_ATTEST_SBOM:-false}" = "true" ]; then
+          cosign attest --key cosign.key --yes --type cyclonedx \
+            --predicate "reports/${SERVICE_NAME}-sbom.cdx.json" "${IMAGE_REF_DIGEST}"
+        fi
+        rm -f cosign.key
+        COSIGN_STATUS="signed"
+      elif [ "${COSIGN_REQUIRED}" = "true" ]; then
+        echo "COSIGN_PRIVATE_KEY is required but not provided."
+        exit 5
+      fi
+      printf 'status=%s\nimage=%s\n' "${COSIGN_STATUS}" "${IMAGE_REF_DIGEST}" > "reports/${SERVICE_NAME}-cosign-status.env"
+
+      CRITICAL_COUNT="$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' "reports/${SERVICE_NAME}-trivy.json")"
+      HIGH_COUNT="$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' "reports/${SERVICE_NAME}-trivy.json")"
+      MEDIUM_COUNT="$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' "reports/${SERVICE_NAME}-trivy.json")"
+
+      {
+        echo "| Service | Critical | High | Medium | SBOM | Signature |"
+        echo "|---|---:|---:|---:|---|---|"
+        echo "| ${SERVICE_NAME} | ${CRITICAL_COUNT} | ${HIGH_COUNT} | ${MEDIUM_COUNT} | cyclonedx | ${COSIGN_STATUS} |"
+      } > "reports/${SERVICE_NAME}-summary.md"
+
+      if [ -n "${TRIVY_FAIL_ON_SEVERITY:-}" ] && [ "${TRIVY_FAIL_ON_SEVERITY}" != "none" ]; then
+        trivy image --no-progress --ignore-unfixed --severity "${TRIVY_FAIL_ON_SEVERITY}" --exit-code 1 "${IMAGE_REF_DIGEST}"
+      fi
+  artifacts:
+    expire_in: 30 days
+    when: always
+    paths:
+      - reports/*-trivy-table.txt
+      - reports/*-trivy.json
+      - reports/*-sbom.cdx.json
+      - reports/*-cosign-status.env
+      - reports/*-summary.md
+
+.security-findings-overview:
+  stage: report
+  image: alpine:3.20
+  script:
+    - |
+      set -eu
+      apk add --no-cache jq curl >/dev/null
+
+      AUDIT_COUNT=0
+      SECRET_COUNT=0
+      IMG_CRIT=0
+      IMG_HIGH=0
+      IMG_MEDIUM=0
+      SIGNED_IMAGES=0
+      SBOM_COUNT=0
+
+      if [ -f reports/npm-audit-report.json ]; then
+        AUDIT_COUNT="$(jq '.metadata.vulnerabilities.total // 0' reports/npm-audit-report.json)"
+      fi
+      if ls reports/gitleaks-*.json >/dev/null 2>&1; then
+        SECRET_COUNT="$(jq -s 'map(. // []) | add | length' reports/gitleaks-*.json)"
+      fi
+
+      if ls reports/*-trivy.json >/dev/null 2>&1; then
+        IMG_CRIT="$(jq -s '[.[].Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' reports/*-trivy.json)"
+        IMG_HIGH="$(jq -s '[.[].Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' reports/*-trivy.json)"
+        IMG_MEDIUM="$(jq -s '[.[].Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' reports/*-trivy.json)"
+      fi
+
+      if ls reports/*-sbom.cdx.json >/dev/null 2>&1; then
+        SBOM_COUNT="$(ls reports/*-sbom.cdx.json | wc -l | tr -d ' ')"
+      fi
+      if ls reports/*-cosign-status.env >/dev/null 2>&1; then
+        SIGNED_IMAGES="$(awk -F= '$1=="status" && $2=="signed" {c++} END {print c+0}' reports/*-cosign-status.env)"
+      fi
+
+      METRICS_PREFIX_SAFE="$(printf '%s' "${METRICS_PREFIX:-secsim}" | tr -c 'A-Za-z0-9_' '_' )"
+
+      {
+        echo "# Security Findings Overview"
+        echo
+        echo "| Finding source | Count |"
+        echo "|---|---:|"
+        echo "| npm audit | ${AUDIT_COUNT} |"
+        echo "| Secret detection | ${SECRET_COUNT} |"
+        echo "| Container critical | ${IMG_CRIT} |"
+        echo "| Container high | ${IMG_HIGH} |"
+        echo "| Container medium | ${IMG_MEDIUM} |"
+        echo "| Generated SBOM files | ${SBOM_COUNT} |"
+        echo "| Signed images | ${SIGNED_IMAGES} |"
+        echo
+        echo "## SBOM Artifact Files"
+        if ls reports/*-sbom.cdx.json >/dev/null 2>&1; then
+          ls reports/*-sbom.cdx.json | sed 's#^#- #'
+        else
+          echo "_No SBOM files were produced in this pipeline run._"
+        fi
+        echo
+        echo "## Per-image summaries"
+        if ls reports/*-summary.md >/dev/null 2>&1; then
+          cat reports/*-summary.md
+        else
+          echo "_No container scan summaries were produced in this pipeline run._"
+        fi
+      } > security-findings-overview.md
+
+      jq -n \
+        --arg service "${SERVICE_ID:-$CI_PROJECT_NAME}" \
+        --arg pipeline_id "${CI_PIPELINE_ID:-unknown}" \
+        --arg ref "${CI_COMMIT_REF_NAME:-unknown}" \
+        --argjson audit "${AUDIT_COUNT}" \
+        --argjson secrets "${SECRET_COUNT}" \
+        --argjson crit "${IMG_CRIT}" \
+        --argjson high "${IMG_HIGH}" \
+        --argjson med "${IMG_MEDIUM}" \
+        --argjson sbom "${SBOM_COUNT}" \
+        --argjson signed "${SIGNED_IMAGES}" \
+        '{
+          service: $service,
+          pipeline_id: $pipeline_id,
+          ref: $ref,
+          findings: {
+            audit: $audit,
+            secret: $secrets,
+            container: {critical: $crit, high: $high, medium: $med}
+          },
+          supply_chain: {sbom_files: $sbom, signed_images: $signed}
+        }' > security-findings-overview.json
+
+      {
+        echo "${METRICS_PREFIX_SAFE}_audit_findings ${AUDIT_COUNT}"
+        echo "${METRICS_PREFIX_SAFE}_secret_findings ${SECRET_COUNT}"
+        echo "${METRICS_PREFIX_SAFE}_container_critical_findings ${IMG_CRIT}"
+        echo "${METRICS_PREFIX_SAFE}_container_high_findings ${IMG_HIGH}"
+        echo "${METRICS_PREFIX_SAFE}_container_medium_findings ${IMG_MEDIUM}"
+        echo "${METRICS_PREFIX_SAFE}_sbom_files ${SBOM_COUNT}"
+        echo "${METRICS_PREFIX_SAFE}_signed_images ${SIGNED_IMAGES}"
+      } > security-findings-overview.prom
+
+      if [ "${PUSH_METRICS_ENABLED:-false}" = "true" ] && [ -n "${PUSHGATEWAY_URL:-}" ]; then
+        curl -fsS --data-binary @security-findings-overview.prom \
+          "${PUSHGATEWAY_URL}/metrics/job/${METRICS_PREFIX_SAFE}-security/pipeline/${CI_PIPELINE_ID:-unknown}"
+      fi
+
+      cat security-findings-overview.md
+  artifacts:
+    expire_in: 30 days
+    when: always
+    paths:
+      - security-findings-overview.md
+      - security-findings-overview.json
+      - security-findings-overview.prom
+      - reports/*-sbom.cdx.json

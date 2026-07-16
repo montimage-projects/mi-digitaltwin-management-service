@@ -2,7 +2,7 @@
 # Used by docker-compose.prod.yml (nginx-based deployment)
 
 # Build stage
-FROM node:20-alpine AS builder
+FROM docker.io/library/node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -18,27 +18,22 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Production stage - nginx for static file serving
-FROM nginx:alpine AS production
+# Production stage - unprivileged nginx for static file serving
+FROM docker.io/nginxinc/nginx-unprivileged:1.31.2-alpine3.23-slim AS production
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy built assets from builder
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Create non-root user for security (nginx alpine includes nginx user)
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid
+# Vite writes assets to ../server/public (configured in vite.config.ts)
+COPY --from=builder --chown=nginx:nginx /server/public /usr/share/nginx/html
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Expose port
-EXPOSE 80
+EXPOSE 8080
+
+USER nginx
 
 CMD ["nginx", "-g", "daemon off;"]
