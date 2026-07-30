@@ -185,26 +185,6 @@ stages:
   - if: "$CI_COMMIT_BRANCH"
     changes: *secsim_change_paths
 
-.client_change_paths: &client_change_paths
-  - .gitlab/**/*
-  - .gitlab-ci.yml
-  - docker/**/*
-  - k8s/**/*
-  - package.json
-  - package-lock.json
-  - .dockerignore
-  - client/**/*
-
-.server_change_paths: &server_change_paths
-  - .gitlab/**/*
-  - .gitlab-ci.yml
-  - docker/**/*
-  - k8s/**/*
-  - package.json
-  - package-lock.json
-  - .dockerignore
-  - server/**/*
-
 quality:
   stage: quality
   script:
