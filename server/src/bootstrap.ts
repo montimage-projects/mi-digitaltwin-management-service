@@ -1,6 +1,12 @@
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { chdir } from 'node:process';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
+
+// Normalize working directory so relative paths (dist, data) resolve consistently.
+chdir(dirname(fileURLToPath(import.meta.url)) + '/..');
 
 const DATA_DIR = process.env.DATA_DIR ?? `${process.cwd()}/data`;
 const SEED_MARKER = `${DATA_DIR}/.seeded`;

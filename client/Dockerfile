@@ -18,6 +18,14 @@ COPY . .
 # Build the application
 RUN npm run build
 
+# Verify build output exists (Vite writes to ../server/public)
+RUN if [ ! -d /server/public ] || [ -z "$(ls -A /server/public)" ]; then \
+      echo "ERROR: Build failed - /server/public is empty or missing"; \
+      ls -la /server/ 2>&1 || true; \
+      exit 1; \
+    fi && \
+    echo "✓ Build verification passed: /server/public populated correctly"
+
 # Production stage - unprivileged nginx for static file serving
 FROM docker.io/nginxinc/nginx-unprivileged:1.31.2-alpine3.23-slim AS production
 

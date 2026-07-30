@@ -1,6 +1,10 @@
 import express, { type Express, type Request, type Response, type NextFunction } from 'express';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { env } from '../config/env.js';
+
+const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 const getClientDistPath = (): string => {
   // Client builds to server/public directory
@@ -11,7 +15,7 @@ const getClientDistPath = (): string => {
   }
 
   // Fallback: try relative to this file
-  const fallbackPath = path.resolve(__dirname, '..', '..', 'public');
+  const fallbackPath = path.resolve(moduleDir, '..', '..', 'public');
   if (fs.existsSync(fallbackPath)) {
     return fallbackPath;
   }
@@ -20,6 +24,12 @@ const getClientDistPath = (): string => {
 };
 
 export const configureStaticServing = (app: Express): boolean => {
+  const staticEnabled = env.SERVE_STATIC;
+  if (!staticEnabled) {
+    console.info('[Static] Static serving disabled via SERVE_STATIC');
+    return false;
+  }
+
   const clientDistPath = getClientDistPath();
   const indexPath = path.join(clientDistPath, 'index.html');
 
