@@ -1,5 +1,5 @@
 include:
-  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.1.0
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.0
     inputs:
       job_prefix: server
       build_stage: build
@@ -7,6 +7,8 @@ include:
       service_name: server
       dockerfile_path: server/Dockerfile
       build_context: server
+      rules_changes: [.gitlab/**/*, .gitlab-ci.yml, docker/**/*, k8s/**/*, package.json, package-lock.json, .dockerignore, server/**/*]
+      gitops_tag_path: server.image
       fail_on_severity: CRITICAL,HIGH
       cosign_required: $COSIGN_REQUIRED
       attest_sbom: "true"
@@ -16,7 +18,7 @@ include:
       gitops_repo_branch: main
       gitops_environment: $DEPLOY_ENV
       gitops_values_file: $GITOPS_VALUES_FILE
-  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.1.0
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.0
     inputs:
       job_prefix: client
       build_stage: build
@@ -24,9 +26,17 @@ include:
       service_name: client
       dockerfile_path: client/Dockerfile
       build_context: client
+      rules_changes: [.gitlab/**/*, .gitlab-ci.yml, docker/**/*, k8s/**/*, package.json, package-lock.json, .dockerignore, client/**/*]
+      gitops_tag_path: client.image
       fail_on_severity: CRITICAL,HIGH
       cosign_required: $COSIGN_REQUIRED
       attest_sbom: "true"
+      gitops_update_enabled: $GITOPS_UPDATE_ENABLED
+      gitops_update_stage: report
+      gitops_repo_url: $GITOPS_REPO_URL
+      gitops_repo_branch: main
+      gitops_environment: $DEPLOY_ENV
+      gitops_values_file: $GITOPS_VALUES_FILE
   - component: $CI_SERVER_FQDN/secassured/ci-cd-components/defectdojo-upload@v1.1.0
     inputs:
       stage: report
@@ -178,34 +188,22 @@ stages:
 .client_change_paths: &client_change_paths
   - .gitlab/**/*
   - .gitlab-ci.yml
+  - docker/**/*
+  - k8s/**/*
+  - package.json
+  - package-lock.json
+  - .dockerignore
   - client/**/*
-  - client/package.json
-  - client/package-lock.json
-  - client/.dockerignore
 
 .server_change_paths: &server_change_paths
   - .gitlab/**/*
   - .gitlab-ci.yml
+  - docker/**/*
+  - k8s/**/*
+  - package.json
+  - package-lock.json
+  - .dockerignore
   - server/**/*
-  - server/package.json
-  - server/package-lock.json
-  - server/.dockerignore
-
-.client_rules: &client_rules
-  - if: "$CI_COMMIT_TAG"
-    changes: *client_change_paths
-  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    changes: *client_change_paths
-  - if: "$CI_COMMIT_BRANCH"
-    changes: *client_change_paths
-
-.server_rules: &server_rules
-  - if: "$CI_COMMIT_TAG"
-    changes: *server_change_paths
-  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    changes: *server_change_paths
-  - if: "$CI_COMMIT_BRANCH"
-    changes: *server_change_paths
 
 quality:
   stage: quality
