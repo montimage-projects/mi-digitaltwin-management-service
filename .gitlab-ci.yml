@@ -1,5 +1,5 @@
 include:
-  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.0
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.4
     inputs:
       job_prefix: server
       build_stage: build
@@ -18,7 +18,7 @@ include:
       gitops_repo_branch: main
       gitops_environment: $DEPLOY_ENV
       gitops_values_file: $GITOPS_VALUES_FILE
-  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.0
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.4
     inputs:
       job_prefix: client
       build_stage: build
@@ -37,7 +37,7 @@ include:
       gitops_repo_branch: main
       gitops_environment: $DEPLOY_ENV
       gitops_values_file: $GITOPS_VALUES_FILE
-  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/defectdojo-upload@v1.1.0
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/defectdojo-upload@v1.2.4
     inputs:
       stage: report
   - local: .gitlab/ci/secure-container-pipeline.yml
