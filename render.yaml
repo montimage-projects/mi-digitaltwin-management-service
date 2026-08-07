@@ -1,0 +1,71 @@
+# Render Blueprint — free demo deployment (single container, MongoDB Atlas M0)
+#
+# Runs the unified image (Express API + built React client served from the same
+# origin) on Render's Free instance type. The service spins down after 15 min of
+# inactivity and takes ~1 min to wake — acceptable for occasional demos.
+#
+# Database is NOT provisioned here: create a free MongoDB Atlas M0 cluster and
+# paste its connection string into MONGODB_URI in the Render dashboard.
+# Atlas Network Access must allow 0.0.0.0/0 — Render free egress IPs are dynamic.
+#
+# Setup: Render Dashboard → New → Blueprint → pick this repo.
+
+services:
+  - type: web
+    name: secsim-demo
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./server/Dockerfile.unified
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: false # deploy on demand, not on every push
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Render injects its own PORT; pin it so the container and the port
+      # Render probes agree.
+      - key: PORT
+        value: "3000"
+
+      # Serve the built client from the API container (same origin).
+      - key: SERVE_STATIC
+        value: "true"
+
+      # --- Secrets: set these in the Render dashboard, never in git ---
+      # mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/intact?retryWrites=true&w=majority
+      - key: MONGODB_URI
+        sync: false
+      # Demo admin login — do not leave at the .env.example default.
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      # Public URL of this service, e.g. https://secsim-demo.onrender.com
+      # (only silences the production startup warning — serving is same-origin).
+      - key: CORS_ORIGIN
+        sync: false
+
+      # Generated once by Render and kept stable across deploys.
+      # Changing ENCRYPTION_KEY makes already-stored credentials undecryptable.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+      - key: JWT_EXPIRES_IN
+        value: "24h"
+
+      # Seeds are idempotent upserts, but the marker file cannot persist on a
+      # free instance, so this re-seeds on every cold start (~seconds against a
+      # warm Atlas, much longer against a paused one).
+      # Flip to false in the dashboard once the first deploy has seeded.
+      - key: SEED_ON_STARTUP
+        value: "true"
+
+      - key: BRANDING_PROFILE
+        value: secassured
+      - key: MAESTRO_BASE_URL
+        value: https://maestro.intact-project.eu
