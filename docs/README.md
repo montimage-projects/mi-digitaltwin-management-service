@@ -35,9 +35,10 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 1. [Prerequisites](installation/prerequisites.md) - System requirements
 2. [Deployment Guide](DEPLOYMENT.md) - Production deployment checklist
 3. [Deployment Playbook](playbooks/deployment.md) - Step-by-step deployment
-4. [External Services](integration/external-services.md) - Third-party integrations
-5. [Troubleshooting](troubleshooting/common-issues.md) - Common issues and solutions
-6. [Database Configuration](database/schema.md) - MongoDB setup and optimization
+4. [Render Demo Playbook](playbooks/render-demo-deployment.md) - Free public demo deployment
+5. [External Services](integration/external-services.md) - Third-party integrations
+6. [Troubleshooting](troubleshooting/common-issues.md) - Common issues and solutions
+7. [Database Configuration](database/schema.md) - MongoDB setup and optimization
 
 ### For Contributors
 
@@ -72,12 +73,13 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 
 ### Deployment & Operations
 
-| Document                                       | Purpose                                 |
-| ---------------------------------------------- | --------------------------------------- |
-| [Deployment Guide](DEPLOYMENT.md)              | Production checklist and best practices |
-| [Deployment Playbook](playbooks/deployment.md) | Docker/Docker Compose deployment steps  |
-| [Prerequisites](installation/prerequisites.md) | System requirements and versions        |
-| [Configuration](installation/configuration.md) | Environment variables and setup         |
+| Document                                                    | Purpose                                 |
+| ----------------------------------------------------------- | --------------------------------------- |
+| [Deployment Guide](DEPLOYMENT.md)                           | Production checklist and best practices |
+| [Deployment Playbook](playbooks/deployment.md)              | Docker/Docker Compose deployment steps  |
+| [Render Demo Playbook](playbooks/render-demo-deployment.md) | Free public demo on Render + Atlas M0   |
+| [Prerequisites](installation/prerequisites.md)              | System requirements and versions        |
+| [Configuration](installation/configuration.md)              | Environment variables and setup         |
 
 ### Integration & Extensibility
 

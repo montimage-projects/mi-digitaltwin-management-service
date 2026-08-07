@@ -44,6 +44,10 @@ existing and new single-server deployments alike:
    [Option 1](#option-1-docker-compose-single-server)
 3. **MongoDB Atlas** - Managed MongoDB in the cloud, usable with either
    option above — see [Option 2](#option-2-mongodb-atlas-cloud-database)
+4. **Render (free demo hosting)** - Not for production. A single free
+   container plus MongoDB Atlas M0 for an occasional public demo; spins down
+   when idle — see the
+   [Render Demo Playbook](playbooks/render-demo-deployment.md)
 
 ## Option 1: Docker Compose (Single Server)
 

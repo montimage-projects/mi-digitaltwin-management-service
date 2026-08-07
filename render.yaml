@@ -28,11 +28,11 @@ services:
       # Render injects its own PORT; pin it so the container and the port
       # Render probes agree.
       - key: PORT
-        value: "3000"
+        value: '3000'
 
       # Serve the built client from the API container (same origin).
       - key: SERVE_STATIC
-        value: "true"
+        value: 'true'
 
       # --- Secrets: set these in the Render dashboard, never in git ---
       # mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/intact?retryWrites=true&w=majority
@@ -56,14 +56,14 @@ services:
         generateValue: true
 
       - key: JWT_EXPIRES_IN
-        value: "24h"
+        value: '24h'
 
       # Seeds are idempotent upserts, but the marker file cannot persist on a
       # free instance, so this re-seeds on every cold start (~seconds against a
       # warm Atlas, much longer against a paused one).
       # Flip to false in the dashboard once the first deploy has seeded.
       - key: SEED_ON_STARTUP
-        value: "true"
+        value: 'true'
 
       - key: BRANDING_PROFILE
         value: secassured
