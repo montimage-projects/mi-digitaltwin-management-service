@@ -21,6 +21,11 @@ RUN npm run build
 # Trim dev dependencies from the production image.
 RUN npm prune --omit=dev && npm cache clean --force
 
+# Pre-create the data dir here: the distroless runtime has no shell, so it
+# cannot mkdir. A named volume mounted at this path inherits the directory's
+# ownership from the image, which is what lets the seed marker be written.
+RUN mkdir -p /app/data
+
 # Production stage
 FROM gcr.io/distroless/nodejs22-debian13:nonroot AS production
 
@@ -34,6 +39,9 @@ ENV SEED_ON_STARTUP=false
 COPY --from=builder --chown=nonroot:nonroot /app/node_modules ./node_modules
 COPY --from=builder --chown=nonroot:nonroot /app/dist ./dist
 COPY --from=builder --chown=nonroot:nonroot /app/package.json ./
+
+# Writable data dir for the seed marker (see the builder stage above).
+COPY --from=builder --chown=nonroot:nonroot /app/data ./data
 
 # Run as non-root user
 USER nonroot

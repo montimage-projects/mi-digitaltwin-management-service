@@ -43,6 +43,16 @@ include:
   - local: .gitlab/ci/secure-container-pipeline.yml
   - template: Security/SAST.gitlab-ci.yml
 
+# The upstream template gates its analyzers on $CI_COMMIT_BRANCH, which is
+# undefined in merge-request pipelines, so SAST never ran on an MR and
+# defectdojo_upload_sast had no report to upload. Extend it to MR pipelines.
+semgrep-sast:
+  rules:
+    - if: '$SAST_DISABLED == "true" || $SAST_DISABLED == "1"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: "$CI_COMMIT_BRANCH"
+
 image: node:22.23.1-bookworm-slim
 
 # Improved cache strategy: split by dependency files for better hit rate
@@ -319,8 +329,9 @@ dependency_scan:
 
       printf 'total=%s\nhigh=%s\ncritical=%s\n' "${AUDIT_TOTAL}" "${AUDIT_HIGH}" "${AUDIT_CRITICAL}" > reports/npm-audit-summary.env
 
-      if [ "${NPM_AUDIT_FAIL_ON_HIGH:-false}" = "true" ] && [ "${AUDIT_HIGH}" -gt 0 ]; then
-        echo "npm audit found HIGH severity vulnerabilities: ${AUDIT_HIGH}"
+      AUDIT_BLOCKING="$((AUDIT_HIGH + AUDIT_CRITICAL))"
+      if [ "${NPM_AUDIT_FAIL_ON_HIGH:-false}" = "true" ] && [ "${AUDIT_BLOCKING}" -gt 0 ]; then
+        echo "npm audit found blocking vulnerabilities: high=${AUDIT_HIGH} critical=${AUDIT_CRITICAL}"
         exit 14
       fi
   artifacts:
@@ -416,7 +427,9 @@ security_findings_overview:
 defectdojo_upload_sast:
   extends: .defectdojo-upload
   needs:
-    - job: sast
+    # GitLab's SAST template defines `sast` as a `when: never` stub; the job
+    # that actually emits gl-sast-report.json for this repo is semgrep-sast.
+    - job: semgrep-sast
       artifacts: true
       optional: true
   variables:

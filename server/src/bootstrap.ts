@@ -13,7 +13,11 @@ const SEED_MARKER = `${DATA_DIR}/.seeded`;
 const MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://localhost:27017/intact';
 
 const ensureDataDir = async (): Promise<void> => {
-  await mkdir(DATA_DIR, { recursive: true });
+  try {
+    await mkdir(DATA_DIR, { recursive: true });
+  } catch (error) {
+    console.warn(`Could not create data dir ${DATA_DIR}:`, error);
+  }
 };
 
 const waitForMongoDb = async (): Promise<void> => {
@@ -62,10 +66,21 @@ const runSeedIfNeeded = async (): Promise<void> => {
   await waitForMongoDb();
 
   const seeded = await runSeedScript();
-  if (seeded) {
-    await writeFile(SEED_MARKER, new Date().toISOString(), 'utf8');
-  } else {
+  if (!seeded) {
     console.warn('Database seeding failed, continuing startup');
+    return;
+  }
+
+  // The marker is an optimisation, not a correctness requirement: seeds are
+  // idempotent upserts. A read-only or root-owned data dir must not take the
+  // server down, so record the failure and carry on.
+  try {
+    await writeFile(SEED_MARKER, new Date().toISOString(), 'utf8');
+  } catch (error) {
+    console.warn(
+      `Could not write seed marker ${SEED_MARKER}; the database will be re-seeded on next start:`,
+      error
+    );
   }
 };
 
