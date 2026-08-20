@@ -69,6 +69,13 @@ note.md
 .gemini/
 .windsurf/
 .github/prompts/
+.github/instructions/
+.github/skills/
+.github/copilot-instructions.md
+copilot-instructions.md
+*.instructions.md
+*.prompt.md
+*.agent.md
 
 # Agent artifacts
 .gitissue/

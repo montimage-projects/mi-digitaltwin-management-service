@@ -1,54 +1,216 @@
-# SAST scanning: https://docs.gitlab.com/user/application_security/sast/
 include:
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.4
+    inputs:
+      job_prefix: server
+      build_stage: build
+      security_stage: security
+      service_name: server
+      dockerfile_path: server/Dockerfile
+      build_context: server
+      rules_changes: [.gitlab/**/*, .gitlab-ci.yml, docker/**/*, k8s/**/*, package.json, package-lock.json, .dockerignore, server/**/*]
+      gitops_tag_path: server.image
+      fail_on_severity: CRITICAL,HIGH
+      cosign_required: $COSIGN_REQUIRED
+      attest_sbom: "true"
+      gitops_update_enabled: $GITOPS_UPDATE_ENABLED
+      gitops_update_stage: report
+      gitops_repo_url: $GITOPS_REPO_URL
+      gitops_repo_branch: main
+      gitops_environment: $DEPLOY_ENV
+      gitops_values_file: $GITOPS_VALUES_FILE
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.4
+    inputs:
+      job_prefix: client
+      build_stage: build
+      security_stage: security
+      service_name: client
+      dockerfile_path: client/Dockerfile
+      build_context: client
+      rules_changes: [.gitlab/**/*, .gitlab-ci.yml, docker/**/*, k8s/**/*, package.json, package-lock.json, .dockerignore, client/**/*]
+      gitops_tag_path: client.image
+      fail_on_severity: CRITICAL,HIGH
+      cosign_required: $COSIGN_REQUIRED
+      attest_sbom: "true"
+      gitops_update_enabled: $GITOPS_UPDATE_ENABLED
+      gitops_update_stage: report
+      gitops_repo_url: $GITOPS_REPO_URL
+      gitops_repo_branch: main
+      gitops_environment: $DEPLOY_ENV
+      gitops_values_file: $GITOPS_VALUES_FILE
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/defectdojo-upload@v1.2.4
+    inputs:
+      stage: report
+  - local: .gitlab/ci/secure-container-pipeline.yml
   - template: Security/SAST.gitlab-ci.yml
 
-image: node:20-alpine
+image: node:22.23.1-bookworm-slim
 
+# Improved cache strategy: split by dependency files for better hit rate
 cache:
-  key: $CI_COMMIT_REF_SLUG
+  key:
+    files:
+      - package-lock.json
+    prefix: ${CI_COMMIT_REF_SLUG}
   paths:
     - node_modules/
     - client/node_modules/
     - server/node_modules/
+    - ~/.npm
+  policy: pull-push
 
 workflow:
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "develop"
+    # Explicit overrides for both toggles
+    - if: '$GITOPS_UPDATE_MODE == "true" && $IMAGE_SIGNING_MODE == "true"'
+      variables:
+        COSIGN_REQUIRED: "true"
+        GITOPS_UPDATE_ENABLED: "true"
+    - if: '$GITOPS_UPDATE_MODE == "true" && $IMAGE_SIGNING_MODE == "false"'
+      variables:
+        COSIGN_REQUIRED: "false"
+        GITOPS_UPDATE_ENABLED: "true"
+    - if: '$GITOPS_UPDATE_MODE == "false" && $IMAGE_SIGNING_MODE == "true"'
+      variables:
+        COSIGN_REQUIRED: "true"
+        GITOPS_UPDATE_ENABLED: "false"
+    - if: '$GITOPS_UPDATE_MODE == "false" && $IMAGE_SIGNING_MODE == "false"'
+      variables:
+        COSIGN_REQUIRED: "false"
+        GITOPS_UPDATE_ENABLED: "false"
+
+    # Explicit GitOps mode + image auto behavior
+    - if: '$GITOPS_UPDATE_MODE == "true" && $IMAGE_SIGNING_MODE == "auto" && ($CI_COMMIT_TAG || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH)'
+      variables:
+        COSIGN_REQUIRED: "true"
+        GITOPS_UPDATE_ENABLED: "true"
+    - if: '$GITOPS_UPDATE_MODE == "true" && $IMAGE_SIGNING_MODE == "auto"'
+      variables:
+        COSIGN_REQUIRED: "false"
+        GITOPS_UPDATE_ENABLED: "true"
+    - if: '$GITOPS_UPDATE_MODE == "false" && $IMAGE_SIGNING_MODE == "auto" && ($CI_COMMIT_TAG || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH)'
+      variables:
+        COSIGN_REQUIRED: "true"
+        GITOPS_UPDATE_ENABLED: "false"
+    - if: '$GITOPS_UPDATE_MODE == "false" && $IMAGE_SIGNING_MODE == "auto"'
+      variables:
+        COSIGN_REQUIRED: "false"
+        GITOPS_UPDATE_ENABLED: "false"
+
+    # Explicit image mode + GitOps auto behavior
+    - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "true" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      variables:
+        COSIGN_REQUIRED: "true"
+        GITOPS_UPDATE_ENABLED: "true"
+    - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "true"'
+      variables:
+        COSIGN_REQUIRED: "true"
+        GITOPS_UPDATE_ENABLED: "false"
+    - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "false" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      variables:
+        COSIGN_REQUIRED: "false"
+        GITOPS_UPDATE_ENABLED: "true"
+    - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "false"'
+      variables:
+        COSIGN_REQUIRED: "false"
+        GITOPS_UPDATE_ENABLED: "false"
+
+    # Default behavior when both modes are auto
+    - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "auto" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      variables:
+        COSIGN_REQUIRED: "true"
+        GITOPS_UPDATE_ENABLED: "true"
+    - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "auto" && $CI_COMMIT_TAG'
+      variables:
+        COSIGN_REQUIRED: "true"
+        GITOPS_UPDATE_ENABLED: "false"
+    - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "auto"'
+      variables:
+        COSIGN_REQUIRED: "false"
+        GITOPS_UPDATE_ENABLED: "false"
+variables:
+  DEPLOY_ENV:
+    value: "dev"
+    description: "Deployment environment used by GitOps update jobs"
+    options:
+      - "dev"
+      - "staging"
+      - "prod"
+  IMAGE_SIGNING_MODE:
+    value: "auto"
+    description: "Image signing mode: auto keeps current branch/tag defaults"
+    options:
+      - "auto"
+      - "true"
+      - "false"
+  GITOPS_UPDATE_MODE:
+    value: "auto"
+    description: "GitOps update mode: auto uses branch defaults; true/false force update behavior"
+    options:
+      - "auto"
+      - "true"
+      - "false"
+  GITOPS_REPO_URL: https://secureflow.assist.ro/secassured/gitops.git
+  GITOPS_VALUES_FILE: gitops/environments/${DEPLOY_ENV}/secsim/values.yaml
+  DEFECTDOJO_ENABLED:
+    value: "false"
+    description: "Upload scan reports (SAST, secrets, dependency audit, container scans) to DefectDojo. A group/project CI/CD variable of the same name overrides this default."
+    options:
+      - "false"
+      - "true"
 
 stages:
   - quality
   - typecheck
   - test
-  - security
   - build
+  - security
+  - report
+
+.secsim_change_paths: &secsim_change_paths
+  - .gitlab/**/*
+  - .gitlab-ci.yml
+  - client/**/*
+  - server/**/*
+  - docker/**/*
+  - k8s/**/*
+  - package.json
+  - package-lock.json
+  - .dockerignore
+
+.secsim_rules: &secsim_rules
+  - if: "$CI_COMMIT_TAG"
+    changes: *secsim_change_paths
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    changes: *secsim_change_paths
+  - if: "$CI_COMMIT_BRANCH"
+    changes: *secsim_change_paths
 
 quality:
   stage: quality
   script:
-    - HUSKY=0 npm ci
+    - HUSKY=0 npm ci --prefer-offline --no-audit 2>/dev/null || npm ci
     - npm run format:check
     - npm run lint
   cache:
-    key: $CI_COMMIT_REF_SLUG
-    paths:
-      - node_modules/
     policy: pull-push
+  timeout: 10 minutes
+  rules: *secsim_rules
 
 typecheck:
   stage: typecheck
   script:
-    - HUSKY=0 npm ci
+    - HUSKY=0 npm ci --prefer-offline --no-audit 2>/dev/null || npm ci
     - npm run typecheck
   cache:
-    key: $CI_COMMIT_REF_SLUG
-    paths:
-      - node_modules/
     policy: pull-push
+  timeout: 10 minutes
+  rules: *secsim_rules
 
 test:
   stage: test
+  needs:
+    - quality
+    - typecheck
   services:
     - name: mongo:7
       alias: mongo
@@ -57,36 +219,261 @@ test:
     JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
     ENCRYPTION_KEY: ci-test-encryption-key-16chr
   script:
-    - HUSKY=0 npm ci
+    - HUSKY=0 npm ci --prefer-offline --no-audit 2>/dev/null || npm ci
     - npm run test:server
   cache:
-    key: $CI_COMMIT_REF_SLUG
-    paths:
-      - node_modules/
     policy: pull-push
+  timeout: 15 minutes
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  rules: *secsim_rules
 
-security:
+secret_scan:
+  stage: security
+  image:
+    name: zricethezav/gitleaks:v8.30.1
+    entrypoint: [""]
+  script:
+    - |
+      set -eu
+      mkdir -p reports
+
+      GITLEAKS_EXIT_CODE=0
+      GITLEAKS_SCOPE="full-history"
+      GITLEAKS_LOG_OPTS=""
+      if [ "${CI_PIPELINE_SOURCE:-}" = "merge_request_event" ] && [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
+        GITLEAKS_EXIT_CODE=1
+        GITLEAKS_SCOPE="mr-diff"
+        GITLEAKS_LOG_OPTS="--log-opts=${CI_MERGE_REQUEST_DIFF_BASE_SHA}..${CI_COMMIT_SHA}"
+      fi
+
+      BASELINE_ARGS=""
+      if [ -n "${GITLEAKS_BASELINE_PATH:-}" ] && [ -f "${GITLEAKS_BASELINE_PATH}" ]; then
+        BASELINE_ARGS="--baseline-path ${GITLEAKS_BASELINE_PATH}"
+      fi
+
+      gitleaks git . --platform gitlab ${GITLEAKS_LOG_OPTS} ${BASELINE_ARGS} \
+        --report-format json --report-path reports/gitleaks-report.json \
+        --exit-code "${GITLEAKS_EXIT_CODE}" --redact=100
+      [ -f reports/gitleaks-report.json ] || printf '[]\n' > reports/gitleaks-report.json
+
+      gitleaks git . --platform gitlab ${GITLEAKS_LOG_OPTS} ${BASELINE_ARGS} \
+        --report-format csv --report-path reports/gitleaks-report.csv \
+        --exit-code 0 --redact=100
+
+      if [ -f reports/gitleaks-report.csv ] && [ "$(wc -l < reports/gitleaks-report.csv)" -gt 1 ]; then
+        echo "Gitleaks (${GITLEAKS_SCOPE}) findings preview (rule,file,line,commit):"
+        sed -n '1,25p' reports/gitleaks-report.csv
+      else
+        echo "No gitleaks findings detected in scope: ${GITLEAKS_SCOPE}."
+      fi
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - reports/gitleaks-report.json
+      - reports/gitleaks-report.csv
+  rules:
+    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+
+secret_scan_full_history:
+  stage: security
+  image:
+    name: zricethezav/gitleaks:v8.30.1
+    entrypoint: [""]
+  script:
+    - |
+      set -eu
+      mkdir -p reports
+      gitleaks git . --platform gitlab --report-format json \
+        --report-path reports/gitleaks-full-report.json --exit-code 0 --redact=100
+      [ -f reports/gitleaks-full-report.json ] || printf '[]\n' > reports/gitleaks-full-report.json
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - reports/gitleaks-full-report.json
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+dependency_scan:
   stage: security
   script:
-    - HUSKY=0 npm ci
-    - npm audit --audit-level=high
-  allow_failure: true
-  cache:
-    key: $CI_COMMIT_REF_SLUG
-    paths:
-      - node_modules/
-    policy: pull-push
+    - |
+      set -eu
+      mkdir -p reports
+      apt-get update >/dev/null
+      apt-get install -y --no-install-recommends jq >/dev/null
+      rm -rf /var/lib/apt/lists/*
+      HUSKY=0 npm ci
+      npm audit --json > reports/npm-audit-report.json || true
 
-build:
-  stage: build
-  needs:
-    - quality
-    - typecheck
-  script:
-    - HUSKY=0 npm ci
-    - npm run build
-  cache:
-    key: $CI_COMMIT_REF_SLUG
+      AUDIT_TOTAL="$(jq '.metadata.vulnerabilities.total // 0' reports/npm-audit-report.json)"
+      AUDIT_HIGH="$(jq '.metadata.vulnerabilities.high // 0' reports/npm-audit-report.json)"
+      AUDIT_CRITICAL="$(jq '.metadata.vulnerabilities.critical // 0' reports/npm-audit-report.json)"
+
+      printf 'total=%s\nhigh=%s\ncritical=%s\n' "${AUDIT_TOTAL}" "${AUDIT_HIGH}" "${AUDIT_CRITICAL}" > reports/npm-audit-summary.env
+
+      if [ "${NPM_AUDIT_FAIL_ON_HIGH:-false}" = "true" ] && [ "${AUDIT_HIGH}" -gt 0 ]; then
+        echo "npm audit found HIGH severity vulnerabilities: ${AUDIT_HIGH}"
+        exit 14
+      fi
+  artifacts:
+    when: always
+    expire_in: 30 days
     paths:
-      - node_modules/
-    policy: pull-push
+      - reports/npm-audit-report.json
+      - reports/npm-audit-summary.env
+  rules:
+    - if: "$CI_COMMIT_TAG"
+      changes: *secsim_change_paths
+      variables:
+        NPM_AUDIT_FAIL_ON_HIGH: "true"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes: *secsim_change_paths
+      variables:
+        NPM_AUDIT_FAIL_ON_HIGH: "true"
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+      changes: *secsim_change_paths
+      variables:
+        NPM_AUDIT_FAIL_ON_HIGH: "true"
+    - if: "$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH"
+      changes: *secsim_change_paths
+      variables:
+        NPM_AUDIT_FAIL_ON_HIGH: "false"
+
+verify_image_signatures:
+  stage: security
+  image: alpine:3.20
+  needs:
+    - job: server-sign
+      artifacts: true
+      optional: true
+    - job: client-sign
+      artifacts: true
+      optional: true
+  script:
+    - |
+      set -eu
+      if [ "${COSIGN_REQUIRED:-false}" != "true" ]; then
+        echo "COSIGN_REQUIRED is not enabled for this ref; skipping signature enforcement."
+        exit 0
+      fi
+      if ! ls reports/*-cosign-status.env >/dev/null 2>&1; then
+        echo "Expected cosign status artifacts were not produced."
+        exit 16
+      fi
+      UNSIGNED_COUNT="$(awk -F= '$1=="status" && $2!="signed" {c++} END {print c+0}' reports/*-cosign-status.env)"
+      if [ "${UNSIGNED_COUNT}" -gt 0 ]; then
+        echo "Found ${UNSIGNED_COUNT} unsigned container images while signing is required."
+        exit 17
+      fi
+      echo "All scanned images are signed."
+  rules:
+    - if: "$CI_COMMIT_TAG"
+      changes: *secsim_change_paths
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+      changes: *secsim_change_paths
+
+security_findings_overview:
+  extends: .security-findings-overview
+  needs:
+    - job: dependency_scan
+      artifacts: true
+      optional: true
+    - job: secret_scan
+      artifacts: true
+      optional: true
+    - job: secret_scan_full_history
+      artifacts: true
+      optional: true
+    - job: server-scan
+      artifacts: true
+      optional: true
+    - job: client-scan
+      artifacts: true
+      optional: true
+    - job: server-sign
+      artifacts: true
+      optional: true
+    - job: client-sign
+      artifacts: true
+      optional: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: "$CI_COMMIT_TAG"
+      changes: *secsim_change_paths
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes: *secsim_change_paths
+    - if: "$CI_COMMIT_BRANCH"
+      changes: *secsim_change_paths
+
+defectdojo_upload_sast:
+  extends: .defectdojo-upload
+  needs:
+    - job: sast
+      artifacts: true
+      optional: true
+  variables:
+    DEFECTDOJO_REPORT_FILE: gl-sast-report.json
+    DEFECTDOJO_SCAN_TYPE: "GitLab SAST Report"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: "$CI_COMMIT_TAG"
+      changes: *secsim_change_paths
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes: *secsim_change_paths
+    - if: "$CI_COMMIT_BRANCH"
+      changes: *secsim_change_paths
+
+defectdojo_upload_secrets:
+  extends: .defectdojo-upload
+  needs:
+    - job: secret_scan
+      artifacts: true
+      optional: true
+  variables:
+    DEFECTDOJO_REPORT_FILE: reports/gitleaks-report.json
+    DEFECTDOJO_SCAN_TYPE: "Gitleaks Scan"
+  rules:
+    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+
+defectdojo_upload_dependencies:
+  extends: .defectdojo-upload
+  needs:
+    - job: dependency_scan
+      artifacts: true
+      optional: true
+  variables:
+    DEFECTDOJO_REPORT_FILE: reports/npm-audit-report.json
+    DEFECTDOJO_SCAN_TYPE: "NPM Audit v7+ Scan"
+  rules: *secsim_rules
+
+defectdojo_upload_server_image:
+  extends: .defectdojo-upload
+  needs:
+    - job: server-scan
+      artifacts: true
+      optional: true
+  variables:
+    DEFECTDOJO_REPORT_FILE: reports/server-trivy.json
+    DEFECTDOJO_SCAN_TYPE: "Trivy Scan"
+    DEFECTDOJO_TEST_TITLE: "$CI_PROJECT_PATH server image $CI_COMMIT_SHORT_SHA"
+
+defectdojo_upload_client_image:
+  extends: .defectdojo-upload
+  needs:
+    - job: client-scan
+      artifacts: true
+      optional: true
+  variables:
+    DEFECTDOJO_REPORT_FILE: reports/client-trivy.json
+    DEFECTDOJO_SCAN_TYPE: "Trivy Scan"
+    DEFECTDOJO_TEST_TITLE: "$CI_PROJECT_PATH client image $CI_COMMIT_SHORT_SHA"

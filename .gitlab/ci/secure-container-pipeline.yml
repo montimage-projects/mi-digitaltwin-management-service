@@ -1,0 +1,119 @@
+# Shared security reporting helpers for secsim.
+# Reused by the root .gitlab-ci.yml for post-scan aggregation only.
+
+variables:
+  SERVICE_ID: "$CI_PROJECT_NAME"
+  METRICS_PREFIX: "$CI_PROJECT_NAME"
+
+.security-findings-overview:
+  stage: report
+  image: alpine:3.20
+  script:
+    - |
+      set -eu
+      apk add --no-cache jq curl >/dev/null
+
+      AUDIT_COUNT=0
+      SECRET_COUNT=0
+      IMG_CRIT=0
+      IMG_HIGH=0
+      IMG_MEDIUM=0
+      SIGNED_IMAGES=0
+      SBOM_COUNT=0
+
+      if [ -f reports/npm-audit-report.json ]; then
+        AUDIT_COUNT="$(jq '.metadata.vulnerabilities.total // 0' reports/npm-audit-report.json)"
+      fi
+      if ls reports/gitleaks-*.json >/dev/null 2>&1; then
+        SECRET_COUNT="$(jq -s 'map(. // []) | add | length' reports/gitleaks-*.json)"
+      fi
+
+      if ls reports/*-trivy.json >/dev/null 2>&1; then
+        IMG_CRIT="$(jq -s '[.[].Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' reports/*-trivy.json)"
+        IMG_HIGH="$(jq -s '[.[].Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' reports/*-trivy.json)"
+        IMG_MEDIUM="$(jq -s '[.[].Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' reports/*-trivy.json)"
+      fi
+
+      SBOM_COUNT="$(find reports -maxdepth 1 -type f \( -name '*-sbom.cdx.json' -o -name '*-sbom.spdx.json' \) | wc -l | tr -d ' ')"
+      if ls reports/*-cosign-status.env >/dev/null 2>&1; then
+        SIGNED_IMAGES="$(awk -F= '$1=="status" && $2=="signed" {c++} END {print c+0}' reports/*-cosign-status.env)"
+      fi
+
+      METRICS_PREFIX_SAFE="$(printf '%s' "${METRICS_PREFIX:-secsim}" | tr -c 'A-Za-z0-9_' '_' )"
+
+      {
+        echo "# Security Findings Overview"
+        echo
+        echo "| Finding source | Count |"
+        echo "|---|---:|"
+        echo "| npm audit | ${AUDIT_COUNT} |"
+        echo "| Secret detection | ${SECRET_COUNT} |"
+        echo "| Container critical | ${IMG_CRIT} |"
+        echo "| Container high | ${IMG_HIGH} |"
+        echo "| Container medium | ${IMG_MEDIUM} |"
+        echo "| Generated SBOM files | ${SBOM_COUNT} |"
+        echo "| Signed images | ${SIGNED_IMAGES} |"
+        echo
+        echo "## SBOM Artifact Files"
+        if find reports -maxdepth 1 -type f \( -name '*-sbom.cdx.json' -o -name '*-sbom.spdx.json' \) | grep -q .; then
+          find reports -maxdepth 1 -type f \( -name '*-sbom.cdx.json' -o -name '*-sbom.spdx.json' \) | sort | sed 's#^#- #'
+        else
+          echo "_No SBOM files were produced in this pipeline run._"
+        fi
+        echo
+        echo "## Per-image summaries"
+        if ls reports/*-summary.md >/dev/null 2>&1; then
+          cat reports/*-summary.md
+        else
+          echo "_No container scan summaries were produced in this pipeline run._"
+        fi
+      } > security-findings-overview.md
+
+      jq -n \
+        --arg service "${SERVICE_ID:-$CI_PROJECT_NAME}" \
+        --arg pipeline_id "${CI_PIPELINE_ID:-unknown}" \
+        --arg ref "${CI_COMMIT_REF_NAME:-unknown}" \
+        --argjson audit "${AUDIT_COUNT}" \
+        --argjson secrets "${SECRET_COUNT}" \
+        --argjson crit "${IMG_CRIT}" \
+        --argjson high "${IMG_HIGH}" \
+        --argjson med "${IMG_MEDIUM}" \
+        --argjson sbom "${SBOM_COUNT}" \
+        --argjson signed "${SIGNED_IMAGES}" \
+        '{
+          service: $service,
+          pipeline_id: $pipeline_id,
+          ref: $ref,
+          findings: {
+            audit: $audit,
+            secret: $secrets,
+            container: {critical: $crit, high: $high, medium: $med}
+          },
+          supply_chain: {sbom_files: $sbom, signed_images: $signed}
+        }' > security-findings-overview.json
+
+      {
+        echo "${METRICS_PREFIX_SAFE}_audit_findings ${AUDIT_COUNT}"
+        echo "${METRICS_PREFIX_SAFE}_secret_findings ${SECRET_COUNT}"
+        echo "${METRICS_PREFIX_SAFE}_container_critical_findings ${IMG_CRIT}"
+        echo "${METRICS_PREFIX_SAFE}_container_high_findings ${IMG_HIGH}"
+        echo "${METRICS_PREFIX_SAFE}_container_medium_findings ${IMG_MEDIUM}"
+        echo "${METRICS_PREFIX_SAFE}_sbom_files ${SBOM_COUNT}"
+        echo "${METRICS_PREFIX_SAFE}_signed_images ${SIGNED_IMAGES}"
+      } > security-findings-overview.prom
+
+      if [ "${PUSH_METRICS_ENABLED:-false}" = "true" ] && [ -n "${PUSHGATEWAY_URL:-}" ]; then
+        curl -fsS --data-binary @security-findings-overview.prom \
+          "${PUSHGATEWAY_URL}/metrics/job/${METRICS_PREFIX_SAFE}-security/pipeline/${CI_PIPELINE_ID:-unknown}"
+      fi
+
+      cat security-findings-overview.md
+  artifacts:
+    expire_in: 30 days
+    when: always
+    paths:
+      - security-findings-overview.md
+      - security-findings-overview.json
+      - security-findings-overview.prom
+      - reports/*-sbom.cdx.json
+      - reports/*-sbom.spdx.json

@@ -33,7 +33,7 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
         role: user.role,
       },
       env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] }
     );
 
     res.json({
