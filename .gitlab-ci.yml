@@ -379,9 +379,14 @@ verify_image_signatures:
         echo "Expected cosign status artifacts were not produced."
         exit 16
       fi
-      UNSIGNED_COUNT="$(awk -F= '$1=="status" && $2!="signed" {c++} END {print c+0}' reports/*-cosign-status.env)"
+      # container-sign emits status=signed, status=signed-with-sbom (when
+      # attest_sbom is on, which it is for both images here) or status=dry-run.
+      # Accept only the two signed forms; anything else -- dry-run, unsigned,
+      # or a status a future component version introduces -- fails closed.
+      UNSIGNED_COUNT="$(awk -F= '$1=="status" && $2!="signed" && $2!="signed-with-sbom" {c++} END {print c+0}' reports/*-cosign-status.env)"
       if [ "${UNSIGNED_COUNT}" -gt 0 ]; then
         echo "Found ${UNSIGNED_COUNT} unsigned container images while signing is required."
+        grep -H '^status=' reports/*-cosign-status.env || true
         exit 17
       fi
       echo "All scanned images are signed."
