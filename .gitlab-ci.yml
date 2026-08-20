@@ -1,3 +1,7 @@
+# SAST scanning: https://docs.gitlab.com/user/application_security/sast/
+include:
+  - template: Security/SAST.gitlab-ci.yml
+
 image: node:20-alpine
 
 cache:
