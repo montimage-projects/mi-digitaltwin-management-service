@@ -8,8 +8,8 @@ build/
 dist/
 *.tsbuildinfo
 
-# Keep server/public (client build output for deployment)
-!server/public/
+# Client build output (Vite writes here; Docker/CI rebuild it on deploy)
+server/public/
 
 # Compiled TypeScript output
 /server/dist/
