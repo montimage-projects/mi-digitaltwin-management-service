@@ -51,6 +51,16 @@ Examples:
 - **TypeScript** — strict mode enabled; run `npm run typecheck` to verify
 - Follow existing patterns in the codebase
 
+### Lint Thresholds
+
+ESLint warnings are advisory everywhere — only errors block, both in the pre-commit hook (via lint-staged) and in CI.
+
+### Pre-Commit Hooks & Bypass Policy
+
+The `.husky/pre-commit` hook runs lint-staged (format + lint on staged files) and type checks; dependency auditing is owned exclusively by CI's security job, not by local hooks.
+
+Bypassing hooks with `git commit --no-verify` is permitted only for exceptional cases (e.g., committing WIP to a personal branch or working around a broken toolchain). Never bypass hooks on shared or release branches — CI remains the final quality gate regardless.
+
 ## Testing
 
 - Tests use **Vitest** in the server workspace
