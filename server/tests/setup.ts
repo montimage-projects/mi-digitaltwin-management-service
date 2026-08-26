@@ -9,5 +9,4 @@
  * wins over the CI-mirrored default.
  */
 process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
-process.env.JWT_SECRET =
-  process.env.JWT_SECRET ?? 'ci-test-jwt-secret-min-32-characters-long';
+process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'ci-test-jwt-secret-min-32-characters-long';
