@@ -9,10 +9,6 @@ echo "Running pre-commit checks..."
 echo "Checking staged files..."
 npx lint-staged --shell
 
-# Check for security vulnerabilities (warning only, doesn't block)
-echo "Checking for security vulnerabilities..."
-npm audit --audit-level=moderate 2>/dev/null || echo "Security scan: Some vulnerabilities found (review recommended)"
-
 # Type checking (test files excluded — tests run via vitest)
 echo "Running type checks..."
 ./node_modules/.bin/tsc --noEmit -p client/tsconfig.json || { echo "Client type check failed!"; exit 1; }
