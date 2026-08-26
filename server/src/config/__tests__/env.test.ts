@@ -24,6 +24,7 @@ describe('config/env', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    delete process.env.JWT_SECRET;
     errorSpy.mockRestore();
   });
 

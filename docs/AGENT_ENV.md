@@ -29,11 +29,11 @@ npm ci
 Example files exist at three levels: `.env.example` (root/deployment),
 `server/.env.example`, and `client/.env.example`.
 
-| Variable         | Required                                                                       | Default                              | Notes                                                                                  |
-| ---------------- | ------------------------------------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------- |
-| `JWT_SECRET`     | Yes — validation fails and the process exits if unset or shorter than 32 chars | none                                 | Enforced by Zod in `server/src/config/env.ts`. Generate with `openssl rand -base64 48` |
-| `ENCRYPTION_KEY` | No (currently defaulted)                                                       | `intact-default-encryption-key-2025` | Hard-coded fallback is a P1 security finding; override in any real deployment          |
-| `ADMIN_PASSWORD` | No (currently defaulted)                                                       | `intact2025`                         | Same P1 concern as above                                                               |
+| Variable         | Required                                                                     | Default                              | Notes                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------- |
+| `JWT_SECRET`     | Yes — validation throws and startup aborts if unset or shorter than 32 chars | none                                 | Enforced by Zod in `server/src/config/env.ts`. Generate with `openssl rand -base64 48` |
+| `ENCRYPTION_KEY` | No (currently defaulted)                                                     | `intact-default-encryption-key-2025` | Hard-coded fallback is a P1 security finding; override in any real deployment          |
+| `ADMIN_PASSWORD` | No (currently defaulted)                                                     | `intact2025`                         | Same P1 concern as above                                                               |
 
 Other variables (`PORT`, `MONGODB_URI`, `CORS_ORIGIN`, ...) have safe
 development defaults — see `server/src/config/env.ts` for the full schema.
@@ -55,17 +55,16 @@ Run from the repository root:
 | `npm run lint`      | ESLint for client and server                                    |
 | `npm run test`      | Runs the server test suite (`vitest`) via `npm run test:server` |
 
-## Known local-suite caveat
+## Server test suite
 
-Until Task 0.1 lands, the server test suite fails unless `JWT_SECRET` is
-exported in your shell: importing `server/src/config/env.ts` calls
-`process.exit(1)` when `JWT_SECRET` is missing or shorter than 32 characters,
-which kills every vitest worker at import time. Export it before running tests:
+`npm run test` works out of the box — no exported secrets needed. The vitest
+config (`server/vitest.config.ts`) loads `server/tests/setup.ts`, which
+injects the same CI-mirrored `JWT_SECRET` value used by
+`.github/workflows/ci.yml` whenever the variable is not already set in your
+shell (an explicit export still wins).
 
-```bash
-export JWT_SECRET="$(openssl rand -base64 48)"
-npm run test
-```
+Note: this applies to tests only. Running the server itself still requires a
+real `JWT_SECRET`.
 
 Additional note: server e2e tests connect to MongoDB at
 `mongodb://127.0.0.1:27017/...` by default (override with
@@ -77,7 +76,6 @@ than fail.
 ```bash
 git clone <repo-url> && cd mi-digitaltwin-management-service
 npm ci
-export JWT_SECRET="$(openssl rand -base64 48)"
 npm run build       # reach a built state
 npm run typecheck && npm run lint && npm run test
 ```
