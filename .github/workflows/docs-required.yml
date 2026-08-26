@@ -172,6 +172,9 @@ jobs:
     name: Add PR Comment with Documentation Links
     runs-on: ubuntu-latest
     if: github.event.action == 'opened'
+    permissions:
+      issues: write
+      pull-requests: write
 
     steps:
       - name: Checkout code
