@@ -59,7 +59,6 @@ data/
 # Development documents
 dev-docs/
 openspec/
-AGENTS.md
 note.md
 
 # IDE and agent configuration
