@@ -18,11 +18,11 @@ Serves milestone **ME** of `MODERNIZATION_PLAN.md` (task Pre.1).
 npm ci
 ```
 
-- Installs exactly what is pinned in `package-lock.json` across both workspaces.
-- Known caveat: a stale root `bun.lock` still exists from an earlier toolchain
-  experiment and can drift from `package-lock.json`. Always treat
-  `package-lock.json` as the source of truth until Task 0.2 removes the drift.
-  Ignore `bun.lock`; do not run `bun install`.
+- Installs exactly what is pinned in `package-lock.json` across both
+  workspaces.
+- Lockfiles are consolidated: `package-lock.json` (root/client/server) is the
+  single resolution source. `bun.lock` files are untracked and gitignored —
+  do not run `bun install` and never commit a `bun.lock`.
 
 ## Environment variables
 
