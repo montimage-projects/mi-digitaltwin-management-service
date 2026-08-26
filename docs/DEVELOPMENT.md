@@ -74,7 +74,7 @@ npm run dev
 
 - **Frontend:** http://localhost:5173
 - **Backend API:** http://localhost:3000
-- **Default Login:** admin / intact2025
+- **Admin Login:** `admin` + your `ADMIN_PASSWORD` from `.env` — no default; the server refuses to boot without it and seeding rejects known defaults (`intact2025`, `admin`, `password`)
 - **MongoDB:** localhost:27017 (via mongo client or Mongo Express)
 
 ## Development Workflow

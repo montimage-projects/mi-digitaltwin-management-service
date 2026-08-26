@@ -3,7 +3,7 @@
  * Checks required services and prints helpful information on server start
  */
 
-import { env } from '../config/env.js';
+import { DEFAULT_ADMIN_PASSWORDS, env } from '../config/env.js';
 import { APP_NAME } from '../config/branding.js';
 
 // ANSI color codes for terminal output
@@ -62,6 +62,33 @@ function validateEnvironment(): ValidationResult[] {
       name: 'JWT_SECRET',
       status: 'ok',
       message: `Configured (${env.JWT_SECRET.length} chars)`,
+    });
+  }
+
+  // Check ADMIN_PASSWORD
+  const adminPasswordIsDefault = (DEFAULT_ADMIN_PASSWORDS as readonly string[]).includes(
+    env.ADMIN_PASSWORD.toLowerCase()
+  );
+  const adminPasswordPatterns = [
+    'change-me',
+    'changeme',
+    'your-',
+    'example',
+    'placeholder',
+    'replace-with',
+  ];
+  if (adminPasswordIsDefault || isDefaultValue(env.ADMIN_PASSWORD, adminPasswordPatterns)) {
+    results.push({
+      name: 'ADMIN_PASSWORD',
+      status: env.NODE_ENV === 'production' ? 'error' : 'warning',
+      message: 'Using default/example ADMIN_PASSWORD',
+      fix: 'Set a strong, unique ADMIN_PASSWORD before seeding the admin user',
+    });
+  } else {
+    results.push({
+      name: 'ADMIN_PASSWORD',
+      status: 'ok',
+      message: `Configured (${env.ADMIN_PASSWORD.length} chars)`,
     });
   }
 
@@ -264,9 +291,10 @@ export async function runStartupChecks(): Promise<boolean> {
 ${colors.dim}Common fixes:
   1. Copy .env.example to .env: cp .env.example .env
   2. Start MongoDB: docker-compose up -d mongodb
-  3. Generate secrets:
-     - JWT_SECRET: openssl rand -base64 48
-     - ENCRYPTION_KEY: openssl rand -hex 16
+   3. Generate secrets:
+      - JWT_SECRET: openssl rand -base64 48
+      - ENCRYPTION_KEY: openssl rand -hex 16
+      - ADMIN_PASSWORD: choose a strong, unique password
   4. For MongoDB Atlas: Whitelist your IP in Network Access${colors.reset}
 `);
     return false;

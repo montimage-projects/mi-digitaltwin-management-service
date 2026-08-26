@@ -75,7 +75,9 @@ cp .env.example .env
 npm install && npm run dev
 ```
 
-Open `http://localhost:5173` — sign in with `admin` / `intact2025`.
+Open `http://localhost:5173` — sign in as `admin` with the `ADMIN_PASSWORD`
+you set in `server/.env` (the server refuses to boot without one, and known
+defaults like `intact2025` are refused by seeding).
 
 ### Unified Docker deployment
 

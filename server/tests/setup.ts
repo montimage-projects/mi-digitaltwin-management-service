@@ -10,3 +10,4 @@
  */
 process.env.NODE_ENV = process.env.NODE_ENV ?? 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'ci-test-jwt-secret-min-32-characters-long';
+process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'ci-test-admin-secret-9f2K7x';

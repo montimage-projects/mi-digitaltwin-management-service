@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+/**
+ * Passwords that must never be accepted for the seeded admin user.
+ * Compared case-insensitively against ADMIN_PASSWORD before seeding.
+ */
+export const DEFAULT_ADMIN_PASSWORDS = ['intact2025', 'admin', 'password'] as const;
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().default('3000').transform(Number),
@@ -12,7 +18,7 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('24h'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   ADMIN_USERNAME: z.string().default('admin'),
-  ADMIN_PASSWORD: z.string().default('intact2025'),
+  ADMIN_PASSWORD: z.string().min(8, 'ADMIN_PASSWORD must be at least 8 characters'),
   ENCRYPTION_KEY: z
     .string()
     .min(16, 'ENCRYPTION_KEY must be at least 16 characters')

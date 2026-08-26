@@ -119,6 +119,7 @@ jobs:
         run: npm run test:server
         env:
           JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
+          ADMIN_PASSWORD: ci-test-admin-secret-9f2K7x
 
   build:
     name: Build

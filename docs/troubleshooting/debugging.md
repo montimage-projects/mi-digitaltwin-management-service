@@ -172,7 +172,7 @@ db.services.find({ categoryId: ObjectId('...') }).explain()
 # Login
 curl -X POST http://localhost:3000/api/auth/login \
  -H "Content-Type: application/json" \
- -d '{"username":"admin","password":"intact2025"}'
+ -d '{"username":"admin","password":"'$ADMIN_PASSWORD'"}'
 
 # Get services (with auth)
 curl http://localhost:3000/api/services \
