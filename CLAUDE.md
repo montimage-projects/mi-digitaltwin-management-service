@@ -8,14 +8,14 @@ live in @docs/AGENT_ENV.md — read it before your first build or test run.
 
 Run from the repo root (npm workspaces only):
 
-| Task      | Command             | Notes                                          |
-| --------- | ------------------- | ---------------------------------------------- |
-| Install   | `npm ci`            | Never `bun install` — see Hard rules           |
-| Build     | `npm run build`     | Client bundle, then server typecheck           |
-| Test      | `npm test`          | Server vitest suite; export `JWT_SECRET` first |
-| Typecheck | `npm run typecheck` | `tsc --noEmit` for client and server           |
-| Lint      | `npm run lint`      | ESLint for both workspaces                     |
-| Dev       | `npm run dev`       | Server and client concurrently                 |
+| Task      | Command             | Notes                                           |
+| --------- | ------------------- | ----------------------------------------------- |
+| Install   | `npm ci`            | Never `bun install` — see Hard rules            |
+| Build     | `npm run build`     | Client bundle, then server typecheck            |
+| Test      | `npm test`          | Server vitest suite; no exported secrets needed |
+| Typecheck | `npm run typecheck` | `tsc --noEmit` for client and server            |
+| Lint      | `npm run lint`      | ESLint for both workspaces                      |
+| Dev       | `npm run dev`       | Server and client concurrently                  |
 
 ## Architecture
 
@@ -27,9 +27,10 @@ Run from the repo root (npm workspaces only):
 
 - IMPORTANT: use `npm ci` / npm workspace commands only. The root `bun.lock`
   is stale drift — `package-lock.json` is the sole source of truth.
-- YOU MUST run `export JWT_SECRET="$(openssl rand -base64 48)"` before
-  `npm test`: without it every vitest worker exits at import time because
-  `config/env.ts` calls `process.exit(1)` when the secret is missing or < 32 chars.
+- `npm test` needs no exported secrets: `server/tests/setup.ts` injects a
+  CI-mirrored `JWT_SECRET` for vitest only. Running the server itself still
+  requires exporting one, e.g.
+  `export JWT_SECRET="$(openssl rand -base64 48)"`.
 - Never commit `.env` files or secrets; use the `.env.example` templates.
 - Husky pre-commit runs lint-staged plus typechecks on both workspaces — fix
   the failure; never bypass hooks with `--no-verify`.
