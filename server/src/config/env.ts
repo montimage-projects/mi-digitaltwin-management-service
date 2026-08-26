@@ -33,7 +33,7 @@ const parseEnv = () => {
   if (!result.success) {
     console.error('Invalid environment variables:');
     console.error(result.error.format());
-    process.exit(1);
+    throw new Error('Environment validation failed — fix the variables above and restart');
   }
 
   return result.data;
