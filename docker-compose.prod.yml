@@ -36,6 +36,7 @@ services:
       - MONGODB_URI=mongodb://mongodb:27017/intact
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
       - MAESTRO_BASE_URL=${MAESTRO_BASE_URL:-https://maestro.intact-project.eu}
@@ -44,7 +45,10 @@ services:
       - ORG_NAME=${ORG_NAME:-}
       - ORG_URL=${ORG_URL:-}
       - SERVE_STATIC=true
-      - SEED_ON_STARTUP=${SEED_ON_STARTUP:-true}
+      # Opt-in: seeding refuses known-default ADMIN_PASSWORDs. Set a strong
+      # ADMIN_PASSWORD (required above), then override SEED_ON_STARTUP=true
+      # for the first boot.
+      - SEED_ON_STARTUP=${SEED_ON_STARTUP:-false}
     depends_on:
       mongodb:
         condition: service_healthy

@@ -19,12 +19,14 @@ describe('config/env', () => {
   beforeEach(() => {
     vi.resetModules();
     delete process.env.JWT_SECRET;
+    process.env.ADMIN_PASSWORD = 'ci-test-admin-secret-9f2K7x';
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
     delete process.env.JWT_SECRET;
+    delete process.env.ADMIN_PASSWORD;
     errorSpy.mockRestore();
   });
 
@@ -63,5 +65,47 @@ describe('config/env', () => {
       .map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg)))
       .join('\n');
     expect(logged).toContain('JWT_SECRET');
+  });
+
+  it('throws instead of exiting when ADMIN_PASSWORD is missing', async () => {
+    process.env.JWT_SECRET = 'ci-test-jwt-secret-min-32-characters-long';
+    delete process.env.ADMIN_PASSWORD;
+
+    await expect(loadEnvModule()).rejects.toThrow(/Environment validation failed/i);
+    expect(errorSpy).toHaveBeenCalled();
+    const logged = errorSpy.mock.calls
+      .flat()
+      .map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg)))
+      .join('\n');
+    expect(logged).toContain('ADMIN_PASSWORD');
+  });
+
+  it('throws when ADMIN_PASSWORD is shorter than 8 characters', async () => {
+    process.env.JWT_SECRET = 'ci-test-jwt-secret-min-32-characters-long';
+    process.env.ADMIN_PASSWORD = 'short';
+
+    await expect(loadEnvModule()).rejects.toThrow(/Environment validation failed/i);
+    const logged = errorSpy.mock.calls
+      .flat()
+      .map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg)))
+      .join('\n');
+    expect(logged).toContain('ADMIN_PASSWORD');
+  });
+
+  it('keeps a strong custom ADMIN_PASSWORD verbatim', async () => {
+    process.env.JWT_SECRET = 'ci-test-jwt-secret-min-32-characters-long';
+    process.env.ADMIN_PASSWORD = 'correct-horse-battery-staple';
+
+    const { env } = await loadEnvModule();
+
+    expect(env.ADMIN_PASSWORD).toBe('correct-horse-battery-staple');
+  });
+
+  it('exports the known-default admin password list', async () => {
+    process.env.JWT_SECRET = 'ci-test-jwt-secret-min-32-characters-long';
+
+    const { DEFAULT_ADMIN_PASSWORDS } = await loadEnvModule();
+
+    expect(DEFAULT_ADMIN_PASSWORDS).toEqual(['intact2025', 'admin', 'password']);
   });
 });

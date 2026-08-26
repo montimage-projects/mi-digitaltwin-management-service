@@ -26,7 +26,7 @@ Request:
 ```json
 {
   "username": "admin",
-  "password": "intact2025"
+  "password": "<ADMIN_PASSWORD>"
 }
 ```
 
@@ -84,7 +84,7 @@ Response:
 ```bash
 curl -X POST http://localhost:3000/api/auth/login \
  -H "Content-Type: application/json" \
- -d '{"username":"admin","password":"intact2025"}'
+ -d '{"username":"admin","password":"<ADMIN_PASSWORD>"}'
 ```
 
 #### Get Current User
@@ -678,7 +678,7 @@ API rate limits (planned, not yet implemented):
 # Login
 TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
  -H "Content-Type: application/json" \
- -d '{"username":"admin","password":"intact2025"}' | jq -r '.token')
+ -d '{"username":"admin","password":"<ADMIN_PASSWORD>"}' | jq -r '.token')
 
 # Use token
 curl -X GET http://localhost:3000/api/services \
@@ -699,7 +699,7 @@ Content-Type: application/json
 
 {
  "username": "admin",
- "password": "intact2025"
+ "password": "<ADMIN_PASSWORD>"
 }
 
 ### Get Services

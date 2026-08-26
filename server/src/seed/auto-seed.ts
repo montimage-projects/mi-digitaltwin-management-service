@@ -109,7 +109,9 @@ export async function autoSeedIfEmpty(): Promise<void> {
     console.info(
       `${colors.dim}       Users: ${stats.users}, Categories: ${stats.categories}, Sectors: ${stats.sectors}, Services: ${stats.services}, Partners: ${stats.partners}${colors.reset}`
     );
-    console.info(`${colors.cyan}[SEED]${colors.reset} Default login: admin / intact2025`);
+    console.info(
+      `${colors.cyan}[SEED]${colors.reset} Admin login comes from ADMIN_USERNAME / ADMIN_PASSWORD in the environment`
+    );
   } catch (error) {
     console.error(`${colors.yellow}[SEED]${colors.reset} Seeding failed:`, error);
     // Don't throw - allow server to start even if seeding fails

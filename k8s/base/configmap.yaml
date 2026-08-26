@@ -18,7 +18,10 @@ data:
   ORG_NAME: ''
   ORG_URL: ''
   SERVE_STATIC: 'true'
-  SEED_ON_STARTUP: 'true'
+  # Opt-in: seeding refuses known-default ADMIN_PASSWORDs. Set a strong
+  # ADMIN_PASSWORD in the Secret, then override this to 'true' (e.g. via a
+  # kustomize patch) for the first boot.
+  SEED_ON_STARTUP: 'false'
   # NOTE: server/docker-entrypoint.sh defaults DATA_DIR to /app/data, which
   # does not match the /app/server/data path the Dockerfile actually creates
   # and the Compose files actually mount (a pre-existing, latent mismatch in

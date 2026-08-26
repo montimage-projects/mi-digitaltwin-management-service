@@ -51,7 +51,7 @@ Access the application:
 
 - Frontend: http://localhost:5173
 - API: http://localhost:3000
-- Login: `admin` / `intact2025`
+- Login: `admin` + your `ADMIN_PASSWORD` (no default — known defaults are refused by seeding)
 
 ## Detailed Setup
 

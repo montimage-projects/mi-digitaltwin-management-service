@@ -29,11 +29,11 @@ npm ci
 Example files exist at three levels: `.env.example` (root/deployment),
 `server/.env.example`, and `client/.env.example`.
 
-| Variable         | Required                                                                     | Default                              | Notes                                                                                  |
-| ---------------- | ---------------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------- |
-| `JWT_SECRET`     | Yes — validation throws and startup aborts if unset or shorter than 32 chars | none                                 | Enforced by Zod in `server/src/config/env.ts`. Generate with `openssl rand -base64 48` |
-| `ENCRYPTION_KEY` | No (currently defaulted)                                                     | `intact-default-encryption-key-2025` | Hard-coded fallback is a P1 security finding; override in any real deployment          |
-| `ADMIN_PASSWORD` | No (currently defaulted)                                                     | `intact2025`                         | Same P1 concern as above                                                               |
+| Variable         | Required                                                                     | Default                              | Notes                                                                                                                          |
+| ---------------- | ---------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `JWT_SECRET`     | Yes — validation throws and startup aborts if unset or shorter than 32 chars | none                                 | Enforced by Zod in `server/src/config/env.ts`. Generate with `openssl rand -base64 48`                                         |
+| `ENCRYPTION_KEY` | No (currently defaulted)                                                     | `intact-default-encryption-key-2025` | Hard-coded fallback is a P1 security finding; override in any real deployment                                                  |
+| `ADMIN_PASSWORD` | Yes — validation throws and startup aborts if unset or shorter than 8 chars  | none                                 | Enforced by Zod in `server/src/config/env.ts`; known defaults (`intact2025`, `admin`, `password`) are refused by admin seeding |
 
 Other variables (`PORT`, `MONGODB_URI`, `CORS_ORIGIN`, ...) have safe
 development defaults — see `server/src/config/env.ts` for the full schema.
@@ -42,6 +42,7 @@ For local development you can simply export the required secret:
 
 ```bash
 export JWT_SECRET="$(openssl rand -base64 48)"
+export ADMIN_PASSWORD="<choose-a-strong-password>"
 ```
 
 ## Recorded commands

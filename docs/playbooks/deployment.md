@@ -115,7 +115,7 @@ The application will be available at `http://localhost:3000`.
 
 **Note:** Database seeding happens automatically on first startup. The seed includes:
 
-- Default admin user (admin / intact2025)
+- Admin user (`ADMIN_USERNAME` / `ADMIN_PASSWORD` from the environment — known defaults such as `intact2025` are refused by seeding)
 - Categories and NIS2 sectors
 - Sample services from INTACT Toolbox
 
@@ -308,10 +308,14 @@ MONGODB_URI=mongodb+srv://your-username:your-password@cluster0.xxxxx.mongodb.net
 JWT_SECRET=<generate-with-openssl-rand-base64-48>
 ENCRYPTION_KEY=<generate-with-openssl-rand-hex-16>
 
+# Required admin credential (server refuses to boot without it;
+# known defaults like intact2025 are refused by seeding)
+ADMIN_PASSWORD=<choose-a-strong-password>
+
 # Optional
 PORT=3000
 CORS_ORIGIN=https://your-domain.com
-SEED_ON_STARTUP=true
+SEED_ON_STARTUP=false
 ```
 
 ### Step 4: Deploy with Atlas

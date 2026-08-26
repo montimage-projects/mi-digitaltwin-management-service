@@ -58,12 +58,12 @@ services:
       - key: JWT_EXPIRES_IN
         value: '24h'
 
-      # Seeds are idempotent upserts, but the marker file cannot persist on a
-      # free instance, so this re-seeds on every cold start (~seconds against a
-      # warm Atlas, much longer against a paused one).
-      # Flip to false in the dashboard once the first deploy has seeded.
+      # Seeding is opt-in: it refuses known-default ADMIN_PASSWORDs and the
+      # marker file cannot persist on a free instance. Set a strong
+      # ADMIN_PASSWORD in the dashboard, flip this to true for one deploy,
+      # then back to false once seeded.
       - key: SEED_ON_STARTUP
-        value: 'true'
+        value: 'false'
 
       - key: BRANDING_PROFILE
         value: secassured

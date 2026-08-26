@@ -87,11 +87,12 @@ them once and keeps them stable across deploys. Never rotate `ENCRYPTION_KEY`
 after the fact: credentials already stored by the app become undecryptable.
 
 > **The admin credentials are frozen after the first seed.**
-> [`server/src/seed/admin.seed.ts:7`](../../server/src/seed/admin.seed.ts)
+> [`server/src/seed/admin.seed.ts`](../../server/src/seed/admin.seed.ts)
 > looks up the username and skips if it exists — it never updates the password.
 > Changing `ADMIN_PASSWORD` in Render later has no effect. Pick the final
-> values before the first deploy, and do not ship the `.env.example` defaults
-> (`admin` / `intact2025`) on a public URL. See
+> values before the first deploy: the server refuses to boot without
+> `ADMIN_PASSWORD`, and seeding rejects known defaults (`intact2025`,
+> `admin`, `password`). See
 > [Resetting the admin password](#resetting-the-admin-password) if you need to
 > recover.
 

@@ -67,7 +67,8 @@ USER nonroot
 ENV SERVE_STATIC=true
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV SEED_ON_STARTUP=true
+# Seeding is opt-in and refuses known-default ADMIN_PASSWORDs.
+ENV SEED_ON_STARTUP=false
 
 # Expose port
 EXPOSE 3000

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- Require `ADMIN_PASSWORD` at boot: removed the committed `intact2025`
+  default; validation aborts startup when it is unset or shorter than 8
+  characters (#36)
+- Refuse admin seeding when `ADMIN_PASSWORD` matches a known default
+  (`intact2025`, `admin`, `password`, case-insensitive) and flag
+  default/example values in startup checks (#36)
+- Stop defaulting `SEED_ON_STARTUP=true` in prod templates: Compose files now
+  require `ADMIN_PASSWORD` and default seeding off; Render blueprint, K8s
+  ConfigMap, and the unified image follow opt-in seeding (#36)
+
 ## [0.1.0] - 2026-07-07
 
 ### Added
