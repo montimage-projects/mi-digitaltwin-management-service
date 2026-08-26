@@ -9,6 +9,7 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 1. **[Development Guide](DEVELOPMENT.md)** - Set up your local environment (5 min read)
 2. **[Deployment Guide](DEPLOYMENT.md)** - Deploy to production (10 min read)
 3. **[API Reference](API.md)** - All REST endpoints with examples (reference)
+4. **[Agent Environment Notes](AGENT_ENV.md)** - Toolchain, install, env vars, and recorded commands for AI agents
 
 ## Documentation by Role
 
