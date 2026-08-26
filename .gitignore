@@ -60,7 +60,6 @@ data/
 dev-docs/
 openspec/
 AGENTS.md
-CLAUDE.md
 note.md
 
 # IDE and agent configuration
