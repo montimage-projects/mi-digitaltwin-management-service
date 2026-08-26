@@ -25,8 +25,9 @@ Run from the repo root (npm workspaces only):
 
 ## Hard rules
 
-- IMPORTANT: use `npm ci` / npm workspace commands only. The root `bun.lock`
-  is stale drift — `package-lock.json` is the sole source of truth.
+- IMPORTANT: use `npm ci` / npm workspace commands only. `package-lock.json`
+  is the sole dependency resolution source; `bun.lock` is untracked and
+  gitignored — never reintroduce it.
 - `npm test` needs no exported secrets: `server/tests/setup.ts` injects a
   CI-mirrored `JWT_SECRET` for vitest only. Running the server itself still
   requires exporting one, e.g.
