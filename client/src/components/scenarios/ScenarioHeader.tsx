@@ -1,9 +1,10 @@
 import { useCallback } from 'react';
-import { ArrowLeft, Pencil, Play, FileDown } from 'lucide-react';
+import { ArrowLeft, Pencil, Play, FileDown, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { exportScenarioToPdf } from '@/lib/pdf-export';
 import { toast } from 'sonner';
 import type { Scenario } from '@/lib/api';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ScenarioHeaderProps {
   scenario: Scenario;
@@ -63,14 +64,28 @@ export function ScenarioHeader({
           <Pencil className="mr-2 h-4 w-4" />
           Edit Details
         </Button>
-        <Button
-          disabled={!selectedInfrastructure}
-          onClick={onDeploy}
-          title="Deploy scenario to target infrastructure"
-        >
-          <Play className="mr-2 h-4 w-4" />
-          Deploy
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                disabled={!selectedInfrastructure}
+                onClick={onDeploy}
+                title="Deploy scenario to target infrastructure"
+              >
+                <Play className="mr-2 h-4 w-4" />
+                Deploy
+              </Button>
+            </TooltipTrigger>
+            {!selectedInfrastructure && (
+              <TooltipContent className="max-w-[250px]">
+                <p className="text-xs">
+                  <AlertCircle className="mr-1 inline h-3 w-3" />
+                  Select a target infrastructure before deploying a scenario.
+                </p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       </div>
     </div>
   );

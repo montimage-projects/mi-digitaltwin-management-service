@@ -28,10 +28,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, Edit, Trash2, Play, FileText } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, Play, FileText, AlertCircle } from 'lucide-react';
 import { Scenario, scenariosApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { ErrorState } from '@/components/ui/error-state';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ScenarioTableProps {
   scenarios: Scenario[];
@@ -167,19 +168,32 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
                       </span>
                       Edit Details
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/scenarios/${scenario._id}?deploy=true`);
-                      }}
-                      disabled={!scenario.infrastructureId}
-                      title="Deploy scenario to target infrastructure"
-                    >
-                      <span>
-                        <Play className="mr-2 h-4 w-4" />
-                      </span>
-                      Deploy
-                    </DropdownMenuItem>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/scenarios/${scenario._id}?deploy=true`);
+                            }}
+                            disabled={!scenario.infrastructureId}
+                          >
+                            <span>
+                              <Play className="mr-2 h-4 w-4" />
+                            </span>
+                            Deploy
+                          </DropdownMenuItem>
+                        </TooltipTrigger>
+                        {!scenario.infrastructureId && (
+                          <TooltipContent className="max-w-[250px]">
+                            <p className="text-xs">
+                              <AlertCircle className="mr-1 inline h-3 w-3" />
+                              Select a target infrastructure before deploying a scenario.
+                            </p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"

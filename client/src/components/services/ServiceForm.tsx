@@ -25,13 +25,14 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Globe, Terminal, Monitor, ChevronsUpDown, Search, Plus, X } from 'lucide-react';
+import { Globe, Terminal, Monitor, ChevronsUpDown, Search, Plus, X, Info } from 'lucide-react';
 import { useServiceForm } from '@/hooks/useServiceForm';
 import { StandardsEditor } from './StandardsEditor';
 import { VersionsEditor, type VersionItem } from './VersionsEditor';
 import { InteractsWithEditor } from './InteractsWithEditor';
 import { TrlSection, type TrlLevel } from './TrlSection';
 import { useServicePayload } from '@/hooks/useServicePayload';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const serviceFormSchema = z.object({
   shortName: z.string().min(1, 'Short name is required').max(50),
@@ -40,12 +41,18 @@ const serviceFormSchema = z.object({
   sectorId: z.string().optional(),
   provider: z.string().min(1, 'Provider is required').max(100),
   description: z.string().max(2000).optional(),
-  type: z.enum(['Software', 'Hardware', 'Software/Hardware']),
-  uiType: z.enum(['web', 'terminal', 'both']),
+  type: z.enum(['Software', 'Hardware', 'Software/Hardware'], {
+    errorMap: () => ({ message: 'Please select a valid service type' }),
+  }),
+  uiType: z.enum(['web', 'terminal', 'both'], {
+    errorMap: () => ({ message: 'Please select a valid user interface type' }),
+  }),
   trlCurrent: z.number().min(1).max(9).optional(),
   trlExpected: z.number().min(1).max(9).optional(),
   license: z.string().max(100).optional(),
-  repositoryTable: z.enum(['INTACT_TOOLBOX', 'OTHER_SERVICES']),
+  repositoryTable: z.enum(['INTACT_TOOLBOX', 'OTHER_SERVICES'], {
+    errorMap: () => ({ message: 'Please select a valid repository' }),
+  }),
   currentVersion: z.string().max(50).optional(),
 });
 
@@ -363,7 +370,26 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
         {repositoryTable === 'OTHER_SERVICES' && (
           <div className="space-y-2">
             <div>
-              <Label htmlFor="sectorId">NIS2 Sector</Label>
+              <Label htmlFor="sectorId" className="flex items-center gap-1">
+                NIS2 Sector
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[300px]">
+                      <p className="text-xs">
+                        <strong>NIS2 Directive</strong> — EU Directive on security of network and
+                        information systems.
+                        <br />
+                        <br />
+                        Defines critical infrastructure sectors (energy, transport, health, etc.)
+                        that must meet enhanced cybersecurity requirements.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </Label>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Critical infrastructure sector per NIS2 directive
               </p>
