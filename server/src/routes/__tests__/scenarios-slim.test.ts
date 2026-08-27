@@ -36,7 +36,7 @@ beforeAll(async () => {
     return;
   }
 
-  await Project.create({
+  const project = await Project.create({
     shortName: 'SLIM',
     title: 'Slim Test Project',
     sector: 'Telecommunications',
