@@ -1,7 +1,17 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useBlocker } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { scenariosApi, infrastructuresApi } from '@/lib/api';
 import { servicesApi } from '@/lib/services';
 import { MAX_LIST_LIMIT } from '@/lib/constants';
@@ -13,6 +23,7 @@ import { WorkspaceTabs } from '@/components/workspace/WorkspaceTabs';
 import { ExecutionPanel } from '@/components/execution/ExecutionPanel';
 import { ScenarioEditorGuidelinesModal } from '@/components/scenarios/ScenarioEditorGuidelinesModal';
 import { RightSidebar } from '@/components/scenarios/ScenarioRightSidebar';
+import { toast } from 'sonner';
 
 export function ScenarioDetail() {
   const { id } = useParams<{ id: string }>();
@@ -68,6 +79,23 @@ export function ScenarioDetail() {
   const [activeTab, setActiveTab] = useState('editor');
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
+  const [navConfirmOpen, setNavConfirmOpen] = useState(false);
+
+  // Block in-app navigation when there are unsaved changes.
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    // Only block when actually navigating away (different path or search).
+    const isNavigation =
+      currentLocation.pathname !== nextLocation.pathname ||
+      currentLocation.search !== nextLocation.search;
+    return topology.isDirty && isNavigation;
+  });
+
+  // When the blocker fires, show a confirmation dialog.
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      setNavConfirmOpen(true);
+    }
+  }, [blocker.state]);
 
   // Extract project ID early so useCallback can be called before early returns
   const scenarioProjectId =
@@ -78,6 +106,22 @@ export function ScenarioDetail() {
   const handleNavProject = useCallback(() => {
     navigate(scenarioProjectId ? `/projects/${scenarioProjectId}` : '/projects');
   }, [navigate, scenarioProjectId]);
+
+  // Warn the user before leaving the page if there are unsaved changes.
+  useEffect(() => {
+    if (!topology.isDirty) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    toast.info('You have unsaved changes. They will be lost if you leave this page.');
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [topology.isDirty]);
 
   useEffect(() => {
     const deployParam = searchParams.get('deploy');
@@ -189,6 +233,40 @@ export function ScenarioDetail() {
         </div>
       </div>
       <ScenarioEditorGuidelinesModal open={guidelinesOpen} onOpenChange={setGuidelinesOpen} />
+
+      {/* In-app navigation confirmation */}
+      {blocker.state === 'blocked' && (
+        <AlertDialog open={navConfirmOpen} onOpenChange={setNavConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+              <AlertDialogDescription>
+                You have unsaved changes. Are you sure you want to leave this page? Your changes
+                will be lost.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  blocker.reset();
+                  setNavConfirmOpen(false);
+                }}
+              >
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  blocker.proceed();
+                  setNavConfirmOpen(false);
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Leave anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
