@@ -1,0 +1,35 @@
+# Gitleaks configuration — baseline for the MI Digital Twin Management Platform.
+# Extends the default ruleset; adds project-specific exclusions.
+
+title = "gitleaks config for mi-digitaltwin-management-service"
+
+[extend]
+useDefault = true
+
+# Rules to explicitly enable (beyond the default set).
+[[rules]]
+id = "generic-secret"
+description = "Catch generic API keys and secrets"
+regex = '''(?i)(api[_-]?key|secret[_-]?key|password|token|credential)[\s]*[=:][\s]*['"]?[^'"]{8,}['"]?'''
+
+# Paths to exclude from scanning (false-positive reduction).
+[rules.exclude]
+paths = [
+  '''node_modules/''',
+  '''\.git/''',
+  '''coverage/''',
+  '''dist/''',
+  '''build/''',
+  '''\.gitleaks\.toml''',
+  '''secret\.yaml$''',
+  '''secret\.example\.yaml$''',
+  '''secret\.example\.yml$''',
+  '''k8s/components/mongodb/secret\.example\.yaml''',
+  '''k8s/base/secret\.example\.yaml''',
+]
+
+# Global exclusions.
+[[rules.exclude]]
+paths = [
+  '''(test|spec)''',
+]
