@@ -117,6 +117,16 @@
   object-fit: contain;
 }
 
+.login-logo-backdrop {
+  background: #fff;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.login-mobile-logo .login-logo-backdrop {
+  padding: 1px 4px;
+}
+
 @keyframes fadeSlideUp {
   from {
     opacity: 0;

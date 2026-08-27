@@ -1,5 +1,5 @@
 import { Shield, Network, Lock } from 'lucide-react';
-import { APP_NAME, LOGO_SRC, LOGO_ALT, LOGO_BACKDROP } from '@/lib/branding';
+import { APP_NAME, LOGO_SRC, LOGO_ALT } from '@/lib/branding';
 
 export function BrandPanel() {
   return (
@@ -12,16 +12,7 @@ export function BrandPanel() {
 
         {/* Logo */}
         <div className="login-logo-wrapper">
-          <img
-            src={LOGO_SRC}
-            alt={LOGO_ALT}
-            className="login-logo"
-            style={
-              LOGO_BACKDROP
-                ? { background: '#fff', borderRadius: 4, padding: '2px 6px' }
-                : undefined
-            }
-          />
+          <img src={LOGO_SRC} alt={LOGO_ALT} className="login-logo login-logo-backdrop" />
         </div>
 
         {/* Tagline */}

@@ -200,13 +200,15 @@ function TopologyCanvasInner({
   const handleNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChange>[0]) => {
       onNodesChange(changes);
-      // Defer the callback to avoid state update during render
-      setTimeout(() => {
+      // Notify parent after React Flow has processed changes internally.
+      // Using requestAnimationFrame avoids the race-condition risk of setTimeout
+      // while still deferring past the current render cycle.
+      requestAnimationFrame(() => {
         setNodes((nds) => {
           onNodesChangeProp(nds);
           return nds;
         });
-      }, 0);
+      });
     },
     [onNodesChange, setNodes, onNodesChangeProp]
   );
@@ -214,12 +216,12 @@ function TopologyCanvasInner({
   const handleEdgesChange = useCallback(
     (changes: Parameters<typeof onEdgesChange>[0]) => {
       onEdgesChange(changes);
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         setEdges((eds) => {
           onEdgesChangeProp(eds);
           return eds;
         });
-      }, 0);
+      });
     },
     [onEdgesChange, setEdges, onEdgesChangeProp]
   );

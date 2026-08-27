@@ -59,11 +59,7 @@ export function Login() {
             <img
               src={LOGO_SRC}
               alt={LOGO_ALT}
-              style={
-                LOGO_BACKDROP
-                  ? { background: '#fff', borderRadius: 4, padding: '2px 6px' }
-                  : undefined
-              }
+              className={LOGO_BACKDROP ? 'login-logo-backdrop' : ''}
             />
           </div>
 
