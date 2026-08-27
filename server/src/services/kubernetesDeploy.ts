@@ -6,6 +6,7 @@ import {
   type V1Deployment,
   type V1Service,
   type V1Namespace,
+  type V1Pod,
 } from '@kubernetes/client-node';
 import type { IInfrastructure } from '../models/Infrastructure.js';
 import { decrypt } from '../utils/encryption.js';
@@ -321,6 +322,9 @@ function serviceManifest(node: ResolvedNode, namespace: string): V1Service {
 /**
  * Deploy a scenario topology into a fresh per-execution namespace: create the
  * namespace, then one Deployment + one NodePort Service per topology node.
+ *
+ * Uses `Promise.all` for batch Deployment/Service creation. On mid-deploy
+ * failure, tears down already-created resources (best-effort) before re-throwing.
  */
 export async function deployTopology(
   clients: K8sClients,
@@ -332,40 +336,50 @@ export async function deployTopology(
   try {
     await clients.core.createNamespace({ body: namespaceManifest(opts.namespace) });
 
-    const services: DeployedServiceResult[] = [];
-    for (const node of resolved) {
-      await clients.apps.createNamespacedDeployment({
-        namespace: opts.namespace,
-        body: deploymentManifest(node, opts.namespace),
-      });
-      const created = await clients.core.createNamespacedService({
-        namespace: opts.namespace,
-        body: serviceManifest(node, opts.namespace),
-      });
+    // Batch create all Deployments + Services concurrently via Promise.all.
+    const results = await Promise.all(
+      resolved.map(async (node) => {
+        await clients.apps.createNamespacedDeployment({
+          namespace: opts.namespace,
+          body: deploymentManifest(node, opts.namespace),
+        });
+        const created = await clients.core.createNamespacedService({
+          namespace: opts.namespace,
+          body: serviceManifest(node, opts.namespace),
+        });
+        const nodePort = created.spec?.ports?.[0]?.nodePort;
+        return {
+          nodeId: node.nodeId,
+          serviceId: node.serviceId,
+          name: node.name,
+          uiType: node.uiType,
+          status: 'pending' as DeployStatus,
+          nodePort,
+          dashboardUrl: nodePort ? `http://${host}:${nodePort}` : undefined,
+        };
+      })
+    );
 
-      const nodePort = created.spec?.ports?.[0]?.nodePort;
-      services.push({
-        nodeId: node.nodeId,
-        serviceId: node.serviceId,
-        name: node.name,
-        uiType: node.uiType,
-        status: 'pending',
-        nodePort,
-        dashboardUrl: nodePort ? `http://${host}:${nodePort}` : undefined,
-      });
-    }
-
-    return { namespace: opts.namespace, services };
+    return { namespace: opts.namespace, services: results };
   } catch (err) {
+    // Best-effort teardown of resources already created.
+    void clients.core.deleteNamespace({ name: opts.namespace }).catch(() => undefined);
     throw toAppError(err, `deploying topology to namespace ${opts.namespace}`);
   }
 }
 
-/** Compute the coarse status of a single Deployment in a namespace. */
+/**
+ * Compute the coarse status of a single Deployment in a namespace.
+ *
+ * When `pods` is provided, uses the pre-fetched pod list (from a combined
+ * label-selector query) instead of issuing a per-service `listNamespacedPod`
+ * call, reducing API traffic from N calls to 1 per status poll tick.
+ */
 async function deploymentStatus(
   clients: K8sClients,
   namespace: string,
-  name: string
+  name: string,
+  pods?: Map<string, V1Pod[]>
 ): Promise<DeployStatus> {
   const deployment = await clients.apps.readNamespacedDeployment({ name, namespace });
   const desired = deployment.spec?.replicas ?? 1;
@@ -374,11 +388,18 @@ async function deploymentStatus(
     return 'running';
   }
 
-  const pods = await clients.core.listNamespacedPod({
-    namespace,
-    labelSelector: `app=${name}`,
-  });
-  for (const pod of pods.items ?? []) {
+  // Use pre-fetched pods if available; fall back to per-service listing.
+  const servicePods = pods?.get(name) ?? [];
+  const podList =
+    servicePods.length > 0
+      ? servicePods
+      : ((
+          await clients.core.listNamespacedPod({
+            namespace,
+            labelSelector: `app=${name}`,
+          })
+        ).items ?? []);
+  for (const pod of podList) {
     if (pod.status?.phase === 'Failed') {
       return 'failed';
     }
@@ -395,6 +416,10 @@ async function deploymentStatus(
 /**
  * Query the current per-service status of a deployed execution and compute an
  * overall progress percentage (share of services that are `running`).
+ *
+ * Uses a single `listNamespacedPod` call per tick with a combined label
+ * selector (`app in (...)`) instead of one call per service, replacing the
+ * prior serial-loop pattern (F-PERF-003, F-PERF-004).
  */
 export async function getDeploymentStatus(
   clients: K8sClients,
@@ -402,10 +427,32 @@ export async function getDeploymentStatus(
 ): Promise<{ statuses: { name: string; status: DeployStatus }[]; progress: number }> {
   try {
     const statuses: { name: string; status: DeployStatus }[] = [];
+
+    // Build a combined "app in (a,b,c)" selector so a single list call
+    // replaces the prior per-service serial loop.
+    const combinedSelector = `app in (${opts.names.join(',')})`;
+
+    // Fetch all pods for the requested services in one API call.
+    const allPods = await clients.core.listNamespacedPod({
+      namespace: opts.namespace,
+      labelSelector: combinedSelector,
+    });
+
+    // Index pods by their `app` label for quick lookup.
+    const podsByApp = new Map<string, typeof allPods.items>();
+    for (const pod of allPods.items ?? []) {
+      const appLabel = pod.metadata?.labels?.app ?? '';
+      if (!appLabel) continue;
+      const existing = podsByApp.get(appLabel) ?? [];
+      existing.push(pod);
+      podsByApp.set(appLabel, existing);
+    }
+
+    // Evaluate status for each requested service using the cached pods.
     for (const name of opts.names) {
       let status: DeployStatus;
       try {
-        status = await deploymentStatus(clients, opts.namespace, name);
+        status = await deploymentStatus(clients, opts.namespace, name, podsByApp);
       } catch (err) {
         // A not-yet-created / already-removed deployment reads as pending.
         if (err instanceof ApiException && err.code === 404) {
