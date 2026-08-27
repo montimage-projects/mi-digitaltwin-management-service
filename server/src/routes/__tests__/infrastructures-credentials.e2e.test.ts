@@ -34,19 +34,33 @@ const SECRET_FIELDS = ['iv', 'encrypted', 'authTag'] as const;
 
 const PLAINTEXT_CREDENTIALS = 'super-secret-bearer-token';
 
+type Ciphertext = { iv: string; encrypted: string; authTag: string };
+
 let mongoAvailable = true;
 let server: ReturnType<Express['listen']>;
 let baseUrl: string;
 let authHeader: Record<string, string>;
 let infraId: string;
-let storedCredentials: { iv: string; encrypted: string; authTag: string };
+
+/**
+ * Read the ciphertext currently stored for an infrastructure.
+ *
+ * Always read it fresh rather than caching one blob for the whole file: the
+ * update test rotates the credentials, so a cached value would make the raw
+ * scan below silently inert for every assertion after the rotation.
+ */
+async function storedCiphertextFor(id: string): Promise<Ciphertext> {
+  const doc = await Infrastructure.findById(id).lean();
+  expect(doc?.credentials).toBeTruthy();
+  return doc!.credentials as Ciphertext;
+}
 
 /**
  * Assert that a response body carries no credential material, at both the
  * structural level (no `credentials` subobject, no leaked secret field names)
  * and the raw level (none of the stored ciphertext values appear anywhere).
  */
-function expectNoCredentials(body: unknown, rawText: string): void {
+function expectNoCredentials(body: unknown, rawText: string, ciphertext: Ciphertext): void {
   const entries = Array.isArray(body) ? body : [body];
 
   for (const entry of entries) {
@@ -57,7 +71,7 @@ function expectNoCredentials(body: unknown, rawText: string): void {
     }
   }
 
-  for (const value of Object.values(storedCredentials)) {
+  for (const value of Object.values(ciphertext)) {
     expect(rawText).not.toContain(value);
   }
 }
@@ -81,11 +95,6 @@ beforeAll(async () => {
     status: 'inactive',
   });
   infraId = infrastructure._id.toString();
-  storedCredentials = {
-    iv: infrastructure.credentials.iv,
-    encrypted: infrastructure.credentials.encrypted,
-    authTag: infrastructure.credentials.authTag,
-  };
 
   const app = express();
   app.use(express.json());
@@ -123,7 +132,7 @@ describe('infrastructure routes never leak credential ciphertext (#38)', () => {
     const rawText = await res.text();
     const body = JSON.parse(rawText) as unknown[];
     expect(body.length).toBeGreaterThan(0);
-    expectNoCredentials(body, rawText);
+    expectNoCredentials(body, rawText, await storedCiphertextFor(infraId));
   });
 
   test('GET /api/infrastructures/:id returns no credentials', async () => {
@@ -135,7 +144,7 @@ describe('infrastructure routes never leak credential ciphertext (#38)', () => {
     const rawText = await res.text();
     const body = JSON.parse(rawText) as Record<string, unknown>;
     expect(body.name).toBeTruthy();
-    expectNoCredentials(body, rawText);
+    expectNoCredentials(body, rawText, await storedCiphertextFor(infraId));
   });
 
   test('PUT /api/infrastructures/:id returns no credentials and still persists them', async () => {
@@ -152,12 +161,16 @@ describe('infrastructure routes never leak credential ciphertext (#38)', () => {
     const rawText = await res.text();
     const body = JSON.parse(rawText) as Record<string, unknown>;
     expect(body.endpoint).toBe('https://10.0.0.3:6443');
-    expectNoCredentials(body, rawText);
 
-    // Projecting credentials out of the response must not stop them being written.
+    // Projecting credentials out of the response must not stop them being
+    // written — and the raw scan must use the ciphertext this request just
+    // stored, not the pre-rotation one.
     const stored = await Infrastructure.findById(infraId).lean();
     expect(stored?.credentials).toBeTruthy();
     expect(decrypt(stored!.credentials)).toBe(rotated);
+
+    expectNoCredentials(body, rawText, stored!.credentials as Ciphertext);
+    expect(rawText).not.toContain(rotated);
   });
 
   test('POST /api/infrastructures returns no credentials', async () => {
@@ -178,7 +191,7 @@ describe('infrastructure routes never leak credential ciphertext (#38)', () => {
     const rawText = await res.text();
     const body = JSON.parse(rawText) as Record<string, unknown>;
     expect(body._id).toBeTruthy();
-    expectNoCredentials(body, rawText);
+    expectNoCredentials(body, rawText, await storedCiphertextFor(body._id as string));
     expect(rawText).not.toContain('brand-new-token');
   });
 });
