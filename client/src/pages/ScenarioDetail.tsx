@@ -2,7 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { scenariosApi, servicesApi, infrastructuresApi } from '@/lib/api';
+import { scenariosApi, infrastructuresApi } from '@/lib/api';
+import { servicesApi } from '@/lib/services';
+import { MAX_LIST_LIMIT } from '@/lib/constants';
 import { useScenarioTopology } from '@/hooks/useScenarioTopology';
 import { useWorkspaceTabSync } from '@/hooks/useWorkspaceTabSync';
 import { ScenarioHeader } from '@/components/scenarios/ScenarioHeader';
@@ -30,7 +32,7 @@ export function ScenarioDetail() {
 
   const { data: servicesData } = useQuery({
     queryKey: ['services', 'all'],
-    queryFn: () => servicesApi.list({ limit: 1000 }),
+    queryFn: () => servicesApi.list({ limit: MAX_LIST_LIMIT }),
   });
   const services = servicesData?.services || [];
 

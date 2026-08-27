@@ -13,6 +13,7 @@ import {
   validateObjectIdParam,
 } from '../middleware/entityLoader.js';
 import { buildCaseInsensitiveFilter, buildSearchOrFilter } from '../utils/search.js';
+import { REPOSITORY_TABLES } from '../lib/constants.js';
 
 const router: RouterType = Router();
 
@@ -56,7 +57,9 @@ const createServiceSchema = z.object({
   outputs: z.array(inputOutputSchema).default([]),
   interactsWith: z.array(z.string().max(100)).default([]),
   potentialUseCases: z.array(z.string().max(500)).default([]),
-  repositoryTable: z.enum(['INTACT_TOOLBOX', 'OTHER_SERVICES']).default('INTACT_TOOLBOX'),
+  repositoryTable: z
+    .enum([REPOSITORY_TABLES.INTACT_TOOLBOX, REPOSITORY_TABLES.OTHER_SERVICES])
+    .default(REPOSITORY_TABLES.INTACT_TOOLBOX),
   currentVersion: z.string().max(50).optional(),
   versions: z
     .array(
@@ -79,7 +82,7 @@ const addVersionSchema = z.object({
 });
 
 const listServicesSchema = z.object({
-  table: z.enum(['INTACT_TOOLBOX', 'OTHER_SERVICES']).optional(),
+  table: z.enum([REPOSITORY_TABLES.INTACT_TOOLBOX, REPOSITORY_TABLES.OTHER_SERVICES]).optional(),
   category: z.string().optional(),
   sector: z.string().optional(),
   provider: z.string().optional(),
