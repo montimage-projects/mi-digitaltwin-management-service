@@ -26,7 +26,9 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    // Exempt login endpoint so 401 errors surface as toast in UI.
+    const isLogin = error.config?.url?.includes('/auth/login');
+    if (error.response?.status === 401 && !isLogin) {
       useAuthStore.getState().logout();
       window.location.href = '/login';
     }

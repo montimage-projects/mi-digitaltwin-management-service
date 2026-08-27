@@ -4,6 +4,7 @@ import { User } from '../models/User.js';
 import { env } from '../config/env.js';
 import { validate } from '../middleware/validation.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { loginRateLimiter } from '../middleware/rateLimiter.js';
 import { loginSchema } from '../validators/auth.validator.js';
 import { asyncHandler } from '../middleware/entityLoader.js';
 
@@ -12,6 +13,7 @@ const router: RouterType = Router();
 // POST /api/auth/login
 router.post(
   '/login',
+  loginRateLimiter,
   validate(loginSchema),
   asyncHandler(async (req, res) => {
     const { username, password } = req.body;
@@ -35,7 +37,7 @@ router.post(
         role: user.role,
       },
       env.JWT_SECRET,
-      { expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] }
+      { algorithm: 'HS256', expiresIn: env.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'] }
     );
 
     res.json({

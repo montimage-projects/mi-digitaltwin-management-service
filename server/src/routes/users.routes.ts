@@ -1,7 +1,7 @@
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { User } from '../models/User.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 import { asyncHandler, findByIdDoc, findByIdAndDelete } from '../middleware/entityLoader.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -79,16 +79,16 @@ router.post(
 // PUT /api/users/:id - Update a user (admin only)
 router.put(
   '/:id',
+  requireRole('admin'),
   validate(updateUserSchema),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { username, role } = req.body;
     const currentUserId = req.user?.userId;
-    const currentUserRole = req.user?.role;
 
-    // Only admins can update users
-    if (currentUserRole !== 'admin') {
-      throw new AppError('Admin access required', 403);
+    // Prevent self-update of role
+    if (id === currentUserId && role !== undefined && role !== 'admin') {
+      throw new Error('Cannot change your own role');
     }
 
     // Prevent self-update of role
@@ -125,19 +125,14 @@ router.put(
 // PUT /api/users/:id/password - Change user password (requires current password)
 router.put(
   '/:id/password',
+  requireRole('admin'),
   validate(changePasswordSchema),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { currentPassword, newPassword } = req.body;
     const currentUserId = req.user?.userId;
-    const currentUserRole = req.user?.role;
 
     const user = await findByIdDoc(User, id, undefined, { notFoundMessage: 'User not found' });
-
-    // Ownership validation: user can only change their own password, or admin can change any
-    if (id !== currentUserId && currentUserRole !== 'admin') {
-      throw new AppError("Access denied: cannot change another user's password", 403);
-    }
 
     // Admin reset: skip current password check for admin password reset
     if (id === currentUserId) {
@@ -164,16 +159,11 @@ router.put(
 // PATCH /api/users/:id/password - Reset user password (admin-only, no current password needed)
 router.patch(
   '/:id/password',
+  requireRole('admin'),
   validate(resetPasswordSchema),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { password } = req.body;
-    const currentUserRole = req.user?.role;
-
-    // Only admins can use PATCH reset
-    if (currentUserRole !== 'admin') {
-      throw new AppError('Admin access required', 403);
-    }
 
     const user = await findByIdDoc(User, id, undefined, { notFoundMessage: 'User not found' });
 
@@ -187,15 +177,10 @@ router.patch(
 // DELETE /api/users/:id - Delete a user (admin only, validates ownership)
 router.delete(
   '/:id',
+  requireRole('admin'),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     const currentUserId = req.user?.userId;
-    const currentUserRole = req.user?.role;
-
-    // Only admins can delete users
-    if (currentUserRole !== 'admin') {
-      throw new AppError('Admin access required', 403);
-    }
 
     // Prevent self-deletion
     if (id === currentUserId) {

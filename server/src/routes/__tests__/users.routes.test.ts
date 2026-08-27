@@ -447,7 +447,7 @@ describe('PUT /api/users/:id', () => {
 
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body).toHaveProperty('error', 'Admin access required');
+      expect(body).toHaveProperty('error', 'Insufficient permissions');
     } finally {
       server.close();
     }
@@ -643,7 +643,7 @@ describe('PUT /api/users/:id/password', () => {
 
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body).toHaveProperty('error', "Access denied: cannot change another user's password");
+      expect(body).toHaveProperty('error', 'Insufficient permissions');
     } finally {
       server.close();
     }
@@ -749,7 +749,7 @@ describe('PATCH /api/users/:id/password', () => {
 
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body).toHaveProperty('error', 'Admin access required');
+      expect(body).toHaveProperty('error', 'Insufficient permissions');
     } finally {
       server.close();
     }
@@ -856,7 +856,7 @@ describe('DELETE /api/users/:id', () => {
 
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body).toHaveProperty('error', 'Admin access required');
+      expect(body).toHaveProperty('error', 'Insufficient permissions');
     } finally {
       server.close();
     }
