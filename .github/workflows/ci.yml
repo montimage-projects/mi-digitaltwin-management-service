@@ -120,6 +120,7 @@ jobs:
         env:
           JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
           ADMIN_PASSWORD: ci-test-admin-secret-9f2K7x
+          ENCRYPTION_KEY: ci-test-encryption-key-16chr
 
   build:
     name: Build
