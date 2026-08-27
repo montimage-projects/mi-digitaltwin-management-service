@@ -227,7 +227,7 @@ async function testMongoDBConnection(): Promise<ValidationResult> {
 /**
  * Print startup banner
  */
-export function printBanner(): void {
+function printBanner(): void {
   console.info(`
 ${colors.cyan}╔══════════════════════════════════════════════════════════════╗
 ║                                                                ║
@@ -240,7 +240,7 @@ ${colors.cyan}╔═════════════════════
 /**
  * Print environment information
  */
-export function printEnvironmentInfo(): void {
+function printEnvironmentInfo(): void {
   log.header('Environment Configuration');
 
   const mongoDisplay = env.MONGODB_URI.includes('@')

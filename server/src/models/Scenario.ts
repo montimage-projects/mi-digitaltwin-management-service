@@ -28,7 +28,6 @@ export interface IExecution {
   namespace?: string;
   deployedServices: IDeployedService[];
   conclusion?: IConclusion;
-  maestroSessionId?: string;
 }
 
 export interface ITopology {
@@ -85,7 +84,6 @@ const executionSchema = new Schema<IExecution>(
     namespace: { type: String },
     deployedServices: [deployedServiceSchema],
     conclusion: conclusionSchema,
-    maestroSessionId: { type: String },
   },
   { _id: true }
 );

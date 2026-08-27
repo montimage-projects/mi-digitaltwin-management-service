@@ -19,7 +19,7 @@ import type {
  * `{ event, data }` pair. Returns null when the record carries no `data:`
  * field (e.g. a keep-alive comment). Pure and side-effect free.
  */
-export function parseSseEvent(raw: string): ParsedSseEvent | null {
+function parseSseEvent(raw: string): ParsedSseEvent | null {
   let event = 'message';
   const dataLines: string[] = [];
   for (const line of raw.split('\n')) {
