@@ -213,7 +213,7 @@ describe('POST /api/scenarios/:id/execute (Kubernetes deploy)', () => {
     expect(body.status).toBe('completed');
 
     expect(clusterCalls.deleteNamespace).toHaveBeenCalled();
-    const calls = clusterCalls.deleteNamespace.mock.calls as unknown as unknown[][];
+    const calls = clusterCalls.deleteNamespace.mock.calls as unknown[][];
     const call = calls[calls.length - 1][0] as { name: string };
     expect(call.name).toBe(namespace);
 

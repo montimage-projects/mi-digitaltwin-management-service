@@ -83,7 +83,7 @@ vi.mock('../../models/User.js', () => ({
             delete obj.passwordHash;
             return obj;
           },
-        } as unknown as import('../../models/User.js').IUser);
+        } as import('../../models/User.js').IUser);
       }
       return Promise.resolve(null);
     }),
@@ -104,7 +104,7 @@ vi.mock('../../models/User.js', () => ({
             delete obj.passwordHash;
             return obj;
           },
-        } as unknown as import('../../models/User.js').IUser);
+        } as import('../../models/User.js').IUser);
       }
       return Promise.resolve(null);
     }),
