@@ -1,5 +1,3 @@
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { Scenario, Execution } from './api';
 import { APP_NAME, ORG_NAME } from './branding';
 
@@ -14,9 +12,15 @@ interface ScenarioReportData {
   };
 }
 
-export function exportScenarioToPdf(data: ScenarioReportData) {
-  const { scenario, project } = data;
-  const doc = new jsPDF();
+export async function exportScenarioToPdf(_data: ScenarioReportData) {
+  // Lazy-load jspdf to keep it out of the initial ScenarioDetail chunk.
+  const { jsPDF } = await import('jspdf');
+  const autoTable = (await import('jspdf-autotable')).default;
+
+  const { scenario, project } = _data;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- jspdf runtime types
+  const doc = new jsPDF() as any;
 
   // Title
   doc.setFontSize(20);
