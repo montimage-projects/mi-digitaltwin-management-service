@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 
 import { env } from './config/env.js';
-import { connectDatabase, disconnectDatabase, isDatabaseConnected } from './config/database.js';
+import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { configureStaticServing } from './middleware/staticServe.js';
 import { runStartupChecks, printServerReady } from './utils/startup.js';
@@ -54,14 +54,9 @@ app.use(morgan(env.NODE_ENV === 'development' ? 'dev' : 'combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
+// Health check endpoint — public, minimal response (no env/DB disclosure).
 app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    database: isDatabaseConnected() ? 'connected' : 'disconnected',
-    environment: env.NODE_ENV,
-  });
+  res.json({ status: 'ok' });
 });
 
 // API Documentation (development only)
