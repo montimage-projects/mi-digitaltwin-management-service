@@ -43,6 +43,14 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/**/*.test.{ts,tsx}'],
+    languageOptions: {
+      parserOptions: {
+        project: null,
+      },
+    },
+  },
+  {
     ignores: ['node_modules/', 'dist/', '*.js', '!eslint.config.js', 'vite.config.ts'],
   }
 );
