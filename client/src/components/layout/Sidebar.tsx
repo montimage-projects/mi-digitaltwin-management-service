@@ -66,7 +66,9 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
       {/* Navigation */}
       <nav className={cn('flex-1 space-y-1 py-4', collapsed ? 'px-2' : 'px-3')}>
         {navigation.map((item) => {
-          const isActive = location.pathname === item.href;
+          // Prefix-based matching: /projects matches /projects, /projects/:id, /projects/add, etc.
+          const isActive =
+            location.pathname === item.href || location.pathname.startsWith(item.href + '/');
           return (
             <Link
               key={item.name}

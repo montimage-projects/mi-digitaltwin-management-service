@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { Breadcrumb } from './Breadcrumb';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 export function MainLayout() {
@@ -43,6 +44,7 @@ export function MainLayout() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onMenuClick={() => setMobileNavOpen(true)} />
         <main id="main-content" className="flex-1 overflow-auto bg-muted/30 p-6" tabIndex={-1}>
+          <Breadcrumb />
           <Outlet />
         </main>
       </div>
