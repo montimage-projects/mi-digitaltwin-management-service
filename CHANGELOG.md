@@ -26,11 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same stored credentials production does (#37)
 
 > **Upgrade note (#37).** Deployments that never set `ENCRYPTION_KEY` were
-> silently running on the removed built-in fallback. Before upgrading, set
-> `ENCRYPTION_KEY` to that previous fallback value — recover it from history
-> with `git show <pre-upgrade-ref>:server/src/config/env.ts` — so already
-> stored `Infrastructure.credentials` keep decrypting. Otherwise generate a
-> fresh key and re-enter those credentials. Never swap the key without a
+> silently running on the removed built-in fallback. That value can not be
+> reused as the running key: the placeholder check rejects it in every
+> `NODE_ENV`, by design, and startup aborts. To keep already stored
+> `Infrastructure.credentials`, recover the old value from history with
+> `git show <pre-upgrade-ref>:server/src/config/env.ts` and use it only in a
+> one-off offline re-encryption script that imports
+> `server/src/utils/encryption.ts` directly — the schema still accepts it
+> there, only the server's startup check refuses it — decrypting each stored
+> credential and re-encrypting it under a freshly generated key. Otherwise
+> generate a fresh key (`openssl rand -hex 16`) and re-enter every stored
+> infrastructure credential through the app. Never swap the key without a
 > re-entry plan: AES-256-GCM fails the auth-tag check and throws rather than
 > returning garbage.
 

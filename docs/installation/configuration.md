@@ -24,7 +24,7 @@ The application uses `.env` files for configuration:
 | Variable         | Description                                   | Example                              |
 | ---------------- | --------------------------------------------- | ------------------------------------ |
 | `JWT_SECRET`     | Secret for signing JWT tokens (min 32 chars)  | `your-super-secret-key-min-32-chars` |
-| `ENCRYPTION_KEY` | Key for encrypting credentials (min 16 chars) | `abcdef0123456789abcdef0123456789`   |
+| `ENCRYPTION_KEY` | Key for encrypting credentials (min 16 chars) | `change-me-strong-encryption-key`    |
 
 ### Optional Variables
 
@@ -45,7 +45,7 @@ MONGODB_URI=mongodb://localhost:27017/intact
 JWT_SECRET=your-super-secret-jwt-key-minimum-32-characters
 JWT_EXPIRES_IN=24h
 CORS_ORIGIN=http://localhost:5173
-ENCRYPTION_KEY=0123456789abcdef0123456789abcdef
+ENCRYPTION_KEY=change-me-strong-encryption-key
 NODE_ENV=development
 ```
 
