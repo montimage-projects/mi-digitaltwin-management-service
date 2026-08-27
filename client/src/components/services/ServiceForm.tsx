@@ -22,23 +22,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import {
-  X,
-  Plus,
-  Globe,
-  Terminal,
-  Monitor,
-  ChevronsUpDown,
-  Search,
-  HelpCircle,
-} from 'lucide-react';
+import { Globe, Terminal, Monitor, ChevronsUpDown, Search, Plus, X } from 'lucide-react';
 import { useServiceForm } from '@/hooks/useServiceForm';
 import { StandardsEditor } from './StandardsEditor';
 import { VersionsEditor, type VersionItem } from './VersionsEditor';
+import { InteractsWithEditor } from './InteractsWithEditor';
+import { TrlSection, type TrlLevel } from './TrlSection';
+import { useServicePayload } from '@/hooks/useServicePayload';
 
 const serviceFormSchema = z.object({
   shortName: z.string().min(1, 'Short name is required').max(50),
@@ -59,7 +51,7 @@ const serviceFormSchema = z.object({
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
 
 // Technology Readiness Levels (TRL) definitions
-const TRL_LEVELS = [
+export const TRL_LEVELS: TrlLevel[] = [
   {
     level: 1,
     name: 'Basic Principles',
@@ -119,6 +111,11 @@ interface ServiceFormProps {
 
 export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: ServiceFormProps) {
   const formState = useServiceForm({ service });
+  const { setOnSubmit, assemblePayload } = useServicePayload();
+
+  // Register the onSubmit callback with the payload hook
+  setOnSubmit(onSubmit);
+
   const [inputName, setInputName] = useState('');
   const [inputDesc, setInputDesc] = useState('');
   const [outputName, setOutputName] = useState('');
@@ -134,8 +131,6 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
     isProviderPopoverOpen,
     setIsProviderPopoverOpen,
     interactsWith,
-    interactsInput,
-    setInteractsInput,
     useCases,
     useCaseInput,
     setUseCaseInput,
@@ -146,7 +141,6 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
     removeTag,
     addInputOutput,
     removeInputOutput,
-    getLatestVersion,
   } = formState;
 
   const { data: categories = [] } = useQuery({
@@ -199,8 +193,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
   const repositoryTable = watch('repositoryTable');
 
   const handleFormSubmit = (data: ServiceFormValues) => {
-    const latestVersion = getLatestVersion();
-    const serviceData: CreateServiceData = {
+    assemblePayload({
       shortName: data.shortName,
       title: data.title,
       categoryId: data.categoryId,
@@ -209,21 +202,18 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
       description: data.description,
       type: data.type,
       uiType: data.uiType,
-      trl: {
-        current: data.trlCurrent,
-        expected: data.trlExpected,
-      },
+      trlCurrent: data.trlCurrent,
+      trlExpected: data.trlExpected,
       license: data.license,
       repositoryTable: data.repositoryTable,
-      currentVersion: latestVersion || data.currentVersion,
+      currentVersion: data.currentVersion,
       standards,
       inputs,
       outputs,
       interactsWith,
       potentialUseCases: useCases,
       versions,
-    };
-    onSubmit(serviceData);
+    });
   };
 
   const handleVersionsChange = (newVersions: VersionItem[]) => {
@@ -630,144 +620,20 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
       <VersionsEditor value={versions} onChange={handleVersionsChange} />
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <Label>TRL Current: {trlCurrent}</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
-                  <div className="p-3 border-b">
-                    <h4 className="font-semibold text-sm">Technology Readiness Levels (TRL)</h4>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      A measurement system to assess the maturity of a technology
-                    </p>
-                  </div>
-                  <ScrollArea className="h-72">
-                    <div className="p-2 space-y-1">
-                      {TRL_LEVELS.map((trl) => (
-                        <div
-                          key={trl.level}
-                          className={`flex gap-3 p-2 rounded-md ${
-                            trl.level === trlCurrent
-                              ? 'bg-primary/10 border border-primary/20'
-                              : 'hover:bg-accent'
-                          }`}
-                        >
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-sm font-bold text-primary">{trl.level}</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium">{trl.name}</div>
-                            <div className="text-xs text-muted-foreground">{trl.description}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Current Technology Readiness Level (1-9)
-            </p>
-          </div>
-          <Slider
-            value={[trlCurrent || 5]}
-            onValueChange={([value]) => setValue('trlCurrent', value)}
-            min={1}
-            max={9}
-            step={1}
-          />
-          {trlCurrent && TRL_LEVELS[trlCurrent - 1] && (
-            <div className="mt-2 p-2 rounded-md bg-muted/50">
-              <p className="text-xs font-medium text-foreground">
-                {TRL_LEVELS[trlCurrent - 1].name}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {TRL_LEVELS[trlCurrent - 1].description}
-              </p>
-            </div>
-          )}
-        </div>
-        <div className="space-y-2">
-          <div>
-            <div className="flex items-center gap-1.5">
-              <Label>TRL Expected: {trlExpected}</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
-                  <div className="p-3 border-b">
-                    <h4 className="font-semibold text-sm">Technology Readiness Levels (TRL)</h4>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      A measurement system to assess the maturity of a technology
-                    </p>
-                  </div>
-                  <ScrollArea className="h-72">
-                    <div className="p-2 space-y-1">
-                      {TRL_LEVELS.map((trl) => (
-                        <div
-                          key={trl.level}
-                          className={`flex gap-3 p-2 rounded-md ${
-                            trl.level === trlExpected
-                              ? 'bg-primary/10 border border-primary/20'
-                              : 'hover:bg-accent'
-                          }`}
-                        >
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-sm font-bold text-primary">{trl.level}</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium">{trl.name}</div>
-                            <div className="text-xs text-muted-foreground">{trl.description}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Target Technology Readiness Level by project end
-            </p>
-          </div>
-          <Slider
-            value={[trlExpected || 7]}
-            onValueChange={([value]) => setValue('trlExpected', value)}
-            min={1}
-            max={9}
-            step={1}
-          />
-          {trlExpected && TRL_LEVELS[trlExpected - 1] && (
-            <div className="mt-2 p-2 rounded-md bg-muted/50">
-              <p className="text-xs font-medium text-foreground">
-                {TRL_LEVELS[trlExpected - 1].name}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {TRL_LEVELS[trlExpected - 1].description}
-              </p>
-            </div>
-          )}
-        </div>
+        <TrlSection
+          label="TRL Current"
+          value={trlCurrent || 5}
+          description="Current Technology Readiness Level (1-9)"
+          levels={TRL_LEVELS}
+          onChange={(value) => setValue('trlCurrent', value)}
+        />
+        <TrlSection
+          label="TRL Expected"
+          value={trlExpected || 7}
+          description="Target Technology Readiness Level by project end"
+          levels={TRL_LEVELS}
+          onChange={(value) => setValue('trlExpected', value)}
+        />
       </div>
 
       {/* Standards Editor (extracted) */}
@@ -776,165 +642,20 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
         onChange={(newStandards) => formState.setStandards(newStandards)}
       />
 
-      {/* Interacts With */}
-      <div className="space-y-2">
-        <div>
-          <Label>Interacts With</Label>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Other services or tools this service integrates with
-          </p>
-        </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              className="w-full justify-between font-normal"
-            >
-              {interactsWith.length === 0
-                ? 'Select services...'
-                : `${interactsWith.length} service${interactsWith.length > 1 ? 's' : ''} selected`}
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[400px] p-0" align="start">
-            <div className="p-2 border-b">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search services..."
-                  value={interactsInput}
-                  onChange={(e) => setInteractsInput(e.target.value)}
-                  className="pl-8 h-9"
-                />
-              </div>
-            </div>
-            <ScrollArea className="h-72">
-              <div className="p-2">
-                {(() => {
-                  const availableServices = allServices.filter(
-                    (s) =>
-                      s._id !== service?._id &&
-                      (s.shortName.toLowerCase().includes(interactsInput.toLowerCase()) ||
-                        s.title.toLowerCase().includes(interactsInput.toLowerCase()))
-                  );
-
-                  const toolboxServices = availableServices.filter(
-                    (s) => s.repositoryTable === 'INTACT_TOOLBOX'
-                  );
-                  const infraServices = availableServices.filter(
-                    (s) => s.repositoryTable === 'OTHER_SERVICES'
-                  );
-
-                  if (availableServices.length === 0) {
-                    return (
-                      <div className="p-4 text-center text-sm text-muted-foreground">
-                        No services found
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <>
-                      {toolboxServices.length > 0 && (
-                        <div className="mb-3">
-                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Security Tools (Toolbox)
-                          </div>
-                          {toolboxServices.map((svc) => {
-                            const isSelected = interactsWith.includes(svc.shortName);
-                            return (
-                              <div
-                                key={svc._id}
-                                className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent cursor-pointer"
-                                onClick={() => {
-                                  if (isSelected) {
-                                    formState.removeInteractsWith(
-                                      interactsWith.indexOf(svc.shortName)
-                                    );
-                                  } else {
-                                    formState.addInteractsWith(svc.shortName);
-                                  }
-                                }}
-                              >
-                                <Checkbox checked={isSelected} />
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-sm font-medium">{svc.shortName}</div>
-                                  <div className="text-xs text-muted-foreground truncate">
-                                    {svc.title}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {infraServices.length > 0 && (
-                        <div className="mb-3">
-                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Critical Infrastructure Services
-                          </div>
-                          {infraServices.map((svc) => {
-                            const isSelected = interactsWith.includes(svc.shortName);
-                            return (
-                              <div
-                                key={svc._id}
-                                className="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-accent cursor-pointer"
-                                onClick={() => {
-                                  if (isSelected) {
-                                    formState.removeInteractsWith(
-                                      interactsWith.indexOf(svc.shortName)
-                                    );
-                                  } else {
-                                    formState.addInteractsWith(svc.shortName);
-                                  }
-                                }}
-                              >
-                                <Checkbox checked={isSelected} />
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-sm font-medium">{svc.shortName}</div>
-                                  <div className="text-xs text-muted-foreground truncate">
-                                    {svc.title}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            </ScrollArea>
-            {interactsWith.length > 0 && (
-              <div className="border-t p-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-muted-foreground"
-                  onClick={() => formState.setInteractsWith([])}
-                >
-                  Clear all
-                </Button>
-              </div>
-            )}
-          </PopoverContent>
-        </Popover>
-        {interactsWith.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {interactsWith.map((item, i) => (
-              <Badge key={i} variant="outline" className="gap-1">
-                {item}
-                <X
-                  className="h-3 w-3 cursor-pointer"
-                  onClick={() => formState.removeInteractsWith(i)}
-                />
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Interacts With (extracted) */}
+      <InteractsWithEditor
+        selected={interactsWith}
+        allServices={allServices.map((s) => ({
+          _id: s._id,
+          shortName: s.shortName,
+          title: s.title,
+          repositoryTable: s.repositoryTable,
+        }))}
+        editingServiceId={service?._id}
+        onAdd={(shortName) => formState.addInteractsWith(shortName)}
+        onRemove={(index) => formState.removeInteractsWith(index)}
+        onClear={() => formState.setInteractsWith([])}
+      />
 
       {/* Use Cases */}
       <div className="space-y-2">
