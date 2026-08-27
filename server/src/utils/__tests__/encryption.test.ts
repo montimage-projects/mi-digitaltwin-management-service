@@ -90,7 +90,11 @@ describe('decrypt', () => {
     const decrypted = encryption.decrypt(encrypted);
 
     expect(decrypted).toBe(plaintext);
-    expect(JSON.parse(decrypted)).toEqual({ name: 'Alice', roles: ['admin', 'editor'], active: true });
+    expect(JSON.parse(decrypted)).toEqual({
+      name: 'Alice',
+      roles: ['admin', 'editor'],
+      active: true,
+    });
   });
 
   it('throws on tampered authTag', () => {
