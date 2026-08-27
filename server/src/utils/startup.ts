@@ -100,6 +100,11 @@ export function validateEnvironment(): ValidationResult[] {
   // the check now aborts the boot, the patterns must be placeholder-specific:
   // bare words like 'default' or 'test' would reject legitimate CI and local
   // keys such as ci-test-encryption-key-16chr.
+  //
+  // Covers every literal placeholder shipped in this repo: the hyphenated
+  // change-me-strong-encryption-key in .env.example and server/.env.example,
+  // and the underscored CHANGE_ME_min_16_chars_use_openssl_rand_hex_16 in
+  // k8s/base/secret.example.yaml (isDefaultValue lowercases both sides).
   const encryptionDefaults = [
     'your-',
     'default-encryption-key',
@@ -107,6 +112,7 @@ export function validateEnvironment(): ValidationResult[] {
     'placeholder',
     'replace-with',
     'change-me',
+    'change_me',
     'changeme',
   ];
   if (isDefaultValue(env.ENCRYPTION_KEY, encryptionDefaults)) {

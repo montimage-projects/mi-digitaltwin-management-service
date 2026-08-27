@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -19,6 +22,39 @@ const CI_ENCRYPTION_KEY = 'ci-test-encryption-key-16chr';
 // Assembled at runtime so this file does not itself carry the fallback that
 // #37 removed: `grep -rn` over server/src must come back empty.
 const REMOVED_FALLBACK_KEY = ['intact', 'default', 'encryption', 'key', '2025'].join('-');
+
+/** Repository root, resolved from this file so the test is cwd-independent. */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+
+/**
+ * Every deployment template that ships a *literal* ENCRYPTION_KEY placeholder.
+ *
+ * docker-compose.prod.yml, docker-compose.atlas.yml and render.yaml are absent
+ * on purpose: they interpolate (`${ENCRYPTION_KEY:?...}`) or generate the value,
+ * so there is no committed literal that could boot the server.
+ */
+const PLACEHOLDER_TEMPLATES = [
+  '.env.example',
+  join('server', '.env.example'),
+  join('k8s', 'base', 'secret.example.yaml'),
+] as const;
+
+/**
+ * Read the ENCRYPTION_KEY placeholder out of a template, so this test can never
+ * drift from what the repository actually ships. Handles both the shell
+ * `KEY=value` form (.env.example) and the YAML `KEY: value` form (k8s Secret);
+ * commented-out lines never match because the name must start the line.
+ */
+const readTemplatePlaceholder = (relativePath: string): string | null => {
+  const lines = readFileSync(join(REPO_ROOT, relativePath), 'utf8').split('\n');
+  for (const line of lines) {
+    const match = /^\s*ENCRYPTION_KEY\s*[:=]\s*(\S.*)$/.exec(line);
+    if (!match) continue;
+    const value = match[1].trim().replace(/^["']|["']$/g, '');
+    if (value.length > 0) return value;
+  }
+  return null;
+};
 
 const loadStartupModule = async (): Promise<typeof import('../startup.js')> => {
   vi.resetModules();
@@ -84,21 +120,27 @@ describe('utils/startup ENCRYPTION_KEY check', () => {
     expect(result.status).toBe('ok');
   });
 
-  it('flags every documented .env.example placeholder', async () => {
-    const placeholders = [
-      'your-32-character-encryption-key',
-      'change-me-strong-encryption-key',
-      'replace-with-a-generated-key',
-      'example-encryption-key-value',
-      'placeholder-encryption-key',
-    ];
+  // Derived from the templates themselves rather than hard-coded: an operator
+  // who applies a shipped template verbatim must never boot (#37).
+  it('flags every ENCRYPTION_KEY placeholder shipped in a deployment template', async () => {
+    const discovered = PLACEHOLDER_TEMPLATES.map((template) => ({
+      template,
+      value: readTemplatePlaceholder(template),
+    })).filter((entry): entry is { template: string; value: string } => entry.value !== null);
 
-    for (const placeholder of placeholders) {
-      stubValidEnv('development', placeholder);
+    // Fail loudly if parsing silently found nothing, instead of vacuously
+    // passing over an empty list.
+    expect(
+      discovered.map((entry) => entry.template),
+      'every deployment template must yield a parsable ENCRYPTION_KEY placeholder'
+    ).toEqual([...PLACEHOLDER_TEMPLATES]);
+
+    for (const { template, value } of discovered) {
+      stubValidEnv('development', value);
 
       const result = await encryptionKeyCheck();
 
-      expect(result.status, `${placeholder} must be rejected`).toBe('error');
+      expect(result.status, `${template} ships "${value}", which must be rejected`).toBe('error');
     }
   });
 });
