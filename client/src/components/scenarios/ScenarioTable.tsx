@@ -212,7 +212,6 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
               </TableCell>
             </TableRow>
           ))}
-          ```{' '}
         </TableBody>
       </Table>
 
