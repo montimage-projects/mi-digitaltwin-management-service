@@ -23,7 +23,9 @@ import { Infrastructure } from '@/lib/api';
 
 const infrastructureSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
-  type: z.enum(['kubernetes', 'docker', 'virtual']),
+  type: z.enum(['kubernetes', 'docker', 'virtual'], {
+    errorMap: () => ({ message: 'Please select a valid infrastructure type' }),
+  }),
   endpoint: z.string().min(1, 'Endpoint is required').url('Must be a valid URL'),
   credentials: z.string().min(1, 'Credentials are required'),
   capacity: z
