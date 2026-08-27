@@ -51,6 +51,8 @@ const conclusionSchema = z.object({
 });
 
 // GET /api/projects/:projectId/scenarios - List scenarios for a project
+// Excludes heavy fields (topology, executions) from list responses.
+// Use GET /api/scenarios/:id for the full detail payload.
 router.get(
   '/projects/:projectId/scenarios',
   authMiddleware,
@@ -65,22 +67,22 @@ router.get(
       .sort({ updatedAt: -1 })
       .lean();
 
-    // Add latest execution status to each scenario
-    const scenariosWithStatus = scenarios.map((scenario) => {
-      const latestExecution = scenario.executions[scenario.executions.length - 1];
-      return {
-        ...scenario,
-        latestExecution: latestExecution
-          ? {
-              status: latestExecution.status,
-              executedAt: latestExecution.executedAt,
-              executedBy: latestExecution.executedBy,
-            }
-          : null,
-      };
+    // Slim response: exclude topology and executions arrays.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const slimScenarios = (scenarios as any[]).map((scenario) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { topology, executions, ...rest } = scenario;
+      const latestExecution = scenario.executions?.length
+        ? {
+            status: scenario.executions[scenario.executions.length - 1].status,
+            executedAt: scenario.executions[scenario.executions.length - 1].executedAt,
+            executedBy: scenario.executions[scenario.executions.length - 1].executedBy,
+          }
+        : null;
+      return { ...rest, latestExecution };
     });
 
-    res.json(scenariosWithStatus);
+    res.json(slimScenarios);
   })
 );
 
