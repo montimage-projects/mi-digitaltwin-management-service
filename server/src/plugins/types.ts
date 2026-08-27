@@ -22,8 +22,10 @@ export type PluginRegisterHook = () => Promise<void>;
  * Called after the database connection is established and routes are
  * mounted. This is the right place for async initialisation (e.g.
  * seeding data, warming caches).
+ *
+ * The optional AbortSignal allows the loader to cancel a slow start.
  */
-export type PluginStartHook = () => Promise<void>;
+export type PluginStartHook = (signal?: AbortSignal) => Promise<void>;
 
 /**
  * Called during graceful shutdown. Clean up connections, timers,

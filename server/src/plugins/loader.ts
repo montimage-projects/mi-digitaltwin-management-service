@@ -205,9 +205,9 @@ export class PluginLoader {
 
           try {
             await Promise.race([
-              instance.plugin.start(),
+              instance.plugin.start(controller.signal),
               new Promise((_, reject) =>
-                setTimeout(() =>
+                controller.signal.addEventListener('abort', () =>
                   reject(
                     new Error(`Plugin "${id}" start timed out after ${this.config.startTimeout}ms`)
                   )
