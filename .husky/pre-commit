@@ -7,7 +7,7 @@ echo "Running pre-commit checks..."
 
 # Run lint-staged for staged files (format + lint)
 echo "Checking staged files..."
-npx lint-staged --shell
+npx lint-staged
 
 # Type checking (test files excluded — tests run via vitest)
 echo "Running type checks..."
