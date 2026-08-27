@@ -140,8 +140,14 @@ export class PluginLoader {
     // Validate dependencies before loading
     this.validateDependencies(plugins);
 
-    // Register phase
-    for (const plugin of plugins) {
+    // Resolve topological order so dependencies register first
+    const ordered = topologicalSort(new Map(plugins.map((p) => [p.metadata.id, p])));
+
+    // Register phase (in dependency order)
+    for (const id of ordered) {
+      const plugin = plugins.find((p) => p.metadata.id === id);
+      if (!plugin) continue;
+
       try {
         const instance: PluginInstance = {
           plugin,
@@ -194,16 +200,23 @@ export class PluginLoader {
 
       try {
         if (instance.plugin.start) {
-          await Promise.race([
-            instance.plugin.start(),
-            new Promise((_, reject) =>
-              setTimeout(() =>
-                reject(
-                  new Error(`Plugin "${id}" start timed out after ${this.config.startTimeout}ms`)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), this.config.startTimeout);
+
+          try {
+            await Promise.race([
+              instance.plugin.start(),
+              new Promise((_, reject) =>
+                setTimeout(() =>
+                  reject(
+                    new Error(`Plugin "${id}" start timed out after ${this.config.startTimeout}ms`)
+                  )
                 )
-              )
-            ),
-          ]);
+              ),
+            ]);
+          } finally {
+            clearTimeout(timeoutId);
+          }
         }
         instance.state = PluginState.STARTED;
       } catch (error) {
@@ -236,9 +249,12 @@ export class PluginLoader {
    * Stop all started plugins in reverse dependency order.
    */
   async stop(): Promise<void> {
-    const ids = [...this.instances.keys()];
-    for (let i = ids.length - 1; i >= 0; i--) {
-      const instance = this.instances.get(ids[i]);
+    const sorted = topologicalSort(
+      new Map([...this.instances.entries()].map(([id, inst]) => [id, inst.plugin]))
+    );
+    const ids = [...sorted].reverse();
+    for (const id of ids) {
+      const instance = this.instances.get(id);
       if (!instance || instance.state !== PluginState.STARTED) continue;
 
       try {
@@ -322,7 +338,8 @@ export class PluginLoader {
       metadata !== null &&
       typeof metadata.id === 'string' &&
       typeof metadata.name === 'string' &&
-      typeof metadata.version === 'string'
+      typeof metadata.version === 'string' &&
+      typeof metadata.description === 'string'
     );
   }
 
