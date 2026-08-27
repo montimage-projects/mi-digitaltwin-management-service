@@ -7,7 +7,7 @@ variables:
 
 .security-findings-overview:
   stage: report
-  image: alpine:3.20
+  image: alpine:3.24
   script:
     - |
       set -eu

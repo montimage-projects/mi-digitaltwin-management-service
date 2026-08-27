@@ -377,7 +377,7 @@ dependency_scan:
 
 verify_image_signatures:
   stage: security
-  image: alpine:3.20
+  image: alpine:3.24
   needs:
     - job: server-sign
       artifacts: true
