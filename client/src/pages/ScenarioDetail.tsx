@@ -67,6 +67,16 @@ export function ScenarioDetail() {
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
 
+  // Extract project ID early so useCallback can be called before early returns
+  const scenarioProjectId =
+    scenario?.projectId && typeof scenario.projectId === 'object'
+      ? (scenario.projectId as { _id?: string })._id
+      : undefined;
+
+  const handleNavProject = useCallback(() => {
+    navigate(scenarioProjectId ? `/projects/${scenarioProjectId}` : '/projects');
+  }, [navigate, scenarioProjectId]);
+
   useEffect(() => {
     const deployParam = searchParams.get('deploy');
     const executeParam = searchParams.get('execute');
@@ -107,14 +117,6 @@ export function ScenarioDetail() {
     selectedInfrastructure && typeof selectedInfrastructure === 'string'
       ? infrastructuresData.find((i) => i._id === selectedInfrastructure)?.name
       : (infrastructure as { name?: string } | null)?.name;
-
-  const handleNavProject = useCallback(() => {
-    const projectId =
-      scenario.projectId && typeof scenario.projectId === 'object'
-        ? (scenario.projectId as { _id?: string })._id
-        : undefined;
-    navigate(projectId ? `/projects/${projectId}` : '/projects');
-  }, [navigate, scenario.projectId]);
 
   return (
     <div className="space-y-4 h-full">
