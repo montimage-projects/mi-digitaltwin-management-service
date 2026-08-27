@@ -31,6 +31,7 @@ describe('config/env', () => {
   beforeEach(() => {
     vi.resetModules();
     delete process.env.JWT_SECRET;
+    delete process.env.MONGODB_URI; // clear in-memory server URI set by global-setup
     process.env.ADMIN_PASSWORD = 'ci-test-admin-secret-9f2K7x';
     process.env.ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

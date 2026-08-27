@@ -26,8 +26,7 @@ const { errorHandler } = await import('../../middleware/errorHandler.js');
 const infrastructuresRoutes = (await import('../infrastructures.routes.js')).default;
 
 const TEST_DB_NAME = `secsim_infra_creds_e2e_${Date.now()}`;
-const TEST_MONGODB_URI =
-  process.env.SEED_TEST_MONGODB_URI ?? `mongodb://127.0.0.1:27017/${TEST_DB_NAME}`;
+const TEST_MONGODB_URI = `${process.env.SEED_TEST_MONGODB_URI ?? process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017'}/${TEST_DB_NAME}`;
 
 /** Every field name that must never appear in an API response. */
 const SECRET_FIELDS = ['iv', 'encrypted', 'authTag'] as const;
