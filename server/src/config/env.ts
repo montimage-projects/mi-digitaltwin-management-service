@@ -19,10 +19,7 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   ADMIN_USERNAME: z.string().default('admin'),
   ADMIN_PASSWORD: z.string().min(8, 'ADMIN_PASSWORD must be at least 8 characters'),
-  ENCRYPTION_KEY: z
-    .string()
-    .min(16, 'ENCRYPTION_KEY must be at least 16 characters')
-    .default('intact-default-encryption-key-2025'),
+  ENCRYPTION_KEY: z.string().min(16, 'ENCRYPTION_KEY must be at least 16 characters'),
   MAESTRO_BASE_URL: z.string().url().default('https://maestro.intact-project.eu'),
   BRANDING_PROFILE: z.preprocess(
     (v) => (v === '' ? undefined : v),

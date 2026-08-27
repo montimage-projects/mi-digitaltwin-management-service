@@ -263,7 +263,10 @@ docker compose -f docker-compose.prod.yml exec app npx tsx src/seed/index.ts
 ## Security Recommendations
 
 1. **Use HTTPS**: Use a reverse proxy (nginx, Caddy) for SSL termination
-2. **Rotate Secrets**: Change JWT_SECRET and ENCRYPTION_KEY periodically
+2. **Rotate Secrets**: Rotate `JWT_SECRET` freely — it only invalidates live
+   sessions. Do **not** rotate `ENCRYPTION_KEY` on a schedule: credentials
+   already stored by the app become undecryptable. Change it only alongside a
+   plan to re-enter every stored infrastructure credential
 3. **Enable Auth**: Enable MongoDB authentication in production
 4. **Firewall**: Restrict access to MongoDB port (27017)
 5. **Updates**: Keep Docker images updated for security patches
