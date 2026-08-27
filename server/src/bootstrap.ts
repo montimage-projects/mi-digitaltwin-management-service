@@ -12,7 +12,7 @@ const DATA_DIR = process.env.DATA_DIR ?? `${process.cwd()}/data`;
 const SEED_MARKER = `${DATA_DIR}/.seeded`;
 const MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://localhost:27017/intact';
 
-const ensureDataDir = async (): Promise<void> => {
+export const ensureDataDir = async (): Promise<void> => {
   try {
     await mkdir(DATA_DIR, { recursive: true });
   } catch (error) {
@@ -48,7 +48,7 @@ const runSeedScript = async (): Promise<boolean> => {
   });
 };
 
-const runSeedIfNeeded = async (): Promise<void> => {
+export const runSeedIfNeeded = async (): Promise<void> => {
   const shouldSeed = process.env.SEED_ON_STARTUP === 'true' || process.env.SEED_ON_STARTUP === '1';
   if (!shouldSeed) {
     return;

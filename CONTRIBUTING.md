@@ -67,6 +67,69 @@ Bypassing hooks with `git commit --no-verify` is permitted only for exceptional 
 - Run `npm test` before pushing to verify nothing is broken
 - Add tests for new features and bug fixes
 
+### Regression-Test Policy
+
+Every bug fix that touches source code **must** include a regression test that
+proves the specific failure mode cannot re-occur. The test must follow the
+**failing-then-passing** pattern:
+
+1. **Describe the exact bug** — what input / condition triggered it.
+2. **Assert the old (broken) behaviour would have failed** — if you could
+   revert the fix, the test must red.
+3. **Assert the fixed behaviour passes** — the test must green with the fix.
+
+When a regression test for a given fix does not yet exist, **backfill one**
+before merging. The test should be small, deterministic, and self-contained
+(no network, no external services beyond the in-memory test DB).
+
+**Example** — a fix that stopped the server from crashing when the seed
+marker could not be written:
+
+```ts
+it('does not crash when the seed marker write fails', async () => {
+  // Simulate a read-only data dir by making writeFile throw.
+  const writeFileSpy = vi.spyOn(fsPromises, 'writeFile').mockRejectedValue(new Error('EACCES'));
+
+  // The fix: ensureDataDir catches mkdir errors and the marker write
+  // is wrapped in try/catch — the server must NOT throw.
+  await expect(runSeedIfNeeded()).resolves.toBeUndefined();
+
+  writeFileSpy.mockRestore();
+});
+```
+
+**CI configuration fixes** that change shell logic (awk filters, exit codes,
+job dependencies) also get a structural test that validates the configuration
+document itself, because CI files are not directly executable:
+
+```ts
+it('accepts signed-with-sbom in the image signature gate', () => {
+  // Regression for: signed-with-sbom was counted as unsigned.
+  const statusLines = ['status=signed', 'status=signed-with-sbom', 'status=dry-run'];
+  const unsignedCount = statusLines.filter((line) => {
+    const [, value] = line.split('=');
+    return value !== 'signed' && value !== 'signed-with-sbom';
+  }).length;
+  expect(unsignedCount).toBe(1); // only dry-run is unsigned
+});
+```
+
+Run `npm test` after adding a regression test to confirm the full suite still
+passes.
+
+### Running Tests
+
+```bash
+# Run the full suite
+npm test
+
+# Run only server tests
+npm run test:server
+
+# Run only client tests
+npm run test:client
+```
+
 ## Development Setup
 
 Requirements:
