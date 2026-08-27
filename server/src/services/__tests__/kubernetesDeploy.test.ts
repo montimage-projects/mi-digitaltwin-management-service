@@ -249,6 +249,77 @@ describe('deployTopology', () => {
     };
   }
 
+  test('creates deployments and services concurrently via Promise.all', async () => {
+    const depCalls: number[] = [];
+    const clients = {
+      core: {
+        createNamespace: vi.fn(async () => ({})),
+        createNamespacedService: vi.fn(async () => ({ spec: { ports: [{ nodePort: 31567 }] } })),
+        deleteNamespace: vi.fn(async () => ({})),
+        listNamespacedPod: vi.fn(async () => ({ items: [] })),
+      },
+      apps: {
+        createNamespacedDeployment: vi.fn(async () => {
+          depCalls.push(Date.now());
+          return {};
+        }),
+        readNamespacedDeployment: vi.fn(async () => ({})),
+      },
+    } as never;
+
+    await deployTopology(clients, {
+      namespace: 'secsim-a-b',
+      nodes: [makeNode('web-a'), makeNode('web-b'), makeNode('web-c')],
+      services: [makeService()],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    // All three deployments should have been created (concurrently via Promise.all).
+    expect(clients.apps.createNamespacedDeployment).toHaveBeenCalledTimes(3);
+    expect(clients.core.createNamespacedService).toHaveBeenCalledTimes(3);
+    expect(depCalls).toHaveLength(3);
+    // All three deployment calls should have started within the same tick.
+    const maxDelta = Math.max(...depCalls) - Math.min(...depCalls);
+    expect(maxDelta).toBeLessThan(50); // all within 50ms = concurrent
+  });
+
+  test('tears down already-created resources on mid-deploy failure', async () => {
+    let callCount = 0;
+    const clients = {
+      core: {
+        createNamespace: vi.fn(async () => ({})),
+        createNamespacedService: vi.fn(async () => ({ spec: { ports: [{ nodePort: 31567 }] } })),
+        deleteNamespace: vi.fn(async () => ({})),
+        listNamespacedPod: vi.fn(async () => ({ items: [] })),
+      },
+      apps: {
+        createNamespacedDeployment: vi.fn(async () => {
+          callCount++;
+          if (callCount === 2) {
+            throw new ApiException(500, 'mid-deploy failure');
+          }
+          return {};
+        }),
+        readNamespacedDeployment: vi.fn(async () => ({})),
+      },
+    } as never;
+
+    await expect(
+      deployTopology(clients, {
+        namespace: 'secsim-a-b',
+        nodes: [makeNode('web-a'), makeNode('web-b'), makeNode('web-c')],
+        services: [makeService()],
+        endpoint: 'https://10.0.0.1:6443',
+      })
+    ).rejects.toThrow();
+
+    // deleteNamespace should have been called for best-effort teardown.
+    expect(clients.core.deleteNamespace).toHaveBeenCalledTimes(1);
+    expect((firstCallArg(clients.core.deleteNamespace) as { name: string }).name).toBe(
+      'secsim-a-b'
+    );
+  });
+
   test('creates a namespace plus a deployment and service per node', async () => {
     const clients = makeClients();
     const result = await deployTopology(clients as never, {
@@ -345,6 +416,7 @@ describe('getDeploymentStatus', () => {
         listNamespacedPod: vi.fn(async () => ({
           items: [
             {
+              metadata: { labels: { app: 'broken' } },
               status: {
                 phase: 'Pending',
                 containerStatuses: [{ state: { waiting: { reason: 'ImagePullBackOff' } } }],
@@ -372,6 +444,59 @@ describe('getDeploymentStatus', () => {
       { name: 'broken', status: 'failed' },
     ]);
     expect(progress).toBe(50);
+  });
+
+  test('uses a single listNamespacedPod call per tick with combined selector', async () => {
+    const listNamespacedPod = vi.fn(async () => ({
+      items: [
+        { metadata: { labels: { app: 'svc-a' } }, status: { phase: 'Running' } },
+        { metadata: { labels: { app: 'svc-b' } }, status: { phase: 'Pending' } },
+      ],
+    }));
+    const clients = {
+      core: { listNamespacedPod },
+      apps: {
+        readNamespacedDeployment: vi.fn(async () => ({
+          spec: { replicas: 1 },
+          status: { availableReplicas: 1 },
+        })),
+      },
+    };
+
+    await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['svc-a', 'svc-b', 'svc-c'],
+    });
+
+    // Only ONE listNamespacedPod call despite 3 services.
+    expect(listNamespacedPod).toHaveBeenCalledTimes(1);
+    const callOpts = (
+      listNamespacedPod.mock.calls[0] as [{ namespace: string; labelSelector: string }]
+    )[0];
+    expect(callOpts.labelSelector).toContain('app in (svc-a,svc-b,svc-c)');
+  });
+
+  test('detects failed pods from the batch query', async () => {
+    const clients = {
+      core: {
+        listNamespacedPod: vi.fn(async () => ({
+          items: [{ metadata: { labels: { app: 'svc-a' } }, status: { phase: 'Failed' } }],
+        })),
+      },
+      apps: {
+        readNamespacedDeployment: vi.fn(async () => ({
+          spec: { replicas: 1 },
+          status: { availableReplicas: 0 },
+        })),
+      },
+    };
+
+    const { statuses } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['svc-a'],
+    });
+
+    expect(statuses).toEqual([{ name: 'svc-a', status: 'failed' }]);
   });
 
   test('reports failed when a pod has reached the Failed phase', async () => {

@@ -321,6 +321,9 @@ function serviceManifest(node: ResolvedNode, namespace: string): V1Service {
 /**
  * Deploy a scenario topology into a fresh per-execution namespace: create the
  * namespace, then one Deployment + one NodePort Service per topology node.
+ *
+ * Uses `Promise.all` for batch Deployment/Service creation. On mid-deploy
+ * failure, tears down already-created resources (best-effort) before re-throwing.
  */
 export async function deployTopology(
   clients: K8sClients,
@@ -332,31 +335,34 @@ export async function deployTopology(
   try {
     await clients.core.createNamespace({ body: namespaceManifest(opts.namespace) });
 
-    const services: DeployedServiceResult[] = [];
-    for (const node of resolved) {
-      await clients.apps.createNamespacedDeployment({
-        namespace: opts.namespace,
-        body: deploymentManifest(node, opts.namespace),
-      });
-      const created = await clients.core.createNamespacedService({
-        namespace: opts.namespace,
-        body: serviceManifest(node, opts.namespace),
-      });
+    // Batch create all Deployments + Services concurrently via Promise.all.
+    const results = await Promise.all(
+      resolved.map(async (node) => {
+        await clients.apps.createNamespacedDeployment({
+          namespace: opts.namespace,
+          body: deploymentManifest(node, opts.namespace),
+        });
+        const created = await clients.core.createNamespacedService({
+          namespace: opts.namespace,
+          body: serviceManifest(node, opts.namespace),
+        });
+        const nodePort = created.spec?.ports?.[0]?.nodePort;
+        return {
+          nodeId: node.nodeId,
+          serviceId: node.serviceId,
+          name: node.name,
+          uiType: node.uiType,
+          status: 'pending' as DeployStatus,
+          nodePort,
+          dashboardUrl: nodePort ? `http://${host}:${nodePort}` : undefined,
+        };
+      })
+    );
 
-      const nodePort = created.spec?.ports?.[0]?.nodePort;
-      services.push({
-        nodeId: node.nodeId,
-        serviceId: node.serviceId,
-        name: node.name,
-        uiType: node.uiType,
-        status: 'pending',
-        nodePort,
-        dashboardUrl: nodePort ? `http://${host}:${nodePort}` : undefined,
-      });
-    }
-
-    return { namespace: opts.namespace, services };
+    return { namespace: opts.namespace, services: results };
   } catch (err) {
+    // Best-effort teardown of resources already created.
+    void clients.core.deleteNamespace({ name: opts.namespace }).catch(() => undefined);
     throw toAppError(err, `deploying topology to namespace ${opts.namespace}`);
   }
 }
@@ -395,6 +401,10 @@ async function deploymentStatus(
 /**
  * Query the current per-service status of a deployed execution and compute an
  * overall progress percentage (share of services that are `running`).
+ *
+ * Uses a single `listNamespacedPod` call per tick with a combined label
+ * selector (`app in (...)`) instead of one call per service, replacing the
+ * prior serial-loop pattern (F-PERF-003, F-PERF-004).
  */
 export async function getDeploymentStatus(
   clients: K8sClients,
@@ -402,6 +412,28 @@ export async function getDeploymentStatus(
 ): Promise<{ statuses: { name: string; status: DeployStatus }[]; progress: number }> {
   try {
     const statuses: { name: string; status: DeployStatus }[] = [];
+
+    // Build a combined "app in (a,b,c)" selector so a single list call
+    // replaces the prior per-service serial loop.
+    const combinedSelector = `app in (${opts.names.join(',')})`;
+
+    // Fetch all pods for the requested services in one API call.
+    const allPods = await clients.core.listNamespacedPod({
+      namespace: opts.namespace,
+      labelSelector: combinedSelector,
+    });
+
+    // Index pods by their `app` label for quick lookup.
+    const podsByApp = new Map<string, typeof allPods.items>();
+    for (const pod of allPods.items ?? []) {
+      const appLabel = pod.metadata?.labels?.app ?? '';
+      if (!appLabel) continue;
+      const existing = podsByApp.get(appLabel) ?? [];
+      existing.push(pod);
+      podsByApp.set(appLabel, existing);
+    }
+
+    // Evaluate status for each requested service using the cached pods.
     for (const name of opts.names) {
       let status: DeployStatus;
       try {
@@ -415,6 +447,26 @@ export async function getDeploymentStatus(
         }
       }
       statuses.push({ name, status });
+    }
+
+    // Enrich statuses with pod-level failure info from the batch query.
+    for (const entry of statuses) {
+      if (entry.status !== 'pending') continue;
+      const pods = podsByApp.get(entry.name) ?? [];
+      for (const pod of pods) {
+        if (pod.status?.phase === 'Failed') {
+          entry.status = 'failed';
+          break;
+        }
+        for (const cs of pod.status?.containerStatuses ?? []) {
+          const reason = cs.state?.waiting?.reason;
+          if (reason && FAILURE_REASONS.has(reason)) {
+            entry.status = 'failed';
+            break;
+          }
+        }
+        if (entry.status === 'failed') break;
+      }
     }
 
     const running = statuses.filter((s) => s.status === 'running').length;
