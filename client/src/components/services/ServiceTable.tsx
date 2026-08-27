@@ -12,6 +12,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ErrorState } from '@/components/ui/error-state';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { toast } from 'sonner';
 
 type SortColumn = 'shortName' | 'title' | 'category' | 'sector' | 'provider';
 type SortDirection = 'asc' | 'desc';
@@ -91,10 +94,19 @@ export function ServiceTable({
     );
   };
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
+
   const deleteMutation = useMutation({
     mutationFn: servicesApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
+      toast.success('Service deleted successfully');
+      setDeleteDialogOpen(false);
+      setServiceToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete service: ${error.message}`);
     },
   });
 
@@ -105,8 +117,13 @@ export function ServiceTable({
 
   const handleDelete = (e: React.MouseEvent, service: Service) => {
     e.stopPropagation();
-    if (confirm(`Are you sure you want to delete ${service.shortName}?`)) {
-      deleteMutation.mutate(service._id);
+    setServiceToDelete(service);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (serviceToDelete) {
+      deleteMutation.mutate(serviceToDelete._id);
     }
   };
 
@@ -151,7 +168,7 @@ export function ServiceTable({
     );
   }
 
-  if (services.length === 0) {
+  if (services.length === 0 && !isLoading) {
     return (
       <div className="rounded-md border p-8 text-center">
         <p className="text-muted-foreground">No services found</p>
@@ -246,6 +263,54 @@ export function ServiceTable({
           ))}
         </tbody>
       </table>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Service"
+        description={`Are you sure you want to delete "${serviceToDelete?.shortName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        destructive
+        onConfirm={confirmDelete}
+      />
     </div>
+  );
+}
+
+export function ServiceTableWithState({
+  services,
+  isLoading,
+  error,
+  onRetry,
+  onRowClick,
+  showSector,
+}: {
+  services: Service[];
+  isLoading: boolean;
+  error: Error | string | null;
+  onRetry?: () => void;
+  onRowClick: (service: Service) => void;
+  showSector?: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <ServiceTable
+        services={services}
+        isLoading={true}
+        onRowClick={onRowClick}
+        showSector={showSector}
+      />
+    );
+  }
+  if (error) {
+    return <ErrorState error={error} onRetry={onRetry} />;
+  }
+  return (
+    <ServiceTable
+      services={services}
+      isLoading={false}
+      onRowClick={onRowClick}
+      showSector={showSector}
+    />
   );
 }

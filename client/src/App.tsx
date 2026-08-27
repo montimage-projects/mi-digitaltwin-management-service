@@ -11,6 +11,7 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { Login } from '@/pages/Login';
 import { Dashboard } from '@/pages/Dashboard';
+import { NotFound } from '@/pages/NotFound';
 
 // Lazy load heavier pages for better initial load performance
 const Services = lazy(() => import('@/pages/Services').then((m) => ({ default: m.Services })));
@@ -181,6 +182,7 @@ function App() {
                 </Suspense>
               }
             />
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
       </BrowserRouter>

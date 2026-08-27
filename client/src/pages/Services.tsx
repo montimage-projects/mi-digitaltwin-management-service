@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ServiceTable } from '@/components/services/ServiceTable';
+import { ServiceTableWithState } from '@/components/services/ServiceTable';
 import { ServiceDrawer } from '@/components/services/ServiceDrawer';
 
 export function Services() {
@@ -133,6 +133,10 @@ export function Services() {
     setDrawerOpen(true);
   };
 
+  const handleRetry = () => {
+    window.location.reload();
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -210,9 +214,11 @@ export function Services() {
               Add Tool
             </Button>
           </div>
-          <ServiceTable
+          <ServiceTableWithState
             services={toolboxServices}
             isLoading={toolboxLoading}
+            error={null}
+            onRetry={handleRetry}
             onRowClick={handleRowClick}
           />
         </TabsContent>
@@ -267,9 +273,11 @@ export function Services() {
               Add Service
             </Button>
           </div>
-          <ServiceTable
+          <ServiceTableWithState
             services={infrastructureServices}
             isLoading={infrastructureLoading}
+            error={null}
+            onRetry={handleRetry}
             onRowClick={handleRowClick}
             showSector
           />

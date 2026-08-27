@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ProjectTable } from '@/components/projects/ProjectTable';
+import { ProjectTableWithState } from '@/components/projects/ProjectTable';
 
 export function Projects() {
   const navigate = useNavigate();
@@ -38,6 +38,11 @@ export function Projects() {
 
   const handleRowClick = (project: Project) => {
     navigate(`/projects/${project._id}`);
+  };
+
+  const handleRetry = () => {
+    // Trigger react-query refetch by resetting the query
+    window.location.reload();
   };
 
   return (
@@ -85,9 +90,11 @@ export function Projects() {
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">{filteredProjects.length} projects</span>
         </div>
-        <ProjectTable
+        <ProjectTableWithState
           projects={filteredProjects}
           isLoading={isLoading}
+          error={null}
+          onRetry={handleRetry}
           onRowClick={handleRowClick}
         />
       </div>

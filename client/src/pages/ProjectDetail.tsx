@@ -7,7 +7,7 @@ import { useWorkspaceStore } from '@/store/workspace-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ScenarioTable } from '@/components/scenarios/ScenarioTable';
+import { ScenarioTableWithState } from '@/components/scenarios/ScenarioTable';
 
 const sectorColors: Record<string, string> = {
   Telecommunications: 'bg-blue-100 text-blue-800',
@@ -162,13 +162,13 @@ export function ProjectDetail() {
                 Add Scenario
               </Button>
             </div>
-            {scenariosLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <ScenarioTable scenarios={scenarios} projectId={id!} />
-            )}
+            <ScenarioTableWithState
+              scenarios={scenarios}
+              projectId={id!}
+              isLoading={scenariosLoading}
+              error={null}
+              onRetry={() => window.location.reload()}
+            />
           </div>
         </div>
 

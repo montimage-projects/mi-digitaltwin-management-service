@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Trash2, MoreHorizontal, Layers } from 'lucide-react';
@@ -11,6 +12,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ErrorState } from '@/components/ui/error-state';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { toast } from 'sonner';
 
 interface ProjectTableProps {
   projects: Project[];
@@ -30,10 +34,19 @@ export function ProjectTable({ projects, isLoading, onRowClick }: ProjectTablePr
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+
   const deleteMutation = useMutation({
     mutationFn: projectsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast.success('Project deleted successfully');
+      setDeleteDialogOpen(false);
+      setProjectToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete project: ${error.message}`);
     },
   });
 
@@ -44,8 +57,13 @@ export function ProjectTable({ projects, isLoading, onRowClick }: ProjectTablePr
 
   const handleDelete = (e: React.MouseEvent, project: Project) => {
     e.stopPropagation();
-    if (confirm(`Are you sure you want to delete ${project.shortName}?`)) {
-      deleteMutation.mutate(project._id);
+    setProjectToDelete(project);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (projectToDelete) {
+      deleteMutation.mutate(projectToDelete._id);
     }
   };
 
@@ -96,7 +114,7 @@ export function ProjectTable({ projects, isLoading, onRowClick }: ProjectTablePr
     );
   }
 
-  if (projects.length === 0) {
+  if (projects.length === 0 && !isLoading) {
     return (
       <div className="rounded-md border p-8 text-center">
         <p className="text-muted-foreground">No projects found</p>
@@ -172,6 +190,38 @@ export function ProjectTable({ projects, isLoading, onRowClick }: ProjectTablePr
           ))}
         </tbody>
       </table>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Project"
+        description={`Are you sure you want to delete "${projectToDelete?.shortName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        destructive
+        onConfirm={confirmDelete}
+      />
     </div>
   );
+}
+
+export function ProjectTableWithState({
+  projects,
+  isLoading,
+  error,
+  onRetry,
+  onRowClick,
+}: {
+  projects: Project[];
+  isLoading: boolean;
+  error: Error | string | null;
+  onRetry?: () => void;
+  onRowClick: (project: Project) => void;
+}) {
+  if (isLoading) {
+    return <ProjectTable projects={projects} isLoading={true} onRowClick={onRowClick} />;
+  }
+  if (error) {
+    return <ErrorState error={error} onRetry={onRetry} />;
+  }
+  return <ProjectTable projects={projects} isLoading={false} onRowClick={onRowClick} />;
 }
