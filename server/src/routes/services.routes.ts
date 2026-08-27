@@ -6,8 +6,12 @@ import { Sector } from '../models/Sector.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateQuery, validateBody, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { buildCaseInsensitiveFilter, buildSearchOrFilter } from '../utils/search.js';
 
 const router: RouterType = Router();
+
+/** Fields a free-text `?search=` term is matched against. */
+const SEARCH_FIELDS = ['shortName', 'title', 'description'] as const;
 
 // Validation schemas
 const inputOutputSchema = z.object({
@@ -118,15 +122,11 @@ router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, r
     }
 
     if (provider) {
-      query.provider = { $regex: new RegExp(provider, 'i') };
+      query.provider = buildCaseInsensitiveFilter(provider);
     }
 
     if (search) {
-      query.$or = [
-        { shortName: { $regex: new RegExp(search, 'i') } },
-        { title: { $regex: new RegExp(search, 'i') } },
-        { description: { $regex: new RegExp(search, 'i') } },
-      ];
+      query.$or = buildSearchOrFilter(SEARCH_FIELDS, search);
     }
 
     const [services, total] = await Promise.all([
