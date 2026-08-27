@@ -19,6 +19,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { YamlEditor } from './YamlEditor';
 import { TopologyCanvas } from './TopologyCanvas';
 import { cn } from '@/lib/utils';
@@ -111,6 +121,8 @@ interface TopologyEditorProps {
   onInfrastructureChange?: (id: string | null) => void;
   onValidate?: () => void;
   onHelpClick?: () => void;
+  /** Callback invoked when the user confirms clearing the canvas. */
+  onClearCanvas?: () => void;
 }
 
 export function TopologyEditor({
@@ -129,6 +141,7 @@ export function TopologyEditor({
   onInfrastructureChange,
   onValidate,
   onHelpClick,
+  onClearCanvas,
 }: TopologyEditorProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('visual');
   const [codeCollapsed, setCodeCollapsed] = useState(false);
@@ -163,12 +176,20 @@ export function TopologyEditor({
     [onEdgesChange, onYamlChange, nodes]
   );
 
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+
   const handleReset = useCallback(() => {
     // Reset to empty topology
     onYamlChange('');
     onNodesChange([]);
     onEdgesChange([]);
   }, [onYamlChange, onNodesChange, onEdgesChange]);
+
+  const handleResetConfirm = useCallback(() => {
+    handleReset();
+    onClearCanvas?.();
+    setResetDialogOpen(false);
+  }, [handleReset, onClearCanvas]);
 
   return (
     <div className="flex flex-col h-full">
@@ -268,10 +289,35 @@ export function TopologyEditor({
             <CheckCircle2 className="h-4 w-4 mr-1" />
             Validate
           </Button>
-          <Button variant="outline" size="sm" onClick={handleReset} disabled={isSaving}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setResetDialogOpen(true)}
+            disabled={isSaving}
+          >
             <RotateCcw className="h-4 w-4 mr-1" />
-            Reset
+            Clear canvas
           </Button>
+          <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear canvas</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove all services and connections from the topology. This action
+                  cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleResetConfirm}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Clear canvas
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button size="sm" onClick={onSave} disabled={isSaving || !isDirty}>
             <Save className="h-4 w-4 mr-1" />
             {isSaving ? 'Saving...' : 'Save'}

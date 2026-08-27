@@ -22,6 +22,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 
 interface LogLine {
@@ -145,6 +155,8 @@ export function ExecutionConsole({
     if (viewport) viewport.scrollTop = viewport.scrollHeight;
   }, [logs]);
 
+  const [teardownDialogOpen, setTeardownDialogOpen] = useState(false);
+
   const teardownMutation = useMutation({
     mutationFn: () => scenariosApi.teardown(scenarioId, executionId),
     onSuccess: (result) => {
@@ -157,6 +169,11 @@ export function ExecutionConsole({
       toast.error(`Failed to tear down deployment: ${error.message}`);
     },
   });
+
+  const handleTeardownConfirm = () => {
+    teardownMutation.mutate();
+    setTeardownDialogOpen(false);
+  };
 
   const mergedServices = useMemo(
     () => services.map((s) => ({ ...s, status: liveStatus[s.name] ?? s.status })),
@@ -188,7 +205,7 @@ export function ExecutionConsole({
             variant="outline"
             size="sm"
             className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-            onClick={() => teardownMutation.mutate()}
+            onClick={() => setTeardownDialogOpen(true)}
             disabled={teardownMutation.isPending || tornDown}
             title="Delete this deployment from the cluster"
           >
@@ -199,6 +216,26 @@ export function ExecutionConsole({
             )}
             {tornDown ? 'Torn Down' : 'Tear Down'}
           </Button>
+          <AlertDialog open={teardownDialogOpen} onOpenChange={setTeardownDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Tear down deployment</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove the deployment from the cluster. All running services will be
+                  stopped and their resources released. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleTeardownConfirm}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Tear down
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
