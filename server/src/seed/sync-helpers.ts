@@ -1,4 +1,9 @@
-import type { Model, Document, FilterQuery, UpdateQuery } from 'mongoose';
+import type { Model, Document, UpdateQuery } from 'mongoose';
+
+// Mongoose v9 renamed FilterQuery to QueryFilter (not exported)
+// We use a compatible type for filter objects
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FilterQuery<T> = Partial<Record<keyof T, any>>;
 
 /**
  * Shared create/update/deprecate mechanism for seed scripts.
