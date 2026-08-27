@@ -41,6 +41,9 @@ interface LogLine {
   line: string;
 }
 
+/** Maximum number of log lines to retain in the ring buffer. */
+const MAX_LOG_LINES = 2000;
+
 type Phase = 'running' | 'completed' | 'failed' | 'torn-down';
 
 interface ExecutionConsoleProps {
@@ -119,10 +122,17 @@ export function ExecutionConsole({
         applyStatuses(event.services);
       },
       onLog: (event) => {
-        setLogs((prev) => [
-          ...prev,
-          { id: logIdRef.current++, service: event.service, pod: event.pod, line: event.line },
-        ]);
+        setLogs((prev) => {
+          const next = [
+            ...prev,
+            { id: logIdRef.current++, service: event.service, pod: event.pod, line: event.line },
+          ];
+          // Ring-buffer cap: drop oldest lines when over the limit.
+          if (next.length > MAX_LOG_LINES) {
+            return next.slice(next.length - MAX_LOG_LINES);
+          }
+          return next;
+        });
       },
       onEnd: (event) => {
         applyStatuses(event.services);
@@ -345,7 +355,11 @@ export function ExecutionConsole({
                 </p>
               ) : (
                 logs.map((log) => (
-                  <div key={log.id} className="whitespace-pre-wrap break-all text-zinc-300">
+                  <div
+                    key={log.id}
+                    data-testid="log-line"
+                    className="whitespace-pre-wrap break-all text-zinc-300"
+                  >
                     <span className="mr-2 text-emerald-400">[{log.service}]</span>
                     {log.line}
                   </div>

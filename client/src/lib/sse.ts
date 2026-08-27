@@ -97,6 +97,7 @@ export function subscribeToExecutionEvents(
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let ended = false;
 
       for (;;) {
         const { done, value } = await reader.read();
@@ -109,9 +110,17 @@ export function subscribeToExecutionEvents(
           const raw = buffer.slice(0, boundary);
           buffer = buffer.slice(boundary + 2);
           const parsed = parseSseEvent(raw);
-          if (parsed) dispatchSseEvent(parsed, handlers);
+          if (parsed) {
+            if (parsed.event === 'end') ended = true;
+            dispatchSseEvent(parsed, handlers);
+          }
           boundary = buffer.indexOf('\n\n');
         }
+      }
+
+      // Stream ended without an explicit 'end' event — notify the client.
+      if (!ended) {
+        handlers.onError?.({ message: 'Event stream ended unexpectedly' });
       }
     } catch (err) {
       // A deliberate unsubscribe surfaces as an AbortError — not a failure.
