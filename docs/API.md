@@ -109,16 +109,187 @@ curl -X POST http://localhost:3000/api/auth/logout \
  -H "Authorization: Bearer $TOKEN"
 ```
 
+### Users
+
+#### List Users
+
+- **GET** `/api/users`
+- **Auth:** Required
+- **Response:** `User[]` (password hash excluded)
+
+```bash
+curl -X GET http://localhost:3000/api/users \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+#### Create User
+
+- **POST** `/api/users`
+- **Auth:** Required
+- **Body:** `{ username: string, password: string, role?: 'admin' }`
+- **Response:** `{ _id, username, role, createdAt, updatedAt }`
+
+```bash
+curl -X POST http://localhost:3000/api/users \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"username":"newuser","password":"securepass123"}'
+```
+
+#### Update User
+
+- **PUT** `/api/users/:id`
+- **Auth:** Required (admin only)
+- **Body:** `{ username?: string, role?: 'admin' }`
+- **Response:** `{ _id, username, role, updatedAt }`
+
+```bash
+curl -X PUT http://localhost:3000/api/users/user123 \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"username":"updateduser"}'
+```
+
+#### Change Password
+
+- **PUT** `/api/users/:id/password`
+- **Auth:** Required
+- **Body:** `{ currentPassword: string, newPassword: string }`
+- **Response:** `{ message: "Password updated successfully" }`
+
+```bash
+curl -X PUT http://localhost:3000/api/users/user123/password \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"currentPassword":"oldpass","newPassword":"newpass123"}'
+```
+
+#### Reset Password (Admin)
+
+- **PATCH** `/api/users/:id/password`
+- **Auth:** Required (admin only)
+- **Body:** `{ password: string }`
+- **Response:** `{ message: "Password updated successfully" }`
+
+```bash
+curl -X PATCH http://localhost:3000/api/users/user123/password \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"password":"newpass123"}'
+```
+
+#### Delete User
+
+- **DELETE** `/api/users/:id`
+- **Auth:** Required (admin only)
+- **Response:** `{ message: "User deleted successfully" }`
+
+```bash
+curl -X DELETE http://localhost:3000/api/users/user123 \
+ -H "Authorization: Bearer $TOKEN"
+```
+
 ### Health Check
 
 #### Application Health
 
 - **GET** `/api/health`
 - **Auth:** None
-- **Response:** `{ status: "ok", timestamp: string }`
+- **Response:** `{ status: "ok", timestamp: string, database: "connected"|"disconnected", environment: string }`
 
 ```bash
 curl http://localhost:3000/api/health
+```
+
+### API Documentation (Development)
+
+#### OpenAPI Spec
+
+- **GET** `/api/docs`
+- **Auth:** None (development only)
+- **Response:** OpenAPI 3.0 JSON specification
+
+```bash
+curl http://localhost:3000/api/docs
+```
+
+### Categories
+
+#### List Categories
+
+- **GET** `/api/categories`
+- **Auth:** Required
+- **Response:** `{ categories: Category[] }`
+
+```bash
+curl -X GET http://localhost:3000/api/categories \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+#### Get Category
+
+- **GET** `/api/categories/:id`
+- **Auth:** Required
+- **Response:** `{ category: Category }`
+
+```bash
+curl -X GET http://localhost:3000/api/categories/cat1 \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+#### Create Category
+
+- **POST** `/api/categories`
+- **Auth:** Required (admin only)
+- **Body:** `{ name: string, description?: string }`
+- **Response:** `{ category: Category }`
+
+```bash
+curl -X POST http://localhost:3000/api/categories \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "name": "Category Name",
+ "description": "Category description"
+ }'
+```
+
+#### Update Category
+
+- **PUT** `/api/categories/:id`
+- **Auth:** Required (admin only)
+- **Body:** `{ name?: string, description?: string }`
+- **Response:** `{ category: Category }`
+
+```bash
+curl -X PUT http://localhost:3000/api/categories/cat1 \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"name": "Updated Category"}'
+```
+
+#### Delete Category
+
+- **DELETE** `/api/categories/:id`
+- **Auth:** Required (admin only)
+- **Response:** `{ message: "Category deleted" }`
+
+```bash
+curl -X DELETE http://localhost:3000/api/categories/cat1 \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+### Sectors
+
+#### List Sectors
+
+- **GET** `/api/sectors`
+- **Auth:** Required
+- **Response:** `Sector[]` (sorted by category then name)
+
+```bash
+curl -X GET http://localhost:3000/api/sectors \
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Services
@@ -190,6 +361,21 @@ curl -X PUT http://localhost:3000/api/services/service123 \
 
 ```bash
 curl -X DELETE http://localhost:3000/api/services/service123 \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+### Partners
+
+#### List Partners
+
+- **GET** `/api/partners`
+- **Auth:** Required
+- **Query Parameters:**
+- `includeDeprecated` (boolean, optional) - Set to `true` to include partners deprecated by a catalog refresh
+- **Response:** `Partner[]` (sorted by shortName, deprecated excluded by default)
+
+```bash
+curl -X GET "http://localhost:3000/api/partners?includeDeprecated=true" \
  -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -265,29 +451,14 @@ curl -X DELETE http://localhost:3000/api/projects/proj123 \
 
 ### Scenarios
 
-#### List Scenarios
+#### List Scenarios (by Project)
 
-- **GET** `/api/scenarios`
+- **GET** `/api/projects/:projectId/scenarios`
 - **Auth:** Required
-- **Query Parameters:**
-- `projectId` (string, optional) - Filter by project
-- `page` (number, default: 1)
-- `limit` (number, default: 20)
-- **Response:** `{ scenarios: Scenario[], meta: Pagination }`
+- **Response:** `Scenario[]` (slim — excludes topology and executions arrays; includes `latestExecution`)
 
 ```bash
-curl -X GET "http://localhost:3000/api/scenarios?projectId=proj123" \
- -H "Authorization: Bearer $TOKEN"
-```
-
-#### Get Scenario
-
-- **GET** `/api/scenarios/:id`
-- **Auth:** Required
-- **Response:** `{ scenario: Scenario }`
-
-```bash
-curl -X GET http://localhost:3000/api/scenarios/scen123 \
+curl -X GET "http://localhost:3000/api/projects/proj123/scenarios" \
  -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -295,25 +466,40 @@ curl -X GET http://localhost:3000/api/scenarios/scen123 \
 
 - **POST** `/api/projects/:projectId/scenarios`
 - **Auth:** Required
-- **Body:** `{ name: string, description: string, topology?: string, ... }`
-- **Response:** `{ scenario: Scenario }`
+- **Body:** `{ title: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string }`
+- **Response:** `{ scenario: Scenario }` (populated with infrastructure)
 
 ```bash
 curl -X POST http://localhost:3000/api/projects/proj123/scenarios \
  -H "Authorization: Bearer $TOKEN" \
  -H "Content-Type: application/json" \
  -d '{
- "name": "Scenario Name",
+ "title": "Scenario Name",
  "description": "Scenario description",
- "topology": "nodes:\n - id: node1\n label: Service 1"
+ "topology": {
+ "yaml": "nodes:\n - id: node1\n label: Service 1",
+ "nodes": [],
+ "edges": []
+ }
  }'
+```
+
+#### Get Scenario
+
+- **GET** `/api/scenarios/:id`
+- **Auth:** Required
+- **Response:** `{ scenario: Scenario }` (full detail — includes projectId, infrastructureId, executions)
+
+```bash
+curl -X GET http://localhost:3000/api/scenarios/scen123 \
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Update Scenario
 
 - **PUT** `/api/scenarios/:id`
 - **Auth:** Required
-- **Body:** `{ name?: string, topology?: string, ... }`
+- **Body:** `{ title?: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string }`
 - **Response:** `{ scenario: Scenario }`
 
 ```bash
@@ -321,7 +507,7 @@ curl -X PUT http://localhost:3000/api/scenarios/scen123 \
  -H "Authorization: Bearer $TOKEN" \
  -H "Content-Type: application/json" \
  -d '{
- "topology": "nodes:\n - id: node1\n label: Updated Service"
+ "title": "Updated Scenario"
  }'
 ```
 
@@ -329,7 +515,7 @@ curl -X PUT http://localhost:3000/api/scenarios/scen123 \
 
 - **DELETE** `/api/scenarios/:id`
 - **Auth:** Required
-- **Response:** `{ message: "Scenario deleted" }`
+- **Response:** `{ message: "Scenario deleted successfully" }`
 
 ```bash
 curl -X DELETE http://localhost:3000/api/scenarios/scen123 \
@@ -364,6 +550,39 @@ curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
 - **DELETE** `/api/scenarios/:id/executions/:executionId`
 - **Auth:** Required
 - **Response:** `{ executionId, namespace, status: "completed", message }`
+
+```bash
+curl -X DELETE http://localhost:3000/api/scenarios/scen123/executions/exec123 \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+#### Update Execution Status
+
+- **PUT** `/api/scenarios/:id/executions/:executionId/status`
+- **Auth:** Required
+- **Body:** `{ status: string }`
+- **Response:** `{ execution: Execution }`
+
+```bash
+curl -X PUT http://localhost:3000/api/scenarios/scen123/executions/exec123/status \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"status":"completed"}'
+```
+
+#### Add Execution Conclusion
+
+- **POST** `/api/scenarios/:id/executions/:executionId/conclusion`
+- **Auth:** Required
+- **Body:** `{ text: string, author: string }`
+- **Response:** `{ execution: Execution }`
+
+```bash
+curl -X POST http://localhost:3000/api/scenarios/scen123/executions/exec123/conclusion \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"text":"Deployment successful","author":"admin"}'
+```
 
 ### Infrastructures
 
@@ -450,83 +669,16 @@ curl -X POST http://localhost:3000/api/infrastructures/infra123/test \
  -H "Authorization: Bearer $TOKEN"
 ```
 
-### Categories
-
-#### List Categories
-
-- **GET** `/api/categories`
-- **Auth:** Required
-- **Response:** `{ categories: Category[] }`
-
-```bash
-curl -X GET http://localhost:3000/api/categories \
- -H "Authorization: Bearer $TOKEN"
-```
-
-#### Get Category
-
-- **GET** `/api/categories/:id`
-- **Auth:** Required
-- **Response:** `{ category: Category }`
-
-```bash
-curl -X GET http://localhost:3000/api/categories/cat1 \
- -H "Authorization: Bearer $TOKEN"
-```
-
-#### Create Category
-
-- **POST** `/api/categories`
-- **Auth:** Required (admin only)
-- **Body:** `{ name: string, description?: string }`
-- **Response:** `{ category: Category }`
-
-```bash
-curl -X POST http://localhost:3000/api/categories \
- -H "Authorization: Bearer $TOKEN" \
- -H "Content-Type: application/json" \
- -d '{
- "name": "Category Name",
- "description": "Category description"
- }'
-```
-
-#### Update Category
-
-- **PUT** `/api/categories/:id`
-- **Auth:** Required (admin only)
-- **Body:** `{ name?: string, description?: string }`
-- **Response:** `{ category: Category }`
-
-```bash
-curl -X PUT http://localhost:3000/api/categories/cat1 \
- -H "Authorization: Bearer $TOKEN" \
- -H "Content-Type: application/json" \
- -d '{"name": "Updated Category"}'
-```
-
-#### Delete Category
-
-- **DELETE** `/api/categories/:id`
-- **Auth:** Required (admin only)
-- **Response:** `{ message: "Category deleted" }`
-
-```bash
-curl -X DELETE http://localhost:3000/api/categories/cat1 \
- -H "Authorization: Bearer $TOKEN"
-```
-
 ## Data Models
 
 ### User
 
 ```typescript
 {
-  id: string;
+  _id: string;
   username: string;
-  email: string;
-  password: string; // hashed
   role: 'admin' | 'user';
+  passwordHash: string; // hashed, never returned by API
   createdAt: Date;
   updatedAt: Date;
 }
@@ -566,12 +718,32 @@ curl -X DELETE http://localhost:3000/api/categories/cat1 \
 {
   id: string;
   projectId: string; // Reference to Project
-  name: string;
-  description: string;
-  topology: string; // YAML format
+  title: string;
+  description?: string;
+  topology: {
+    yaml?: string;
+    nodes: object[];
+    edges: object[];
+  };
+  infrastructureId?: string; // Reference to Infrastructure
   status: 'draft' | 'ready' | 'executed';
+  executions: Execution[];
   createdAt: Date;
   updatedAt: Date;
+}
+```
+
+### Execution
+
+```typescript
+{
+  _id: string;
+  executedAt: Date;
+  executedBy: string;
+  status: 'pending' | 'deploying' | 'completed' | 'failed';
+  namespace?: string;
+  deployedServices: DeployedService[];
+  conclusion?: { text: string, author: string, createdAt: Date };
 }
 ```
 
@@ -599,6 +771,38 @@ curl -X DELETE http://localhost:3000/api/categories/cat1 \
  description?: string;
  createdAt: Date;
  updatedAt: Date;
+}
+```
+
+### Sector
+
+```typescript
+{
+  id: string;
+  name: string;
+  slug: string;
+  category: 'essential' | 'important';
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### Partner
+
+```typescript
+{
+  id: string;
+  shortName: string;
+  legalName: string;
+  role: 'COO' | 'BEN';
+  country: string;
+  pic: string;
+  maxGrantAmountEur: number;
+  deprecated: boolean;
+  seedManaged: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
