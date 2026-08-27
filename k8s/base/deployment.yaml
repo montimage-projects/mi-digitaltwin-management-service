@@ -79,6 +79,13 @@ spec:
                 secretKeyRef:
                   name: app-secret
                   key: MONGODB_URI
+            # MongoDB app-user credentials (used when MONGODB_URI has no embedded creds).
+            - name: MONGO_APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-secret
+                  key: MONGO_APP_PASSWORD
+                  optional: true
           volumeMounts:
             - name: app-data
               mountPath: /app/server/data

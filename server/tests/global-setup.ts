@@ -13,7 +13,10 @@ export default async function globalSetup(): Promise<void> {
   mongod = await MongoMemoryServer.create();
   const uri = mongod.getUri().replace(/\/$/, ''); // strip trailing slash for DB-name concatenation
   process.env.MONGODB_URI = uri;
-  process.env.SEED_TEST_MONGODB_URI = uri;
+  // Only set SEED_TEST_MONGODB_URI when not already provided (e.g. by CI).
+  if (!process.env.SEED_TEST_MONGODB_URI) {
+    process.env.SEED_TEST_MONGODB_URI = uri;
+  }
   // Keep the server alive for the entire test run.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).__MONGOD__ = mongod;

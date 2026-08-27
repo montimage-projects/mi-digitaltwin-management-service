@@ -90,10 +90,13 @@ jobs:
         ports:
           - 27017:27017
         options: >-
-          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-cmd "mongosh -u admin -p admin123 --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: admin123
 
     steps:
       - name: Checkout code
@@ -115,12 +118,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Create MongoDB app user
+        run: |
+          mongosh -u admin -p admin123 --authenticationDatabase admin --eval '
+            db = db.getSiblingDB("intact");
+            db.createUser({
+              user: "intact_app",
+              pwd: "intact_pass",
+              roles: [{ role: "readWrite", db: "intact" }]
+            });
+          '
+
       - name: Run server tests
         run: npm run test:server
         env:
           JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
           ADMIN_PASSWORD: ci-test-admin-secret-9f2K7x
           ENCRYPTION_KEY: ci-test-encryption-key-16chr
+          MONGODB_URI: 'mongodb://intact_app:intact_pass@localhost:27017/intact?authSource=admin'
+          SEED_TEST_MONGODB_URI: 'mongodb://admin:admin123@localhost:27017/admin'
 
   coverage:
     name: Coverage
@@ -153,6 +169,8 @@ jobs:
           JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
           ADMIN_PASSWORD: ci-test-admin-secret-9f2K7x
           ENCRYPTION_KEY: ci-test-encryption-key-16chr
+          MONGODB_URI: 'mongodb://intact_app:intact_pass@localhost:27017/intact?authSource=admin'
+          SEED_TEST_MONGODB_URI: 'mongodb://admin:admin123@localhost:27017/admin'
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
