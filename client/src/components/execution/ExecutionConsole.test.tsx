@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { ExecutionConsole } from './ExecutionConsole';
+import * as sseModule from '@/lib/sse';
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -73,5 +74,69 @@ describe('ExecutionConsole', () => {
     render(<ExecutionConsole {...defaultProps} />, { wrapper: createWrapper() });
 
     expect(screen.getByText('Tear Down')).toBeInTheDocument();
+  });
+
+  it('flips to error state when SSE stream closes prematurely', async () => {
+    const mockUnsubscribe = vi.fn();
+    vi.spyOn(sseModule, 'subscribeToExecutionEvents').mockReturnValue(mockUnsubscribe);
+
+    render(<ExecutionConsole {...defaultProps} />, { wrapper: createWrapper() });
+
+    // Simulate premature stream close by triggering onError via the SSE handler
+    // The component subscribes in useEffect, so we need to wait for it
+    await vi.waitFor(() => {
+      expect(sseModule.subscribeToExecutionEvents).toHaveBeenCalled();
+    });
+
+    // Get the handlers that were passed to subscribeToExecutionEvents
+    const callArgs = (sseModule.subscribeToExecutionEvents as { mock: { calls: unknown[] } }).mock
+      .calls[0];
+    const handlers = callArgs[2] as {
+      onError?: (event: { message: string }) => void;
+      onLog?: (event: { service: string; pod: string; line: string }) => void;
+    };
+
+    // Simulate an error event (stream closed without 'end')
+    handlers.onError?.({ message: 'Event stream ended unexpectedly' });
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('Deployment failed')).toBeInTheDocument();
+    });
+
+    // Verify error message is displayed
+    expect(screen.getByText(/Event stream ended unexpectedly/)).toBeInTheDocument();
+  });
+
+  it('caps log array at MAX_LOG_LINES when receiving a large stream', async () => {
+    const mockUnsubscribe = vi.fn();
+    vi.spyOn(sseModule, 'subscribeToExecutionEvents').mockReturnValue(mockUnsubscribe);
+
+    render(<ExecutionConsole {...defaultProps} />, { wrapper: createWrapper() });
+
+    await vi.waitFor(() => {
+      expect(sseModule.subscribeToExecutionEvents).toHaveBeenCalled();
+    });
+
+    const callArgs = (sseModule.subscribeToExecutionEvents as { mock: { calls: unknown[] } }).mock
+      .calls[0];
+    const handlers = callArgs[2] as {
+      onError?: (event: { message: string }) => void;
+      onLog?: (event: { service: string; pod: string; line: string }) => void;
+    };
+
+    // Simulate 2500 log lines
+    for (let i = 0; i < 2500; i++) {
+      handlers.onLog?.({
+        service: 'test-service',
+        pod: `pod-${i}`,
+        line: `Log line ${i}`,
+      });
+    }
+
+    await vi.waitFor(() => {
+      // The viewport should have scrolled and logs should be capped
+      const logLines = screen.getAllByTestId('log-line');
+      expect(logLines.length).toBeLessThanOrEqual(2000);
+    });
   });
 });
