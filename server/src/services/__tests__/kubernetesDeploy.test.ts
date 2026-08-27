@@ -477,12 +477,11 @@ describe('getDeploymentStatus', () => {
   });
 
   test('detects failed pods from the batch query', async () => {
+    const listNamespacedPod = vi.fn(async () => ({
+      items: [{ metadata: { labels: { app: 'svc-a' } }, status: { phase: 'Failed' } }],
+    }));
     const clients = {
-      core: {
-        listNamespacedPod: vi.fn(async () => ({
-          items: [{ metadata: { labels: { app: 'svc-a' } }, status: { phase: 'Failed' } }],
-        })),
-      },
+      core: { listNamespacedPod },
       apps: {
         readNamespacedDeployment: vi.fn(async () => ({
           spec: { replicas: 1 },
@@ -496,6 +495,8 @@ describe('getDeploymentStatus', () => {
       names: ['svc-a'],
     });
 
+    // Only ONE listNamespacedPod call despite availableReplicas=0 (batch pods used).
+    expect(listNamespacedPod).toHaveBeenCalledTimes(1);
     expect(statuses).toEqual([{ name: 'svc-a', status: 'failed' }]);
   });
 

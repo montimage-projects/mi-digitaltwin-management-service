@@ -6,6 +6,7 @@ import {
   type V1Deployment,
   type V1Service,
   type V1Namespace,
+  type V1Pod,
 } from '@kubernetes/client-node';
 import type { IInfrastructure } from '../models/Infrastructure.js';
 import { decrypt } from '../utils/encryption.js';
@@ -367,11 +368,18 @@ export async function deployTopology(
   }
 }
 
-/** Compute the coarse status of a single Deployment in a namespace. */
+/**
+ * Compute the coarse status of a single Deployment in a namespace.
+ *
+ * When `pods` is provided, uses the pre-fetched pod list (from a combined
+ * label-selector query) instead of issuing a per-service `listNamespacedPod`
+ * call, reducing API traffic from N calls to 1 per status poll tick.
+ */
 async function deploymentStatus(
   clients: K8sClients,
   namespace: string,
-  name: string
+  name: string,
+  pods?: Map<string, V1Pod[]>
 ): Promise<DeployStatus> {
   const deployment = await clients.apps.readNamespacedDeployment({ name, namespace });
   const desired = deployment.spec?.replicas ?? 1;
@@ -380,11 +388,18 @@ async function deploymentStatus(
     return 'running';
   }
 
-  const pods = await clients.core.listNamespacedPod({
-    namespace,
-    labelSelector: `app=${name}`,
-  });
-  for (const pod of pods.items ?? []) {
+  // Use pre-fetched pods if available; fall back to per-service listing.
+  const servicePods = pods?.get(name) ?? [];
+  const podList =
+    servicePods.length > 0
+      ? servicePods
+      : ((
+          await clients.core.listNamespacedPod({
+            namespace,
+            labelSelector: `app=${name}`,
+          })
+        ).items ?? []);
+  for (const pod of podList) {
     if (pod.status?.phase === 'Failed') {
       return 'failed';
     }
@@ -437,7 +452,7 @@ export async function getDeploymentStatus(
     for (const name of opts.names) {
       let status: DeployStatus;
       try {
-        status = await deploymentStatus(clients, opts.namespace, name);
+        status = await deploymentStatus(clients, opts.namespace, name, podsByApp);
       } catch (err) {
         // A not-yet-created / already-removed deployment reads as pending.
         if (err instanceof ApiException && err.code === 404) {
@@ -447,26 +462,6 @@ export async function getDeploymentStatus(
         }
       }
       statuses.push({ name, status });
-    }
-
-    // Enrich statuses with pod-level failure info from the batch query.
-    for (const entry of statuses) {
-      if (entry.status !== 'pending') continue;
-      const pods = podsByApp.get(entry.name) ?? [];
-      for (const pod of pods) {
-        if (pod.status?.phase === 'Failed') {
-          entry.status = 'failed';
-          break;
-        }
-        for (const cs of pod.status?.containerStatuses ?? []) {
-          const reason = cs.state?.waiting?.reason;
-          if (reason && FAILURE_REASONS.has(reason)) {
-            entry.status = 'failed';
-            break;
-          }
-        }
-        if (entry.status === 'failed') break;
-      }
     }
 
     const running = statuses.filter((s) => s.status === 'running').length;
