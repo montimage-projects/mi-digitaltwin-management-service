@@ -26,7 +26,8 @@ export const validateBody = <T extends ZodSchema>(schema: T) => {
 export const validateQuery = <T extends ZodSchema>(schema: T) => {
   return (req: Request, _res: Response, next: NextFunction): void => {
     try {
-      req.query = schema.parse(req.query);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      req.query = schema.parse(req.query) as Record<string, any>;
       next();
     } catch (error) {
       next(error);

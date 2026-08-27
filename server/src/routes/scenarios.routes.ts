@@ -29,8 +29,8 @@ const router: RouterType = Router();
 // Validation schemas
 const topologySchema = z.object({
   yaml: z.string().default(''),
-  nodes: z.array(z.record(z.unknown())).default([]),
-  edges: z.array(z.record(z.unknown())).default([]),
+  nodes: z.array(z.record(z.string(), z.unknown())).default([]),
+  edges: z.array(z.record(z.string(), z.unknown())).default([]),
 });
 
 const createScenarioSchema = z.object({
