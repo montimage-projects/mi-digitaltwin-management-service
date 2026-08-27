@@ -5,25 +5,27 @@ import { env } from '../config/env.js';
 import { validate } from '../middleware/validation.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { loginSchema } from '../validators/auth.validator.js';
-import { AppError } from '../middleware/errorHandler.js';
+import { asyncHandler } from '../middleware/entityLoader.js';
 
 const router: RouterType = Router();
 
 // POST /api/auth/login
-router.post('/login', validate(loginSchema), async (req, res, next) => {
-  try {
+router.post(
+  '/login',
+  validate(loginSchema),
+  asyncHandler(async (req, res) => {
     const { username, password } = req.body;
 
     const user = await User.findOne({ username: username.toLowerCase() });
 
     if (!user) {
-      throw new AppError('Invalid credentials', 401);
+      throw new Error('Invalid credentials');
     }
 
     const isMatch = await user.comparePassword(password);
 
     if (!isMatch) {
-      throw new AppError('Invalid credentials', 401);
+      throw new Error('Invalid credentials');
     }
 
     const token = jwt.sign(
@@ -44,18 +46,21 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
         role: user.role,
       },
     });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // GET /api/auth/me
-router.get('/me', authMiddleware, async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user?.userId).select('-passwordHash');
-
+router.get(
+  '/me',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new Error('User not authenticated');
+    }
+    const user = await User.findById(userId).select('-passwordHash').lean();
     if (!user) {
-      throw new AppError('User not found', 404);
+      throw new Error('User not found');
     }
 
     res.json({
@@ -63,10 +68,8 @@ router.get('/me', authMiddleware, async (req, res, next) => {
       username: user.username,
       role: user.role,
     });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // POST /api/auth/logout
 router.post('/logout', (_req, res) => {

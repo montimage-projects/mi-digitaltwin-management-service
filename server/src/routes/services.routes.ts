@@ -5,7 +5,13 @@ import { Category } from '../models/Category.js';
 import { Sector } from '../models/Sector.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateQuery, validateBody, objectIdSchema } from '../middleware/validation.js';
-import { AppError } from '../middleware/errorHandler.js';
+import {
+  asyncHandler,
+  findById,
+  findByIdAndUpdate,
+  findByIdAndDelete,
+  validateObjectIdParam,
+} from '../middleware/entityLoader.js';
 import { buildCaseInsensitiveFilter, buildSearchOrFilter } from '../utils/search.js';
 
 const router: RouterType = Router();
@@ -98,8 +104,11 @@ type ListServicesQuery = z.infer<typeof listServicesSchema>;
 // By default, services deprecated by a catalog refresh (see
 // `seed/services.seed.ts`) are excluded. Pass `?includeDeprecated=true` to
 // see the full history, e.g. for admin/audit views.
-router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, res, next) => {
-  try {
+router.get(
+  '/',
+  authMiddleware,
+  validateQuery(listServicesSchema),
+  asyncHandler(async (req, res) => {
     const { table, category, sector, provider, search, includeDeprecated, limit, skip } =
       req.query as unknown as ListServicesQuery;
 
@@ -146,60 +155,44 @@ router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, r
       limit,
       skip,
     });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // GET /api/services/:id
-router.get('/:id', authMiddleware, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    // Validate ObjectId format
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid service ID', 400);
-    }
-
-    const service = await Service.findById(id)
-      .populate('categoryId', 'name slug')
-      .populate('sectorId', 'name slug category')
-      .lean();
-
-    if (!service) {
-      throw new AppError('Service not found', 404);
-    }
+router.get(
+  '/:id',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
+    const service = await findById(Service, req.params.id, [
+      'categoryId',
+      { path: 'sectorId', select: 'name slug category' },
+    ]);
 
     res.json(service);
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // POST /api/services - Create new service
-router.post('/', authMiddleware, validateBody(createServiceSchema), async (req, res, next) => {
-  try {
+router.post(
+  '/',
+  authMiddleware,
+  validateBody(createServiceSchema),
+  asyncHandler(async (req, res) => {
     const data = req.body;
 
     // Check if category exists
-    const category = await Category.findById(data.categoryId);
-    if (!category) {
-      throw new AppError('Category not found', 400);
-    }
+    await findById(Category, data.categoryId);
 
     // Check if sector exists (if provided)
     if (data.sectorId) {
-      const sector = await Sector.findById(data.sectorId);
-      if (!sector) {
-        throw new AppError('Sector not found', 400);
-      }
+      await findById(Sector, data.sectorId);
     }
 
     // Check for duplicate shortName
     const existingService = await Service.findOne({ shortName: data.shortName });
     if (existingService) {
-      throw new AppError('Service with this short name already exists', 409);
+      throw new Error('Service with this short name already exists');
     }
 
     // Set currentVersion from versions if provided
@@ -216,37 +209,27 @@ router.post('/', authMiddleware, validateBody(createServiceSchema), async (req, 
       .lean();
 
     res.status(201).json(populatedService);
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // PUT /api/services/:id - Update service
-router.put('/:id', authMiddleware, validateBody(updateServiceSchema), async (req, res, next) => {
-  try {
+router.put(
+  '/:id',
+  authMiddleware,
+  validateObjectIdParam,
+  validateBody(updateServiceSchema),
+  asyncHandler(async (req, res) => {
     const { id } = req.params;
     const data = req.body;
 
-    // Validate ObjectId format
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid service ID', 400);
-    }
-
     // Check if category exists (if being updated)
     if (data.categoryId) {
-      const category = await Category.findById(data.categoryId);
-      if (!category) {
-        throw new AppError('Category not found', 400);
-      }
+      await findById(Category, data.categoryId);
     }
 
     // Check if sector exists (if being updated)
     if (data.sectorId) {
-      const sector = await Sector.findById(data.sectorId);
-      if (!sector) {
-        throw new AppError('Sector not found', 400);
-      }
+      await findById(Sector, data.sectorId);
     }
 
     // Check for duplicate shortName (if being updated)
@@ -256,103 +239,74 @@ router.put('/:id', authMiddleware, validateBody(updateServiceSchema), async (req
         _id: { $ne: id },
       });
       if (existingService) {
-        throw new AppError('Service with this short name already exists', 409);
+        throw new Error('Service with this short name already exists');
       }
     }
 
-    const service = await Service.findByIdAndUpdate(
+    const service = await findByIdAndUpdate(
+      Service,
       id,
       { $set: data },
-      { new: true, runValidators: true }
-    )
-      .populate('categoryId', 'name slug')
-      .populate('sectorId', 'name slug category')
-      .lean();
-
-    if (!service) {
-      throw new AppError('Service not found', 404);
-    }
+      { new: true, runValidators: true },
+      ['categoryId', { path: 'sectorId', select: 'name slug category' }]
+    );
 
     res.json(service);
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // DELETE /api/services/:id - Delete service
-router.delete('/:id', authMiddleware, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    // Validate ObjectId format
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid service ID', 400);
-    }
-
-    const service = await Service.findByIdAndDelete(id);
-
-    if (!service) {
-      throw new AppError('Service not found', 404);
-    }
-
+router.delete(
+  '/:id',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
+    await findByIdAndDelete(Service, req.params.id);
     res.json({ message: 'Service deleted successfully' });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // POST /api/services/:id/versions - Add new version
 router.post(
   '/:id/versions',
   authMiddleware,
+  validateObjectIdParam,
   validateBody(addVersionSchema),
-  async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const { version, dockerImage, releaseNotes } = req.body;
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { version, dockerImage, releaseNotes } = req.body;
 
-      // Validate ObjectId format
-      const parseResult = objectIdSchema.safeParse(id);
-      if (!parseResult.success) {
-        throw new AppError('Invalid service ID', 400);
-      }
-
-      const service = await Service.findById(id);
-
-      if (!service) {
-        throw new AppError('Service not found', 404);
-      }
-
-      // Check for duplicate version
-      const existingVersion = service.versions.find((v) => v.version === version);
-      if (existingVersion) {
-        throw new AppError('Version already exists', 409);
-      }
-
-      // Add new version
-      service.versions.push({
-        version,
-        dockerImage,
-        releaseNotes,
-        releasedAt: new Date(),
-      });
-
-      // Update currentVersion
-      service.currentVersion = version;
-
-      await service.save();
-
-      const populatedService = await Service.findById(id)
-        .populate('categoryId', 'name slug')
-        .populate('sectorId', 'name slug category')
-        .lean();
-
-      res.json(populatedService);
-    } catch (error) {
-      next(error);
+    const service = await Service.findById(id);
+    if (!service) {
+      throw new Error('Service not found');
     }
-  }
+
+    // Check for duplicate version
+    const existingVersion = service.versions.find((v) => v.version === version);
+    if (existingVersion) {
+      throw new Error('Version already exists');
+    }
+
+    // Add new version
+    service.versions.push({
+      version,
+      dockerImage,
+      releaseNotes,
+      releasedAt: new Date(),
+    });
+
+    // Update currentVersion
+    service.currentVersion = version;
+
+    await service.save();
+
+    const populatedService = await Service.findById(id)
+      .populate('categoryId', 'name slug')
+      .populate('sectorId', 'name slug category')
+      .lean();
+
+    res.json(populatedService);
+  })
 );
 
 export default router;

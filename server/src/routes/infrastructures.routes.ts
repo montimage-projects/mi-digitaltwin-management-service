@@ -3,8 +3,13 @@ import { z } from 'zod';
 import { Infrastructure } from '../models/Infrastructure.js';
 import { Scenario } from '../models/Scenario.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { validateBody, objectIdSchema } from '../middleware/validation.js';
-import { AppError } from '../middleware/errorHandler.js';
+import { validateBody } from '../middleware/validation.js';
+import {
+  asyncHandler,
+  findById,
+  findByIdAndDelete,
+  validateObjectIdParam,
+} from '../middleware/entityLoader.js';
 import { encrypt } from '../utils/encryption.js';
 import { buildClientFromInfrastructure, pingCluster } from '../services/kubernetesDeploy.js';
 
@@ -47,180 +52,146 @@ const updateInfrastructureSchema = z.object({
 });
 
 // GET /api/infrastructures - List all infrastructures
-router.get('/', authMiddleware, async (_req, res, next) => {
-  try {
+router.get(
+  '/',
+  authMiddleware,
+  asyncHandler(async (_req, res) => {
     const infrastructures = await Infrastructure.find()
       .sort({ name: 1 })
       .select(PUBLIC_PROJECTION)
       .lean();
 
     res.json(infrastructures);
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // POST /api/infrastructures - Create new infrastructure
 router.post(
   '/',
   authMiddleware,
   validateBody(createInfrastructureSchema),
-  async (req, res, next) => {
-    try {
-      const { name, type, endpoint, credentials, capacity, skipTLSVerify } = req.body;
+  asyncHandler(async (req, res) => {
+    const { name, type, endpoint, credentials, capacity, skipTLSVerify } = req.body;
 
-      // Check for duplicate name
-      const existing = await Infrastructure.findOne({ name });
-      if (existing) {
-        throw new AppError('Infrastructure with this name already exists', 409);
-      }
-
-      // Encrypt credentials
-      const encryptedCredentials = encrypt(credentials);
-
-      const infrastructure = new Infrastructure({
-        name,
-        type,
-        endpoint,
-        credentials: encryptedCredentials,
-        capacity: capacity || {},
-        status: 'inactive',
-        skipTLSVerify,
-      });
-
-      await infrastructure.save();
-
-      // Re-read the stored document, projecting the credentials out: `.lean()`
-      // skips the `toJSON` transform, so the exclusion must be explicit.
-      const result = await Infrastructure.findById(infrastructure._id)
-        .select(PUBLIC_PROJECTION)
-        .lean();
-      res.status(201).json(result);
-    } catch (error) {
-      next(error);
+    // Check for duplicate name
+    const existing = await Infrastructure.findOne({ name });
+    if (existing) {
+      throw new Error('Infrastructure with this name already exists');
     }
-  }
+
+    // Encrypt credentials
+    const encryptedCredentials = encrypt(credentials);
+
+    const infrastructure = new Infrastructure({
+      name,
+      type,
+      endpoint,
+      credentials: encryptedCredentials,
+      capacity: capacity || {},
+      status: 'inactive',
+      skipTLSVerify,
+    });
+
+    await infrastructure.save();
+
+    // Re-read the stored document, projecting the credentials out: `.lean()`
+    // skips the `toJSON` transform, so the exclusion must be explicit.
+    const result = await Infrastructure.findById(infrastructure._id)
+      .select(PUBLIC_PROJECTION)
+      .lean();
+    res.status(201).json(result);
+  })
 );
 
 // GET /api/infrastructures/:id - Get infrastructure detail
-router.get('/:id', authMiddleware, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid infrastructure ID', 400);
-    }
-
-    const infrastructure = await Infrastructure.findById(id).select(PUBLIC_PROJECTION).lean();
+router.get(
+  '/:id',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
+    const infrastructure = await Infrastructure.findById(req.params.id)
+      .select(PUBLIC_PROJECTION)
+      .lean();
 
     if (!infrastructure) {
-      throw new AppError('Infrastructure not found', 404);
+      throw new Error('Infrastructure not found');
     }
 
     res.json(infrastructure);
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // PUT /api/infrastructures/:id - Update infrastructure
 router.put(
   '/:id',
   authMiddleware,
+  validateObjectIdParam,
   validateBody(updateInfrastructureSchema),
-  async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const { name, type, endpoint, credentials, capacity, skipTLSVerify } = req.body;
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { name, type, endpoint, credentials, capacity, skipTLSVerify } = req.body;
 
-      const parseResult = objectIdSchema.safeParse(id);
-      if (!parseResult.success) {
-        throw new AppError('Invalid infrastructure ID', 400);
+    // Check for duplicate name
+    if (name) {
+      const existing = await Infrastructure.findOne({ name, _id: { $ne: id } });
+      if (existing) {
+        throw new Error('Infrastructure with this name already exists');
       }
-
-      // Check for duplicate name
-      if (name) {
-        const existing = await Infrastructure.findOne({ name, _id: { $ne: id } });
-        if (existing) {
-          throw new AppError('Infrastructure with this name already exists', 409);
-        }
-      }
-
-      const updateData: Record<string, unknown> = {};
-      if (name) updateData.name = name;
-      if (type) updateData.type = type;
-      if (endpoint) updateData.endpoint = endpoint;
-      if (capacity) updateData.capacity = capacity;
-      if (skipTLSVerify !== undefined) updateData.skipTLSVerify = skipTLSVerify;
-
-      // Encrypt new credentials if provided
-      if (credentials) {
-        updateData.credentials = encrypt(credentials);
-      }
-
-      const infrastructure = await Infrastructure.findByIdAndUpdate(
-        id,
-        { $set: updateData },
-        { new: true, runValidators: true }
-      )
-        .select(PUBLIC_PROJECTION)
-        .lean();
-
-      if (!infrastructure) {
-        throw new AppError('Infrastructure not found', 404);
-      }
-
-      res.json(infrastructure);
-    } catch (error) {
-      next(error);
     }
-  }
+
+    const updateData: Record<string, unknown> = {};
+    if (name) updateData.name = name;
+    if (type) updateData.type = type;
+    if (endpoint) updateData.endpoint = endpoint;
+    if (capacity) updateData.capacity = capacity;
+    if (skipTLSVerify !== undefined) updateData.skipTLSVerify = skipTLSVerify;
+
+    // Encrypt new credentials if provided
+    if (credentials) {
+      updateData.credentials = encrypt(credentials);
+    }
+
+    const infrastructure = await Infrastructure.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    )
+      .select(PUBLIC_PROJECTION)
+      .lean();
+
+    res.json(infrastructure);
+  })
 );
 
 // DELETE /api/infrastructures/:id - Delete infrastructure
-router.delete('/:id', authMiddleware, async (req, res, next) => {
-  try {
+router.delete(
+  '/:id',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
     const { id } = req.params;
-
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid infrastructure ID', 400);
-    }
 
     // Check if infrastructure is in use
     const scenariosUsingInfra = await Scenario.findOne({ infrastructureId: id });
     if (scenariosUsingInfra) {
-      throw new AppError('Cannot delete infrastructure: it is used by one or more scenarios', 400);
+      throw new Error('Cannot delete infrastructure: it is used by one or more scenarios');
     }
 
-    const infrastructure = await Infrastructure.findByIdAndDelete(id);
-
-    if (!infrastructure) {
-      throw new AppError('Infrastructure not found', 404);
-    }
+    await findByIdAndDelete(Infrastructure, id);
 
     res.json({ message: 'Infrastructure deleted successfully' });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // POST /api/infrastructures/:id/test - Test connection
-router.post('/:id/test', authMiddleware, async (req, res, next) => {
-  try {
+router.post(
+  '/:id/test',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
     const { id } = req.params;
 
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid infrastructure ID', 400);
-    }
-
-    const infrastructure = await Infrastructure.findById(id);
-
-    if (!infrastructure) {
-      throw new AppError('Infrastructure not found', 404);
-    }
+    const infrastructure = await findById(Infrastructure, id);
 
     // Decrypt credentials, build a cluster client and make a lightweight real
     // call (list a single namespace). Expected connection failures — an
@@ -229,27 +200,28 @@ router.post('/:id/test', authMiddleware, async (req, res, next) => {
     let success = false;
     let message = 'Connection successful';
     try {
-      const clients = buildClientFromInfrastructure(infrastructure);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const clients = buildClientFromInfrastructure(infrastructure as any);
       await pingCluster(clients);
       success = true;
     } catch (err) {
       message = err instanceof Error ? err.message : 'Connection failed';
     }
 
-    infrastructure.status = success ? 'active' : 'error';
-    infrastructure.lastHealthCheck = new Date();
+    // Update status in DB
+    await Infrastructure.findByIdAndUpdate(id, {
+      status: success ? 'active' : 'error',
+      lastHealthCheck: new Date(),
+    });
 
-    await infrastructure.save();
-
+    const saved = await Infrastructure.findById(id).select(PUBLIC_PROJECTION).lean();
     res.json({
       success,
-      status: infrastructure.status,
-      lastHealthCheck: infrastructure.lastHealthCheck,
+      status: saved?.status,
+      lastHealthCheck: saved?.lastHealthCheck,
       message,
     });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 export default router;
