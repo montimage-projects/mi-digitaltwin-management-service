@@ -14,7 +14,8 @@
  * These helpers escape the term first, so it always matches literally, and
  * emit a **string** `$regex` with `$options` rather than a `RegExp` object —
  * MongoDB accepts both, and the string form keeps regex construction out of
- * the codebase entirely.
+ * the codebase entirely. They also strip NUL bytes, which MongoDB refuses to
+ * accept inside a `$regex` at all (see `NUL_BYTE` below).
  */
 
 /**
@@ -24,6 +25,17 @@
  * and `[` is escaped here, so the escaped output can never open one.
  */
 const REGEX_METACHARACTERS = /[.*+?^${}()|[\]\\]/g;
+
+/**
+ * The NUL byte (U+0000), which is *removed* rather than escaped.
+ *
+ * It is not a regex metacharacter, so escaping does not apply to it, but
+ * MongoDB rejects it at the wire level — `Regular expression cannot contain
+ * an embedded null byte` — and that `MongoServerError` is not one of the
+ * cases `errorHandler` recognises, so it would surface as a 500. Dropping it
+ * here keeps the helper incapable of emitting a pattern MongoDB refuses.
+ */
+const NUL_BYTE = '\u0000';
 
 /** Case-insensitive substring filter, in MongoDB's string-`$regex` form. */
 export interface CaseInsensitiveFilter {
@@ -35,12 +47,15 @@ export interface CaseInsensitiveFilter {
  * Escape every regular-expression metacharacter in `input`, so the result is
  * a pattern that matches `input` verbatim and nothing else.
  *
+ * NUL bytes are dropped before the escape, so the returned pattern is always
+ * one MongoDB will accept.
+ *
  * @example
  *   escapeRegex('C++')  // 'C\\+\\+'
  *   escapeRegex('(')    // '\\('
  */
 export function escapeRegex(input: string): string {
-  return input.replace(REGEX_METACHARACTERS, '\\$&');
+  return input.replaceAll(NUL_BYTE, '').replace(REGEX_METACHARACTERS, '\\$&');
 }
 
 /**

@@ -14,6 +14,9 @@ import { buildCaseInsensitiveFilter, buildSearchOrFilter, escapeRegex } from '..
 /** Compile an already-escaped pattern, for behavioural assertions only. */
 const compile = (pattern: string): RegExp => RegExp(pattern);
 
+/** The NUL byte (U+0000), spelled out so it stays visible in the source. */
+const NUL = String.fromCharCode(0);
+
 describe('escapeRegex', () => {
   it('leaves plain alphanumeric input untouched', () => {
     expect(escapeRegex('nmap42')).toBe('nmap42');
@@ -110,6 +113,24 @@ describe('escapeRegex', () => {
     expect(compile(escapeRegex(payload)).test(payload)).toBe(true);
   });
 
+  // A NUL byte is not a metacharacter, so escaping leaves it alone — but
+  // MongoDB rejects an embedded NUL in a `$regex`, which `errorHandler` could
+  // only report as a 500. It is therefore dropped, not escaped.
+  it('strips a NUL-only term down to the empty string', () => {
+    expect(escapeRegex(NUL)).toBe('');
+  });
+
+  it('strips a NUL from the middle of a term, keeping the rest', () => {
+    expect(escapeRegex(`ab${NUL}cd`)).toBe('abcd');
+  });
+
+  it('strips every NUL while still escaping the metacharacters around it', () => {
+    const escaped = escapeRegex(`${NUL}C++${NUL}(EU)${NUL}`);
+
+    expect(escaped).not.toContain(NUL);
+    expect(escaped).toBe('C\\+\\+\\(EU\\)');
+  });
+
   it('is idempotent in meaning: escaping twice still matches the escaped text', () => {
     const once = escapeRegex('a.b');
 
@@ -131,6 +152,14 @@ describe('buildCaseInsensitiveFilter', () => {
 
   it('passes an empty value through, matching every document as before', () => {
     expect(buildCaseInsensitiveFilter('')).toEqual({ $regex: '', $options: 'i' });
+  });
+
+  it('never emits a $regex containing a NUL byte, which MongoDB would reject', () => {
+    const filter = buildCaseInsensitiveFilter(`ab${NUL}cd`);
+
+    expect(filter.$regex).not.toContain(NUL);
+    expect(filter).toEqual({ $regex: 'abcd', $options: 'i' });
+    expect(buildCaseInsensitiveFilter(NUL)).toEqual({ $regex: '', $options: 'i' });
   });
 });
 

@@ -20,7 +20,9 @@ import projectsRoutes from '../projects.routes.js';
  * `SyntaxError` that `errorHandler` could only report as a 500, and any
  * metacharacter silently changed the meaning of the search. These tests pin
  * both halves of the contract: the endpoints stay on 200, and the term is
- * matched *literally*.
+ * matched *literally*. A NUL byte is covered too: MongoDB rejects one inside
+ * a `$regex` at the wire level, so it has to be stripped before the query is
+ * built or the endpoint would still answer 500.
  *
  * Requires a MongoDB reachable at `mongodb://127.0.0.1:27017` (or
  * `SEED_TEST_MONGODB_URI` override). If unavailable, all tests are skipped.
@@ -73,6 +75,9 @@ type ServiceListResponse = {
 };
 
 type ProjectListResponse = Array<{ shortName: string }>;
+
+/** The NUL byte (U+0000): not a metacharacter, but rejected by MongoDB. */
+const NUL = String.fromCharCode(0);
 
 /** Build a URL with a single, correctly percent-encoded query parameter. */
 const searchUrl = (path: string, param: string, value: string): string =>
@@ -204,6 +209,48 @@ describe('GET /api/services search hardening (e2e)', () => {
     expect(body.total).toBe(0);
   });
 
+  // A NUL byte is not a metacharacter, so escaping alone left it in the
+  // pattern and MongoDB answered `Regular expression cannot contain an
+  // embedded null byte` — a 500. Stripped, the term behaves like an empty one.
+  test('a NUL byte in search returns 200, not 500', async () => {
+    if (!mongoAvailable) return;
+
+    const res = await getServices('search', NUL);
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as ServiceListResponse;
+    expect(body.services.map((s) => s.shortName).sort()).toEqual([
+      METACHAR_SERVICE.shortName,
+      PLAIN_SERVICE.shortName,
+    ]);
+  });
+
+  test('a NUL byte in the middle of a search term returns 200, not 500', async () => {
+    if (!mongoAvailable) return;
+
+    const res = await getServices('search', `analy${NUL}zer`);
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as ServiceListResponse;
+    expect(body.services.map((s) => s.shortName).sort()).toEqual([
+      METACHAR_SERVICE.shortName,
+      PLAIN_SERVICE.shortName,
+    ]);
+  });
+
+  test('a NUL byte in provider returns 200, not 500', async () => {
+    if (!mongoAvailable) return;
+
+    const res = await getServices('provider', NUL);
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as ServiceListResponse;
+    expect(body.services.map((s) => s.shortName).sort()).toEqual([
+      METACHAR_SERVICE.shortName,
+      PLAIN_SERVICE.shortName,
+    ]);
+  });
+
   test('rejects unauthenticated requests', async () => {
     if (!mongoAvailable) return;
 
@@ -241,6 +288,32 @@ describe('GET /api/projects search hardening (e2e)', () => {
 
     const body = (await res.json()) as ProjectListResponse;
     expect(body.map((p) => p.shortName)).toEqual([METACHAR_PROJECT.shortName]);
+  });
+
+  test('a NUL byte in search returns 200, not 500', async () => {
+    if (!mongoAvailable) return;
+
+    const res = await getProjects('search', NUL);
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as ProjectListResponse;
+    expect(body.map((p) => p.shortName).sort()).toEqual([
+      METACHAR_PROJECT.shortName,
+      PLAIN_PROJECT.shortName,
+    ]);
+  });
+
+  test('a NUL byte in leader returns 200, not 500', async () => {
+    if (!mongoAvailable) return;
+
+    const res = await getProjects('leader', NUL);
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as ProjectListResponse;
+    expect(body.map((p) => p.shortName).sort()).toEqual([
+      METACHAR_PROJECT.shortName,
+      PLAIN_PROJECT.shortName,
+    ]);
   });
 
   test('an ordinary search still matches, case-insensitively', async () => {
