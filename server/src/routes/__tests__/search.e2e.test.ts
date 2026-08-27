@@ -29,8 +29,7 @@ import projectsRoutes from '../projects.routes.js';
  */
 
 const TEST_DB_NAME = `secsim_search_e2e_test_${Date.now()}`;
-const TEST_MONGODB_URI =
-  process.env.SEED_TEST_MONGODB_URI ?? `mongodb://127.0.0.1:27017/${TEST_DB_NAME}`;
+const TEST_MONGODB_URI = `${process.env.SEED_TEST_MONGODB_URI ?? process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017'}/${TEST_DB_NAME}`;
 
 let mongoAvailable = true;
 let server: ReturnType<Express['listen']>;
