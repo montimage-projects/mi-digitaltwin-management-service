@@ -129,7 +129,7 @@ curl http://localhost:3000/api/health
 - **Auth:** Required
 - **Query Parameters:**
 - `category` (string, optional) - Filter by category ID
-- `search` (string, optional) - Full-text search
+- `search` (string, optional) - Case-insensitive literal substring match on short name, title, and description
 - `page` (number, default: 1) - Page number
 - `limit` (number, default: 20) - Items per page
 - **Response:** `{ services: Service[], meta: Pagination }`
@@ -649,13 +649,13 @@ curl -X GET "http://localhost:3000/api/services?page=2&limit=50" \
 
 Most endpoints support filters via query parameters:
 
-| Filter     | Example            | Behavior                             |
-| ---------- | ------------------ | ------------------------------------ |
-| `search`   | `?search=firewall` | Full-text search on name/description |
-| `category` | `?category=cat1`   | Exact match on category              |
-| `status`   | `?status=active`   | Exact match on status                |
-| `sector`   | `?sector=Telecom`  | Exact match on sector                |
-| `type`     | `?type=kubernetes` | Exact match on type                  |
+| Filter     | Example            | Behavior                                                                 |
+| ---------- | ------------------ | ------------------------------------------------------------------------ |
+| `search`   | `?search=firewall` | Case-insensitive literal substring match on short name/title/description |
+| `category` | `?category=cat1`   | Exact match on category                                                  |
+| `status`   | `?status=active`   | Exact match on status                                                    |
+| `sector`   | `?sector=Telecom`  | Exact match on sector                                                    |
+| `type`     | `?type=kubernetes` | Exact match on type                                                      |
 
 **Example:**
 
