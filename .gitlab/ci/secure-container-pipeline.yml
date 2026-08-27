@@ -2,8 +2,8 @@
 # Reused by the root .gitlab-ci.yml for post-scan aggregation only.
 
 variables:
-  SERVICE_ID: "$CI_PROJECT_NAME"
-  METRICS_PREFIX: "$CI_PROJECT_NAME"
+  SERVICE_ID: '$CI_PROJECT_NAME'
+  METRICS_PREFIX: '$CI_PROJECT_NAME'
 
 .security-findings-overview:
   stage: report
