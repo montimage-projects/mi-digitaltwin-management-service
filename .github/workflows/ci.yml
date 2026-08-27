@@ -5,6 +5,9 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  schedule:
+    # Full-history secret scan daily at 06:00 UTC.
+    - cron: '0 6 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -217,6 +220,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for full-history scheduled scan
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -233,6 +238,24 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install gitleaks
+        run: curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz | tar xz -C /usr/local/bin
+
+      - name: Run gitleaks (diff-mode)
+        if: github.event_name != 'schedule'
+        run: gitleaks detect --no-banner --report-format json --report-path gitleaks-report.json --log-opts "HEAD~1..HEAD"
+
+      - name: Run gitleaks (full-history)
+        if: github.event_name == 'schedule'
+        run: gitleaks detect --no-banner --report-format json --report-path gitleaks-report.json --verbose
+
+      - name: Upload gitleaks report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          retention-days: 14
 
       - name: Audit dependencies
         run: |

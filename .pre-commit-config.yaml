@@ -1,0 +1,13 @@
+# Pre-commit hooks — run on every commit.
+# Install with: pip install pre-commit && pre-commit install
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secret scan)
+        description: Scan staged files for secrets and credentials
+        entry: gitleaks protect --staged --no-banner
+        language: system
+        stages: [commit]
