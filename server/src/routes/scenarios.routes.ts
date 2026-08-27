@@ -6,21 +6,23 @@ import { Infrastructure } from '../models/Infrastructure.js';
 import { Service } from '../models/Service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateBody, objectIdSchema } from '../middleware/validation.js';
-import {
-  buildClientFromInfrastructure,
-  collectNewPodLogs,
-  deployTopology,
-  deriveNamespace,
-  getDeploymentStatus,
-  isDeploymentSettled,
-  teardownDeployment,
-  type ServiceImageSource,
-} from '../services/kubernetesDeploy.js';
+import { buildClientFromInfrastructure, teardownDeployment } from '../services/kubernetesDeploy.js';
 import { asyncHandler, findById, validateObjectIdParam } from '../middleware/entityLoader.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { executeScenario } from '../services/scenarioExecution.js';
+import { runSSEStream } from '../services/scenarioSSE.js';
 
-/** Interval between cluster status/log polls for the SSE progress stream. */
-const SSE_POLL_INTERVAL_MS = 2000;
+/** Extract unique service IDs from a scenario's topology nodes. */
+function resolveServiceIds(scenario: { topology?: { nodes?: unknown[] } }): string[] {
+  const nodes = scenario.topology?.nodes ?? [];
+  return [
+    ...new Set(
+      nodes
+        .map((n) => (n as { data?: { serviceId?: string } }).data?.serviceId)
+        .filter((sid): sid is string => Boolean(sid))
+    ),
+  ];
+}
 
 const router: RouterType = Router();
 
@@ -179,65 +181,37 @@ router.post(
     const infrastructure = await findById(Infrastructure, scenario.infrastructureId.toString());
 
     // Resolve the services referenced by the topology nodes.
-    const nodes = scenario.topology?.nodes ?? [];
-    const serviceIds = [
-      ...new Set(
-        nodes
-          .map((n) => (n as { data?: { serviceId?: string } }).data?.serviceId)
-          .filter((sid): sid is string => Boolean(sid))
-      ),
-    ];
+    const serviceIds = resolveServiceIds(scenario);
     const services = await Service.find({ _id: { $in: serviceIds } }).lean();
 
-    // Create the execution record up front so we have an id for the namespace.
-    scenario.executions.push({
-      executedAt: new Date(),
-      executedBy: user?.username || 'admin',
-      status: 'pending',
-      deployedServices: [],
-    });
-    await scenario.save();
+    // Atomically push a new execution record using $push with positional
+    // operator, so concurrent POSTs each get their own execution slot.
+    const pushResult = await Scenario.findOneAndUpdate(
+      { _id: id },
+      {
+        $push: {
+          executions: {
+            executedAt: new Date(),
+            executedBy: user?.username || 'admin',
+            status: 'pending',
+            deployedServices: [],
+          },
+        },
+      },
+      { new: true }
+    );
 
-    const execution = scenario.executions[scenario.executions.length - 1];
-    const executionId = execution._id!.toString();
-    const namespace = deriveNamespace(id, executionId);
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const clients = buildClientFromInfrastructure(infrastructure as any);
-      const result = await deployTopology(clients, {
-        namespace,
-        nodes,
-        services: services as unknown as ServiceImageSource[],
-        endpoint: infrastructure.endpoint as string,
-      });
-
-      execution.namespace = result.namespace;
-      execution.status = 'running';
-      execution.deployedServices = result.services.map((s) => ({
-        serviceId:
-          s.serviceId as unknown as (typeof execution.deployedServices)[number]['serviceId'],
-        nodeId: s.nodeId,
-        name: s.name,
-        uiType: s.uiType,
-        status: s.status,
-        dashboardUrl: s.dashboardUrl,
-      }));
-      await scenario.save();
-
-      res.json({
-        executionId,
-        namespace: result.namespace,
-        status: execution.status,
-        services: result.services,
-      });
-    } catch (deployError) {
-      // Surface the deploy failure but leave a durable, failed execution record.
-      execution.namespace = namespace;
-      execution.status = 'failed';
-      await scenario.save();
-      throw deployError;
+    if (!pushResult) {
+      throw new Error('Scenario not found');
     }
+
+    const infraForExec = {
+      endpoint: String(infrastructure.endpoint),
+      credentials: infrastructure.credentials as { iv: string; encrypted: string; authTag: string },
+    };
+    const result = await executeScenario(pushResult, infraForExec, services);
+
+    res.json(result);
   })
 );
 
@@ -253,26 +227,16 @@ router.delete(
     }
 
     const scenario = await Scenario.findById(id);
-
-    if (!scenario) {
-      throw new Error('Scenario not found');
-    }
+    if (!scenario) throw new Error('Scenario not found');
 
     const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
-    if (!execution) {
-      throw new AppError('Execution not found', 404);
-    }
+    if (!execution) throw new AppError('Execution not found', 404);
 
     // Only reach the cluster when something was actually deployed.
     if (execution.namespace && scenario.infrastructureId) {
-      const infrastructure = await findById(Infrastructure, scenario.infrastructureId.toString());
-      const infra = infrastructure as {
-        endpoint: string;
-        credentials: { iv: string; encrypted: string; authTag: string };
-      };
+      const infra = await findById(Infrastructure, scenario.infrastructureId.toString());
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const clients = buildClientFromInfrastructure(infra as any);
-      await teardownDeployment(clients, execution.namespace);
+      await teardownDeployment(buildClientFromInfrastructure(infra as any), execution.namespace);
     }
 
     execution.status = 'completed';
@@ -299,40 +263,18 @@ router.get(
     }
 
     const scenario = await Scenario.findById(id);
-
-    if (!scenario) {
-      throw new Error('Scenario not found');
-    }
+    if (!scenario) throw new Error('Scenario not found');
 
     const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
-    if (!execution) {
-      throw new AppError('Execution not found', 404);
-    }
+    if (!execution) throw new AppError('Execution not found', 404);
 
-    const namespace = execution.namespace;
-    const names = (execution.deployedServices ?? [])
-      .map((s) => s.name)
-      .filter((n): n is string => Boolean(n));
+    // Build the cluster client before switching to SSE, so a failure returns
+    // a normal JSON error rather than a half-open stream.
+    const infrastructure = scenario.infrastructureId
+      ? await findById(Infrastructure, scenario.infrastructureId.toString())
+      : null;
 
-    // Nothing was deployed, or the execution has already reached a terminal
-    // state — there is nothing to poll for. Emit a single snapshot and close.
-    const terminal =
-      !namespace ||
-      names.length === 0 ||
-      execution.status === 'completed' ||
-      execution.status === 'failed';
-
-    // Build the cluster client (may throw on bad credentials) *before*
-    // switching the response to an event stream, so a failure returns a
-    // normal JSON error rather than a half-open SSE connection.
-    const infrastructure =
-      terminal || !scenario.infrastructureId
-        ? null
-        : await findById(Infrastructure, scenario.infrastructureId.toString());
-
-    // Switch to a Server-Sent Events stream. `no-transform` opts this response
-    // out of the global compression() middleware's buffering; `X-Accel-Buffering`
-    // disables buffering in reverse proxies (e.g. nginx).
+    // Switch to Server-Sent Events stream, bypassing compression/buffering.
     res.status(200).set({
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
@@ -341,76 +283,19 @@ router.get(
     });
     res.flushHeaders();
 
-    let closed = false;
-    let timer: ReturnType<typeof setInterval> | undefined;
+    const infraView = infrastructure
+      ? {
+          endpoint: String(infrastructure.endpoint),
+          credentials: infrastructure.credentials as {
+            iv: string;
+            encrypted: string;
+            authTag: string;
+          },
+        }
+      : null;
+    const cleanup = runSSEStream(res, scenario, execution, infraView);
 
-    const send = (event: string, data: unknown): void => {
-      if (closed) return;
-      res.write(`event: ${event}\n`);
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
-    };
-
-    const cleanup = (): void => {
-      if (closed) return;
-      closed = true;
-      if (timer) clearInterval(timer);
-      timer = undefined;
-      res.end();
-    };
-
-    // Client disconnect: stop polling and close any pending work.
     req.on('close', cleanup);
-
-    if (terminal || !names.length) {
-      send('progress', { status: execution.status, progress: 0, services: [] });
-      send('end', { status: execution.status });
-      cleanup();
-      return;
-    }
-
-    if (!infrastructure) {
-      throw new Error('Assigned infrastructure not found');
-    }
-
-    const infra = infrastructure as {
-      endpoint: string;
-      credentials: { iv: string; encrypted: string; authTag: string };
-    };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const clients = buildClientFromInfrastructure(infra as any);
-
-    const seen = new Map<string, number>();
-
-    const poll = async (): Promise<void> => {
-      if (closed) return;
-      try {
-        const { statuses, progress } = await getDeploymentStatus(clients, { namespace, names });
-        send('progress', { progress, services: statuses });
-
-        const logs = await collectNewPodLogs(clients, { namespace, names, seen });
-        for (const entry of logs) {
-          send('log', { service: entry.name, pod: entry.pod, line: entry.line });
-        }
-
-        if (isDeploymentSettled(statuses)) {
-          const status = statuses.some((s) => s.status === 'failed') ? 'failed' : 'completed';
-          send('end', { status, services: statuses });
-          cleanup();
-        }
-      } catch (err) {
-        send('error', { message: err instanceof Error ? err.message : String(err) });
-        cleanup();
-      }
-    };
-
-    // Emit an immediate snapshot, then poll on an interval until settled or
-    // the client disconnects.
-    await poll();
-    if (!closed) {
-      timer = setInterval(() => {
-        void poll();
-      }, SSE_POLL_INTERVAL_MS);
-    }
   })
 );
 
