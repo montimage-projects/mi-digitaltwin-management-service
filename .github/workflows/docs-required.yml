@@ -26,9 +26,12 @@ jobs:
             package.json
 
       - name: Check if docs updated when code changed
+        env:
+          CODE_CHANGED: ${{ steps.changed-files.outputs.all_changed_files }}
+          DOCS_CHANGED: ${{ steps.changed-files.outputs.other_changed_files }}
         run: |
           # Get list of changed files in code
-          code_changed="${{ steps.changed-files.outputs.all_changed_files }}"
+          code_changed="$CODE_CHANGED"
 
           if [ -z "$code_changed" ]; then
             echo " No code changes detected"
@@ -36,7 +39,7 @@ jobs:
           fi
 
           # Check if documentation was changed
-          docs_changed="${{ steps.changed-files.outputs.other_changed_files }}"
+          docs_changed="$DOCS_CHANGED"
 
           # List of patterns that suggest docs should be updated
           code_patterns=(
@@ -105,8 +108,10 @@ jobs:
 
       - name: Verify API docs updated
         if: steps.changed-routes.outputs.any_changed == 'true'
+        env:
+          CHANGED_FILES: ${{ steps.changed-routes.outputs.all_changed_files }}
         run: |
-          changed_files="${{ steps.changed-routes.outputs.all_changed_files }}"
+          changed_files="$CHANGED_FILES"
 
           echo " Changed API route files:"
           echo "$changed_files"
@@ -145,8 +150,10 @@ jobs:
 
       - name: Verify component docs updated
         if: steps.changed-components.outputs.any_changed == 'true'
+        env:
+          CHANGED_FILES: ${{ steps.changed-components.outputs.all_changed_files }}
         run: |
-          changed_files="${{ steps.changed-components.outputs.all_changed_files }}"
+          changed_files="$CHANGED_FILES"
 
           # Count number of component files changed
           component_count=$(echo "$changed_files" | wc -l)
