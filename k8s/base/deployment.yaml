@@ -47,7 +47,11 @@ spec:
           # work) — build and push it yourself first:
           #   docker build -f server/Dockerfile.unified -t <your-registry>/<image>:<tag> .
           #   docker push <your-registry>/<image>:<tag>
-          image: ghcr.io/montimage-projects/mi-digitaltwin-management-service:latest # TODO: replace with your built/pushed image (node:20-slim based)
+          # TODO: replace with your built/pushed image (node:22-slim based).
+          # Pin to an immutable digest after building, e.g.:
+          #   IMAGE=$(docker buildx imagetools inspect ghcr.io/...:tag --format '{{.Digest}}')
+          #   sed -i "s|:latest|@${IMAGE#sha256:}|" k8s/base/deployment.yaml
+          image: ghcr.io/montimage-projects/mi-digitaltwin-management-service:latest # TODO: replace with your built/pushed image (node:22-slim based)
           ports:
             - name: http
               containerPort: 3000

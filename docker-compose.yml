@@ -24,18 +24,18 @@ services:
       - montimage-network
 
   mongo-express:
-    image: mongo-express:latest
+    image: mongo-express:1.0.2
     container_name: montimage-mongo-express
     ports:
-      - '8081:8081'
+      - '127.0.0.1:8081:8081'
     environment:
       ME_CONFIG_MONGODB_SERVER: mongodb
       ME_CONFIG_MONGODB_PORT: '27017'
       ME_CONFIG_MONGODB_AUTH_DATABASE: admin
       ME_CONFIG_MONGODB_AUTH_USERNAME: admin
       ME_CONFIG_MONGODB_AUTH_PASSWORD: admin123
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+      ME_CONFIG_BASICAUTH_USERNAME: ${ME_BASICAUTH_USERNAME:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_BASICAUTH_PASSWORD:-admin123}
     depends_on:
       mongodb:
         condition: service_healthy
