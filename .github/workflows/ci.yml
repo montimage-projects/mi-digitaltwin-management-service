@@ -148,7 +148,7 @@ jobs:
         run: npm ci
 
       - name: Run server tests with coverage
-        run: npm run test:coverage
+        run: cd server && npm run test:coverage
         env:
           JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
           ADMIN_PASSWORD: ci-test-admin-secret-9f2K7x
