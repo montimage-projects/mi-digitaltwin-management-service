@@ -21,15 +21,7 @@ interface ServiceSeed {
   repositoryTable: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
 }
 
-// ---------------------------------------------------------------------------
-// Table 1: Cybersecurity Services catalog (INTACT_TOOLBOX)
-//
-// Refreshed from the SECASSURED source of truth (Horizon Europe Grant
-// Agreement GAP-101225858, "Cybersecurity Services Catalogue"). The 12
-// services below are the R1-R5.4 entries from that catalogue's Summary
-// Table, grouped into the "Dev Services" (R1-R3.5) and "Ops Services" (R5)
-// categories the source document defines. Resolves issue #5.
-// ---------------------------------------------------------------------------
+// INTACT_TOOLBOX: Cybersecurity Services catalog
 const intactToolboxServices: ServiceSeed[] = [
   {
     shortName: 'CSAM',
@@ -363,7 +355,7 @@ const intactToolboxServices: ServiceSeed[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Table 2: Infrastructure list (OTHER_SERVICES)
+// OTHER_SERVICES: Infrastructure list
 //
 // Refreshed from the SECASSURED source of truth (Grant Agreement
 // GAP-101225858, Part B page 41, section "Infrastructure"). Each entry is a

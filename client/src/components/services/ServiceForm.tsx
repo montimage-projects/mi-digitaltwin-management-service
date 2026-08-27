@@ -10,6 +10,7 @@ import {
   type Service,
   type CreateServiceData,
 } from '@/lib/api';
+import { MAX_LIST_LIMIT } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -156,7 +157,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
   // Fetch all services for "Interacts With" dropdown
   const { data: allServicesData } = useQuery({
     queryKey: ['services', 'all'],
-    queryFn: () => servicesApi.list({ limit: 1000 }),
+    queryFn: () => servicesApi.list({ limit: MAX_LIST_LIMIT }),
   });
   const allServices = allServicesData?.services || [];
 
