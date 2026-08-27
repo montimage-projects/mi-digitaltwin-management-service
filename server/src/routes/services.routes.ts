@@ -109,8 +109,10 @@ router.get(
   authMiddleware,
   validateQuery(listServicesSchema),
   asyncHandler(async (req, res) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsedQuery = req.query as any as ListServicesQuery;
     const { table, category, sector, provider, search, includeDeprecated, limit, skip } =
-      req.query as unknown as ListServicesQuery;
+      parsedQuery;
 
     const query: Record<string, unknown> = {};
 

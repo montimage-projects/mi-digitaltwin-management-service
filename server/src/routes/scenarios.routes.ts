@@ -166,7 +166,7 @@ router.post(
   validateObjectIdParam,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const user = (req as unknown as { user: { username: string } }).user;
+    const user = req.user!;
 
     const scenario = await Scenario.findById(id);
 
