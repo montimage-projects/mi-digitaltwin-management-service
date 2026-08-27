@@ -49,7 +49,9 @@ vi.mock('jsonwebtoken', () => ({
 
 // ── Import after mocking ───────────────────────────────────────────────────
 
-const jwt = await import('jsonwebtoken').then((m) => m.default as typeof import('jsonwebtoken').default);
+const jwt = await import('jsonwebtoken').then(
+  (m) => m.default as typeof import('jsonwebtoken').default
+);
 const { User } = await import('../../models/User.js');
 const { validate } = await import('../../middleware/validation.js');
 const { loginSchema } = await import('../../validators/auth.validator.js');
@@ -353,7 +355,11 @@ describe('GET /me', () => {
     const server = app.listen(0);
     const port = (server.address() as AddressInfo).port;
 
-    verifyMock.mockReturnValue({ userId: '507f1f77bcf86cd799439011', username: 'testuser', role: 'admin' });
+    verifyMock.mockReturnValue({
+      userId: '507f1f77bcf86cd799439011',
+      username: 'testuser',
+      role: 'admin',
+    });
 
     try {
       const res = await fetch(`http://127.0.0.1:${port}/me`, {
