@@ -29,21 +29,26 @@ npm ci
 Example files exist at three levels: `.env.example` (root/deployment),
 `server/.env.example`, and `client/.env.example`.
 
-| Variable         | Required                                                                     | Default                              | Notes                                                                                                                          |
-| ---------------- | ---------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `JWT_SECRET`     | Yes — validation throws and startup aborts if unset or shorter than 32 chars | none                                 | Enforced by Zod in `server/src/config/env.ts`. Generate with `openssl rand -base64 48`                                         |
-| `ENCRYPTION_KEY` | No (currently defaulted)                                                     | `intact-default-encryption-key-2025` | Hard-coded fallback is a P1 security finding; override in any real deployment                                                  |
-| `ADMIN_PASSWORD` | Yes — validation throws and startup aborts if unset or shorter than 8 chars  | none                                 | Enforced by Zod in `server/src/config/env.ts`; known defaults (`intact2025`, `admin`, `password`) are refused by admin seeding |
+| Variable         | Required                                                                     | Default | Notes                                                                                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JWT_SECRET`     | Yes — validation throws and startup aborts if unset or shorter than 32 chars | none    | Enforced by Zod in `server/src/config/env.ts`. Generate with `openssl rand -base64 48`                                                                                |
+| `ENCRYPTION_KEY` | Yes — validation throws and startup aborts if unset or shorter than 16 chars | none    | Enforced by Zod in `server/src/config/env.ts`; placeholder/example values are refused by the startup checks in every `NODE_ENV`. Generate with `openssl rand -hex 16` |
+| `ADMIN_PASSWORD` | Yes — validation throws and startup aborts if unset or shorter than 8 chars  | none    | Enforced by Zod in `server/src/config/env.ts`; known defaults (`intact2025`, `admin`, `password`) are refused by admin seeding                                        |
 
 Other variables (`PORT`, `MONGODB_URI`, `CORS_ORIGIN`, ...) have safe
 development defaults — see `server/src/config/env.ts` for the full schema.
 
-For local development you can simply export the required secret:
+For local development you can simply export the required secrets:
 
 ```bash
 export JWT_SECRET="$(openssl rand -base64 48)"
 export ADMIN_PASSWORD="<choose-a-strong-password>"
+export ENCRYPTION_KEY="$(openssl rand -hex 16)"
 ```
+
+`ENCRYPTION_KEY` is SHA-256 derived into the AES-256 key, so any value at or
+above the 16-character floor works. Never rotate it once credentials have been
+stored: already-encrypted `Infrastructure.credentials` become undecryptable.
 
 ## Recorded commands
 
@@ -60,12 +65,12 @@ Run from the repository root:
 
 `npm run test` works out of the box — no exported secrets needed. The vitest
 config (`server/vitest.config.ts`) loads `server/tests/setup.ts`, which
-injects the same CI-mirrored `JWT_SECRET` value used by
-`.github/workflows/ci.yml` whenever the variable is not already set in your
-shell (an explicit export still wins).
+injects the same CI-mirrored `JWT_SECRET`, `ADMIN_PASSWORD` and
+`ENCRYPTION_KEY` values used by `.github/workflows/ci.yml` whenever a variable
+is not already set in your shell (an explicit export still wins).
 
-Note: this applies to tests only. Running the server itself still requires a
-real `JWT_SECRET`.
+Note: this applies to tests only. Running the server itself still requires real
+`JWT_SECRET`, `ADMIN_PASSWORD` and `ENCRYPTION_KEY` values.
 
 Additional note: server e2e tests connect to MongoDB at
 `mongodb://127.0.0.1:27017/...` by default (override with

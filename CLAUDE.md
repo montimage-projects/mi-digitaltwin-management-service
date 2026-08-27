@@ -28,10 +28,12 @@ Run from the repo root (npm workspaces only):
 - IMPORTANT: use `npm ci` / npm workspace commands only. `package-lock.json`
   is the sole dependency resolution source; `bun.lock` is untracked and
   gitignored — never reintroduce it.
-- `npm test` needs no exported secrets: `server/tests/setup.ts` injects a
-  CI-mirrored `JWT_SECRET` for vitest only. Running the server itself still
-  requires exporting one, e.g.
-  `export JWT_SECRET="$(openssl rand -base64 48)"`.
+- `npm test` needs no exported secrets: `server/tests/setup.ts` injects
+  CI-mirrored values for vitest only. Running the server itself still requires
+  exporting every required secret, e.g.
+  `export JWT_SECRET="$(openssl rand -base64 48)"`,
+  `export ADMIN_PASSWORD="<strong-password>"`,
+  `export ENCRYPTION_KEY="$(openssl rand -hex 16)"`.
 - Never commit `.env` files or secrets; use the `.env.example` templates.
 - Husky pre-commit runs lint-staged plus typechecks on both workspaces — fix
   the failure; never bypass hooks with `--no-verify`.

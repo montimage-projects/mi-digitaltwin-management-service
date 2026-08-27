@@ -21,10 +21,10 @@ The application uses `.env` files for configuration:
 
 ### Required Variables
 
-| Variable         | Description                                  | Example                              |
-| ---------------- | -------------------------------------------- | ------------------------------------ |
-| `JWT_SECRET`     | Secret for signing JWT tokens (min 32 chars) | `your-super-secret-key-min-32-chars` |
-| `ENCRYPTION_KEY` | Key for encrypting credentials (32 chars)    | `abcdef0123456789abcdef0123456789`   |
+| Variable         | Description                                   | Example                              |
+| ---------------- | --------------------------------------------- | ------------------------------------ |
+| `JWT_SECRET`     | Secret for signing JWT tokens (min 32 chars)  | `your-super-secret-key-min-32-chars` |
+| `ENCRYPTION_KEY` | Key for encrypting credentials (min 16 chars) | `abcdef0123456789abcdef0123456789`   |
 
 ### Optional Variables
 
@@ -219,7 +219,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('24h'),
   CORS_ORIGIN: z.string().url(),
-  ENCRYPTION_KEY: z.string().length(32),
+  ENCRYPTION_KEY: z.string().min(16),
   NODE_ENV: z.enum(['development', 'production', 'test']),
 });
 
@@ -324,10 +324,13 @@ Error: Missing required environment variable: JWT_SECRET
 ### Invalid Configuration
 
 ```
-Error: ENCRYPTION_KEY must be exactly 32 characters
+Invalid environment variables:
+{ ENCRYPTION_KEY: { _errors: [ 'ENCRYPTION_KEY must be at least 16 characters' ] } }
+Error: Environment validation failed — fix the variables above and restart
 ```
 
-**Solution:** Generate a new key with `openssl rand -hex 16`.
+**Solution:** Generate a new key with `openssl rand -hex 16`. `ENCRYPTION_KEY`
+has no default — the server refuses to boot without it in every `NODE_ENV`.
 
 ### CORS Errors
 

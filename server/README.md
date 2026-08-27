@@ -84,7 +84,7 @@ src/
 | `JWT_SECRET`     | JWT signing secret             | (required)                         |
 | `JWT_EXPIRES_IN` | Token expiration               | `24h`                              |
 | `CORS_ORIGIN`    | Allowed CORS origin            | `http://localhost:5173`            |
-| `ENCRYPTION_KEY` | Credential encryption key      | (required, 32 chars)               |
+| `ENCRYPTION_KEY` | Credential encryption key      | (required, min 16 chars)           |
 | `SERVE_STATIC`   | Serve client build from server | `false`                            |
 
 ## API Endpoints
@@ -202,7 +202,13 @@ Check JWT_SECRET is set in `.env`.
 
 ### Encryption Errors
 
-Ensure ENCRYPTION_KEY is exactly 32 characters.
+Ensure ENCRYPTION_KEY is set and at least 16 characters — there is no built-in
+default, so the server refuses to boot without it. The value is SHA-256 derived
+into the AES-256 key, so any length at or above the floor is valid.
+
+If decryption starts failing (`Unsupported state or unable to authenticate
+data`) the key changed: AES-256-GCM rejects the auth tag rather than returning
+garbage. Restore the previous key, or re-enter the stored credentials.
 
 ## Static File Serving
 

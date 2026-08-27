@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stop defaulting `SEED_ON_STARTUP=true` in prod templates: Compose files now
   require `ADMIN_PASSWORD` and default seeding off; Render blueprint, K8s
   ConfigMap, and the unified image follow opt-in seeding (#36)
+- Require `ENCRYPTION_KEY` at boot: removed the committed fallback key that
+  could decrypt every stored cluster credential; validation aborts startup when
+  it is unset or shorter than 16 characters (#37)
+- Make the placeholder `ENCRYPTION_KEY` startup check fatal in every
+  `NODE_ENV` instead of production only — development and staging encrypt the
+  same stored credentials production does (#37)
+
+> **Upgrade note (#37).** Deployments that never set `ENCRYPTION_KEY` were
+> silently running on the removed built-in fallback. Before upgrading, set
+> `ENCRYPTION_KEY` to that previous fallback value — recover it from history
+> with `git show <pre-upgrade-ref>:server/src/config/env.ts` — so already
+> stored `Infrastructure.credentials` keep decrypting. Otherwise generate a
+> fresh key and re-enter those credentials. Never swap the key without a
+> re-entry plan: AES-256-GCM fails the auth-tag check and throws rather than
+> returning garbage.
 
 ## [0.1.0] - 2026-07-07
 
