@@ -77,7 +77,9 @@ describe('authMiddleware', () => {
 
     expect(next).toHaveBeenCalledTimes(1);
     expect((req as Record<string, unknown>).user).toEqual(decoded);
-    expect(verifyMock).toHaveBeenCalledWith('valid-token', expect.any(String));
+    expect(verifyMock).toHaveBeenCalledWith('valid-token', expect.any(String), {
+      algorithms: ['HS256'],
+    });
   });
 
   test('rejects when Authorization header is missing', () => {
@@ -200,8 +202,10 @@ describe('authMiddleware', () => {
 
     authMiddleware(req as never, res as never, next);
 
-    // Verify was called with the token without the "Bearer " prefix
-    expect(verifyMock).toHaveBeenCalledWith('my-secret-token', expect.any(String));
+    // Verify was called with the token without the "Bearer " prefix and HS256 pin.
+    expect(verifyMock).toHaveBeenCalledWith('my-secret-token', expect.any(String), {
+      algorithms: ['HS256'],
+    });
   });
 
   test('rejects empty Bearer token as invalid', () => {

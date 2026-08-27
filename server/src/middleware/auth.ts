@@ -18,6 +18,16 @@ declare global {
   }
 }
 
+export const requireRole = (...roles: string[]) => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      next(new AppError('Insufficient permissions', 403));
+      return;
+    }
+    next();
+  };
+};
+
 export const authMiddleware = (req: Request, _res: Response, next: NextFunction): void => {
   try {
     const authHeader = req.headers.authorization;
@@ -28,17 +38,18 @@ export const authMiddleware = (req: Request, _res: Response, next: NextFunction)
 
     const token = authHeader.substring(7);
 
-    const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as JwtPayload;
     req.user = decoded;
 
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      next(new AppError('Invalid token', 401));
-      return;
-    }
+    // TokenExpiredError must be checked before JsonWebTokenError — it extends it.
     if (error instanceof jwt.TokenExpiredError) {
       next(new AppError('Token expired', 401));
+      return;
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      next(new AppError('Invalid token', 401));
       return;
     }
     next(error);
