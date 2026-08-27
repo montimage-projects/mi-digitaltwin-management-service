@@ -5,8 +5,12 @@ import { Scenario } from '../models/Scenario.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateBody, validateQuery, objectIdSchema } from '../middleware/validation.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { buildCaseInsensitiveFilter, buildSearchOrFilter } from '../utils/search.js';
 
 const router: RouterType = Router();
+
+/** Fields a free-text `?search=` term is matched against. */
+const SEARCH_FIELDS = ['shortName', 'title', 'description'] as const;
 
 // Validation schemas
 const createProjectSchema = z.object({
@@ -48,15 +52,11 @@ router.get('/', authMiddleware, validateQuery(listProjectsSchema), async (req, r
     }
 
     if (leader) {
-      query.leader = { $regex: new RegExp(leader, 'i') };
+      query.leader = buildCaseInsensitiveFilter(leader);
     }
 
     if (search) {
-      query.$or = [
-        { shortName: { $regex: new RegExp(search, 'i') } },
-        { title: { $regex: new RegExp(search, 'i') } },
-        { description: { $regex: new RegExp(search, 'i') } },
-      ];
+      query.$or = buildSearchOrFilter(SEARCH_FIELDS, search);
     }
 
     const projects = await Project.find(query)
