@@ -582,7 +582,8 @@ curl -X DELETE http://localhost:3000/api/categories/cat1 \
   id: string;
   name: string;
   type: 'kubernetes' | 'docker' | 'vm';
-  credentials: object; // AES-256 encrypted
+  // `credentials` is stored AES-256-GCM encrypted and is NEVER returned by the
+  // API — list, detail, create and update responses project it out (issue #38).
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;

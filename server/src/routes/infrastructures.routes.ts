@@ -10,6 +10,17 @@ import { buildClientFromInfrastructure, pingCluster } from '../services/kubernet
 
 const router: RouterType = Router();
 
+/**
+ * Fields projected out of every infrastructure API response.
+ *
+ * These handlers read with `.lean()`, which returns the raw MongoDB document
+ * and therefore bypasses the schema's `toJSON` transform — the transform that
+ * strips `credentials` and `__v`. Without this explicit projection the
+ * encrypted credential blob (`iv` / `encrypted` / `authTag`) leaks to every API
+ * consumer (issue #38, F-BUG-002).
+ */
+const PUBLIC_PROJECTION = '-credentials -__v';
+
 // Validation schemas
 const capacitySchema = z.object({
   cpu: z.number().positive().optional(),
@@ -38,7 +49,10 @@ const updateInfrastructureSchema = z.object({
 // GET /api/infrastructures - List all infrastructures
 router.get('/', authMiddleware, async (_req, res, next) => {
   try {
-    const infrastructures = await Infrastructure.find().sort({ name: 1 }).lean();
+    const infrastructures = await Infrastructure.find()
+      .sort({ name: 1 })
+      .select(PUBLIC_PROJECTION)
+      .lean();
 
     res.json(infrastructures);
   } catch (error) {
@@ -76,8 +90,11 @@ router.post(
 
       await infrastructure.save();
 
-      // Return without credentials (handled by toJSON transform)
-      const result = await Infrastructure.findById(infrastructure._id).lean();
+      // Re-read the stored document, projecting the credentials out: `.lean()`
+      // skips the `toJSON` transform, so the exclusion must be explicit.
+      const result = await Infrastructure.findById(infrastructure._id)
+        .select(PUBLIC_PROJECTION)
+        .lean();
       res.status(201).json(result);
     } catch (error) {
       next(error);
@@ -95,7 +112,7 @@ router.get('/:id', authMiddleware, async (req, res, next) => {
       throw new AppError('Invalid infrastructure ID', 400);
     }
 
-    const infrastructure = await Infrastructure.findById(id).lean();
+    const infrastructure = await Infrastructure.findById(id).select(PUBLIC_PROJECTION).lean();
 
     if (!infrastructure) {
       throw new AppError('Infrastructure not found', 404);
@@ -146,7 +163,9 @@ router.put(
         id,
         { $set: updateData },
         { new: true, runValidators: true }
-      ).lean();
+      )
+        .select(PUBLIC_PROJECTION)
+        .lean();
 
       if (!infrastructure) {
         throw new AppError('Infrastructure not found', 404);
