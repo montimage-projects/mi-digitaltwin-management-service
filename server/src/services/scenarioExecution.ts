@@ -7,7 +7,7 @@
  * two parallel POSTs interleave.
  */
 
-import type { Types } from 'mongoose';
+import mongoose, { type Types } from 'mongoose';
 import {
   buildClientFromInfrastructure,
   deployTopology,
@@ -16,6 +16,7 @@ import {
   type ServiceImageSource,
 } from './kubernetesDeploy.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { Scenario } from '../models/Scenario.js';
 
 /** Minimal view of an Infrastructure document. */
 interface InfrastructureView {
@@ -93,7 +94,8 @@ export async function executeScenario(
       endpoint: infrastructure.endpoint,
     });
 
-    // Update the execution record atomically.
+    // Update the execution record atomically via positional operator
+    // so concurrent requests don't collide on save().
     execItem.namespace = result.namespace;
     execItem.status = 'running';
     execItem.deployedServices = result.services.map((s) => ({
@@ -105,9 +107,16 @@ export async function executeScenario(
       dashboardUrl: s.dashboardUrl,
     }));
 
-    if (scenario.save) {
-      await scenario.save();
-    }
+    await Scenario.findOneAndUpdate(
+      { _id: scenario._id, 'executions._id': new mongoose.Types.ObjectId(executionId) },
+      {
+        $set: {
+          'executions.$.namespace': result.namespace,
+          'executions.$.status': execItem.status,
+          'executions.$.deployedServices': execItem.deployedServices,
+        },
+      }
+    );
 
     return {
       executionId,
@@ -119,9 +128,15 @@ export async function executeScenario(
     // Surface the deploy failure but leave a durable, failed execution record.
     execItem.namespace = namespace;
     execItem.status = 'failed';
-    if (scenario.save) {
-      await scenario.save();
-    }
+    await Scenario.findOneAndUpdate(
+      { _id: scenario._id, 'executions._id': new mongoose.Types.ObjectId(executionId) },
+      {
+        $set: {
+          'executions.$.namespace': namespace,
+          'executions.$.status': 'failed',
+        },
+      }
+    );
     throw deployError;
   }
 }
