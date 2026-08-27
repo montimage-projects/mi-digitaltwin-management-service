@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, Edit, Trash2, Play, FileText } from 'lucide-react';
 import { Scenario, scenariosApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { ErrorState } from '@/components/ui/error-state';
 
 interface ScenarioTableProps {
   scenarios: Scenario[];
@@ -223,4 +224,26 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
       </AlertDialog>
     </>
   );
+}
+
+export function ScenarioTableWithState({
+  scenarios,
+  projectId,
+  isLoading,
+  error,
+  onRetry,
+}: {
+  scenarios: Scenario[];
+  projectId: string;
+  isLoading: boolean;
+  error: Error | string | null;
+  onRetry?: () => void;
+}) {
+  if (isLoading) {
+    return <ScenarioTable scenarios={scenarios} projectId={projectId} />;
+  }
+  if (error) {
+    return <ErrorState error={error} onRetry={onRetry} />;
+  }
+  return <ScenarioTable scenarios={scenarios} projectId={projectId} />;
 }
