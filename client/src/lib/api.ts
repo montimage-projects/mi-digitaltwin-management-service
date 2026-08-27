@@ -6,25 +6,22 @@
  * public surface unchanged for existing imports.
  */
 
-export { default as api } from './api-core';
+import api from './api-core';
+
+export { api };
 
 // Auth
 export const authApi = {
   login: async (username: string, password: string) => {
-    const { data } = await (
-      await import('./api-core')
-    ).default.post('/auth/login', {
-      username,
-      password,
-    });
+    const { data } = await api.post('/auth/login', { username, password });
     return data;
   },
   me: async () => {
-    const { data } = await (await import('./api-core')).default.get('/auth/me');
+    const { data } = await api.get('/auth/me');
     return data;
   },
   logout: async () => {
-    const { data } = await (await import('./api-core')).default.post('/auth/logout');
+    const { data } = await api.post('/auth/logout');
     return data;
   },
 };
