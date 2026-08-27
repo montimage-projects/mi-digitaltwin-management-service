@@ -50,17 +50,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check markdown links
-        uses: gaurav-nelson/github-action-markdown-link-check@v1
+      - name: Check markdown links (mlc container)
+        uses: docker://ghcr.io/tcort/markdown-link-check:latest
         with:
-          use-quiet-mode: 'yes'
-          use-verbose-mode: 'yes'
-          file-path: |
-            ./README.md
-            ./docs/README.md
-            ./client/README.md
-            ./server/README.md
-          config-file: '.github/workflows/mlc_config.json'
+          args: -q -v --config .github/workflows/mlc_config.json README.md docs/README.md client/README.md server/README.md
 
   yaml-validation:
     name: YAML & Frontmatter Validation

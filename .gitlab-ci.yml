@@ -1,3 +1,6 @@
+# TODO: Resolve v1.2.4 to commit SHA (F-DEP-408).
+#   git ls-remote --refs https://$CI_SERVER_FQDN/secassured/ci-cd-components.git 'refs/tags/v1.2.4'
+#   Then replace the @v1.2.4 tag with the full SHA.
 include:
   - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.4
     inputs:
