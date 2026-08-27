@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -8,10 +11,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * kill switch), and must apply schema defaults for optional variables.
  */
 
+const TEST_ENCRYPTION_KEY = 'ci-test-encryption-key-16chr';
+
 const loadEnvModule = async (): Promise<typeof import('../env.js')> => {
   vi.resetModules();
   return await import('../env.js');
 };
+
+/** Flatten everything the parser logged so a test can assert on the offending name. */
+const loggedErrors = (spy: ReturnType<typeof vi.spyOn>): string =>
+  spy.mock.calls
+    .flat()
+    .map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg)))
+    .join('\n');
 
 describe('config/env', () => {
   let errorSpy: ReturnType<typeof vi.spyOn>;
@@ -20,6 +32,7 @@ describe('config/env', () => {
     vi.resetModules();
     delete process.env.JWT_SECRET;
     process.env.ADMIN_PASSWORD = 'ci-test-admin-secret-9f2K7x';
+    process.env.ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -27,6 +40,7 @@ describe('config/env', () => {
     vi.unstubAllEnvs();
     delete process.env.JWT_SECRET;
     delete process.env.ADMIN_PASSWORD;
+    delete process.env.ENCRYPTION_KEY;
     errorSpy.mockRestore();
   });
 
@@ -60,11 +74,7 @@ describe('config/env', () => {
 
     await expect(loadEnvModule()).rejects.toThrow(/Environment validation failed/i);
     expect(errorSpy).toHaveBeenCalled();
-    const logged = errorSpy.mock.calls
-      .flat()
-      .map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg)))
-      .join('\n');
-    expect(logged).toContain('JWT_SECRET');
+    expect(loggedErrors(errorSpy)).toContain('JWT_SECRET');
   });
 
   it('throws instead of exiting when ADMIN_PASSWORD is missing', async () => {
@@ -73,11 +83,7 @@ describe('config/env', () => {
 
     await expect(loadEnvModule()).rejects.toThrow(/Environment validation failed/i);
     expect(errorSpy).toHaveBeenCalled();
-    const logged = errorSpy.mock.calls
-      .flat()
-      .map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg)))
-      .join('\n');
-    expect(logged).toContain('ADMIN_PASSWORD');
+    expect(loggedErrors(errorSpy)).toContain('ADMIN_PASSWORD');
   });
 
   it('throws when ADMIN_PASSWORD is shorter than 8 characters', async () => {
@@ -85,11 +91,7 @@ describe('config/env', () => {
     process.env.ADMIN_PASSWORD = 'short';
 
     await expect(loadEnvModule()).rejects.toThrow(/Environment validation failed/i);
-    const logged = errorSpy.mock.calls
-      .flat()
-      .map((arg) => (typeof arg === 'string' ? arg : JSON.stringify(arg)))
-      .join('\n');
-    expect(logged).toContain('ADMIN_PASSWORD');
+    expect(loggedErrors(errorSpy)).toContain('ADMIN_PASSWORD');
   });
 
   it('keeps a strong custom ADMIN_PASSWORD verbatim', async () => {
@@ -107,5 +109,72 @@ describe('config/env', () => {
     const { DEFAULT_ADMIN_PASSWORDS } = await loadEnvModule();
 
     expect(DEFAULT_ADMIN_PASSWORDS).toEqual(['intact2025', 'admin', 'password']);
+  });
+
+  it('throws instead of exiting when ENCRYPTION_KEY is missing', async () => {
+    process.env.JWT_SECRET = 'ci-test-jwt-secret-min-32-characters-long';
+    delete process.env.ENCRYPTION_KEY;
+
+    await expect(loadEnvModule()).rejects.toThrow(/Environment validation failed/i);
+    expect(errorSpy).toHaveBeenCalled();
+    expect(loggedErrors(errorSpy)).toContain('ENCRYPTION_KEY');
+  });
+
+  // The schema has no NODE_ENV branch, so a missing ENCRYPTION_KEY must abort
+  // the boot in development and test exactly as it does in production (#37).
+  for (const nodeEnv of ['development', 'test', 'production'] as const) {
+    it(`throws when ENCRYPTION_KEY is missing under NODE_ENV=${nodeEnv}`, async () => {
+      vi.stubEnv('NODE_ENV', nodeEnv);
+      process.env.JWT_SECRET = 'ci-test-jwt-secret-min-32-characters-long';
+      delete process.env.ENCRYPTION_KEY;
+
+      await expect(loadEnvModule()).rejects.toThrow(/Environment validation failed/i);
+      expect(loggedErrors(errorSpy)).toContain('ENCRYPTION_KEY');
+    });
+  }
+
+  it('throws when ENCRYPTION_KEY is shorter than 16 characters', async () => {
+    process.env.JWT_SECRET = 'ci-test-jwt-secret-min-32-characters-long';
+    process.env.ENCRYPTION_KEY = 'too-short';
+
+    await expect(loadEnvModule()).rejects.toThrow(/Environment validation failed/i);
+    expect(loggedErrors(errorSpy)).toContain('ENCRYPTION_KEY');
+  });
+
+  it('keeps a caller-supplied ENCRYPTION_KEY verbatim (no committed fallback)', async () => {
+    process.env.JWT_SECRET = 'ci-test-jwt-secret-min-32-characters-long';
+    process.env.ENCRYPTION_KEY = 'operator-supplied-encryption-key';
+
+    const { env } = await loadEnvModule();
+
+    expect(env.ENCRYPTION_KEY).toBe('operator-supplied-encryption-key');
+  });
+});
+
+/**
+ * Source-hygiene guard for #37: no committed encryption-key fallback may
+ * survive anywhere under `server/src`.
+ *
+ * The banned literal is assembled at runtime so this test file does not
+ * itself contain it — the acceptance criterion greps the whole tree and must
+ * come back empty, and a guard that plants the string it bans would defeat it.
+ */
+describe('config/env source hygiene', () => {
+  const serverSrc = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+  const bannedKey = ['intact', 'default', 'encryption', 'key'].join('-');
+
+  const sourceFiles = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      if (entry.name === 'node_modules' || entry.name === 'dist') return [];
+      const full = join(dir, entry.name);
+      return entry.isDirectory() ? sourceFiles(full) : [full];
+    });
+
+  it('ships no hard-coded encryption-key fallback under server/src', () => {
+    const offenders = sourceFiles(serverSrc)
+      .filter((file) => readFileSync(file, 'utf8').includes(bannedKey))
+      .map((file) => relative(serverSrc, file));
+
+    expect(offenders).toEqual([]);
   });
 });
