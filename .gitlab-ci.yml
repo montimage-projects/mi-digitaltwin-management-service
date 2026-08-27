@@ -82,9 +82,6 @@ cache:
       - package-lock.json
     prefix: ${CI_COMMIT_REF_SLUG}
   paths:
-    - node_modules/
-    - client/node_modules/
-    - server/node_modules/
     - ~/.npm
   policy: pull-push
 
@@ -218,7 +215,7 @@ stages:
 quality:
   stage: quality
   script:
-    - HUSKY=0 npm ci --prefer-offline --no-audit 2>/dev/null || npm ci
+    - HUSKY=0 npm ci --prefer-offline --no-audit
     - npm run format:check
     - npm run lint
   cache:
@@ -229,7 +226,7 @@ quality:
 typecheck:
   stage: typecheck
   script:
-    - HUSKY=0 npm ci --prefer-offline --no-audit 2>/dev/null || npm ci
+    - HUSKY=0 npm ci --prefer-offline --no-audit
     - npm run typecheck
   cache:
     policy: pull-push
@@ -249,7 +246,7 @@ test:
     JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
     ENCRYPTION_KEY: ci-test-encryption-key-16chr
   script:
-    - HUSKY=0 npm ci --prefer-offline --no-audit 2>/dev/null || npm ci
+    - HUSKY=0 npm ci --prefer-offline --no-audit
     - npm run test:server
   cache:
     policy: pull-push
