@@ -7,11 +7,21 @@ include:
       service_name: server
       dockerfile_path: server/Dockerfile
       build_context: server
-      rules_changes: [.gitlab/**/*, .gitlab-ci.yml, docker/**/*, k8s/**/*, package.json, package-lock.json, .dockerignore, server/**/*]
+      rules_changes:
+        [
+          .gitlab/**/*,
+          .gitlab-ci.yml,
+          docker/**/*,
+          k8s/**/*,
+          package.json,
+          package-lock.json,
+          .dockerignore,
+          server/**/*,
+        ]
       gitops_tag_path: server.image
       fail_on_severity: CRITICAL,HIGH
       cosign_required: $COSIGN_REQUIRED
-      attest_sbom: "true"
+      attest_sbom: 'true'
       gitops_update_enabled: $GITOPS_UPDATE_ENABLED
       gitops_update_stage: report
       gitops_repo_url: $GITOPS_REPO_URL
@@ -26,11 +36,21 @@ include:
       service_name: client
       dockerfile_path: client/Dockerfile
       build_context: client
-      rules_changes: [.gitlab/**/*, .gitlab-ci.yml, docker/**/*, k8s/**/*, package.json, package-lock.json, .dockerignore, client/**/*]
+      rules_changes:
+        [
+          .gitlab/**/*,
+          .gitlab-ci.yml,
+          docker/**/*,
+          k8s/**/*,
+          package.json,
+          package-lock.json,
+          .dockerignore,
+          client/**/*,
+        ]
       gitops_tag_path: client.image
       fail_on_severity: CRITICAL,HIGH
       cosign_required: $COSIGN_REQUIRED
-      attest_sbom: "true"
+      attest_sbom: 'true'
       gitops_update_enabled: $GITOPS_UPDATE_ENABLED
       gitops_update_stage: report
       gitops_repo_url: $GITOPS_REPO_URL
@@ -51,7 +71,7 @@ semgrep-sast:
     - if: '$SAST_DISABLED == "true" || $SAST_DISABLED == "1"'
       when: never
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: "$CI_COMMIT_BRANCH"
+    - if: '$CI_COMMIT_BRANCH'
 
 image: node:22.23.1-bookworm-slim
 
@@ -73,100 +93,100 @@ workflow:
     # Explicit overrides for both toggles
     - if: '$GITOPS_UPDATE_MODE == "true" && $IMAGE_SIGNING_MODE == "true"'
       variables:
-        COSIGN_REQUIRED: "true"
-        GITOPS_UPDATE_ENABLED: "true"
+        COSIGN_REQUIRED: 'true'
+        GITOPS_UPDATE_ENABLED: 'true'
     - if: '$GITOPS_UPDATE_MODE == "true" && $IMAGE_SIGNING_MODE == "false"'
       variables:
-        COSIGN_REQUIRED: "false"
-        GITOPS_UPDATE_ENABLED: "true"
+        COSIGN_REQUIRED: 'false'
+        GITOPS_UPDATE_ENABLED: 'true'
     - if: '$GITOPS_UPDATE_MODE == "false" && $IMAGE_SIGNING_MODE == "true"'
       variables:
-        COSIGN_REQUIRED: "true"
-        GITOPS_UPDATE_ENABLED: "false"
+        COSIGN_REQUIRED: 'true'
+        GITOPS_UPDATE_ENABLED: 'false'
     - if: '$GITOPS_UPDATE_MODE == "false" && $IMAGE_SIGNING_MODE == "false"'
       variables:
-        COSIGN_REQUIRED: "false"
-        GITOPS_UPDATE_ENABLED: "false"
+        COSIGN_REQUIRED: 'false'
+        GITOPS_UPDATE_ENABLED: 'false'
 
     # Explicit GitOps mode + image auto behavior
     - if: '$GITOPS_UPDATE_MODE == "true" && $IMAGE_SIGNING_MODE == "auto" && ($CI_COMMIT_TAG || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH)'
       variables:
-        COSIGN_REQUIRED: "true"
-        GITOPS_UPDATE_ENABLED: "true"
+        COSIGN_REQUIRED: 'true'
+        GITOPS_UPDATE_ENABLED: 'true'
     - if: '$GITOPS_UPDATE_MODE == "true" && $IMAGE_SIGNING_MODE == "auto"'
       variables:
-        COSIGN_REQUIRED: "false"
-        GITOPS_UPDATE_ENABLED: "true"
+        COSIGN_REQUIRED: 'false'
+        GITOPS_UPDATE_ENABLED: 'true'
     - if: '$GITOPS_UPDATE_MODE == "false" && $IMAGE_SIGNING_MODE == "auto" && ($CI_COMMIT_TAG || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH)'
       variables:
-        COSIGN_REQUIRED: "true"
-        GITOPS_UPDATE_ENABLED: "false"
+        COSIGN_REQUIRED: 'true'
+        GITOPS_UPDATE_ENABLED: 'false'
     - if: '$GITOPS_UPDATE_MODE == "false" && $IMAGE_SIGNING_MODE == "auto"'
       variables:
-        COSIGN_REQUIRED: "false"
-        GITOPS_UPDATE_ENABLED: "false"
+        COSIGN_REQUIRED: 'false'
+        GITOPS_UPDATE_ENABLED: 'false'
 
     # Explicit image mode + GitOps auto behavior
     - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "true" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       variables:
-        COSIGN_REQUIRED: "true"
-        GITOPS_UPDATE_ENABLED: "true"
+        COSIGN_REQUIRED: 'true'
+        GITOPS_UPDATE_ENABLED: 'true'
     - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "true"'
       variables:
-        COSIGN_REQUIRED: "true"
-        GITOPS_UPDATE_ENABLED: "false"
+        COSIGN_REQUIRED: 'true'
+        GITOPS_UPDATE_ENABLED: 'false'
     - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "false" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       variables:
-        COSIGN_REQUIRED: "false"
-        GITOPS_UPDATE_ENABLED: "true"
+        COSIGN_REQUIRED: 'false'
+        GITOPS_UPDATE_ENABLED: 'true'
     - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "false"'
       variables:
-        COSIGN_REQUIRED: "false"
-        GITOPS_UPDATE_ENABLED: "false"
+        COSIGN_REQUIRED: 'false'
+        GITOPS_UPDATE_ENABLED: 'false'
 
     # Default behavior when both modes are auto
     - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "auto" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       variables:
-        COSIGN_REQUIRED: "true"
-        GITOPS_UPDATE_ENABLED: "true"
+        COSIGN_REQUIRED: 'true'
+        GITOPS_UPDATE_ENABLED: 'true'
     - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "auto" && $CI_COMMIT_TAG'
       variables:
-        COSIGN_REQUIRED: "true"
-        GITOPS_UPDATE_ENABLED: "false"
+        COSIGN_REQUIRED: 'true'
+        GITOPS_UPDATE_ENABLED: 'false'
     - if: '$GITOPS_UPDATE_MODE == "auto" && $IMAGE_SIGNING_MODE == "auto"'
       variables:
-        COSIGN_REQUIRED: "false"
-        GITOPS_UPDATE_ENABLED: "false"
+        COSIGN_REQUIRED: 'false'
+        GITOPS_UPDATE_ENABLED: 'false'
 variables:
   DEPLOY_ENV:
-    value: "dev"
-    description: "Deployment environment used by GitOps update jobs"
+    value: 'dev'
+    description: 'Deployment environment used by GitOps update jobs'
     options:
-      - "dev"
-      - "staging"
-      - "prod"
+      - 'dev'
+      - 'staging'
+      - 'prod'
   IMAGE_SIGNING_MODE:
-    value: "auto"
-    description: "Image signing mode: auto keeps current branch/tag defaults"
+    value: 'auto'
+    description: 'Image signing mode: auto keeps current branch/tag defaults'
     options:
-      - "auto"
-      - "true"
-      - "false"
+      - 'auto'
+      - 'true'
+      - 'false'
   GITOPS_UPDATE_MODE:
-    value: "auto"
-    description: "GitOps update mode: auto uses branch defaults; true/false force update behavior"
+    value: 'auto'
+    description: 'GitOps update mode: auto uses branch defaults; true/false force update behavior'
     options:
-      - "auto"
-      - "true"
-      - "false"
+      - 'auto'
+      - 'true'
+      - 'false'
   GITOPS_REPO_URL: https://secureflow.assist.ro/secassured/gitops.git
   GITOPS_VALUES_FILE: gitops/environments/${DEPLOY_ENV}/secsim/values.yaml
   DEFECTDOJO_ENABLED:
-    value: "false"
-    description: "Upload scan reports (SAST, secrets, dependency audit, container scans) to DefectDojo. A group/project CI/CD variable of the same name overrides this default."
+    value: 'false'
+    description: 'Upload scan reports (SAST, secrets, dependency audit, container scans) to DefectDojo. A group/project CI/CD variable of the same name overrides this default.'
     options:
-      - "false"
-      - "true"
+      - 'false'
+      - 'true'
 
 stages:
   - quality
@@ -188,11 +208,11 @@ stages:
   - .dockerignore
 
 .secsim_rules: &secsim_rules
-  - if: "$CI_COMMIT_TAG"
+  - if: '$CI_COMMIT_TAG'
     changes: *secsim_change_paths
   - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     changes: *secsim_change_paths
-  - if: "$CI_COMMIT_BRANCH"
+  - if: '$CI_COMMIT_BRANCH'
     changes: *secsim_change_paths
 
 quality:
@@ -245,7 +265,7 @@ secret_scan:
   stage: security
   image:
     name: zricethezav/gitleaks:v8.30.1
-    entrypoint: [""]
+    entrypoint: ['']
   script:
     - |
       set -eu
@@ -287,15 +307,15 @@ secret_scan:
       - reports/gitleaks-report.json
       - reports/gitleaks-report.csv
   rules:
-    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
 secret_scan_full_history:
   stage: security
   image:
     name: zricethezav/gitleaks:v8.30.1
-    entrypoint: [""]
+    entrypoint: ['']
   script:
     - |
       set -eu
@@ -341,22 +361,22 @@ dependency_scan:
       - reports/npm-audit-report.json
       - reports/npm-audit-summary.env
   rules:
-    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_COMMIT_TAG'
       changes: *secsim_change_paths
       variables:
-        NPM_AUDIT_FAIL_ON_HIGH: "true"
+        NPM_AUDIT_FAIL_ON_HIGH: 'true'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes: *secsim_change_paths
       variables:
-        NPM_AUDIT_FAIL_ON_HIGH: "true"
-    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+        NPM_AUDIT_FAIL_ON_HIGH: 'true'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       changes: *secsim_change_paths
       variables:
-        NPM_AUDIT_FAIL_ON_HIGH: "true"
-    - if: "$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH"
+        NPM_AUDIT_FAIL_ON_HIGH: 'true'
+    - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
       changes: *secsim_change_paths
       variables:
-        NPM_AUDIT_FAIL_ON_HIGH: "false"
+        NPM_AUDIT_FAIL_ON_HIGH: 'false'
 
 verify_image_signatures:
   stage: security
@@ -391,9 +411,9 @@ verify_image_signatures:
       fi
       echo "All scanned images are signed."
   rules:
-    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_COMMIT_TAG'
       changes: *secsim_change_paths
-    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       changes: *secsim_change_paths
 
 security_findings_overview:
@@ -422,11 +442,11 @@ security_findings_overview:
       optional: true
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_COMMIT_TAG'
       changes: *secsim_change_paths
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes: *secsim_change_paths
-    - if: "$CI_COMMIT_BRANCH"
+    - if: '$CI_COMMIT_BRANCH'
       changes: *secsim_change_paths
 
 defectdojo_upload_sast:
@@ -439,14 +459,14 @@ defectdojo_upload_sast:
       optional: true
   variables:
     DEFECTDOJO_REPORT_FILE: gl-sast-report.json
-    DEFECTDOJO_SCAN_TYPE: "GitLab SAST Report"
+    DEFECTDOJO_SCAN_TYPE: 'GitLab SAST Report'
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_COMMIT_TAG'
       changes: *secsim_change_paths
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes: *secsim_change_paths
-    - if: "$CI_COMMIT_BRANCH"
+    - if: '$CI_COMMIT_BRANCH'
       changes: *secsim_change_paths
 
 defectdojo_upload_secrets:
@@ -457,11 +477,11 @@ defectdojo_upload_secrets:
       optional: true
   variables:
     DEFECTDOJO_REPORT_FILE: reports/gitleaks-report.json
-    DEFECTDOJO_SCAN_TYPE: "Gitleaks Scan"
+    DEFECTDOJO_SCAN_TYPE: 'Gitleaks Scan'
   rules:
-    - if: "$CI_COMMIT_TAG"
+    - if: '$CI_COMMIT_TAG'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: "$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH"
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
 
 defectdojo_upload_dependencies:
   extends: .defectdojo-upload
@@ -471,7 +491,7 @@ defectdojo_upload_dependencies:
       optional: true
   variables:
     DEFECTDOJO_REPORT_FILE: reports/npm-audit-report.json
-    DEFECTDOJO_SCAN_TYPE: "NPM Audit v7+ Scan"
+    DEFECTDOJO_SCAN_TYPE: 'NPM Audit v7+ Scan'
   rules: *secsim_rules
 
 defectdojo_upload_server_image:
@@ -482,8 +502,8 @@ defectdojo_upload_server_image:
       optional: true
   variables:
     DEFECTDOJO_REPORT_FILE: reports/server-trivy.json
-    DEFECTDOJO_SCAN_TYPE: "Trivy Scan"
-    DEFECTDOJO_TEST_TITLE: "$CI_PROJECT_PATH server image $CI_COMMIT_SHORT_SHA"
+    DEFECTDOJO_SCAN_TYPE: 'Trivy Scan'
+    DEFECTDOJO_TEST_TITLE: '$CI_PROJECT_PATH server image $CI_COMMIT_SHORT_SHA'
 
 defectdojo_upload_client_image:
   extends: .defectdojo-upload
@@ -493,5 +513,5 @@ defectdojo_upload_client_image:
       optional: true
   variables:
     DEFECTDOJO_REPORT_FILE: reports/client-trivy.json
-    DEFECTDOJO_SCAN_TYPE: "Trivy Scan"
-    DEFECTDOJO_TEST_TITLE: "$CI_PROJECT_PATH client image $CI_COMMIT_SHORT_SHA"
+    DEFECTDOJO_SCAN_TYPE: 'Trivy Scan'
+    DEFECTDOJO_TEST_TITLE: '$CI_PROJECT_PATH client image $CI_COMMIT_SHORT_SHA'

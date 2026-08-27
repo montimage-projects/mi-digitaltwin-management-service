@@ -34,7 +34,8 @@
     "typecheck": "npm run typecheck:client && npm run typecheck:server",
     "typecheck:client": "cd client && npx tsc --noEmit",
     "typecheck:server": "cd server && npx tsc --noEmit",
-    "test": "npm run test:server",
+    "test": "npm run test:client && npm run test:server",
+    "test:client": "cd client && npm run test",
     "test:server": "cd server && npm run test",
     "prepare": "husky"
   },
