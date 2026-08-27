@@ -49,7 +49,6 @@ export function ScenarioDetail() {
   });
   const services = servicesData?.services || [];
 
-  // Infrastructure ID from scenario
   const infra = scenario?.infrastructureId;
   const selectedInfrastructure =
     infra && typeof infra === 'object'
@@ -78,7 +77,6 @@ export function ScenarioDetail() {
     isDirty: topology.isDirty,
   });
 
-  // UI state
   const [executionPanelOpen, setExecutionPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('editor');
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
@@ -121,7 +119,6 @@ export function ScenarioDetail() {
     scenario.infrastructureId && typeof scenario.infrastructureId === 'object'
       ? scenario.infrastructureId
       : null;
-
   const executions = scenario.executions ?? [];
   const infraName =
     selectedInfrastructure && typeof selectedInfrastructure === 'string'
@@ -150,11 +147,15 @@ export function ScenarioDetail() {
     toast.success('PDF report generated');
   }, [scenario, project]);
 
+  const handleCloseExecution = useCallback(() => {
+    topology.handleCloseExecution();
+    setActiveTab('editor');
+  }, [topology]);
+
   return (
     <div className="space-y-4 h-full">
       <WorkspaceTabs onTabClick={handleTabClick} />
 
-      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={handleNavProject}>
@@ -190,7 +191,6 @@ export function ScenarioDetail() {
         </div>
       </div>
 
-      {/* Execution Panel */}
       <ExecutionPanel
         scenarioId={id!}
         scenarioTitle={scenario.title}
@@ -202,7 +202,6 @@ export function ScenarioDetail() {
       />
 
       <div className="flex gap-4" style={{ height: 'calc(100vh - 200px)' }}>
-        {/* Main Content */}
         <div className="flex-1 min-w-0 transition-all duration-300">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
             <div className="rounded-t-lg border border-b-0 bg-background px-2">
@@ -222,14 +221,12 @@ export function ScenarioDetail() {
                       className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-destructive/20 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={(e) => {
                         e.stopPropagation();
-                        topology.handleCloseExecution();
-                        setActiveTab('editor');
+                        handleCloseExecution();
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
-                          topology.handleCloseExecution();
-                          setActiveTab('editor');
+                          handleCloseExecution();
                         }
                       }}
                     >
@@ -268,10 +265,7 @@ export function ScenarioDetail() {
                     executionId={topology.activeExecution.executionId}
                     namespace={topology.activeExecution.namespace}
                     services={topology.activeExecution.services}
-                    onClose={() => {
-                      topology.handleCloseExecution();
-                      setActiveTab('editor');
-                    }}
+                    onClose={handleCloseExecution}
                   />
                 </TabsContent>
               )}
@@ -279,7 +273,6 @@ export function ScenarioDetail() {
           </Tabs>
         </div>
 
-        {/* Toggle Right Panel Button */}
         <div className="relative flex items-start pt-2">
           <Button
             variant="ghost"
@@ -296,7 +289,6 @@ export function ScenarioDetail() {
           </Button>
         </div>
 
-        {/* Right Sidebar */}
         <div
           className={`transition-all duration-300 overflow-hidden ${rightPanelCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100'}`}
         >

@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -96,7 +96,9 @@ describe('useScenarioTopology', () => {
       { wrapper: createWrapper() }
     );
 
-    result.current.handleYamlChange('new yaml');
+    act(() => {
+      result.current.handleYamlChange('new yaml');
+    });
 
     expect(result.current.yaml).toBe('new yaml');
     expect(result.current.isDirty).toBe(true);
@@ -114,7 +116,9 @@ describe('useScenarioTopology', () => {
       { wrapper: createWrapper() }
     );
 
-    result.current.handleNodesChange([{ id: 'new-node' }]);
+    act(() => {
+      result.current.handleNodesChange([{ id: 'new-node' }]);
+    });
 
     expect(result.current.nodes).toEqual([{ id: 'new-node' }]);
     expect(result.current.isDirty).toBe(true);
@@ -132,7 +136,9 @@ describe('useScenarioTopology', () => {
       { wrapper: createWrapper() }
     );
 
-    result.current.handleEdgesChange([{ id: 'new-edge' }]);
+    act(() => {
+      result.current.handleEdgesChange([{ id: 'new-edge' }]);
+    });
 
     expect(result.current.edges).toEqual([{ id: 'new-edge' }]);
     expect(result.current.isDirty).toBe(true);
@@ -156,7 +162,9 @@ describe('useScenarioTopology', () => {
       services: [],
     };
 
-    result.current.handleExecutionStart(mockResult);
+    act(() => {
+      result.current.handleExecutionStart(mockResult);
+    });
 
     expect(result.current.activeExecution).toEqual(mockResult);
   });
@@ -179,11 +187,15 @@ describe('useScenarioTopology', () => {
       services: [],
     };
 
-    result.current.handleExecutionStart(mockResult);
+    act(() => {
+      result.current.handleExecutionStart(mockResult);
+    });
 
     expect(result.current.activeExecution).not.toBeNull();
 
-    result.current.handleCloseExecution();
+    act(() => {
+      result.current.handleCloseExecution();
+    });
 
     expect(result.current.activeExecution).toBeNull();
   });
@@ -202,11 +214,15 @@ describe('useScenarioTopology', () => {
       { wrapper: createWrapper() }
     );
 
-    result.current.handleYamlChange('dirty yaml');
+    act(() => {
+      result.current.handleYamlChange('dirty yaml');
+    });
 
     expect(result.current.isDirty).toBe(true);
 
-    result.current.handleSave();
+    act(() => {
+      result.current.handleSave();
+    });
 
     await waitFor(() => {
       expect(result.current.isDirty).toBe(false);
