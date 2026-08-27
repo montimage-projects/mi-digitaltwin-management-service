@@ -91,6 +91,10 @@ const listServicesSchema = z.object({
     .string()
     .optional()
     .transform((val) => val === 'true'),
+  slim: z
+    .string()
+    .optional()
+    .transform((val) => val === 'true'),
   limit: z
     .string()
     .optional()
@@ -107,6 +111,9 @@ type ListServicesQuery = z.infer<typeof listServicesSchema>;
 // By default, services deprecated by a catalog refresh (see
 // `seed/services.seed.ts`) are excluded. Pass `?includeDeprecated=true` to
 // see the full history, e.g. for admin/audit views.
+// Pass `?slim=true` to return only `shortName` and `title` — ideal for
+// dropdown pickers that need to display up to 1000 services without
+// transferring the full catalog payload.
 router.get(
   '/',
   authMiddleware,
@@ -114,7 +121,7 @@ router.get(
   asyncHandler(async (req, res) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const parsedQuery = req.query as any as ListServicesQuery;
-    const { table, category, sector, provider, search, includeDeprecated, limit, skip } =
+    const { table, category, sector, provider, search, includeDeprecated, slim, limit, skip } =
       parsedQuery;
 
     const query: Record<string, unknown> = {};
@@ -141,6 +148,21 @@ router.get(
 
     if (search) {
       query.$or = buildSearchOrFilter(SEARCH_FIELDS, search);
+    }
+
+    if (slim) {
+      // Slim mode: only shortName + title — no population, no extra fields.
+      const [services, total] = await Promise.all([
+        Service.find(query, 'shortName title')
+          .sort({ shortName: 1 })
+          .skip(skip as number)
+          .limit(limit as number)
+          .lean(),
+        Service.countDocuments(query),
+      ]);
+
+      res.json({ services, total, limit, skip });
+      return;
     }
 
     const [services, total] = await Promise.all([
