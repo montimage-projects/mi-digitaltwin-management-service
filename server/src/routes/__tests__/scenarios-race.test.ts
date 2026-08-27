@@ -80,9 +80,9 @@ vi.mock('@kubernetes/client-node', () => ({
   CoreV1Api,
   AppsV1Api,
   ApiException,
-   
+
   counts: { createNamespace: 0, createNamespacedDeployment: 0 },
-   
+
   impl: {
     createNamespace: async (): Promise<unknown> => ({ metadata: { name: 'ns' } }),
     createNamespacedDeployment: async (): Promise<unknown> => ({
