@@ -17,6 +17,8 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>()(
+  // Token is in-memory only (never persisted to localStorage) to prevent
+  // XSS theft. User info is persisted so the UI can show the logged-in state.
   persist(
     (set) => ({
       user: null,
@@ -46,7 +48,7 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({
-        token: state.token,
+        // Deliberately omit token — stored in-memory only.
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),

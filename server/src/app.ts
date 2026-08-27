@@ -33,7 +33,7 @@ app.use(
       useDefaults: false,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'cdn.jsdelivr.net'],
+        scriptSrc: ["'self'", 'cdn.jsdelivr.net'], // no unsafe-inline/eval; Monaco uses wasm-unsafe-eval via importmap
         styleSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'fonts.googleapis.com'],
         fontSrc: ["'self'", 'fonts.gstatic.com', 'cdn.jsdelivr.net'],
         imgSrc: ["'self'", 'data:', 'blob:'],
