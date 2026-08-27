@@ -27,7 +27,7 @@ RUN if [ ! -d /server/public ] || [ -z "$(ls -A /server/public)" ]; then \
     echo "✓ Build verification passed: /server/public populated correctly"
 
 # Production stage - unprivileged nginx for static file serving
-FROM docker.io/nginxinc/nginx-unprivileged:1.31.2-alpine3.23-slim AS production
+FROM docker.io/nginxinc/nginx-unprivileged:1.31.4-alpine3.23-slim AS production
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
