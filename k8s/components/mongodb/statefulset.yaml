@@ -22,20 +22,42 @@ spec:
           ports:
             - name: mongodb
               containerPort: 27017
+          envFrom:
+            - secretRef:
+                name: mongodb-secret
           volumeMounts:
             - name: mongodb-data
               mountPath: /data/db
-          # Same check Compose already relies on (mongosh ships in mongo:7).
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d
           readinessProbe:
             exec:
-              command: ['mongosh', '--eval', "db.adminCommand('ping')"]
+              command:
+                - mongosh
+                - --username
+                - $(MONGO_INITDB_ROOT_USERNAME)
+                - --password
+                - $(MONGO_INITDB_ROOT_PASSWORD)
+                - --authenticationDatabase
+                - admin
+                - --eval
+                - "db.adminCommand('ping')"
             initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 5
           livenessProbe:
             exec:
-              command: ['mongosh', '--eval', "db.adminCommand('ping')"]
+              command:
+                - mongosh
+                - --username
+                - $(MONGO_INITDB_ROOT_USERNAME)
+                - --password
+                - $(MONGO_INITDB_ROOT_PASSWORD)
+                - --authenticationDatabase
+                - admin
+                - --eval
+                - "db.adminCommand('ping')"
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 10
@@ -47,6 +69,10 @@ spec:
             limits:
               cpu: 500m
               memory: 1Gi
+      volumes:
+        - name: init-script
+          configMap:
+            name: mongodb-init-script
   volumeClaimTemplates:
     - metadata:
         name: mongodb-data

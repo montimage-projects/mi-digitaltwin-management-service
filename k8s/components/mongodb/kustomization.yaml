@@ -7,3 +7,6 @@ kind: Component
 resources:
   - statefulset.yaml
   - service.yaml
+  - configmap.yaml
+  # secret.yaml is git-ignored; use secret.example.yaml as template.
+  # - secret.yaml

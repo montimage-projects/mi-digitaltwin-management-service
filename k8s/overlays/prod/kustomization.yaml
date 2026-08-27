@@ -28,4 +28,4 @@ patches:
         path: /spec/template/spec/containers/0/env/3
         value:
           name: MONGODB_URI
-          value: mongodb://mongodb:27017/intact
+          value: mongodb://intact_app:intact_pass@mongodb:27017/intact?authSource=admin
