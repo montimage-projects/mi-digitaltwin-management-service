@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -118,6 +119,10 @@ interface ServiceFormProps {
 
 export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: ServiceFormProps) {
   const formState = useServiceForm({ service });
+  const [inputName, setInputName] = useState('');
+  const [inputDesc, setInputDesc] = useState('');
+  const [outputName, setOutputName] = useState('');
+  const [outputDesc, setOutputDesc] = useState('');
   const {
     standards,
     licenseSearch,
@@ -982,18 +987,26 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
           </p>
         </div>
         <div className="flex gap-2">
-          <Input id="inputName" placeholder="Name" className="flex-1" />
-          <Input id="inputDesc" placeholder="Description (optional)" className="flex-1" />
+          <Input
+            placeholder="Name"
+            value={inputName}
+            onChange={(e) => setInputName(e.target.value)}
+            className="flex-1"
+          />
+          <Input
+            placeholder="Description (optional)"
+            value={inputDesc}
+            onChange={(e) => setInputDesc(e.target.value)}
+            className="flex-1"
+          />
           <Button
             type="button"
             variant="outline"
             size="icon"
             onClick={() => {
-              const nameEl = document.getElementById('inputName') as HTMLInputElement;
-              const descEl = document.getElementById('inputDesc') as HTMLInputElement;
-              addInputOutput('input', nameEl.value, descEl.value);
-              nameEl.value = '';
-              descEl.value = '';
+              addInputOutput('input', inputName, inputDesc);
+              setInputName('');
+              setInputDesc('');
             }}
           >
             <Plus className="h-4 w-4" />
@@ -1024,18 +1037,26 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
           </p>
         </div>
         <div className="flex gap-2">
-          <Input id="outputName" placeholder="Name" className="flex-1" />
-          <Input id="outputDesc" placeholder="Description (optional)" className="flex-1" />
+          <Input
+            placeholder="Name"
+            value={outputName}
+            onChange={(e) => setOutputName(e.target.value)}
+            className="flex-1"
+          />
+          <Input
+            placeholder="Description (optional)"
+            value={outputDesc}
+            onChange={(e) => setOutputDesc(e.target.value)}
+            className="flex-1"
+          />
           <Button
             type="button"
             variant="outline"
             size="icon"
             onClick={() => {
-              const nameEl = document.getElementById('outputName') as HTMLInputElement;
-              const descEl = document.getElementById('outputDesc') as HTMLInputElement;
-              addInputOutput('output', nameEl.value, descEl.value);
-              nameEl.value = '';
-              descEl.value = '';
+              addInputOutput('output', outputName, outputDesc);
+              setOutputName('');
+              setOutputDesc('');
             }}
           >
             <Plus className="h-4 w-4" />

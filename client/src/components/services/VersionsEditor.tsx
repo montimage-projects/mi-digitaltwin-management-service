@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,21 +17,24 @@ export interface VersionsEditorProps {
 }
 
 export function VersionsEditor({ value, onChange }: VersionsEditorProps) {
-  const addVersion = () => {
-    const versionEl = document.getElementById('newVersion') as HTMLInputElement;
-    const dockerEl = document.getElementById('newDockerImage') as HTMLInputElement;
-    const notesEl = document.getElementById('newReleaseNotes') as HTMLInputElement;
+  const [newVersion, setNewVersion] = useState('');
+  const [newDockerImage, setNewDockerImage] = useState('');
+  const [newReleaseNotes, setNewReleaseNotes] = useState('');
 
-    if (versionEl.value.trim() && dockerEl.value.trim()) {
-      const newVersion: VersionItem = {
-        version: versionEl.value.trim(),
-        dockerImage: dockerEl.value.trim(),
-        releaseNotes: notesEl.value.trim() || undefined,
+  const handleAddVersion = () => {
+    const versionTrimmed = newVersion.trim();
+    const dockerTrimmed = newDockerImage.trim();
+
+    if (versionTrimmed && dockerTrimmed) {
+      const newVersionItem: VersionItem = {
+        version: versionTrimmed,
+        dockerImage: dockerTrimmed,
+        releaseNotes: newReleaseNotes.trim() || undefined,
       };
-      onChange([newVersion, ...value]);
-      versionEl.value = '';
-      dockerEl.value = '';
-      notesEl.value = '';
+      onChange([newVersionItem, ...value]);
+      setNewVersion('');
+      setNewDockerImage('');
+      setNewReleaseNotes('');
     }
   };
 
@@ -91,33 +95,49 @@ export function VersionsEditor({ value, onChange }: VersionsEditorProps) {
         <p className="text-xs font-medium text-muted-foreground">Add new version</p>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label htmlFor="newVersion" className="text-xs">
+            <Label htmlFor="version-input" className="text-xs">
               Version *
             </Label>
-            <Input id="newVersion" placeholder="e.g., 1.0.0" className="h-8 text-sm font-mono" />
+            <Input
+              id="version-input"
+              placeholder="e.g., 1.0.0"
+              value={newVersion}
+              onChange={(e) => setNewVersion(e.target.value)}
+              className="h-8 text-sm font-mono"
+            />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="newDockerImage" className="text-xs">
+            <Label htmlFor="docker-image-input" className="text-xs">
               Docker Image URL *
             </Label>
             <Input
-              id="newDockerImage"
+              id="docker-image-input"
               placeholder="e.g., registry.example.com/image:v1.0.0"
+              value={newDockerImage}
+              onChange={(e) => setNewDockerImage(e.target.value)}
               className="h-8 text-sm font-mono"
             />
           </div>
         </div>
         <div className="space-y-1">
-          <Label htmlFor="newReleaseNotes" className="text-xs">
+          <Label htmlFor="release-notes-input" className="text-xs">
             Release Notes
           </Label>
           <Input
-            id="newReleaseNotes"
+            id="release-notes-input"
             placeholder="e.g., Initial release, Bug fixes, New features..."
+            value={newReleaseNotes}
+            onChange={(e) => setNewReleaseNotes(e.target.value)}
             className="h-8 text-sm"
           />
         </div>
-        <Button type="button" variant="outline" size="sm" className="w-full" onClick={addVersion}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={handleAddVersion}
+        >
           <Plus className="h-4 w-4 mr-2" />
           Add Version
         </Button>
