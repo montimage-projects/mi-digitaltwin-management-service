@@ -242,7 +242,7 @@ test:
     - quality
     - typecheck
   services:
-    - name: mongo:7
+    - name: mongo:8
       alias: mongo
   variables:
     MONGODB_URI: mongodb://mongo:27017/intact-test
