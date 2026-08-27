@@ -106,6 +106,8 @@ export function getValidationErrorMessage(result: ValidationResult): string | nu
  * @param edges - Array of topology edges
  * @returns true if topology is valid, false otherwise
  */
+// isTopologyValid removed: unused public API — callers should invoke
+// validateTopology() directly and check result.isValid.
 export function isTopologyValid(
   infrastructure: string | null | undefined,
   nodes: object[] | undefined,

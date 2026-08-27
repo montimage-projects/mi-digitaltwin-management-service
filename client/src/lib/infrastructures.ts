@@ -30,10 +30,6 @@ export const infrastructuresApi = {
     const { data } = await api.get('/infrastructures');
     return data;
   },
-  get: async (id: string): Promise<Infrastructure> => {
-    const { data } = await api.get(`/infrastructures/${id}`);
-    return data;
-  },
   create: async (infraData: CreateInfrastructureData): Promise<Infrastructure> => {
     const { data } = await api.post('/infrastructures', infraData);
     return data;

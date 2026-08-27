@@ -58,8 +58,6 @@ export interface Execution {
   namespace?: string;
   deployedServices: DeployedService[];
   conclusion?: Conclusion;
-  /** @deprecated Legacy MAESTRO field, no longer written or read. */
-  maestroSessionId?: string;
 }
 
 export interface Scenario {
