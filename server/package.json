@@ -17,6 +17,7 @@
     "format:check": "prettier --check src/**/*.ts",
     "typecheck": "npx tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:unit": "vitest run src/seed/__tests__/sync-helpers.test.ts"
   },
@@ -47,6 +48,7 @@
     "@types/node": "^22.20.0",
     "@typescript-eslint/eslint-plugin": "^8.49.0",
     "@typescript-eslint/parser": "^8.49.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
@@ -54,6 +56,6 @@
     "tsx": "^4.23.0",
     "typescript": "^7.0.2",
     "typescript-eslint": "^8.63.0",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.11"
   }
 }
