@@ -8,45 +8,59 @@ The application uses `.env` files for configuration:
 
 ```
 /
+ .env.example # Root template (used by docker-compose)
  client/
  .env # Client development config
  .env.example # Client template
  server/
  .env # Server development config
  .env.example # Server template
- .env.prod # Production config (optional)
 ```
 
 ## Server Configuration
 
 ### Required Variables
 
-| Variable         | Description                                   | Example                              |
-| ---------------- | --------------------------------------------- | ------------------------------------ |
-| `JWT_SECRET`     | Secret for signing JWT tokens (min 32 chars)  | `your-super-secret-key-min-32-chars` |
-| `ENCRYPTION_KEY` | Key for encrypting credentials (min 16 chars) | `change-me-strong-encryption-key`    |
+These variables have no default and must be set — the server refuses to boot without them.
+
+| Variable         | Description                                           | Example                              |
+| ---------------- | ----------------------------------------------------- | ------------------------------------ |
+| `JWT_SECRET`     | Secret for signing JWT tokens (min 32 characters)     | `your-super-secret-key-min-32-chars` |
+| `ADMIN_PASSWORD` | Password for the seeded admin user (min 8 characters) | `change-me-strong-admin-password`    |
+| `ENCRYPTION_KEY` | Key for encrypting credentials (min 16 characters)    | `change-me-strong-encryption-key`    |
 
 ### Optional Variables
 
-| Variable         | Description               | Default                            |
-| ---------------- | ------------------------- | ---------------------------------- |
-| `PORT`           | Server port               | `3000`                             |
-| `MONGODB_URI`    | MongoDB connection string | `mongodb://localhost:27017/intact` |
-| `JWT_EXPIRES_IN` | Token expiration          | `24h`                              |
-| `CORS_ORIGIN`    | Allowed CORS origin       | `http://localhost:5173`            |
-| `NODE_ENV`       | Environment mode          | `development`                      |
+| Variable           | Description                                                      | Default                             |
+| ------------------ | ---------------------------------------------------------------- | ----------------------------------- |
+| `NODE_ENV`         | Environment mode                                                 | `development`                       |
+| `PORT`             | Server port                                                      | `3000`                              |
+| `SERVE_STATIC`     | Serve built client from the same origin (`true`/`false`/`1`/`0`) | unset (false)                       |
+| `MONGODB_URI`      | MongoDB connection string                                        | `mongodb://localhost:27017/intact`  |
+| `JWT_EXPIRES_IN`   | JWT token expiration                                             | `24h`                               |
+| `CORS_ORIGIN`      | Allowed CORS origin                                              | `http://localhost:5173`             |
+| `ADMIN_USERNAME`   | Username for the seeded admin user                               | `admin`                             |
+| `MAESTRO_BASE_URL` | External Maestro API base URL                                    | `https://maestro.intact-project.eu` |
+| `BRANDING_PROFILE` | Branding profile: `default` / `intact` / `secassured`            | `default`                           |
+| `APP_NAME`         | Override application display name                                | (uses profile default)              |
+| `ORG_NAME`         | Override organization name                                       | (uses profile default)              |
+| `ORG_URL`          | Override organization URL                                        | (uses profile default)              |
 
 ### Example Server .env
 
 ```bash
 # server/.env
+NODE_ENV=development
 PORT=3000
 MONGODB_URI=mongodb://localhost:27017/intact
 JWT_SECRET=your-super-secret-jwt-key-minimum-32-characters
 JWT_EXPIRES_IN=24h
 CORS_ORIGIN=http://localhost:5173
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=change-me-strong-admin-password
 ENCRYPTION_KEY=change-me-strong-encryption-key
-NODE_ENV=development
+MAESTRO_BASE_URL=https://maestro.intact-project.eu
+BRANDING_PROFILE=secassured
 ```
 
 ## Client Configuration
@@ -62,6 +76,7 @@ NODE_ENV=development
 ```bash
 # client/.env
 VITE_API_URL=http://localhost:3000
+VITE_BRANDING_PROFILE=secassured
 ```
 
 ### Accessing Variables in Code
@@ -94,18 +109,18 @@ client-builder stage does not currently forward.
 
 ### Shipped Profiles
 
-| Profile      | App name                          | Logo / Favicon                                              |
-| ------------ | --------------------------------- | ----------------------------------------------------------- |
-| `default`    | `DigitalTwin Management Platform` | Montimage (`/montimage_logo.png`, `/montimage_favicon.png`) |
-| `intact`     | `DigitalTwin Management Platform` | INTACT (`/intact_logo.png`)                                 |
-| `secassured` | `secSIM`                          | SecAssured (`/secassured_logo.png`)                         |
+| Profile      | App name                          | Short name              | Logo / Favicon                                                 |
+| ------------ | --------------------------------- | ----------------------- | -------------------------------------------------------------- |
+| `default`    | `DigitalTwin Management Platform` | `Digital Twin Platform` | Montimage (`/montimage_logo.png`, `/montimage_favicon.png`)    |
+| `intact`     | `DigitalTwin Management Platform` | `Digital Twin Platform` | INTACT (`/intact_logo.png`, `/intact_favicon.png`)             |
+| `secassured` | `secSIM`                          | `secSIM`                | SecAssured (`/secassured_logo.png`, `/secassured_favicon.png`) |
 
 Select a profile with one variable on each side:
 
-| Variable                | Side   | Values                                | Default      |
-| ----------------------- | ------ | ------------------------------------- | ------------ |
-| `VITE_BRANDING_PROFILE` | Client | `default` \| `intact` \| `secassured` | `secassured` |
-| `BRANDING_PROFILE`      | Server | `default` \| `intact` \| `secassured` | `secassured` |
+| Variable                | Side   | Values                                | Default   |
+| ----------------------- | ------ | ------------------------------------- | --------- |
+| `VITE_BRANDING_PROFILE` | Client | `default` \| `intact` \| `secassured` | `default` |
+| `BRANDING_PROFILE`      | Server | `default` \| `intact` \| `secassured` | `default` |
 
 The client falls back to `default` on an unrecognized profile name; the server
 rejects an invalid `BRANDING_PROFILE` at startup (zod enum validation).
@@ -180,29 +195,37 @@ openssl rand -hex 16
 
 ### Environment Variables
 
-```bash
-# .env.prod
-PORT=80
-MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/intact_prod
-JWT_SECRET=<generated-jwt-secret>
-JWT_EXPIRES_IN=8h
-CORS_ORIGIN=https://your-domain.com
-ENCRYPTION_KEY=<generated-encryption-key>
-NODE_ENV=production
-```
+Production deployments typically use `.env.prod` or Docker Compose environment files.
+Key differences from development:
 
-### Docker Compose Override
+| Variable          | Development        | Production               |
+| ----------------- | ------------------ | ------------------------ |
+| `NODE_ENV`        | `development`      | `production`             |
+| `PORT`            | `3000`             | `3000` (or behind proxy) |
+| `JWT_EXPIRES_IN`  | `24h`              | `8h` (shorter)           |
+| `CORS_ORIGIN`     | `http://localhost` | `https://your-domain`    |
+| `MONGODB_URI`     | Local              | Atlas / managed          |
+| `SERVE_STATIC`    | unset              | `true` (unified image)   |
+| `SEED_ON_STARTUP` | unset              | `false`                  |
+
+### Docker Compose Environment
+
+Production compose files (`docker-compose.prod.yml`, `docker-compose.atlas.yml`)
+read values from a root `.env` file and forward them to the server container:
 
 ```yaml
-# docker-compose.prod.yml
+# docker-compose.prod.yml (excerpt)
 services:
   server:
-  environment:
-    - NODE_ENV=production
-    - PORT=3000
-    - MONGODB_URI=${MONGODB_URI}
-    - JWT_SECRET=${JWT_SECRET}
-    - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3000}
+      - MONGODB_URI=${MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - BRANDING_PROFILE=${BRANDING_PROFILE:-secassured}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
 ```
 
 ## Configuration Schema
@@ -210,20 +233,35 @@ services:
 ### Server Environment Validation
 
 ```typescript
-// config/env.ts
+// server/src/config/env.ts
 import { z } from 'zod';
 
 const envSchema = z.object({
-  PORT: z.string().default('3000'),
-  MONGODB_URI: z.string().url(),
-  JWT_SECRET: z.string().min(32),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z.string().default('3000').transform(Number),
+  SERVE_STATIC: z
+    .enum(['true', 'false', '1', '0'])
+    .optional()
+    .transform((v) => v === 'true' || v === '1'),
+  MONGODB_URI: z.string().default('mongodb://localhost:27017/intact'),
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   JWT_EXPIRES_IN: z.string().default('24h'),
-  CORS_ORIGIN: z.string().url(),
-  ENCRYPTION_KEY: z.string().min(16),
-  NODE_ENV: z.enum(['development', 'production', 'test']),
+  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  ADMIN_USERNAME: z.string().default('admin'),
+  ADMIN_PASSWORD: z.string().min(8, 'ADMIN_PASSWORD must be at least 8 characters'),
+  ENCRYPTION_KEY: z.string().min(16, 'ENCRYPTION_KEY must be at least 16 characters'),
+  MAESTRO_BASE_URL: z.string().url().default('https://maestro.intact-project.eu'),
+  BRANDING_PROFILE: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['default', 'intact', 'secassured']).default('default')
+  ),
+  APP_NAME: z.string().optional(),
+  ORG_NAME: z.string().optional(),
+  ORG_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
 });
 
 export const env = envSchema.parse(process.env);
+export type Env = z.infer<typeof envSchema>;
 ```
 
 ## CORS Configuration
@@ -297,7 +335,6 @@ mongoose.connect(process.env.MONGODB_URI, {
 .env
 .env.local
 .env.*.local
-.env.prod
 
 # Keep examples
 !.env.example

@@ -339,9 +339,7 @@ in the full guide — it is not required, Compose keeps working as-is.
 ```bash
 # Backend health
 curl https://yourdomain.com/api/health
-
-# Database connectivity
-docker-compose exec server npm run health-check
+# {"status":"ok","database":"connected","environment":"production"}
 ```
 
 ### Backup & Recovery
@@ -384,7 +382,6 @@ docker-compose logs --tail 100 service-name
 
 ```bash
 docker stats
-docker-compose exec server npm run memory-profiling
 ```
 
 **Database connection issues?**
