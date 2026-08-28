@@ -43,7 +43,8 @@
     "concurrently": "^10.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.0",
-    "prettier": "^3.9.6"
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3"
   },
   "lint-staged": {
     "client/src/**/*.{ts,tsx}": [
