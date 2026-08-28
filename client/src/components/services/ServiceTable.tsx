@@ -245,13 +245,13 @@ export function ServiceTable({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => handleEdit(e, service)}>
+                    <DropdownMenuItem onClick={(e: React.MouseEvent) => handleEdit(e, service)}>
                       <Pencil className="mr-2 h-4 w-4" />
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={(e) => handleDelete(e, service)}
+                      onClick={(e: React.MouseEvent) => handleDelete(e, service)}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete

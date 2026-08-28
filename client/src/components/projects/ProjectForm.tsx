@@ -261,7 +261,10 @@ export function ProjectForm({ project, onSubmit, isSubmitting }: ProjectFormProp
 
         <div className="space-y-2">
           <Label htmlFor="leader">Leader *</Label>
-          <Select value={watch('leader')} onValueChange={(value) => setValue('leader', value)}>
+          <Select
+            value={watch('leader')}
+            onValueChange={(value: string) => setValue('leader', value)}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select leader" />
             </SelectTrigger>
@@ -292,7 +295,9 @@ export function ProjectForm({ project, onSubmit, isSubmitting }: ProjectFormProp
           <Label htmlFor="sector">Sector *</Label>
           <Select
             value={watch('sector')}
-            onValueChange={(value) => setValue('sector', value as ProjectFormValues['sector'])}
+            onValueChange={(value: string) =>
+              setValue('sector', value as ProjectFormValues['sector'])
+            }
           >
             <SelectTrigger>
               <SelectValue />

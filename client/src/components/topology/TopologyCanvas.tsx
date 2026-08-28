@@ -186,7 +186,6 @@ function TopologyCanvasInner({
           {
             ...params,
             animated: true,
-            style: { stroke: '#64748b' },
           },
           eds
         );

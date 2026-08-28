@@ -32,7 +32,7 @@ import {
 import { YamlEditor } from './YamlEditor';
 import { TopologyCanvas } from './TopologyCanvas';
 import { cn } from '@/lib/utils';
-import yaml from 'js-yaml';
+import { dump as yamlDump } from 'js-yaml';
 
 interface TopologyNode {
   id: string;
@@ -84,7 +84,7 @@ function nodesToYaml(nodes: TopologyNode[], edges: TopologyEdge[]): string {
     })),
   };
 
-  return yaml.dump(topology, { indent: 2, lineWidth: -1 });
+  return yamlDump(topology, { indent: 2, lineWidth: -1 });
 }
 
 type ViewMode = 'code' | 'visual' | 'split';
@@ -202,7 +202,7 @@ export function TopologyEditor({
             </label>
             <Select
               value={selectedInfrastructure || 'none'}
-              onValueChange={(value) => {
+              onValueChange={(value: string) => {
                 onInfrastructureChange?.(value === 'none' ? null : value);
               }}
             >

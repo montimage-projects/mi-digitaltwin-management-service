@@ -74,7 +74,13 @@ export function TrlSection({ label, value, description, levels, onChange }: TrlS
         </div>
         <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
       </div>
-      <Slider value={[value]} onValueChange={([v]) => onChange(v)} min={1} max={9} step={1} />
+      <Slider
+        value={[value]}
+        onValueChange={([v]: number[]) => onChange(v)}
+        min={1}
+        max={9}
+        step={1}
+      />
       {currentLevel && (
         <div className="mt-2 p-2 rounded-md bg-muted/50">
           <p className="text-xs font-medium text-foreground">{currentLevel.name}</p>
