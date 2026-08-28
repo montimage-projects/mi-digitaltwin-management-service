@@ -61,5 +61,8 @@
   },
   "engines": {
     "node": ">=22 <25"
+  },
+  "dependencies": {
+    "tailwindcss": "^4.3.3"
   }
 }
