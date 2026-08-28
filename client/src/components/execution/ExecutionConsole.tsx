@@ -81,7 +81,7 @@ export function ExecutionConsole({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const logIdRef = useRef(0);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const unsubscribeRef = useRef<() => void>();
+  const unsubscribeRef = useRef<() => void>(undefined);
 
   // Subscribe to the live event stream for this execution. The subscription is
   // torn down on unmount or whenever the execution identity changes, mirroring

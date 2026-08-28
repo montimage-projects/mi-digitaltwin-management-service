@@ -133,7 +133,7 @@ export function ScenarioEditorGuidelinesModal({
             <Checkbox
               id="dont-show-again"
               checked={dontShowAgain}
-              onCheckedChange={(checked) => setDontShowAgain(checked as boolean)}
+              onCheckedChange={(checked: boolean) => setDontShowAgain(checked)}
             />
             <label
               htmlFor="dont-show-again"

@@ -112,7 +112,7 @@ export function ScenarioForm({ scenario, onSubmit, isSubmitting }: ScenarioFormP
             <FormItem>
               <FormLabel>Target Infrastructure</FormLabel>
               <Select
-                onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}
+                onValueChange={(value: string) => field.onChange(value === 'none' ? '' : value)}
                 defaultValue={field.value || 'none'}
               >
                 <FormControl>

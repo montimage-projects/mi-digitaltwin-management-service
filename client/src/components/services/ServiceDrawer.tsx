@@ -54,7 +54,7 @@ export function ServiceDrawer({ service, open, onClose }: ServiceDrawerProps) {
   const UiTypeIcon = UI_TYPE_ICONS[service.uiType || 'web'];
 
   return (
-    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Sheet open={open} onOpenChange={(isOpen: boolean) => !isOpen && onClose()}>
       <SheetContent className="overflow-y-auto sm:max-w-xl">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">

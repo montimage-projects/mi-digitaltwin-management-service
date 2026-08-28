@@ -172,13 +172,13 @@ export function ProjectTable({ projects, isLoading, onRowClick }: ProjectTablePr
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => handleEdit(e, project)}>
+                    <DropdownMenuItem onClick={(e: React.MouseEvent) => handleEdit(e, project)}>
                       <Pencil className="mr-2 h-4 w-4" />
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={(e) => handleDelete(e, project)}
+                      onClick={(e: React.MouseEvent) => handleDelete(e, project)}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete

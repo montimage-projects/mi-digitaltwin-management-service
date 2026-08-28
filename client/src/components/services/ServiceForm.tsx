@@ -358,7 +358,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
           </div>
           <Select
             value={watch('categoryId')}
-            onValueChange={(value) => setValue('categoryId', value)}
+            onValueChange={(value: string) => setValue('categoryId', value)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select category" />
@@ -405,7 +405,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
             </div>
             <Select
               value={watch('sectorId') || ''}
-              onValueChange={(value) => setValue('sectorId', value)}
+              onValueChange={(value: string) => setValue('sectorId', value)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select sector" />
@@ -433,7 +433,7 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
           </div>
           <Select
             value={watch('type')}
-            onValueChange={(value) => setValue('type', value as ServiceFormValues['type'])}
+            onValueChange={(value: string) => setValue('type', value as ServiceFormValues['type'])}
           >
             <SelectTrigger>
               <SelectValue />
@@ -455,7 +455,9 @@ export function ServiceForm({ service, onSubmit, isSubmitting, defaultTable }: S
           </div>
           <Select
             value={watch('uiType')}
-            onValueChange={(value) => setValue('uiType', value as ServiceFormValues['uiType'])}
+            onValueChange={(value: string) =>
+              setValue('uiType', value as ServiceFormValues['uiType'])
+            }
           >
             <SelectTrigger>
               <SelectValue />

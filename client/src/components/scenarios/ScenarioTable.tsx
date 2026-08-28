@@ -140,14 +140,17 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
               <TableCell>{new Date(scenario.updatedAt).toLocaleDateString()}</TableCell>
               <TableCell>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuTrigger
+                    asChild
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  >
                     <Button variant="ghost" className="h-8 w-8 p-0">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         navigate(`/scenarios/${scenario._id}`);
                       }}
@@ -158,7 +161,7 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
                       Open Editor
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         navigate(`/scenarios/${scenario._id}/edit`);
                       }}
@@ -172,7 +175,7 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <DropdownMenuItem
-                            onClick={(e) => {
+                            onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               navigate(`/scenarios/${scenario._id}?deploy=true`);
                             }}
@@ -197,7 +200,7 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         handleDelete(scenario);
                       }}
