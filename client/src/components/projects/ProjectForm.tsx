@@ -66,9 +66,15 @@ const PROJECT_SECTOR_TO_NIS2: Record<string, string[]> = {
 };
 
 const projectFormSchema = z.object({
-  shortName: z.string().min(1, 'Short name is required').max(50),
-  title: z.string().min(1, 'Title is required').max(200),
-  sector: z.enum(['Telecommunications', 'Healthcare', 'Transportation', 'Nuclear', 'Cross-Sector']),
+  shortName: z.string().min(1, { error: 'Short name is required' }).max(50),
+  title: z.string().min(1, { error: 'Title is required' }).max(200),
+  sector: z.enum({
+    Telecommunications: 'Telecommunications',
+    Healthcare: 'Healthcare',
+    Transportation: 'Transportation',
+    Nuclear: 'Nuclear',
+    'Cross-Sector': 'Cross-Sector',
+  }),
   leader: z.string().min(1, 'Leader is required').max(100),
   description: z.string().max(2000).optional().or(z.literal('')),
   isComposite: z.boolean(),
