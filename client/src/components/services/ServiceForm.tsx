@@ -35,24 +35,33 @@ import { useServicePayload } from '@/hooks/useServicePayload';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const serviceFormSchema = z.object({
-  shortName: z.string().min(1, 'Short name is required').max(50),
-  title: z.string().min(1, 'Title is required').max(200),
-  categoryId: z.string().min(1, 'Category is required'),
+  shortName: z.string().min(1, { error: 'Short name is required' }).max(50),
+  title: z.string().min(1, { error: 'Title is required' }).max(200),
+  categoryId: z.string().min(1, { error: 'Category is required' }),
   sectorId: z.string().optional(),
-  provider: z.string().min(1, 'Provider is required').max(100),
+  provider: z.string().min(1, { error: 'Provider is required' }).max(100),
   description: z.string().max(2000).optional(),
-  type: z.enum(['Software', 'Hardware', 'Software/Hardware'], {
-    errorMap: () => ({ message: 'Please select a valid service type' }),
-  }),
-  uiType: z.enum(['web', 'terminal', 'both'], {
-    errorMap: () => ({ message: 'Please select a valid user interface type' }),
-  }),
+  type: z.enum(
+    { Software: 'Software', Hardware: 'Hardware', 'Software/Hardware': 'Software/Hardware' },
+    {
+      error: 'Please select a valid service type',
+    }
+  ),
+  uiType: z.enum(
+    { web: 'web', terminal: 'terminal', both: 'both' },
+    {
+      error: 'Please select a valid user interface type',
+    }
+  ),
   trlCurrent: z.number().min(1).max(9).optional(),
   trlExpected: z.number().min(1).max(9).optional(),
   license: z.string().max(100).optional(),
-  repositoryTable: z.enum(['INTACT_TOOLBOX', 'OTHER_SERVICES'], {
-    errorMap: () => ({ message: 'Please select a valid repository' }),
-  }),
+  repositoryTable: z.enum(
+    { INTACT_TOOLBOX: 'INTACT_TOOLBOX', OTHER_SERVICES: 'OTHER_SERVICES' },
+    {
+      error: 'Please select a valid repository',
+    }
+  ),
   currentVersion: z.string().max(50).optional(),
 });
 
