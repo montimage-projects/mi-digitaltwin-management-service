@@ -17,7 +17,7 @@ Ensure you have these tools installed:
 
 | Tool                           | Version | Purpose                       |
 | ------------------------------ | ------- | ----------------------------- |
-| [Node.js](https://nodejs.org/) | 20+     | JavaScript runtime            |
+| [Node.js](https://nodejs.org/) | 22+     | JavaScript runtime            |
 | [Docker](https://docker.com/)  | 24.0+   | Container runtime for MongoDB |
 | [Git](https://git-scm.com/)    | 2.0+    | Version control               |
 

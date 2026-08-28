@@ -8,7 +8,7 @@ Required software and system requirements.
 
 [Node.js](https://nodejs.org/) is the JavaScript runtime for this project.
 
-**Version:** 20+
+**Version:** 22+
 
 **Installation (via nvm):**
 
@@ -194,10 +194,10 @@ echo "Prerequisites OK!"
 
 ```bash
 # Try with nvm
-nvm install 20
+nvm install 22
 
 # Or use fnm
-fnm install 20
+fnm install 22
 ```
 
 ### Docker Permission Denied

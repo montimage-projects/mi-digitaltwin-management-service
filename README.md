@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/montimage-projects/mi-digitaltwin-management-service/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/montimage-projects/mi-digitaltwin-management-service/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/montimage-projects/mi-digitaltwin-management-service/releases/tag/v0.1.0)
-[![Node](https://img.shields.io/badge/node-%3E%3D20.0-brightgreen)]()
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/montimage-projects/mi-digitaltwin-management-service/releases/tag/v1.0.0)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.0-brightgreen)](<>)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 # Design and deploy cybersecurity Digital Twins on Kubernetes
@@ -146,7 +146,7 @@ The platform supports multiple critical infrastructure sectors (Telecom, Healthc
 
 | Technology                | Purpose                   |
 | ------------------------- | ------------------------- |
-| **React 18**              | UI library                |
+| **React 19**              | UI library                |
 | **TypeScript**            | Type-safe development     |
 | **Vite**                  | Build tool and dev server |
 | **Tailwind CSS**          | Utility-first styling     |
@@ -154,7 +154,7 @@ The platform supports multiple critical infrastructure sectors (Telecom, Healthc
 | **TanStack React Query**  | Server state management   |
 | **Zustand**               | Client state management   |
 | **React Flow (xyflow)**   | Topology visualization    |
-| **React Router v6**       | Client-side routing       |
+| **React Router v7**       | Client-side routing       |
 | **react-hook-form + Zod** | Form validation           |
 | **Axios**                 | HTTP client               |
 | **Monaco Editor**         | YAML code editor          |
@@ -163,19 +163,19 @@ The platform supports multiple critical infrastructure sectors (Telecom, Healthc
 
 ### Backend
 
-| Technology                  | Purpose                    |
-| --------------------------- | -------------------------- |
-| **Node.js 20+**             | Runtime                    |
-| **TypeScript**              | Type-safe development      |
-| **Express.js**              | HTTP framework             |
-| **MongoDB 7**               | Document database          |
-| **Mongoose**                | ODM and schema validation  |
-| **Zod**                     | Request validation         |
-| **JWT + bcrypt**            | Authentication             |
-| **@kubernetes/client-node** | Kubernetes API integration |
-| **Helmet**                  | HTTP security headers      |
-| **Compression**             | gzip response compression  |
-| **Morgan**                  | HTTP request logging       |
+| Technology                     | Purpose                    |
+| ------------------------------ | -------------------------- |
+| **Node.js 22+**                | Runtime                    |
+| **TypeScript**                 | Type-safe development      |
+| **Express.js**                 | HTTP framework             |
+| **MongoDB 8**                  | Document database          |
+| **Mongoose v9**                | ODM and schema validation  |
+| **Zod v4**                     | Request validation         |
+| **JWT + bcrypt**               | Authentication             |
+| **@kubernetes/client-node v2** | Kubernetes API integration |
+| **Helmet**                     | HTTP security headers      |
+| **Compression**                | gzip response compression  |
+| **Morgan**                     | HTTP request logging       |
 
 </details>
 

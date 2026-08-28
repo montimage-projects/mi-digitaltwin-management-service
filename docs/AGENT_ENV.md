@@ -8,7 +8,7 @@ Serves milestone **ME** of `MODERNIZATION_PLAN.md` (task Pre.1).
 
 | Component | Requirement                                            | Notes                                                                                                       |
 | --------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| Node.js   | `>=20` (`engines` floor in `package.json`)             | Dev machine runs v24.11.1; GitLab CI runs node:22-slim (`node:22.23.1-bookworm-slim`, see `.gitlab-ci.yml`) |
+| Node.js   | `>=22` (`engines` floor in `package.json`)             | Dev machine runs v24.11.1; GitLab CI runs node:22-slim (`node:22.23.1-bookworm-slim`, see `.gitlab-ci.yml`) |
 | npm       | Ships with Node; npm workspaces (`client/`, `server/`) | Do not use bun/yarn/pnpm workspaces commands                                                                |
 | Git       | Any recent version                                     | Husky hooks installed via the `prepare` script                                                              |
 

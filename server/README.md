@@ -8,7 +8,7 @@ The server provides a RESTful API for managing cybersecurity services, digital t
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 20+
+- [Node.js](https://nodejs.org/) 22+
 - Docker (for MongoDB)
 - MongoDB running on `localhost:27017`
 
@@ -136,15 +136,15 @@ src/
 
 ## Technology Stack
 
-| Technology | Purpose            |
-| ---------- | ------------------ |
-| Node.js    | JavaScript runtime |
-| Express    | HTTP framework     |
-| MongoDB    | Document database  |
-| Mongoose   | ODM for MongoDB    |
-| Zod        | Schema validation  |
-| JWT        | Authentication     |
-| bcrypt     | Password hashing   |
+| Technology | Purpose              |
+| ---------- | -------------------- |
+| Node.js    | JavaScript runtime   |
+| Express    | HTTP framework       |
+| MongoDB    | Document database    |
+| Mongoose   | ODM for MongoDB v9   |
+| Zod        | Schema validation v4 |
+| JWT        | Authentication       |
+| bcrypt     | Password hashing     |
 
 ## Testing
 

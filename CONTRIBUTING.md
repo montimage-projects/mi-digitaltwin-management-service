@@ -166,6 +166,6 @@ docs/                  # Technical documentation
 k8s/                   # Kubernetes manifests (Kustomize)
 ```
 
-- `client/` — React 18, Vite, Tailwind CSS, shadcn/ui, React Query, Zustand
+- `client/` — React 19, Vite 8, Tailwind CSS 4, shadcn/ui, React Query, Zustand
 - `server/` — Express.js, MongoDB/Mongoose, Zod, JWT auth
 - `docs/` — Architecture, API reference, deployment guides, playbooks

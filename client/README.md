@@ -8,7 +8,7 @@ The client is a single-page application (SPA) built with React, TypeScript, and 
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 20+
+- [Node.js](https://nodejs.org/) 22+
 - Backend server running (see [server/README.md](../server/README.md))
 
 ## Quick Start
@@ -65,18 +65,18 @@ src/
 
 ## Technology Stack
 
-| Technology    | Purpose                   |
-| ------------- | ------------------------- |
-| React 18      | UI framework              |
-| TypeScript    | Type safety               |
-| Vite          | Build tool and dev server |
-| Tailwind CSS  | Utility-first styling     |
-| shadcn/ui     | Component library         |
-| React Query   | Server state management   |
-| Zustand       | Client state management   |
-| React Router  | Client-side routing       |
-| React Flow    | Topology canvas           |
-| Monaco Editor | YAML editing              |
+| Technology      | Purpose                   |
+| --------------- | ------------------------- |
+| React 19        | UI framework              |
+| TypeScript      | Type safety               |
+| Vite            | Build tool and dev server |
+| Tailwind CSS    | Utility-first styling     |
+| shadcn/ui       | Component library         |
+| React Query     | Server state management   |
+| Zustand         | Client state management   |
+| React Router v7 | Client-side routing       |
+| React Flow      | Topology canvas           |
+| Monaco Editor   | YAML editing              |
 
 ## Testing
 
