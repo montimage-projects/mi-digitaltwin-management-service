@@ -296,6 +296,23 @@ describe('resolveTopologyNodes', () => {
       expect((err as AppError).statusCode).toBe(400);
     }
   });
+
+  test('falls back to currentVersion when the node pins a missing version', () => {
+    const service = makeService({
+      currentVersion: '1.0.0',
+      versions: [
+        { version: '1.0.0', dockerImage: 'registry.example/app:1.0.0' },
+        { version: '2.0.0', dockerImage: 'registry.example/app:2.0.0' },
+      ],
+    });
+    const resolved = resolveTopologyNodes([makeNode('n1', { version: '9.9.9' })], [service]);
+    expect(resolved[0].image).toBe('registry.example/app:1.0.0');
+  });
+
+  test('truncates a very long node id to a 50-char resource name', () => {
+    const resolved = resolveTopologyNodes([makeNode('x'.repeat(80))], [makeService()]);
+    expect(resolved[0].name).toBe('x'.repeat(50));
+  });
 });
 
 describe('resolveTopologyNodes — deployment spec and edge context', () => {
@@ -495,6 +512,26 @@ describe('resolveTopologyNodes — deployment spec and edge context', () => {
       edges
     );
     expect(resolved[0].edgeContext.targets).toEqual(['t1', 't2']);
+  });
+
+  test('prefers data.edgeType over data.type and type when several are present', () => {
+    const edges = [
+      {
+        id: 'e1',
+        source: 'mmt',
+        target: 'http-sim',
+        type: 'attacks',
+        data: { type: 'notifies', edgeType: 'monitors' },
+      },
+    ];
+    const resolved = resolveTopologyNodes(
+      [makeNode('mmt'), makeNode('http-sim')],
+      [makeService()],
+      edges
+    );
+    expect(resolved[0].edgeContext.monitors).toEqual(['http-sim']);
+    expect(resolved[0].edgeContext.targets).toEqual([]);
+    expect(resolved[0].edgeContext.notifies).toEqual([]);
   });
 });
 
@@ -908,6 +945,32 @@ describe('deployTopology — sidecar grouping (issue #191)', () => {
     ).rejects.toThrow(AppError);
     expect(clients.core.createNamespace).not.toHaveBeenCalled();
   });
+
+  test('does not double-mount a same-named volume the host already mounts', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [hostNode(), sidecarNode('mmt-probe')],
+      edges: [{ source: 'mmt-probe', target: 'http-sim', type: 'monitors' }],
+      services: [
+        hostService({
+          volumes: [{ name: 'shared', mountPath: '/host/shared', emptyDir: true }],
+        }),
+        sidecarService(SIDECAR_ID, {
+          volumes: [{ name: 'shared', mountPath: '/side/shared', emptyDir: true }],
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const podSpec = deploymentBody(clients).spec.template.spec;
+    // One backing volume — the host already mounts `shared`, so the
+    // sidecar's declaration does not add a second host mount or volume.
+    expect(podSpec.volumes).toEqual([{ name: 'shared', emptyDir: {} }]);
+    const [host, sidecar] = podSpec.containers;
+    expect(host.volumeMounts).toEqual([{ name: 'shared', mountPath: '/host/shared' }]);
+    expect(sidecar.volumeMounts).toEqual([{ name: 'shared', mountPath: '/side/shared' }]);
+  });
 });
 
 describe('deployTopology — Job, ConfigMap and RBAC manifests (issue #192)', () => {
@@ -1214,6 +1277,159 @@ describe('deployTopology — Job, ConfigMap and RBAC manifests (issue #192)', ()
     };
     expect(podSpec.containers[0].readinessProbe?.httpGet).toEqual({ path: '/', port: 8080 });
   });
+
+  test('falls back to file-<index> keys for colliding or illegal configFile basenames', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [specNode('mmt')],
+      services: [
+        specService({
+          kind: 'Deployment',
+          role: 'monitor',
+          configFiles: [
+            { mountPath: '/opt/mmt/app.conf', content: 'a' },
+            // Same basename as the first file — collides, needs a fallback key.
+            { mountPath: '/etc/other/app.conf', content: 'b' },
+            // `..` is not a legal ConfigMap key — needs a fallback key.
+            { mountPath: '/etc/..', content: 'c' },
+          ],
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const cmArg = firstCallArg(clients.core.createNamespacedConfigMap) as {
+      body: { data: Record<string, string> };
+    };
+    expect(cmArg.body.data).toEqual({ 'app.conf': 'a', 'file-1': 'b', 'file-2': 'c' });
+
+    const podSpec = workloadBody(clients) as {
+      containers: { volumeMounts?: { name: string; mountPath: string; subPath?: string }[] }[];
+    };
+    expect(podSpec.containers[0].volumeMounts).toEqual([
+      { name: 'mmt-config', mountPath: '/opt/mmt/app.conf', subPath: 'app.conf' },
+      { name: 'mmt-config', mountPath: '/etc/other/app.conf', subPath: 'file-1' },
+      { name: 'mmt-config', mountPath: '/etc/..', subPath: 'file-2' },
+    ]);
+  });
+
+  test('a Job workload can host a sidecar container', async () => {
+    const clients = makeClients();
+    const SIDE_ID = '507f1f77bcf86cd799439012';
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [specNode('mag'), { id: 'mag-side', data: { serviceId: SIDE_ID } }],
+      edges: [{ source: 'mag-side', target: 'mag', type: 'monitors' }],
+      services: [
+        specService({ kind: 'Job', role: 'attack', exposePort: false }),
+        makeService({
+          _id: SIDE_ID,
+          deployment: {
+            kind: 'Deployment',
+            role: 'monitor',
+            attachMode: 'sidecar',
+            exposePort: false,
+          },
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    // The sidecar rides in the Job's pod — one Job, no Deployment.
+    expect(clients.batch.createNamespacedJob).toHaveBeenCalledTimes(1);
+    expect(clients.apps.createNamespacedDeployment).not.toHaveBeenCalled();
+    const podSpec = workloadBody(clients) as {
+      restartPolicy?: string;
+      containers: { name: string }[];
+    };
+    expect(podSpec.containers.map((c) => c.name)).toEqual(['mag', 'mag-side']);
+    expect(podSpec.restartPolicy).toBe('Never');
+  });
+
+  test('the Role carries the union of host and sidecar rbac rules', async () => {
+    const clients = makeClients();
+    const SIDE_ID = '507f1f77bcf86cd799439012';
+    const hostRules = [{ apiGroups: [''], resources: ['pods'], verbs: ['get'] }];
+    const sidecarRules = [{ apiGroups: ['apps'], resources: ['deployments'], verbs: ['patch'] }];
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [specNode('http-sim'), { id: 'probe', data: { serviceId: SIDE_ID } }],
+      edges: [{ source: 'probe', target: 'http-sim', type: 'monitors' }],
+      services: [
+        specService({
+          kind: 'Deployment',
+          role: 'target',
+          containerPort: 8080,
+          exposePort: true,
+          rbac: hostRules,
+        }),
+        makeService({
+          _id: SIDE_ID,
+          deployment: {
+            kind: 'Deployment',
+            role: 'monitor',
+            attachMode: 'sidecar',
+            exposePort: false,
+            rbac: sidecarRules,
+          },
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    // One Role per pod — host rules first, then the sidecar's folded in.
+    const roleArg = firstCallArg(clients.rbac.createNamespacedRole) as {
+      body: { metadata: { name: string }; rules: unknown[] };
+    };
+    expect(roleArg.body.metadata.name).toBe('http-sim');
+    expect(roleArg.body.rules).toEqual([...hostRules, ...sidecarRules]);
+    const podSpec = workloadBody(clients) as { serviceAccountName?: string };
+    expect(podSpec.serviceAccountName).toBe('http-sim');
+  });
+
+  test('creates the RBAC triple and ConfigMaps before the workload that needs them', async () => {
+    const clients = makeClients();
+    const events: string[] = [];
+    clients.core.createNamespacedServiceAccount = vi.fn(async () => {
+      events.push('serviceaccount');
+      return {};
+    }) as never;
+    clients.rbac.createNamespacedRole = vi.fn(async () => {
+      events.push('role');
+      return {};
+    }) as never;
+    clients.rbac.createNamespacedRoleBinding = vi.fn(async () => {
+      events.push('rolebinding');
+      return {};
+    }) as never;
+    clients.core.createNamespacedConfigMap = vi.fn(async () => {
+      events.push('configmap');
+      return {};
+    }) as never;
+    clients.apps.createNamespacedDeployment = vi.fn(async () => {
+      events.push('deployment');
+      return {};
+    }) as never;
+
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [specNode('ai4soar')],
+      services: [
+        specService({
+          kind: 'Deployment',
+          role: 'reaction',
+          configFiles: [{ mountPath: '/opt/app.conf', content: 'x' }],
+          rbac: [{ apiGroups: [''], resources: ['pods'], verbs: ['get'] }],
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    // The workload references the ServiceAccount and ConfigMap volumes, so
+    // every supporting resource must exist first.
+    expect(events).toEqual(['serviceaccount', 'role', 'rolebinding', 'configmap', 'deployment']);
+  });
 });
 
 describe('deployTopology — PodSecurity label and attack containment (issue #194)', () => {
@@ -1456,6 +1672,89 @@ describe('deployTopology — PodSecurity label and attack containment (issue #19
       { podSelector: { matchLabels: { app: 'http-sim' } } },
     ]);
   });
+
+  test('a privileged securityContext triggers the enforce=privileged label', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('http-sim', TARGET_ID)],
+      services: [
+        makeService({
+          _id: TARGET_ID,
+          deployment: {
+            kind: 'Deployment',
+            role: 'target',
+            securityContext: { privileged: true },
+          },
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    expect(namespaceLabels(clients)['pod-security.kubernetes.io/enforce']).toBe('privileged');
+  });
+
+  test('creates the containment NetworkPolicy before any workload goes up', async () => {
+    const clients = makeClients();
+    const events: string[] = [];
+    clients.networking.createNamespacedNetworkPolicy = vi.fn(async () => {
+      events.push('netpol');
+      return {};
+    }) as never;
+    clients.apps.createNamespacedDeployment = vi.fn(async () => {
+      events.push('deployment');
+      return {};
+    }) as never;
+    clients.batch.createNamespacedJob = vi.fn(async () => {
+      events.push('job');
+      return {};
+    }) as never;
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [readyPod('http-sim')],
+    })) as unknown as typeof clients.core.listNamespacedPod;
+
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('http-sim', TARGET_ID), node('mag', ATTACK_ID)],
+      edges: [{ source: 'mag', target: 'http-sim', type: 'attacks' }],
+      services: [targetSvc(), attackSvc()],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    // The policy precedes both workloads so the attack pod starts contained.
+    expect(events[0]).toBe('netpol');
+    expect(events).toEqual(['netpol', 'deployment', 'job']);
+  });
+
+  test('every attack node gets its own egress NetworkPolicy', async () => {
+    const clients = makeClients();
+    const ATTACK2_ID = '507f1f77bcf86cd799439015';
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [readyPod('http-sim')],
+    })) as unknown as typeof clients.core.listNamespacedPod;
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('http-sim', TARGET_ID), node('mag', ATTACK_ID), node('mag2', ATTACK2_ID)],
+      edges: [
+        { source: 'mag', target: 'http-sim', type: 'attacks' },
+        { source: 'mag2', target: 'http-sim', type: 'attacks' },
+      ],
+      services: [
+        targetSvc(),
+        attackSvc(),
+        makeService({
+          _id: ATTACK2_ID,
+          deployment: { kind: 'Job', role: 'attack', exposePort: false },
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const policies = networkPolicyBodies(clients);
+    expect(policies).toHaveLength(2);
+    expect(policies.map((p) => p.metadata.name)).toEqual(['mag-egress', 'mag2-egress']);
+    expect(policies[0].spec.podSelector).toEqual({ matchLabels: { app: 'mag' } });
+    expect(policies[1].spec.podSelector).toEqual({ matchLabels: { app: 'mag2' } });
+  });
 });
 
 describe('deployTopology — ordered rollout and readiness wait (issue #195)', () => {
@@ -1682,6 +1981,71 @@ describe('deployTopology — ordered rollout and readiness wait (issue #195)', (
     expect(clients.batch.createNamespacedJob).not.toHaveBeenCalled();
     expect(clients.core.deleteNamespace).toHaveBeenCalledTimes(1);
   });
+
+  test('an attack sharing a startOrder tier still waits for its tier-mate to report Ready', async () => {
+    const clients = makeClients();
+    const events: string[] = [];
+    let pollsBeforeJob = 0;
+    clients.core.listNamespacedPod = vi.fn(async () => {
+      pollsBeforeJob++;
+      return { items: [readyPod('http-sim')] };
+    }) as unknown as typeof clients.core.listNamespacedPod;
+    clients.apps.createNamespacedDeployment = vi.fn(async () => {
+      events.push('deploy:http-sim');
+      return {};
+    }) as never;
+    clients.batch.createNamespacedJob = vi.fn(async () => {
+      events.push(`job:mag after ${pollsBeforeJob} polls`);
+      return {};
+    }) as never;
+
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('http-sim', TARGET_ID), node('mag', ATTACK_ID)],
+      edges: [{ source: 'mag', target: 'http-sim', type: 'attacks' }],
+      services: [
+        // Same startOrder — non-attack plans of the tier still go first.
+        svc(TARGET_ID, { kind: 'Deployment', role: 'target', startOrder: 10 }),
+        svc(ATTACK_ID, { kind: 'Job', role: 'attack', exposePort: false, startOrder: 10 }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+      readinessPollMs: 5,
+      readinessTimeoutMs: 5_000,
+    });
+
+    expect(events).toEqual(['deploy:http-sim', 'job:mag after 1 polls']);
+  });
+
+  test('a completed earlier-tier Job pod releases the readiness gate', async () => {
+    const clients = makeClients();
+    // The earlier-tier Job already finished: its pod reports Succeeded, which
+    // counts as Ready for the gate (a finished Job pod never reports Ready).
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [
+        {
+          metadata: { name: 'setup-pod', labels: { app: 'setup' } },
+          status: { phase: 'Succeeded' },
+        },
+      ],
+    })) as unknown as typeof clients.core.listNamespacedPod;
+
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('setup', TARGET_ID), node('mag', ATTACK_ID)],
+      edges: [{ source: 'mag', target: 'setup', type: 'attacks' }],
+      services: [
+        svc(TARGET_ID, { kind: 'Job', role: 'generic', exposePort: false, startOrder: 10 }),
+        svc(ATTACK_ID, { kind: 'Job', role: 'attack', exposePort: false, startOrder: 30 }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+      readinessPollMs: 5,
+      readinessTimeoutMs: 5_000,
+    });
+
+    // Both Jobs ran — the gate did not block on the finished setup pod.
+    expect(createdWorkloadOrder(clients)).toEqual(['setup', 'mag']);
+    expect(clients.batch.createNamespacedJob).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('edge-derived environment variables (issue #193)', () => {
@@ -1850,6 +2214,88 @@ describe('edge-derived environment variables (issue #193)', () => {
     );
     expect(resolved[0].deployment.env).toEqual([{ name: 'HOST_INTERFACE', value: 'eth0' }]);
   });
+
+  test('does not mutate the catalog env entries shared with the service document', () => {
+    const attack = attackSvc([{ name: 'TARGET_URL', fromEdge: 'target' }]);
+    const resolved = resolveTopologyNodes(
+      [node('mag', ATTACK_ID), node('http-sim', TARGET_ID)],
+      [attack, targetSvc()],
+      [{ source: 'mag', target: 'http-sim', type: 'attacks' }]
+    );
+    // The resolved node carries the concrete value…
+    expect(resolved[0].deployment.env).toEqual([
+      { name: 'TARGET_URL', fromEdge: 'target', value: 'http://http-sim:8080' },
+    ]);
+    // …but resolveEdgeEnv rebuilt the list rather than writing `value` onto
+    // the catalog entry — a shared object must not leak state across deploys.
+    expect(attack.deployment?.env).toEqual([{ name: 'TARGET_URL', fromEdge: 'target' }]);
+  });
+
+  test("a sidecar's fromEdge env resolves onto its container inside the host pod", async () => {
+    const clients = makeClients();
+    const sidecarMonitor = makeService({
+      _id: MONITOR_ID,
+      deployment: {
+        kind: 'Deployment',
+        role: 'monitor',
+        attachMode: 'sidecar',
+        exposePort: false,
+        env: [{ name: 'ALERT_WEBHOOK_URL', fromEdge: 'reaction' }],
+      },
+    });
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [
+        node('http-sim', TARGET_ID),
+        node('mmt-probe', MONITOR_ID),
+        node('ai4soar', REACTION_ID),
+      ],
+      edges: [
+        { source: 'mmt-probe', target: 'http-sim', type: 'monitors' },
+        { source: 'mmt-probe', target: 'ai4soar', type: 'notifies' },
+      ],
+      services: [targetSvc(), sidecarMonitor, reactionSvc()],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    // The sidecar container in http-sim's pod gets the resolved webhook URL.
+    const hostDeploy = (
+      clients.apps.createNamespacedDeployment.mock.calls as {
+        body: {
+          metadata: { name: string };
+          spec: {
+            template: {
+              spec: { containers: { name: string; env?: { name: string; value: string }[] }[] };
+            };
+          };
+        };
+      }[][]
+    )
+      .map((call) => call[0].body)
+      .find((body) => body.metadata.name === 'http-sim');
+    const sidecar = hostDeploy?.spec.template.spec.containers.find((c) => c.name === 'mmt-probe');
+    expect(sidecar?.env).toEqual([{ name: 'ALERT_WEBHOOK_URL', value: 'http://ai4soar:5000' }]);
+  });
+
+  test('a declared env with no value emits an explicitly empty string', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('mmt-probe', MONITOR_ID)],
+      services: [monitorSvc([{ name: 'HOST_INTERFACE' }])],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    const depArg = firstCallArg(clients.apps.createNamespacedDeployment) as {
+      body: {
+        spec: {
+          template: { spec: { containers: { env?: { name: string; value: string }[] }[] } };
+        };
+      };
+    };
+    expect(depArg.body.spec.template.spec.containers[0].env).toEqual([
+      { name: 'HOST_INTERFACE', value: '' },
+    ]);
+  });
 });
 
 describe('getDeploymentStatus — Job workloads (issue #192)', () => {
@@ -1946,6 +2392,24 @@ describe('getDeploymentStatus — Job workloads (issue #192)', () => {
       names: ['mag'],
     });
     expect(statuses).toEqual([{ name: 'mag', status: 'pending', containers: [] }]);
+  });
+
+  test('uses the default backoffLimit (6) when the Job spec does not set one', async () => {
+    // No spec.backoffLimit — Kubernetes defaults it to 6.
+    const under = jobClients({ status: { failed: 5 } });
+    const atLimit = jobClients({ status: { failed: 6 } });
+
+    const underResult = await getDeploymentStatus(under as never, {
+      namespace: 'secsim-a-b',
+      names: ['mag'],
+    });
+    expect(underResult.statuses[0].status).toBe('pending');
+
+    const atResult = await getDeploymentStatus(atLimit as never, {
+      namespace: 'secsim-a-b',
+      names: ['mag'],
+    });
+    expect(atResult.statuses[0].status).toBe('failed');
   });
 });
 
@@ -2089,6 +2553,35 @@ describe('getDeploymentStatus — per-container status (issue #196)', () => {
     });
     expect(statuses.map((s) => s.status)).toEqual(['running', 'completed']);
     expect(progress).toBe(100);
+  });
+
+  test('the worst status wins when a container name appears across several pods', async () => {
+    const healthy = multiContainerPod([
+      { name: 'http-sim', ready: true, state: { running: {} } },
+      { name: 'mmt-probe', ready: true, state: { running: {} } },
+    ]);
+    const failing = multiContainerPod([
+      { name: 'http-sim', ready: true, state: { running: {} } },
+      { name: 'mmt-probe', ready: false, state: { waiting: { reason: 'CrashLoopBackOff' } } },
+    ]);
+
+    // A container failing in any pod reads failed even when a sibling pod's
+    // copy of it is fine — whichever order the API returns the pods in.
+    for (const pods of [
+      [healthy, failing],
+      [failing, healthy],
+    ]) {
+      const clients = deploymentClients(pods);
+      const { statuses } = await getDeploymentStatus(clients as never, {
+        namespace: 'secsim-a-b',
+        names: ['http-sim'],
+      });
+      expect(statuses[0].status).toBe('failed');
+      expect(statuses[0].containers).toEqual([
+        { name: 'http-sim', status: 'running' },
+        { name: 'mmt-probe', status: 'failed' },
+      ]);
+    }
   });
 });
 
@@ -2269,6 +2762,74 @@ describe('getDeploymentStatus', () => {
       names: ['gone'],
     });
     expect(statuses).toEqual([{ name: 'gone', status: 'pending', containers: [] }]);
+    expect(progress).toBe(0);
+  });
+
+  test('a duplicated name yields one workload read and a deduped selector', async () => {
+    // Sidecar rows share their host's resource name — a duplicated name must
+    // not cost a second workload read or produce a duplicate selector value
+    // (Kubernetes rejects repeated values in a set-based selector).
+    const listNamespacedPod = vi.fn(async () => ({ items: [] }));
+    const readNamespacedDeployment = vi.fn(async () => ({
+      spec: { replicas: 1 },
+      status: { availableReplicas: 1 },
+    }));
+    const clients = { core: { listNamespacedPod }, apps: { readNamespacedDeployment } };
+
+    const { statuses } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['http-sim', 'http-sim'],
+    });
+
+    expect(statuses).toHaveLength(2);
+    expect(statuses.every((s) => s.status === 'running')).toBe(true);
+    expect(readNamespacedDeployment).toHaveBeenCalledTimes(1);
+    const callOpts = (listNamespacedPod.mock.calls[0] as [{ labelSelector: string }])[0];
+    expect(callOpts.labelSelector).toBe('app in (http-sim)');
+  });
+
+  test('falls back to a per-name pod list for a workload absent from the batch map', async () => {
+    // The combined-selector call reports no pod for 'ghost' — podsFor then
+    // issues a live `app=ghost` list and its result is used.
+    const listNamespacedPod = vi.fn(
+      async ({ labelSelector }: { namespace: string; labelSelector: string }) => ({
+        items:
+          labelSelector === 'app=ghost'
+            ? [{ metadata: { labels: { app: 'ghost' } }, status: { phase: 'Failed' } }]
+            : [],
+      })
+    );
+    const clients = {
+      core: { listNamespacedPod },
+      apps: {
+        readNamespacedDeployment: vi.fn(async () => ({
+          spec: { replicas: 1 },
+          status: { availableReplicas: 0 },
+        })),
+      },
+    };
+
+    const { statuses } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['ghost'],
+    });
+
+    expect(listNamespacedPod).toHaveBeenCalledTimes(2);
+    const fallbackCall = (listNamespacedPod.mock.calls[1] as [{ labelSelector: string }])[0];
+    expect(fallbackCall.labelSelector).toBe('app=ghost');
+    expect(statuses[0].status).toBe('failed');
+  });
+
+  test('an empty name list yields no statuses and zero progress', async () => {
+    const clients = {
+      core: { listNamespacedPod: vi.fn(async () => ({ items: [] })) },
+      apps: { readNamespacedDeployment: vi.fn(async () => ({})) },
+    };
+    const { statuses, progress } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: [],
+    });
+    expect(statuses).toEqual([]);
     expect(progress).toBe(0);
   });
 });
@@ -2508,6 +3069,38 @@ describe('collectNewPodLogs', () => {
     const callArg = clients.core.readNamespacedPodLog.mock.calls[0][0] as Record<string, unknown>;
     expect(callArg).not.toHaveProperty('container');
     expect(out).toEqual([{ name: 'svc-a', pod: 'p', line: 'line' }]);
+  });
+
+  test('falls back to status containerStatuses when the pod spec declares no containers', async () => {
+    // A pod whose spec is not reported still gets per-container reads — the
+    // names come from the reported container statuses instead.
+    const pod = {
+      metadata: { name: 'http-sim-pod' },
+      status: { containerStatuses: [{ name: 'http-sim' }, { name: 'mmt-probe' }] },
+    };
+    const logs: Record<string, string> = {
+      'http-sim': 'access\n',
+      'mmt-probe': 'alert\n',
+    };
+    const clients = {
+      core: {
+        listNamespacedPod: vi.fn(async () => ({ items: [pod] })),
+        readNamespacedPodLog: vi.fn(
+          async ({ container }: { container: string }) => logs[container]
+        ),
+      },
+      apps: {},
+    };
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['http-sim'],
+      seen: new Map(),
+    });
+    expect(clients.core.readNamespacedPodLog).toHaveBeenCalledTimes(2);
+    expect(out).toEqual([
+      { name: 'http-sim', pod: 'http-sim-pod', container: 'http-sim', line: 'access' },
+      { name: 'http-sim', pod: 'http-sim-pod', container: 'mmt-probe', line: 'alert' },
+    ]);
   });
 
   test('reads every container of a multi-container pod and tags each line (issue #197)', async () => {
@@ -2957,6 +3550,18 @@ describe('buildClientFromInfrastructure', () => {
     };
     expect(opts.clusters[0].server).toBe('https://10.0.0.1:6443');
     expect(opts.users[0].token).toBe('a-bearer-token-value');
+  });
+
+  test('propagates skipTLSVerify into the token-based cluster config', () => {
+    buildClientFromInfrastructure({
+      endpoint: 'https://10.0.0.1:6443',
+      credentials: encrypt('a-bearer-token-value'),
+      skipTLSVerify: true,
+    } as unknown as IInfrastructure);
+    const opts = kubeconfigCalls.fromOptions[0] as {
+      clusters: { skipTLSVerify?: boolean }[];
+    };
+    expect(opts.clusters[0].skipTLSVerify).toBe(true);
   });
 
   test('returns core, apps, batch, networking and rbac clients', () => {
