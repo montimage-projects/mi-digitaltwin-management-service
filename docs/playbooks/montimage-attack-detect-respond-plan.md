@@ -130,7 +130,7 @@ execution namespace, provisioned with:
 ```bash
 kubectl create secret docker-registry montimage-registry \
   --docker-server=registry.montimage.eu \
-  --docker-username=<user> --docker-password=<token> \
+  --docker-username=<user> --docker-password "<token>" \
   -n <execution-namespace>
 ```
 
