@@ -69,6 +69,23 @@ describe('seed catalog refresh (integration)', () => {
     expect(infraService?.deprecated).toBe(false);
     expect(infraService?.sectorId).toBeDefined();
 
+    // Issue #186 — the four Montimage scenario modules are seeded with the
+    // image refs confirmed in playbook task Pre.1, not the synthetic
+    // `registry.montimage.eu/<provider-slug>/<shortName>:v1.0.0` fallback.
+    const montimageImages: Record<string, string> = {
+      MAG: 'registry.montimage.eu/montimage-mti/mag:v1.0.0',
+      'HTTP-SIM': 'registry.montimage.eu/montimage-mti/http-sim:v1.0.0',
+      'MMT-PROBE': 'registry.montimage.eu/montimage-mti/mmt-probe:v1.0.0',
+      AI4SOAR: 'registry.montimage.eu/montimage-mti/ai4soar:v1.0.0',
+    };
+    for (const [shortName, image] of Object.entries(montimageImages)) {
+      const svc = await Service.findOne({ shortName });
+      expect(svc, `${shortName} seeded`).not.toBeNull();
+      expect(svc?.repositoryTable).toBe('INTACT_TOOLBOX');
+      expect(svc?.deprecated).toBe(false);
+      expect(svc?.versions[0]?.dockerImage).toBe(image);
+    }
+
     const sector = await Sector.findOne({ slug: 'digital-infrastructure' });
     expect(infraService?.sectorId?.toString()).toBe(sector?._id.toString());
 
