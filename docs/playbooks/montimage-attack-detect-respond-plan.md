@@ -246,12 +246,67 @@ by these findings — see the updated topology and wiring rows above.
 
 **Acceptance Criteria**:
 
-- [ ] AI4SOAR auth mode is recorded (ServiceAccount token, or kubeconfig injection with rationale)
-- [ ] Target cluster PodSecurity enforce level is recorded and the required namespace label is documented
+- [x] AI4SOAR auth mode is recorded (ServiceAccount token, or kubeconfig injection with rationale)
+- [x] Target cluster PodSecurity enforce level is recorded and the required namespace label is documented
 
 **Dependencies**: Pre.2
 **Effort**: S
 **Verify**: `kubectl auth can-i delete pods --as=system:serviceaccount:<ns>:ai4soar -n <ns>` returns yes in a test namespace with the planned Role
+
+**Result** (recorded 2026-09-12):
+
+**AI4SOAR auth mode — in-cluster ServiceAccount token (confirmed).** The
+AI4SOAR source contains no Kubernetes client: the response path recommends a
+CACAO playbook and delegates execution to the Shuffle backend
+(`playbook_service.py` POSTs `/api/v1/workflows/{id}/execute` with
+`SHUFFLE_API_TOKEN`), so whichever component in the `ai4soar` deployment
+actually calls the Kubernetes API authenticates with the pod's own
+ServiceAccount token — the standard in-cluster client config
+(`token` + `ca.crt` under `/var/run/secrets/kubernetes.io/serviceaccount/`
+against `https://kubernetes.default.svc`), which every mainstream Kubernetes
+client library supports out of the box. The engine runs the `ai4soar` pod with
+`serviceAccountName: ai4soar` bound to a namespace-scoped Role granting
+`pods` `delete`, `deployments` `patch`/`scale`, `networkpolicies` `create`
+(the AI4SOAR → http-sim wiring row; Task 1.3 builds the ServiceAccount, Role
+and RoleBinding manifests). **No kubeconfig injection** — rationale: the
+Infrastructure's kubeconfig is the engine's deploy credential and is typically
+cluster-wide; mounting it inside an alert-driven reaction pod would hand that
+pod the same scope (see Risks — never fall back to the admin kubeconfig in the
+pod). The namespace-scoped SA token is least-privilege, needs no secret
+distribution, and rotates automatically (bound service-account tokens are the
+default since K8s 1.21). Residual: which component inside the packaged
+`ai4soar:v1.0.0` image issues the API call (the Shuffle app/worker) is
+confirmed at first pull — the SA token covers either layout since the whole
+stack shares the pod.
+
+**PodSecurity — `enforce=privileged` on the execution namespace (required).**
+The MMT-Probe sidecar adds `NET_ADMIN` + `NET_RAW` (MAG does the same in the
+same namespace), and both capabilities are outside the `baseline` policy's
+allowed `capabilities.add` list (`AUDIT_WRITE`, `CHOWN`, `DAC_OVERRIDE`,
+`FOWNER`, `FSETID`, `KILL`, `MKNOD`, `NET_BIND_SERVICE`, `SETFCAP`, `SETGID`,
+`SETPCAP`, `SETUID`, `SYS_CHROOT`); `restricted` is stricter still. Every
+per-execution namespace the engine creates therefore carries
+`pod-security.kubernetes.io/enforce=privileged` — the label Task 1.5 already
+adds whenever a node declares capabilities or `hostNetwork`. The admission
+plugin evaluates the namespace's own `enforce` label before its configured
+default, so the scenario is admitted on clusters whose cluster-wide default is
+`baseline` or `restricted`, as long as the PodSecurity admission plugin is
+enabled (GA since K8s 1.25, on by default in managed offerings); where the
+plugin is disabled the label is a harmless no-op. The issue's alternative —
+`baseline` with an exemption — means an `exemptions:` entry in the plugin's
+AdmissionConfiguration: a cluster-admin-level change outside the engine's
+control, recorded as the fallback for clusters where per-namespace labels are
+locked down, not the recorded default. The execution namespace is created by
+the engine, so the label is set at creation time by the same identity that
+deploys the workload — no extra grant is needed to set it.
+
+**Verify status:** pending a machine with cluster access — this environment
+has neither `kubectl` nor a reachable cluster. Run once the Task 1.3 Role
+lands (or against a hand-applied test Role in a scratch namespace):
+`kubectl auth can-i delete pods --as=system:serviceaccount:<ns>:ai4soar -n
+<ns>` → `yes` (the planned Role grants `pods` `delete`), and
+`kubectl get ns <ns> -o jsonpath='{.metadata.labels.pod-security\.kubernetes\.io/enforce}'`
+→ `privileged`.
 
 ## Phase P0 — Catalog and model
 
