@@ -19,6 +19,12 @@ interface ServiceSeed {
   interactsWith: string[];
   potentialUseCases: string[];
   repositoryTable: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
+  /**
+   * Explicit `versions[0].dockerImage` for the initial seeded version. When
+   * absent, `seedServices()` generates a synthetic
+   * `registry.montimage.eu/<provider-slug>/<shortName>:v1.0.0` reference.
+   */
+  dockerImage?: string;
 }
 
 // INTACT_TOOLBOX: Cybersecurity Services catalog
@@ -351,6 +357,132 @@ const intactToolboxServices: ServiceSeed[] = [
     interactsWith: [],
     potentialUseCases: ['>=15% improvement in system resilience from proposed remediations'],
     repositoryTable: 'INTACT_TOOLBOX',
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Montimage attack → detect → respond scenario modules (issue #186)
+//
+// The four containerized modules the Kubernetes scenario deploys — roles and
+// wiring in docs/playbooks/montimage-attack-detect-respond-plan.md. Each entry
+// carries the image reference confirmed in plan task Pre.1 (the `montimage-mti`
+// namespace of registry.montimage.eu, pinned to v1.0.0) instead of the
+// synthetic `<provider-slug>/<shortName>` dockerImage fallback. They sit under
+// `ops-services` until task 0.2 introduces the dedicated attack/target/
+// monitor/reaction categories and reassigns them.
+// ---------------------------------------------------------------------------
+const montimageScenarioServices: ServiceSeed[] = [
+  {
+    shortName: 'MAG',
+    title: 'Montimage Attack Generator (MAG)',
+    categorySlug: 'ops-services',
+    provider: 'Montimage (MTI)',
+    description:
+      'Containerized attack-traffic generator distributed by Montimage. Runs as a finite CLI (`mag <attack> --target-ip <ip> --target-port <port>`) sending HTTP attack traffic at the scenario target; in the attack→detect→respond scenario it is deployed as a Kubernetes Job.',
+    type: 'Software',
+    trl: { current: 6, expected: 8 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'Attack Profile & Target',
+        description: 'Attack type plus target Service IP/port passed as CLI args',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Attack Traffic',
+        description: 'HTTP attack traffic directed at the scenario target',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Attack module in the Montimage attack→detect→respond scenario'],
+    repositoryTable: 'INTACT_TOOLBOX',
+    dockerImage: 'registry.montimage.eu/montimage-mti/mag:v1.0.0',
+  },
+  {
+    shortName: 'HTTP-SIM',
+    title: 'Simulated HTTP Server (HTTP-SIM)',
+    categorySlug: 'ops-services',
+    provider: 'Montimage (MTI)',
+    description:
+      'Packaged HTTP victim workload listening on :8080 (`GET /` → 200). The only workload MAG is allowed to reach in the attack→detect→respond scenario; MMT-Probe is injected as a sidecar in its pod to observe the traffic.',
+    type: 'Software',
+    trl: { current: 6, expected: 8 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'HTTP Requests',
+        description: 'Inbound HTTP traffic, including MAG attack traffic',
+      },
+    ],
+    outputs: [
+      {
+        name: 'HTTP Responses',
+        description: 'Served responses plus the traffic surface observed by MMT-Probe',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Target module in the Montimage attack→detect→respond scenario'],
+    repositoryTable: 'INTACT_TOOLBOX',
+    dockerImage: 'registry.montimage.eu/montimage-mti/http-sim:v1.0.0',
+  },
+  {
+    shortName: 'MMT-PROBE',
+    title: 'MMT Traffic Analysis Probe (MMT-PROBE)',
+    categorySlug: 'ops-services',
+    provider: 'Montimage (MTI)',
+    description:
+      'Montimage Monitoring Tool DPI probe (shipped publicly as the `montimage/mmt` image). Injected as a sidecar sharing the target pod network namespace — requires NET_ADMIN and NET_RAW — configured via `mmt-probe.conf` (libconfig) or the `HOST_INTERFACE` env, and emits security alerts/reports consumed by AI4SOAR.',
+    type: 'Software',
+    trl: { current: 7, expected: 8 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'Pod Network Traffic',
+        description: 'Packets on the target pod interface (HOST_INTERFACE / -i arg)',
+      },
+    ],
+    outputs: [
+      {
+        name: 'DPI Alerts & Reports',
+        description: 'Security output-channel alerts and analysis reports',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Monitor module in the Montimage attack→detect→respond scenario'],
+    repositoryTable: 'INTACT_TOOLBOX',
+    dockerImage: 'registry.montimage.eu/montimage-mti/mmt-probe:v1.0.0',
+  },
+  {
+    shortName: 'AI4SOAR',
+    title: 'AI-driven Security Orchestration and Response (AI4SOAR)',
+    categorySlug: 'ops-services',
+    provider: 'Montimage (MTI)',
+    description:
+      'Shuffle-based SOAR stack packaged from the Montimage/ai4soar repository, exposing its API/UI on :5000. Ingests MMT-Probe alerts and applies namespace-scoped Kubernetes playbook responses (NetworkPolicy creation, pod deletion, Job scale-down) through its ServiceAccount.',
+    type: 'Software',
+    trl: { current: 5, expected: 8 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'Security Alerts',
+        description: 'Detection alerts emitted by MMT-Probe',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Orchestrated Response',
+        description: 'Namespace-scoped Kubernetes remediation actions',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Reaction module in the Montimage attack→detect→respond scenario'],
+    repositoryTable: 'INTACT_TOOLBOX',
+    dockerImage: 'registry.montimage.eu/montimage-mti/ai4soar:v1.0.0',
   },
 ];
 
@@ -738,7 +870,11 @@ const infrastructureServices: ServiceSeed[] = [
   },
 ];
 
-const servicesData: ServiceSeed[] = [...intactToolboxServices, ...infrastructureServices];
+const servicesData: ServiceSeed[] = [
+  ...intactToolboxServices,
+  ...montimageScenarioServices,
+  ...infrastructureServices,
+];
 const activeServiceShortNames = servicesData.map((s) => s.shortName.toUpperCase());
 
 export const seedServices = async (): Promise<void> => {
@@ -807,7 +943,9 @@ export const seedServices = async (): Promise<void> => {
             versions: [
               {
                 version: '1.0.0',
-                dockerImage: `registry.montimage.eu/${serviceData.provider.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/${serviceData.shortName.toLowerCase()}:v1.0.0`,
+                dockerImage:
+                  serviceData.dockerImage ??
+                  `registry.montimage.eu/${serviceData.provider.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/${serviceData.shortName.toLowerCase()}:v1.0.0`,
                 releaseNotes: 'Initial release',
                 releasedAt: new Date(),
               },
