@@ -18,6 +18,6 @@
   ],
   "retry": true,
   "retryOn": [408, 429, 500, 502, 503, 504],
-  "timeout": 10000,
+  "timeout": "10s",
   "getGitHubAbsolutePathPrefix": "https://raw.githubusercontent.com/montimage-projects/mi-digitaltwin-management-service/main/"
 }
