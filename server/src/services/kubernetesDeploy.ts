@@ -1143,17 +1143,23 @@ export async function getDeploymentStatus(
     }
 
     // Evaluate status for each requested service using the cached pods.
+    // Sidecar rows share their host's resource name — memoize per name so a
+    // duplicated row does not cost a second workload read per tick.
+    const statusByName = new Map<string, DeployStatus>();
     for (const name of opts.names) {
-      let status: DeployStatus;
-      try {
-        status = await deploymentStatus(clients, opts.namespace, name, podsByApp);
-      } catch (err) {
-        // A not-yet-created / already-removed deployment reads as pending.
-        if (err instanceof ApiException && err.code === 404) {
-          status = 'pending';
-        } else {
-          throw err;
+      let status = statusByName.get(name);
+      if (status === undefined) {
+        try {
+          status = await deploymentStatus(clients, opts.namespace, name, podsByApp);
+        } catch (err) {
+          // A not-yet-created / already-removed deployment reads as pending.
+          if (err instanceof ApiException && err.code === 404) {
+            status = 'pending';
+          } else {
+            throw err;
+          }
         }
+        statusByName.set(name, status);
       }
       statuses.push({ name, status });
     }
