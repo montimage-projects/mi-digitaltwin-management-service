@@ -153,8 +153,13 @@ export function NodeConfigPanel({
               </p>
             )}
             <div className="space-y-2">
-              {envRows.map((row) => (
-                <div key={`${row.source}-${row.name}`} className="space-y-1">
+              {envRows.map((row, i) => (
+                // Added rows key by position: their name is edited inline, so a
+                // name-derived key would remount the input on every keystroke.
+                <div
+                  key={row.source === 'added' ? `env-added-${i}` : `env-${row.name}`}
+                  className="space-y-1"
+                >
                   <div className="flex items-center gap-2">
                     {row.source === 'added' ? (
                       <Input
@@ -226,6 +231,11 @@ export function NodeConfigPanel({
                     {row.fromEdge && (
                       <span className="text-[10px] text-muted-foreground">
                         value resolved from the {FROM_EDGE_LABELS[row.fromEdge]} at deploy
+                      </span>
+                    )}
+                    {row.source === 'added' && !row.name.trim() && (
+                      <span className="text-[10px] text-destructive">
+                        a variable name is required
                       </span>
                     )}
                   </div>
@@ -321,15 +331,24 @@ export function NodeConfigPanel({
               </p>
             )}
             <div className="space-y-4">
-              {fileRows.map((file) => (
-                <div key={`${file.source}-${file.mountPath}`} className="space-y-1">
+              {fileRows.map((file, i) => (
+                // Same for added files — the mountPath input edits the key field.
+                <div
+                  key={file.source === 'added' ? `file-added-${i}` : `file-${file.mountPath}`}
+                  className="space-y-1"
+                >
                   <div className="flex items-center gap-2">
                     {file.source === 'added' ? (
                       <Input
                         value={file.mountPath}
                         onChange={(e) => {
                           const base = removeConfigFile(config, file.mountPath);
-                          emit(upsertConfigFile(base, { ...file, mountPath: e.target.value }));
+                          emit(
+                            upsertConfigFile(base, {
+                              mountPath: e.target.value,
+                              content: file.content,
+                            })
+                          );
                         }}
                         className="h-8 flex-1 font-mono text-xs"
                         aria-label="Config file path"
