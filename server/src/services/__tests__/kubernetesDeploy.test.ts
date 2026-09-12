@@ -15,6 +15,7 @@ const {
   CoreV1Api,
   AppsV1Api,
   BatchV1Api,
+  NetworkingV1Api,
   RbacAuthorizationV1Api,
   KubeConfig,
   ApiException,
@@ -41,6 +42,7 @@ const {
   class CoreV1Api {}
   class AppsV1Api {}
   class BatchV1Api {}
+  class NetworkingV1Api {}
   class RbacAuthorizationV1Api {}
 
   class KubeConfig {
@@ -65,6 +67,7 @@ const {
     CoreV1Api,
     AppsV1Api,
     BatchV1Api,
+    NetworkingV1Api,
     RbacAuthorizationV1Api,
     KubeConfig,
     ApiException,
@@ -76,6 +79,7 @@ vi.mock('@kubernetes/client-node', () => ({
   CoreV1Api,
   AppsV1Api,
   BatchV1Api,
+  NetworkingV1Api,
   RbacAuthorizationV1Api,
   ApiException,
 }));
@@ -133,6 +137,9 @@ function makeClients() {
     batch: {
       createNamespacedJob: vi.fn(async () => ({})),
       readNamespacedJob: vi.fn(async () => ({})),
+    },
+    networking: {
+      createNamespacedNetworkPolicy: vi.fn(async () => ({})),
     },
     rbac: {
       createNamespacedRole: vi.fn(async () => ({})),
@@ -1197,6 +1204,237 @@ describe('deployTopology — Job, ConfigMap and RBAC manifests (issue #192)', ()
   });
 });
 
+describe('deployTopology — PodSecurity label and attack containment (issue #194)', () => {
+  const TARGET_ID = '507f1f77bcf86cd799439011';
+  const ATTACK_ID = '507f1f77bcf86cd799439013';
+  const MONITOR_ID = '507f1f77bcf86cd799439014';
+  type DeploymentSpec = NonNullable<ServiceImageSource['deployment']>;
+
+  const targetSvc = (id = TARGET_ID) =>
+    makeService({
+      _id: id,
+      deployment: {
+        kind: 'Deployment',
+        role: 'target',
+        containerPort: 8080,
+        exposePort: true,
+      },
+    });
+  const attackSvc = (deployment: Partial<DeploymentSpec> = {}) =>
+    makeService({
+      _id: ATTACK_ID,
+      deployment: { kind: 'Job', role: 'attack', exposePort: false, ...deployment },
+    });
+  const monitorSvc = (deployment: Partial<DeploymentSpec> = {}) =>
+    makeService({
+      _id: MONITOR_ID,
+      deployment: {
+        kind: 'Deployment',
+        role: 'monitor',
+        attachMode: 'sidecar',
+        exposePort: false,
+        ...deployment,
+      },
+    });
+
+  const node = (id: string, serviceId: string) => ({ id, data: { serviceId } });
+
+  function namespaceLabels(clients: ReturnType<typeof makeClients>): Record<string, string> {
+    const arg = firstCallArg(clients.core.createNamespace) as {
+      body: { metadata: { labels?: Record<string, string> } };
+    };
+    return arg.body.metadata.labels ?? {};
+  }
+
+  interface NetworkPolicyBody {
+    body: {
+      metadata: { name: string; namespace: string; labels?: Record<string, string> };
+      spec: {
+        podSelector: { matchLabels: Record<string, string> };
+        policyTypes: string[];
+        egress: {
+          to?: { podSelector?: { matchLabels: Record<string, string> } }[];
+          ports?: { port: number; protocol: string }[];
+        }[];
+      };
+    };
+  }
+
+  function networkPolicyBodies(clients: ReturnType<typeof makeClients>) {
+    return (clients.networking.createNamespacedNetworkPolicy.mock.calls as unknown[][]).map(
+      (call) => (call[0] as NetworkPolicyBody).body
+    );
+  }
+
+  test('labels the namespace enforce=privileged when a node declares capabilities', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('http-sim', TARGET_ID), node('mag', ATTACK_ID)],
+      edges: [{ source: 'mag', target: 'http-sim', type: 'attacks' }],
+      services: [
+        targetSvc(),
+        attackSvc({ securityContext: { capabilities: ['NET_ADMIN', 'NET_RAW'] } }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    expect(namespaceLabels(clients)['pod-security.kubernetes.io/enforce']).toBe('privileged');
+  });
+
+  test('a sidecar declaring capabilities still triggers the privileged label', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('http-sim', TARGET_ID), node('mmt-probe', MONITOR_ID)],
+      edges: [{ source: 'mmt-probe', target: 'http-sim', type: 'monitors' }],
+      services: [
+        targetSvc(),
+        monitorSvc({ securityContext: { capabilities: ['NET_ADMIN', 'NET_RAW'] } }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    expect(namespaceLabels(clients)['pod-security.kubernetes.io/enforce']).toBe('privileged');
+  });
+
+  test('hostNetwork triggers the privileged label', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('http-sim', TARGET_ID)],
+      services: [
+        makeService({
+          _id: TARGET_ID,
+          deployment: { kind: 'Deployment', role: 'target', hostNetwork: true },
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    expect(namespaceLabels(clients)['pod-security.kubernetes.io/enforce']).toBe('privileged');
+  });
+
+  test('omits the label when no node needs elevated privileges', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('http-sim', TARGET_ID), node('web-b', TARGET_ID)],
+      services: [targetSvc()],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    const labels = namespaceLabels(clients);
+    expect(labels).not.toHaveProperty('pod-security.kubernetes.io/enforce');
+    expect(labels['app.kubernetes.io/managed-by']).toBe('secsim');
+  });
+
+  test('an attack node gets an egress NetworkPolicy limited to its target and DNS', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('mag', ATTACK_ID), node('http-sim', TARGET_ID)],
+      edges: [{ source: 'mag', target: 'http-sim', type: 'attacks' }],
+      services: [attackSvc(), targetSvc()],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    expect(clients.networking.createNamespacedNetworkPolicy).toHaveBeenCalledTimes(1);
+    const policy = networkPolicyBodies(clients)[0];
+    expect(policy.metadata.name).toBe('mag-egress');
+    expect(policy.metadata.namespace).toBe('secsim-a-b');
+    expect(policy.spec.podSelector).toEqual({ matchLabels: { app: 'mag' } });
+    expect(policy.spec.policyTypes).toEqual(['Egress']);
+    // One rule per attack target, then the DNS rule.
+    expect(policy.spec.egress).toHaveLength(2);
+    expect(policy.spec.egress[0].to).toEqual([
+      { podSelector: { matchLabels: { app: 'http-sim' } } },
+    ]);
+    expect(policy.spec.egress[0].ports).toEqual([{ port: 8080, protocol: 'TCP' }]);
+    expect(policy.spec.egress[1].to).toBeUndefined();
+    expect(policy.spec.egress[1].ports).toEqual([
+      { port: 53, protocol: 'UDP' },
+      { port: 53, protocol: 'TCP' },
+    ]);
+  });
+
+  test('every attack-edge target gets its own egress rule', async () => {
+    const clients = makeClients();
+    const TARGET2_ID = '507f1f77bcf86cd799439015';
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('mag', ATTACK_ID), node('t1', TARGET_ID), node('t2', TARGET2_ID)],
+      edges: [
+        { source: 'mag', target: 't1', type: 'attacks' },
+        { source: 'mag', target: 't2', type: 'attacks' },
+      ],
+      services: [attackSvc(), targetSvc(), targetSvc(TARGET2_ID)],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const policy = networkPolicyBodies(clients)[0];
+    // Two target rules + the DNS rule.
+    expect(policy.spec.egress).toHaveLength(3);
+    expect(policy.spec.egress[0].to).toEqual([{ podSelector: { matchLabels: { app: 't1' } } }]);
+    expect(policy.spec.egress[1].to).toEqual([{ podSelector: { matchLabels: { app: 't2' } } }]);
+    expect(policy.spec.egress[2].ports).toEqual([
+      { port: 53, protocol: 'UDP' },
+      { port: 53, protocol: 'TCP' },
+    ]);
+  });
+
+  test('an attack node with no attack edge gets a DNS-only containment policy', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('mag', ATTACK_ID)],
+      edges: [],
+      services: [attackSvc()],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const policy = networkPolicyBodies(clients)[0];
+    expect(policy.spec.podSelector).toEqual({ matchLabels: { app: 'mag' } });
+    expect(policy.spec.egress).toHaveLength(1);
+    expect(policy.spec.egress[0].to).toBeUndefined();
+    expect(policy.spec.egress[0].ports).toEqual([
+      { port: 53, protocol: 'UDP' },
+      { port: 53, protocol: 'TCP' },
+    ]);
+  });
+
+  test('a non-attack topology creates no NetworkPolicy', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('http-sim', TARGET_ID), node('mmt-probe', MONITOR_ID)],
+      edges: [{ source: 'mmt-probe', target: 'http-sim', type: 'monitors' }],
+      services: [targetSvc(), monitorSvc()],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    expect(clients.networking.createNamespacedNetworkPolicy).not.toHaveBeenCalled();
+  });
+
+  test('an attack sidecar is contained by a policy on the pod it runs in', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('http-sim', TARGET_ID), node('mag-side', ATTACK_ID)],
+      edges: [
+        // attachMode 'sidecar' rides on the pod its monitor edge points at.
+        { source: 'mag-side', target: 'http-sim', type: 'monitors' },
+        { source: 'mag-side', target: 'http-sim', type: 'attacks' },
+      ],
+      services: [targetSvc(), attackSvc({ kind: 'Deployment', attachMode: 'sidecar' })],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const policy = networkPolicyBodies(clients)[0];
+    // Named after the attack node but selecting the host pod it rides in.
+    expect(policy.metadata.name).toBe('mag-side-egress');
+    expect(policy.spec.podSelector).toEqual({ matchLabels: { app: 'http-sim' } });
+    expect(policy.spec.egress[0].to).toEqual([
+      { podSelector: { matchLabels: { app: 'http-sim' } } },
+    ]);
+  });
+});
+
 describe('edge-derived environment variables (issue #193)', () => {
   const TARGET_ID = '507f1f77bcf86cd799439011';
   const REACTION_ID = '507f1f77bcf86cd799439012';
@@ -1861,11 +2099,12 @@ describe('buildClientFromInfrastructure', () => {
     expect(opts.users[0].token).toBe('a-bearer-token-value');
   });
 
-  test('returns core, apps, batch and rbac clients', () => {
+  test('returns core, apps, batch, networking and rbac clients', () => {
     const clients = buildClientFromInfrastructure(infra('apiVersion: v1\nclusters: []'));
     expect(clients.core).toBeInstanceOf(CoreV1Api);
     expect(clients.apps).toBeInstanceOf(AppsV1Api);
     expect(clients.batch).toBeInstanceOf(BatchV1Api);
+    expect(clients.networking).toBeInstanceOf(NetworkingV1Api);
     expect(clients.rbac).toBeInstanceOf(RbacAuthorizationV1Api);
   });
 });
