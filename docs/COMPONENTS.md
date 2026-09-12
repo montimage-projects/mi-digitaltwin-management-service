@@ -403,6 +403,8 @@ Components for specific features located in `client/src/components/`.
 - React Flow canvas wrapper
 - Service node rendering
 - Edge/connection visualization
+- Scenario role badges on nodes (attack / target / monitor / reaction from `Service.deployment.role`)
+- Sidecar nodes (`deployment.attachMode: 'sidecar'`) dock inside the host node their `monitors` edge targets
 
 **YamlEditor**
 

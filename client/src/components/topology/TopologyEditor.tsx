@@ -33,6 +33,7 @@ import { YamlEditor } from './YamlEditor';
 import { TopologyCanvas } from './TopologyCanvas';
 import { cn } from '@/lib/utils';
 import { dump as yamlDump } from 'js-yaml';
+import type { ServiceDeployment } from '@/lib/services';
 
 interface TopologyNode {
   id: string;
@@ -95,6 +96,7 @@ interface ServiceOption {
   title: string;
   description?: string;
   categoryId?: { name: string };
+  deployment?: ServiceDeployment;
 }
 
 interface Infrastructure {
