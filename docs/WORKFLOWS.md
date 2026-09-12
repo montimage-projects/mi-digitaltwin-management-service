@@ -180,6 +180,42 @@ The MI Digital Twin Management Service includes several GitHub Actions workflows
 - Check workflow run logs for detailed report
 - Look for GitHub Issues with `documentation` label
 
+### 5. Kind E2E — Montimage Scenario (`e2e-kind.yml`)
+
+**Trigger:** Pull requests and pushes to `main` that touch `server/src/services/`,
+`server/src/seed/`, or the e2e assets themselves; also `workflow_dispatch`
+
+**Purpose:** Prove the seeded Montimage attack → detect → respond demo scenario
+runs end-to-end on a real Kubernetes cluster (issue #206 / playbook task 4.3)
+
+**Steps:**
+
+1. **Provision** — installs `kind` + `kubectl` and creates a throwaway cluster
+2. **Stub image** — builds `scripts/e2e-kind/stub/` and loads it into kind. The
+   four module images live in the private `registry.montimage.eu` (not
+   resolvable on the public Internet), so the stub stands in for them while the
+   real scenario topology, deployment specs, RBAC and ordering are exercised.
+   Setting `SECSIM_E2E_REQUIRE_REAL_IMAGES=1` makes the job fail clearly when
+   the registry is unreachable instead of using the stub
+3. **Execute** — `scripts/e2e-kind/run-e2e.js` registers the kind cluster as an
+   Infrastructure over the REST API and executes the seeded demo scenario
+4. **Assert** — the MMT-Probe sidecar emits an alert, the AI4SOAR pod creates a
+   NetworkPolicy through its ServiceAccount, the MAG Job completes, and
+   namespace deletion leaves no resources behind
+5. **Teardown** — diagnostics are dumped on failure and the cluster is always
+   deleted
+
+**When It Runs:**
+
+- On pull requests to `main` or `develop` touching the paths above
+- On pushes to `main` or `develop` touching the same paths
+- Manually via workflow dispatch
+
+**View Results:**
+
+- Check the "Kind E2E — Montimage demo scenario" job logs; assertion results
+  print as `PASS`/`FAIL` lines with a summary at the end
+
 ## Configuration Files
 
 ### `.markdownlintrc`
