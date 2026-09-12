@@ -468,6 +468,7 @@ export function ExecutionConsole({
               <button
                 type="button"
                 data-testid="log-tab-all"
+                aria-pressed={activeContainer === null}
                 onClick={() => setActiveContainer(null)}
                 className={`rounded px-2 py-0.5 text-xs ${
                   activeContainer === null
@@ -482,6 +483,7 @@ export function ExecutionConsole({
                   key={key}
                   type="button"
                   data-testid={`log-tab-${key}`}
+                  aria-pressed={activeContainer === key}
                   onClick={() => setActiveContainer(key)}
                   className={`rounded px-2 py-0.5 font-mono text-xs ${
                     activeContainer === key
