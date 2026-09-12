@@ -63,6 +63,11 @@ const statusMeta: Record<DeployStatus, { label: string; className: string; icon:
     className: 'text-green-700 dark:text-green-400',
     icon: CheckCircle2,
   },
+  completed: {
+    label: 'Completed',
+    className: 'text-green-700 dark:text-green-400',
+    icon: CheckCircle2,
+  },
   failed: { label: 'Failed', className: 'text-red-600 dark:text-red-400', icon: XCircle },
 };
 

@@ -8,6 +8,7 @@ import {
   ApiException,
   type V1ConfigMap,
   type V1Container,
+  type V1ContainerStatus,
   type V1Deployment,
   type V1Job,
   type V1Namespace,
@@ -54,8 +55,15 @@ import { AppError } from '../middleware/errorHandler.js';
  * reaction it depends on.
  */
 
-/** Coarse per-service deploy status. */
-export type DeployStatus = 'pending' | 'running' | 'failed';
+/** Coarse per-service deploy status; `completed` marks a finished Job. */
+export type DeployStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+/** Per-container status inside one workload's pods (task 2.1). */
+export interface ContainerDeployStatus {
+  /** Container name — the node name for host and sidecar containers alike. */
+  name: string;
+  status: DeployStatus;
+}
 
 /** Kubernetes API clients scoped to a single cluster. */
 export interface K8sClients {
@@ -1273,23 +1281,71 @@ async function podsFor(
 
 /**
  * Pod-level failure scan shared by Deployment- and Job-backed services:
- * a `Failed` phase or a container stuck on a hard waiting reason marks the
- * service failed.
+ * a `Failed` phase or *any* container stuck on a hard waiting reason or
+ * terminated non-zero marks the service failed. Every containerStatus is
+ * checked, so a failing sidecar container fails the node it rides on even
+ * when the host container is healthy (task 2.1).
  */
 function podFailed(pod: V1Pod): boolean {
   if (pod.status?.phase === 'Failed') return true;
   return (pod.status?.containerStatuses ?? []).some((cs) => {
     const reason = cs.state?.waiting?.reason;
-    return Boolean(reason && FAILURE_REASONS.has(reason));
+    if (reason && FAILURE_REASONS.has(reason)) return true;
+    const terminated = cs.state?.terminated;
+    return terminated !== undefined && terminated.exitCode !== 0;
   });
 }
 
 /**
+ * Status of one container: a hard waiting reason or a non-zero termination
+ * is `failed`; a clean termination is `completed` (a Job container exits 0);
+ * a Ready container is `running`; anything else is still `pending` — a
+ * started-but-not-Ready container is not yet ready to serve, so it does not
+ * count as running either.
+ */
+function containerStatusOf(cs: V1ContainerStatus): DeployStatus {
+  const reason = cs.state?.waiting?.reason;
+  if (reason && FAILURE_REASONS.has(reason)) return 'failed';
+  const terminated = cs.state?.terminated;
+  if (terminated) return terminated.exitCode === 0 ? 'completed' : 'failed';
+  return cs.ready === true ? 'running' : 'pending';
+}
+
+/**
+ * Per-container status breakdown for the pods backing one workload. Container
+ * names repeat across a workload's pods, so the worst status wins — a
+ * container failing in any pod reads `failed` even when a sibling pod's copy
+ * of it is fine.
+ */
+function containersFor(pods: V1Pod[]): ContainerDeployStatus[] {
+  const rank: Record<DeployStatus, number> = {
+    failed: 0,
+    pending: 1,
+    running: 2,
+    completed: 3,
+  };
+  const byName = new Map<string, DeployStatus>();
+  for (const pod of pods) {
+    for (const cs of pod.status?.containerStatuses ?? []) {
+      if (!cs.name) continue;
+      const status = containerStatusOf(cs);
+      const prev = byName.get(cs.name);
+      if (prev === undefined || rank[status] < rank[prev]) {
+        byName.set(cs.name, status);
+      }
+    }
+  }
+  return [...byName.entries()].map(([name, status]) => ({ name, status }));
+}
+
+/**
  * Status of a `batch/v1` Job node: a `Failed` condition or a saturated
- * `backoffLimit` means `failed`; `Complete` or a succeeded pod means
- * `running`; a Running pod also reads `running` while the job is in flight.
- * Pod-level failure reasons still short-circuit to `failed` while the job
- * retries. A Job that 404s propagates — the caller maps it to `pending`.
+ * `backoffLimit` means `failed`; a `Complete` condition, a `succeeded` count
+ * or a `Succeeded` pod means `completed` — the Job ran to the end, which is
+ * distinct from `running` (task 2.1). A Running pod still reads `running`
+ * while the job is in flight. Pod-level failure reasons short-circuit to
+ * `failed` while the job retries. A Job that 404s propagates — the caller
+ * maps it to `pending`.
  */
 async function jobStatus(
   clients: K8sClients,
@@ -1306,14 +1362,15 @@ async function jobStatus(
     conditions.some((c) => c.type === 'Complete' && c.status === 'True') ||
     (job.status?.succeeded ?? 0) >= 1
   ) {
-    return 'running';
+    return 'completed';
   }
   if ((job.status?.failed ?? 0) >= (job.spec?.backoffLimit ?? 6)) {
     return 'failed';
   }
   for (const pod of await podsFor(clients, namespace, name, pods)) {
     if (podFailed(pod)) return 'failed';
-    if (pod.status?.phase === 'Running' || pod.status?.phase === 'Succeeded') return 'running';
+    if (pod.status?.phase === 'Succeeded') return 'completed';
+    if (pod.status?.phase === 'Running') return 'running';
   }
   return 'pending';
 }
@@ -1357,8 +1414,21 @@ async function deploymentStatus(
 }
 
 /**
+ * A workload's coarse status plus the per-container breakdown of its pods
+ * (task 2.1): `containers` lists every container the pods report — host and
+ * sidecars alike — so a sidecar's state is visible instead of being folded
+ * into the workload row. It is empty until the cluster reports pod status.
+ */
+export interface DeploymentServiceStatus {
+  name: string;
+  status: DeployStatus;
+  containers: ContainerDeployStatus[];
+}
+
+/**
  * Query the current per-service status of a deployed execution and compute an
- * overall progress percentage (share of services that are `running`).
+ * overall progress percentage (share of services that are `running` or
+ * `completed` — a finished Job counts as done, not still-running).
  *
  * Uses a single `listNamespacedPod` call per tick with a combined label
  * selector (`app in (...)`) instead of one call per service, replacing the
@@ -1367,9 +1437,9 @@ async function deploymentStatus(
 export async function getDeploymentStatus(
   clients: K8sClients,
   opts: { namespace: string; names: string[] }
-): Promise<{ statuses: { name: string; status: DeployStatus }[]; progress: number }> {
+): Promise<{ statuses: DeploymentServiceStatus[]; progress: number }> {
   try {
-    const statuses: { name: string; status: DeployStatus }[] = [];
+    const statuses: DeploymentServiceStatus[] = [];
 
     // Build a combined "app in (a,b,c)" selector so a single list call
     // replaces the prior per-service serial loop. Names are deduplicated —
@@ -1412,11 +1482,11 @@ export async function getDeploymentStatus(
         }
         statusByName.set(name, status);
       }
-      statuses.push({ name, status });
+      statuses.push({ name, status, containers: containersFor(podsByApp.get(name) ?? []) });
     }
 
-    const running = statuses.filter((s) => s.status === 'running').length;
-    const progress = statuses.length ? Math.round((running / statuses.length) * 100) : 0;
+    const done = statuses.filter((s) => s.status === 'running' || s.status === 'completed').length;
+    const progress = statuses.length ? Math.round((done / statuses.length) * 100) : 0;
     return { statuses, progress };
   } catch (err) {
     throw toAppError(err, `reading deployment status in namespace ${opts.namespace}`);
@@ -1424,9 +1494,11 @@ export async function getDeploymentStatus(
 }
 
 /**
- * True once every service has left `pending` (all `running` or `failed`), i.e.
- * the deploy has settled and there is nothing left to poll for. An empty list
- * is trivially settled (nothing was deployed).
+ * True once every service has left `pending` (all `running`, `completed` or
+ * `failed`), i.e. the deploy has settled and there is nothing left to poll
+ * for. `completed` — a finished Job — counts as settled like any other
+ * terminal state (task 2.1). An empty list is trivially settled (nothing was
+ * deployed).
  */
 export function isDeploymentSettled(statuses: { status: DeployStatus }[]): boolean {
   return statuses.every((s) => s.status !== 'pending');
