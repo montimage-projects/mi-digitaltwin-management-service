@@ -27,9 +27,38 @@ function resolveServiceIds(scenario: { topology?: { nodes?: unknown[] } }): stri
 const router: RouterType = Router();
 
 // Validation schemas
+
+/**
+ * Per-node config overrides — task 0.4 of the Montimage attack→detect→respond
+ * plan (docs/playbooks/montimage-attack-detect-respond-plan.md). A scenario may
+ * override the service catalog's `deployment` defaults without editing the
+ * catalog (e.g. selecting a MAG attack profile via `args`). `env` mirrors
+ * `IDeploymentSpec.env` entries. `looseObject` at every level preserves keys
+ * the schema does not know (React Flow fields, future override fields like
+ * `configFiles`) so saved topologies reload intact.
+ */
+const nodeConfigEnvSchema = z.looseObject({
+  name: z.string().min(1),
+  value: z.string().optional(),
+  fromEdge: z.enum(['target', 'reaction']).optional(),
+});
+
+const nodeConfigSchema = z.looseObject({
+  env: z.array(nodeConfigEnvSchema).optional(),
+  args: z.array(z.string()).optional(),
+});
+
+const topologyNodeSchema = z.looseObject({
+  data: z
+    .looseObject({
+      config: nodeConfigSchema.optional(),
+    })
+    .optional(),
+});
+
 const topologySchema = z.object({
   yaml: z.string().default(''),
-  nodes: z.array(z.record(z.string(), z.unknown())).default([]),
+  nodes: z.array(topologyNodeSchema).default([]),
   edges: z.array(z.record(z.string(), z.unknown())).default([]),
 });
 
