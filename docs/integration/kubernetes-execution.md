@@ -91,8 +91,12 @@ When a user clicks **Execute** on a scenario:
 
 ## Kubernetes Resource Model
 
-The engine is intentionally thin. Edge wiring, env vars and volumes are out of
-scope — each node maps to exactly one workload plus one service.
+The engine is intentionally thin. `resolveTopologyNodes` resolves each node's
+deployment spec (the service's `deployment` catalog spec merged with
+`node.data.config` `env`/`args` overrides, defaulting to a standalone
+`Deployment` on port `80`) and its typed-edge context (`attacks`, `monitors`,
+`notifies`, `acts-on`); manifest builders consume those fields as later
+playbook tasks land.
 
 | Topology concept | Kubernetes resource          | Notes                                                                                                                     |
 | ---------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -103,8 +107,9 @@ scope — each node maps to exactly one workload plus one service.
 - **Resource naming:** each node's `id` is normalised to an RFC-1035 label
   (lowercase, starting with a letter, ≤50 chars); the Deployment and Service
   share that name.
-- **Port:** a single port is mapped per node, defaulting to `80` for both the
-  container and the service.
+- **Port:** a single port is mapped per node — `deployment.containerPort`
+  when the service spec sets it, `80` otherwise — for both the container and
+  the service.
 - **Labels:** every managed object carries
   `app.kubernetes.io/managed-by: secsim`; Deployments also carry
   `secsim.io/node: <nodeId>`.
