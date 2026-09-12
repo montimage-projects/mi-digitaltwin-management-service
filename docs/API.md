@@ -325,7 +325,7 @@ curl -X GET http://localhost:3000/api/services/service123 \
 
 - **POST** `/api/services`
 - **Auth:** Required
-- **Body:** `{ name: string, description: string, categoryId: string, ... }`
+- **Body:** `{ shortName: string, title: string, provider: string, categoryId: string, deployment?: DeploymentSpec, ... }`
 - **Response:** `{ service: Service }`
 
 ```bash
@@ -343,7 +343,7 @@ curl -X POST http://localhost:3000/api/services \
 
 - **PUT** `/api/services/:id`
 - **Auth:** Required
-- **Body:** `{ name?: string, description?: string, ... }`
+- **Body:** `{ shortName?: string, title?: string, deployment?: DeploymentSpec, ... }` — all fields optional, including `deployment`
 - **Response:** `{ service: Service }`
 
 ```bash
@@ -689,14 +689,62 @@ curl -X POST http://localhost:3000/api/infrastructures/infra123/test \
 ```typescript
 {
   id: string;
-  name: string;
-  description: string;
+  shortName: string; // uppercase, unique
+  title: string;
   categoryId: string; // Reference to Category
-  status: 'active' | 'inactive';
+  sectorId?: string; // Reference to Sector
+  provider: string;
+  description?: string;
+  currentVersion?: string;
+  versions: {
+    version: string;
+    dockerImage: string;
+    releaseNotes?: string;
+    releasedAt: Date;
+    releasedBy?: string;
+  }[];
+  type: 'Software' | 'Hardware' | 'Software/Hardware';
+  uiType: 'web' | 'terminal' | 'both';
+  trl: { current?: number; expected?: number }; // 1–9
+  license?: string;
+  standards: string[];
+  inputs: { name: string; description?: string; format?: string }[];
+  outputs: { name: string; description?: string; format?: string }[];
+  interactsWith: string[];
+  potentialUseCases: string[];
+  repositoryTable: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
+  deprecated: boolean;
+  deployment?: DeploymentSpec; // see below — optional Kubernetes deploy spec
   createdAt: Date;
   updatedAt: Date;
 }
 ```
+
+#### Service `deployment` spec
+
+Optional sub-document describing how the service's container is deployed on
+Kubernetes — consumed by the deploy engine
+(`docs/playbooks/montimage-attack-detect-respond-plan.md`). Services without
+a spec deploy with the engine defaults (Deployment, port 80, standalone).
+Validated on `POST`/`PUT /api/services`; invalid specs are rejected with
+`400`. Unknown fields are not allowed (the schema is strict).
+
+| Field             | Type                                                                    | Description                                                                      |
+| ----------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `kind`            | `'Deployment' \| 'Job'`                                                 | **Required.** Workload resource — `Job` for finite runs (e.g. MAG).              |
+| `role`            | `'attack' \| 'target' \| 'monitor' \| 'reaction' \| 'generic'`          | **Required.** Scenario role — drives node badges and edge validation.            |
+| `attachMode`      | `'standalone' \| 'sidecar'`                                             | `sidecar` injects the container into the target pod's network namespace.         |
+| `containerPort`   | number (int, 1–65535)                                                   | Container port — replaces the engine's default of 80.                            |
+| `exposePort`      | boolean                                                                 | Whether a Kubernetes Service exposes the port (`false` for sidecars and Jobs).   |
+| `args`            | string[]                                                                | Container arguments (e.g. `mag <attack> --target-ip …`).                         |
+| `env`             | `{ name: string; value?: string; fromEdge?: 'target' \| 'reaction' }[]` | Env vars — `fromEdge` marks a value the engine resolves from a topology edge.    |
+| `configFiles`     | `{ mountPath: string; content: string }[]`                              | Files rendered into a ConfigMap mounted at `mountPath`.                          |
+| `volumes`         | `{ name: string; mountPath: string; emptyDir: true }[]`                 | `emptyDir` volumes shared between the pod's containers.                          |
+| `securityContext` | `{ capabilities?: string[]; privileged?: boolean }`                     | Container security context (e.g. `capabilities: ['NET_ADMIN', 'NET_RAW']`).      |
+| `hostNetwork`     | boolean                                                                 | Run the pod on the host network (a sidecar `attachMode` is preferred).           |
+| `rbac`            | `{ apiGroups: string[]; resources: string[]; verbs: string[] }[]`       | Namespace-scoped Role rules bound to the pod's ServiceAccount (`''` = core API). |
+| `readinessPath`   | string                                                                  | HTTP readiness path — must start with `/` (e.g. `/health`).                      |
+| `startOrder`      | number (int, ≥ 0)                                                       | Startup ordering — lower starts first.                                           |
 
 ### Project
 

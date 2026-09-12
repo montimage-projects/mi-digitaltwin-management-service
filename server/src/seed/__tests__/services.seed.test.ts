@@ -168,4 +168,64 @@ describe('seedServices', () => {
       /^registry\.montimage\.eu\/.+\/csam:v1\.0\.0$/
     );
   });
+
+  it('seeds a deployment spec on the four Montimage services (issue #188)', async () => {
+    await seedServices();
+
+    const creates = vi.mocked(Service.create).mock.calls.map(([doc]) => doc) as {
+      shortName: string;
+      deployment?: {
+        kind: string;
+        role: string;
+        attachMode?: string;
+        exposePort?: boolean;
+        containerPort?: number;
+        securityContext?: { capabilities?: string[] };
+        rbac?: { apiGroups: string[]; resources: string[]; verbs: string[] }[];
+      };
+    }[];
+    const byName = (name: string) => creates.find((d) => d.shortName === name);
+
+    // MAG — finite attack run deployed as a Job.
+    expect(byName('MAG')?.deployment).toMatchObject({
+      kind: 'Job',
+      role: 'attack',
+      exposePort: false,
+    });
+
+    // http-sim — victim workload serving HTTP on :8080.
+    expect(byName('HTTP-SIM')?.deployment).toMatchObject({
+      kind: 'Deployment',
+      role: 'target',
+      containerPort: 8080,
+      exposePort: true,
+    });
+
+    // MMT-Probe — sidecar in the target pod, needs NET_ADMIN + NET_RAW.
+    const probe = byName('MMT-PROBE')?.deployment;
+    expect(probe).toMatchObject({
+      kind: 'Deployment',
+      role: 'monitor',
+      attachMode: 'sidecar',
+      exposePort: false,
+    });
+    expect(probe?.securityContext?.capabilities).toEqual(
+      expect.arrayContaining(['NET_ADMIN', 'NET_RAW'])
+    );
+
+    // AI4SOAR — namespace-scoped RBAC rules for the reaction playbook.
+    const soar = byName('AI4SOAR')?.deployment;
+    expect(soar).toMatchObject({ kind: 'Deployment', role: 'reaction', containerPort: 5000 });
+    expect(soar?.rbac).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          resources: expect.arrayContaining(['pods']),
+          verbs: expect.arrayContaining(['delete']),
+        }),
+      ])
+    );
+
+    // Non-scenario services carry no deployment spec.
+    expect(byName('CSAM')?.deployment).toBeUndefined();
+  });
 });
