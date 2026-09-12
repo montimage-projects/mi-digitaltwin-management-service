@@ -1,4 +1,4 @@
-import { Service } from '../models/Service.js';
+import { Service, type IDeploymentSpec } from '../models/Service.js';
 import { Category } from '../models/Category.js';
 import { Sector } from '../models/Sector.js';
 import { upsertRecord, deprecateStale } from './sync-helpers.js';
@@ -25,6 +25,13 @@ interface ServiceSeed {
    * `registry.montimage.eu/<provider-slug>/<shortName>:v1.0.0` reference.
    */
   dockerImage?: string;
+  /**
+   * Optional Kubernetes deployment spec (issue #188, playbook task 0.3) —
+   * how the service's container is deployed in a scenario execution. Only
+   * the Montimage scenario modules carry one; other services rely on the
+   * engine defaults.
+   */
+  deployment?: IDeploymentSpec;
 }
 
 // INTACT_TOOLBOX: Cybersecurity Services catalog
@@ -400,6 +407,17 @@ const montimageScenarioServices: ServiceSeed[] = [
     potentialUseCases: ['Attack module in the Montimage attack→detect→respond scenario'],
     repositoryTable: 'INTACT_TOOLBOX',
     dockerImage: 'registry.montimage.eu/montimage-mti/mag:v1.0.0',
+    deployment: {
+      // Finite CLI run — deployed as a Kubernetes Job. The attack-edge
+      // resolution supplies `--target-ip`/`--target-port` args (playbook
+      // wiring table); `startOrder` keeps it last so monitor and reaction
+      // are Ready before traffic starts.
+      kind: 'Job',
+      role: 'attack',
+      exposePort: false,
+      securityContext: { capabilities: ['NET_ADMIN', 'NET_RAW'] },
+      startOrder: 30,
+    },
   },
   {
     shortName: 'HTTP-SIM',
@@ -428,6 +446,15 @@ const montimageScenarioServices: ServiceSeed[] = [
     potentialUseCases: ['Target module in the Montimage attack→detect→respond scenario'],
     repositoryTable: 'INTACT_TOOLBOX',
     dockerImage: 'registry.montimage.eu/montimage-mti/http-sim:v1.0.0',
+    deployment: {
+      // Victim workload: HTTP on :8080, readiness `GET /` → 200 (Pre.2).
+      kind: 'Deployment',
+      role: 'target',
+      containerPort: 8080,
+      exposePort: true,
+      readinessPath: '/',
+      startOrder: 10,
+    },
   },
   {
     shortName: 'MMT-PROBE',
@@ -456,6 +483,33 @@ const montimageScenarioServices: ServiceSeed[] = [
     potentialUseCases: ['Monitor module in the Montimage attack→detect→respond scenario'],
     repositoryTable: 'INTACT_TOOLBOX',
     dockerImage: 'registry.montimage.eu/montimage-mti/mmt-probe:v1.0.0',
+    deployment: {
+      // DPI probe injected as a sidecar in the target pod — shares its
+      // network namespace, so it needs NET_ADMIN + NET_RAW (Pre.2/Pre.3)
+      // and exposes no port. Alerts go to the Kafka topic AI4SOAR consumes.
+      kind: 'Deployment',
+      role: 'monitor',
+      attachMode: 'sidecar',
+      exposePort: false,
+      env: [{ name: 'HOST_INTERFACE', value: 'eth0' }],
+      configFiles: [
+        {
+          mountPath: '/opt/mmt/probe/mmt-probe.conf',
+          content: [
+            '# mmt-probe.conf — Montimage attack→detect→respond scenario',
+            '# (libconfig syntax). Captures on the pod interface and emits',
+            '# security reports to the Kafka topic AI4SOAR consumes — see',
+            '# playbook task Pre.2 for the confirmed runtime contract.',
+            'security = {',
+            '  output-channel = "kafka";',
+            '};',
+          ].join('\n'),
+        },
+      ],
+      volumes: [{ name: 'mmt-reports', mountPath: '/opt/mmt/probe/result/report', emptyDir: true }],
+      securityContext: { capabilities: ['NET_ADMIN', 'NET_RAW'] },
+      startOrder: 10,
+    },
   },
   {
     shortName: 'AI4SOAR',
@@ -484,6 +538,31 @@ const montimageScenarioServices: ServiceSeed[] = [
     potentialUseCases: ['Reaction module in the Montimage attack→detect→respond scenario'],
     repositoryTable: 'INTACT_TOOLBOX',
     dockerImage: 'registry.montimage.eu/montimage-mti/ai4soar:v1.0.0',
+    deployment: {
+      // SOAR stack on :5000, readiness `GET /health` (Pre.2). The rbac
+      // rules are the namespace-scoped Role bound to the pod's
+      // ServiceAccount (Pre.3): delete the MAG pod, patch/scale the MAG
+      // Job, create NetworkPolicies denying ingress to the target.
+      kind: 'Deployment',
+      role: 'reaction',
+      containerPort: 5000,
+      exposePort: true,
+      readinessPath: '/health',
+      rbac: [
+        { apiGroups: [''], resources: ['pods'], verbs: ['delete'] },
+        {
+          apiGroups: ['apps'],
+          resources: ['deployments', 'deployments/scale'],
+          verbs: ['patch', 'update'],
+        },
+        {
+          apiGroups: ['networking.k8s.io'],
+          resources: ['networkpolicies'],
+          verbs: ['create'],
+        },
+      ],
+      startOrder: 20,
+    },
   },
 ];
 
@@ -929,6 +1008,12 @@ export const seedServices = async (): Promise<void> => {
       potentialUseCases: serviceData.potentialUseCases,
       repositoryTable: serviceData.repositoryTable,
     };
+
+    // Tracked only when the seed entry declares one — a manually-set
+    // `deployment` on a service the seed doesn't specify is left untouched.
+    if (serviceData.deployment) {
+      desiredFields.deployment = serviceData.deployment;
+    }
 
     const action = await upsertRecord(Service, { shortName: serviceData.shortName }, desiredFields);
 

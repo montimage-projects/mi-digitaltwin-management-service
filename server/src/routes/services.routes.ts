@@ -27,6 +27,74 @@ const inputOutputSchema = z.object({
   format: z.string().max(100).optional(),
 });
 
+/**
+ * Optional Kubernetes deployment spec — mirrors `IDeploymentSpec` in
+ * `models/Service.ts` (issue #188, playbook task 0.3). Strict at every level
+ * so a misspelled field is rejected with 400 instead of silently stripped.
+ */
+const deploymentSpecSchema = z.strictObject({
+  kind: z.enum(['Deployment', 'Job']),
+  role: z.enum(['attack', 'target', 'monitor', 'reaction', 'generic']),
+  attachMode: z.enum(['standalone', 'sidecar']).optional(),
+  containerPort: z.number().int().min(1).max(65535).optional(),
+  exposePort: z.boolean().optional(),
+  args: z.array(z.string().min(1).max(500)).max(50).optional(),
+  env: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1).max(200),
+        value: z.string().max(4000).optional(),
+        fromEdge: z.enum(['target', 'reaction']).optional(),
+      })
+    )
+    .max(100)
+    .optional(),
+  configFiles: z
+    .array(
+      z.strictObject({
+        mountPath: z.string().min(1).max(500),
+        content: z.string().max(65536),
+      })
+    )
+    .max(20)
+    .optional(),
+  volumes: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1).max(100),
+        mountPath: z.string().min(1).max(500),
+        emptyDir: z.literal(true),
+      })
+    )
+    .max(20)
+    .optional(),
+  securityContext: z
+    .strictObject({
+      capabilities: z.array(z.string().min(1).max(100)).max(50).optional(),
+      privileged: z.boolean().optional(),
+    })
+    .optional(),
+  hostNetwork: z.boolean().optional(),
+  rbac: z
+    .array(
+      z.strictObject({
+        // '' names the core API group (e.g. pods), so items allow empty strings
+        apiGroups: z.array(z.string().max(200)).min(1).max(20),
+        resources: z.array(z.string().min(1).max(200)).min(1).max(20),
+        verbs: z.array(z.string().min(1).max(50)).min(1).max(20),
+      })
+    )
+    .max(20)
+    .optional(),
+  readinessPath: z
+    .string()
+    .min(1)
+    .max(500)
+    .regex(/^\//, 'readinessPath must be an absolute path')
+    .optional(),
+  startOrder: z.number().int().min(0).max(1000).optional(),
+});
+
 const createServiceSchema = z.object({
   shortName: z
     .string()
@@ -71,6 +139,7 @@ const createServiceSchema = z.object({
       })
     )
     .default([]),
+  deployment: deploymentSpecSchema.optional(),
 });
 
 const updateServiceSchema = createServiceSchema.partial();
