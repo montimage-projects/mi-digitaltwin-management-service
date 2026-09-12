@@ -126,9 +126,10 @@ playbook tasks land.
 ## SSE Events Protocol
 
 Live progress and logs are streamed from a Server-Sent Events endpoint. The
-server polls the cluster every 2 seconds, emitting a `progress` snapshot and any
-new pod log lines, until every service has settled (all `running`, `completed`
-or `failed`) or the client disconnects.
+server polls the cluster every 2 seconds, emitting a `progress` snapshot, any
+new pod log lines and any new Kubernetes namespace events, until every service
+has settled (all `running`, `completed` or `failed`) or the client
+disconnects.
 
 - **GET** `/api/scenarios/:id/executions/:executionId/events`
 - **Auth:** Required
@@ -141,12 +142,13 @@ a half-open connection.
 
 ### Event types
 
-| Event      | When                           | Payload                                                                                                                                                                                                                                                                                                                                                       |
-| ---------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `progress` | Each poll                      | `{ progress: number, services: [{ name, status, containers }] }` — `progress` is the percentage of services that are `running` or `completed`; `status` is `pending` \| `running` \| `completed` \| `failed` (`completed` marks a finished Job); `containers` is the per-container breakdown `[{ name, status }]` covering host and sidecar containers alike. |
-| `log`      | Per new pod log line           | `{ service: string, pod: string, container?: string, line: string }` — `container` names the container the line came from, so sidecar output (e.g. `mmt-probe` alerts) stays distinguishable from the host container's logs.                                                                                                                                  |
-| `end`      | Deploy settled                 | `{ status: "completed" \| "failed", services: [{ name, status, containers }] }`                                                                                                                                                                                                                                                                               |
-| `error`    | Cluster read failed mid-stream | `{ message: string }` (the stream then closes)                                                                                                                                                                                                                                                                                                                |
+| Event       | When                                                | Payload                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `progress`  | Each poll                                           | `{ progress: number, services: [{ name, status, containers }] }` — `progress` is the percentage of services that are `running` or `completed`; `status` is `pending` \| `running` \| `completed` \| `failed` (`completed` marks a finished Job); `containers` is the per-container breakdown `[{ name, status }]` covering host and sidecar containers alike.                                                                                                              |
+| `log`       | Per new pod log line                                | `{ service: string, pod: string, container?: string, line: string }` — `container` names the container the line came from, so sidecar output (e.g. `mmt-probe` alerts) stays distinguishable from the host container's logs.                                                                                                                                                                                                                                               |
+| `k8s-event` | Per new Kubernetes Event in the execution namespace | `{ uid?: string, reason?: string, message?: string, objectKind?: string, objectName?: string, type?: string, count?: number, timestamp?: string }` — `reason`/`message`/`objectKind`/`objectName` distil the Event's involved object (e.g. `Pod`/`svc-a-pod`), `type` is `Normal` or `Warning`, and `timestamp` is the ISO time of the most recent occurrence. Events are deduplicated across polls on `<uid>:<count>`; a recurring event re-emits when its `count` grows. |
+| `end`       | Deploy settled                                      | `{ status: "completed" \| "failed", services: [{ name, status, containers }] }`                                                                                                                                                                                                                                                                                                                                                                                            |
+| `error`     | Cluster read failed mid-stream                      | `{ message: string }` (the stream then closes)                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ```text
 event: progress
@@ -154,6 +156,9 @@ data: {"progress":50,"services":[{"name":"mmt-probe","status":"running","contain
 
 event: log
 data: {"service":"http-sim","pod":"http-sim-7c9f-abcde","container":"mmt-probe","line":"ALERT syn-flood detected"}
+
+event: k8s-event
+data: {"uid":"f7a2...","reason":"Killing","message":"Killing container http-sim in pod http-sim-7c9f-abcde","objectKind":"Pod","objectName":"http-sim-7c9f-abcde","type":"Normal","count":1,"timestamp":"2026-09-07T10:00:00.000Z"}
 
 event: end
 data: {"status":"completed","services":[{"name":"mmt-probe","status":"running","containers":[{"name":"mmt-probe","status":"running"}]},{"name":"kafka","status":"running","containers":[{"name":"kafka","status":"running"}]}]}

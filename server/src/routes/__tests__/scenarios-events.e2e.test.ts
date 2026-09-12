@@ -47,6 +47,7 @@ const {
     readNamespacedJob: async (): Promise<unknown> => ({ status: {} }),
     listNamespacedPod: async (): Promise<unknown> => ({ items: [] }),
     readNamespacedPodLog: async (): Promise<string> => '',
+    listNamespacedEvent: async (): Promise<unknown> => ({ items: [] }),
     listNamespace: async (): Promise<unknown> => ({ items: [] }),
   };
 
@@ -64,6 +65,7 @@ const {
         return {
           listNamespacedPod: (...a: unknown[]) => impl.listNamespacedPod(...(a as [])),
           readNamespacedPodLog: (...a: unknown[]) => impl.readNamespacedPodLog(...(a as [])),
+          listNamespacedEvent: (...a: unknown[]) => impl.listNamespacedEvent(...(a as [])),
           listNamespace: (...a: unknown[]) => {
             counts.listNamespace += 1;
             return impl.listNamespace(...(a as []));
@@ -300,6 +302,19 @@ describe('GET /api/scenarios/:id/executions/:executionId/events (SSE)', () => {
       ],
     });
     impl.readNamespacedPodLog = async () => 'hello\nworld\n';
+    impl.listNamespacedEvent = async () => ({
+      items: [
+        {
+          metadata: { uid: 'evt-1', name: 'svc-a-pod.17f2' },
+          reason: 'Killing',
+          message: 'Killing container svc-a in pod svc-a-pod',
+          involvedObject: { kind: 'Pod', name: 'svc-a-pod' },
+          type: 'Normal',
+          count: 1,
+          lastTimestamp: new Date('2026-09-07T10:00:00Z'),
+        },
+      ],
+    });
 
     const executionId = await makeExecution({ status: 'running' });
 
@@ -316,6 +331,10 @@ describe('GET /api/scenarios/:id/executions/:executionId/events (SSE)', () => {
     expect(text).toContain('"line":"hello"');
     expect(text).toContain('"service":"svc-a"');
     expect(text).toContain('"container":"svc-a"');
+    // Namespace events ride the same stream as `k8s-event` records (#198).
+    expect(text).toContain('event: k8s-event');
+    expect(text).toContain('"reason":"Killing"');
+    expect(text).toContain('"objectName":"svc-a-pod"');
     expect(text).toContain('event: end');
     expect(text).toContain('"status":"completed"');
 
@@ -326,6 +345,7 @@ describe('GET /api/scenarios/:id/executions/:executionId/events (SSE)', () => {
     });
     impl.listNamespacedPod = async () => ({ items: [] });
     impl.readNamespacedPodLog = async () => '';
+    impl.listNamespacedEvent = async () => ({ items: [] });
   });
 
   test('emits an error event and closes when the cluster fails mid-stream', async () => {

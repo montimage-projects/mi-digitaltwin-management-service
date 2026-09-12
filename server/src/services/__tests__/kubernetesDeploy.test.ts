@@ -91,6 +91,7 @@ const {
   getDeploymentStatus,
   isDeploymentSettled,
   collectNewPodLogs,
+  collectNewNamespaceEvents,
   pingCluster,
   teardownDeployment,
   buildClientFromInfrastructure,
@@ -2582,6 +2583,173 @@ describe('collectNewPodLogs', () => {
         namespace: 'ns',
         names: ['svc-a'],
         seen: new Map(),
+      });
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppError);
+      expect((err as AppError).statusCode).toBe(502);
+    }
+  });
+});
+
+describe('collectNewNamespaceEvents', () => {
+  const k8sEvent = (
+    uid: string,
+    overrides: Record<string, unknown> = {}
+  ): Record<string, unknown> => ({
+    metadata: { uid, name: `${uid}-name` },
+    reason: 'Scheduled',
+    message: `event ${uid}`,
+    involvedObject: { kind: 'Pod', name: 'svc-a-pod' },
+    type: 'Normal',
+    count: 1,
+    lastTimestamp: new Date('2026-09-07T10:00:00Z'),
+    ...overrides,
+  });
+
+  function eventClients(items: Record<string, unknown>[]) {
+    return {
+      core: {
+        listNamespacedEvent: vi.fn(async () => ({ items })),
+      },
+      apps: {},
+    };
+  }
+
+  test('distils each Event to reason, message, involved object, type and count', async () => {
+    const clients = eventClients([
+      k8sEvent('u1', {
+        reason: 'Killing',
+        message: 'Killing container svc-a in pod svc-a-pod',
+        type: 'Warning',
+        count: 2,
+      }),
+    ]);
+
+    const out = await collectNewNamespaceEvents(clients as never, {
+      namespace: 'ns',
+      seen: new Set(),
+    });
+
+    expect(clients.core.listNamespacedEvent).toHaveBeenCalledWith({ namespace: 'ns' });
+    expect(out).toEqual([
+      {
+        uid: 'u1',
+        reason: 'Killing',
+        message: 'Killing container svc-a in pod svc-a-pod',
+        objectKind: 'Pod',
+        objectName: 'svc-a-pod',
+        type: 'Warning',
+        count: 2,
+        timestamp: '2026-09-07T10:00:00.000Z',
+      },
+    ]);
+  });
+
+  test('emits each event once across polling iterations', async () => {
+    const items = [k8sEvent('u1'), k8sEvent('u2', { reason: 'Pulled' })];
+    const clients = eventClients(items);
+    const seen = new Set<string>();
+
+    const first = await collectNewNamespaceEvents(clients as never, {
+      namespace: 'ns',
+      seen,
+    });
+    expect(first).toHaveLength(2);
+
+    // Same list on the next poll — nothing new to surface.
+    const second = await collectNewNamespaceEvents(clients as never, {
+      namespace: 'ns',
+      seen,
+    });
+    expect(second).toEqual([]);
+
+    // A genuinely new event appears on a later poll.
+    items.push(k8sEvent('u3', { reason: 'Started' }));
+    const third = await collectNewNamespaceEvents(clients as never, {
+      namespace: 'ns',
+      seen,
+    });
+    expect(third).toEqual([expect.objectContaining({ uid: 'u3', reason: 'Started' })]);
+  });
+
+  test('re-emits an event when its occurrence count grows', async () => {
+    const backoff = k8sEvent('u1', { reason: 'BackOff', count: 1 });
+    const clients = eventClients([backoff]);
+    const seen = new Set<string>();
+
+    await collectNewNamespaceEvents(clients as never, { namespace: 'ns', seen });
+
+    // Kubernetes aggregates repeats onto the same Event object (same uid)
+    // with a bumped count — a new occurrence, not a duplicate.
+    backoff.count = 4;
+    const out = await collectNewNamespaceEvents(clients as never, {
+      namespace: 'ns',
+      seen,
+    });
+    expect(out).toEqual([expect.objectContaining({ uid: 'u1', count: 4 })]);
+  });
+
+  test('dedups a uid-less event on its metadata name', async () => {
+    const items = [
+      {
+        metadata: { name: 'svc-a-pod.17f2' },
+        reason: 'Pulled',
+        message: 'pull done',
+        involvedObject: { kind: 'Pod', name: 'svc-a-pod' },
+      },
+    ];
+    const clients = eventClients(items);
+    const seen = new Set<string>();
+
+    const first = await collectNewNamespaceEvents(clients as never, {
+      namespace: 'ns',
+      seen,
+    });
+    expect(first).toHaveLength(1);
+    const second = await collectNewNamespaceEvents(clients as never, {
+      namespace: 'ns',
+      seen,
+    });
+    expect(second).toEqual([]);
+  });
+
+  test('a malformed timestamp is omitted rather than failing the read', async () => {
+    const clients = eventClients([
+      k8sEvent('u1', { lastTimestamp: 'not-a-date', eventTime: undefined }),
+    ]);
+    const out = await collectNewNamespaceEvents(clients as never, {
+      namespace: 'ns',
+      seen: new Set(),
+    });
+    expect(out).toEqual([expect.objectContaining({ uid: 'u1', timestamp: undefined })]);
+  });
+
+  test('orders emitted events by their most-recent timestamp', async () => {
+    const clients = eventClients([
+      k8sEvent('u2', { lastTimestamp: new Date('2026-09-07T10:02:00Z') }),
+      k8sEvent('u1', { lastTimestamp: new Date('2026-09-07T10:00:00Z') }),
+    ]);
+    const out = await collectNewNamespaceEvents(clients as never, {
+      namespace: 'ns',
+      seen: new Set(),
+    });
+    expect(out.map((e) => e.uid)).toEqual(['u1', 'u2']);
+  });
+
+  test('wraps a cluster error as AppError(502)', async () => {
+    const clients = {
+      core: {
+        listNamespacedEvent: vi.fn(async () => {
+          throw new ApiException(403, 'forbidden');
+        }),
+      },
+      apps: {},
+    };
+    try {
+      await collectNewNamespaceEvents(clients as never, {
+        namespace: 'ns',
+        seen: new Set(),
       });
       throw new Error('expected throw');
     } catch (err) {

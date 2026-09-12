@@ -1600,6 +1600,77 @@ export async function collectNewPodLogs(
   }
 }
 
+/** A single Kubernetes Event in the execution namespace, distilled for SSE. */
+export interface NamespaceEventEntry {
+  /** `metadata.uid` of the Event object — the dedup key alongside `count`. */
+  uid?: string;
+  /** Short machine reason, e.g. `Scheduled`, `Pulled`, `Killing`. */
+  reason?: string;
+  /** Human-readable detail of what happened. */
+  message?: string;
+  /** Kind of the object the event is about, e.g. `Pod`. */
+  objectKind?: string;
+  /** Name of the object the event is about, e.g. the pod name. */
+  objectName?: string;
+  /** `Normal` or `Warning`. */
+  type?: string;
+  /** Number of times the event has fired. */
+  count?: number;
+  /** ISO timestamp of the most recent occurrence. */
+  timestamp?: string;
+}
+
+/**
+ * Collect Kubernetes Events from the execution namespace and return only the
+ * ones not yet emitted (task 2.3). `seen` is a caller-owned set of
+ * `<uid>:<count>` keys mutated in place, so successive polls surface only new
+ * events — a recurring event (BackOff, Killing) re-emits when its `count`
+ * grows because that is a new occurrence, not a duplicate. Returned entries
+ * are sorted by their most-recent timestamp so the stream reads
+ * chronologically.
+ *
+ * The events API is the same `core/v1` credential the pod reads already use;
+ * a failure is wrapped in an `AppError` like every other cluster read.
+ */
+export async function collectNewNamespaceEvents(
+  clients: K8sClients,
+  opts: { namespace: string; seen: Set<string> }
+): Promise<NamespaceEventEntry[]> {
+  try {
+    const list = await clients.core.listNamespacedEvent({ namespace: opts.namespace });
+    const fresh: NamespaceEventEntry[] = [];
+
+    for (const ev of list.items ?? []) {
+      const uid = ev.metadata?.uid;
+      // A uid-less event still dedups on its name; the composite is the last
+      // resort so a malformed event cannot replay on every poll.
+      const key = `${uid ?? ev.metadata?.name ?? `${ev.involvedObject?.kind}/${ev.involvedObject?.name}/${ev.reason}`}:${ev.count ?? 0}`;
+      if (opts.seen.has(key)) continue;
+      opts.seen.add(key);
+
+      // A malformed timestamp must not take the stream down — leave it out.
+      const raw = ev.lastTimestamp ?? ev.eventTime ?? ev.firstTimestamp;
+      const date = raw ? (raw instanceof Date ? raw : new Date(raw as unknown as string)) : null;
+      fresh.push({
+        uid,
+        reason: ev.reason,
+        message: ev.message,
+        objectKind: ev.involvedObject?.kind,
+        objectName: ev.involvedObject?.name,
+        type: ev.type,
+        count: ev.count,
+        timestamp: date && !Number.isNaN(date.getTime()) ? date.toISOString() : undefined,
+      });
+    }
+
+    // Emit chronologically — the API does not guarantee ordering.
+    fresh.sort((a, b) => (a.timestamp ?? '').localeCompare(b.timestamp ?? ''));
+    return fresh;
+  } catch (err) {
+    throw toAppError(err, `reading namespace events in namespace ${opts.namespace}`);
+  }
+}
+
 /**
  * Lightweight liveness probe against a cluster: list a single namespace. A
  * successful call means the API server answered and authorized the request.

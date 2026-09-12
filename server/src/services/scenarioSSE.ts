@@ -11,6 +11,7 @@ import {
   buildClientFromInfrastructure,
   getDeploymentStatus,
   collectNewPodLogs,
+  collectNewNamespaceEvents,
   isDeploymentSettled,
 } from './kubernetesDeploy.js';
 
@@ -27,7 +28,8 @@ export const SSE_POLL_INTERVAL_MS = 2000;
  *  - Calling `res.flushHeaders()`.
  *
  * This function:
- *  - Writes `progress`, `log`, `end`, and `error` events to the response.
+ *  - Writes `progress`, `log`, `k8s-event`, `end`, and `error` events to the
+ *    response.
  *  - Cleans up the interval on client disconnect or when the deploy settles.
  *  - Returns a cleanup function that the caller should invoke on `req.close`.
  *
@@ -101,6 +103,8 @@ export function runSSEStream(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const clients = buildClientFromInfrastructure(infraForPoll as any);
   const seen = new Map<string, number>();
+  // `<uid>:<count>` keys of namespace events already streamed (task 2.3).
+  const seenEvents = new Set<string>();
 
   const poll = async (): Promise<void> => {
     if (closed) return;
@@ -116,6 +120,17 @@ export function runSSEStream(
           container: entry.container,
           line: entry.line,
         });
+      }
+
+      // Namespace events (pod scheduled, image pulled, container started,
+      // probe failures, the AI4SOAR reaction landing…) — before the settle
+      // check so the final tick's events still reach the client.
+      const events = await collectNewNamespaceEvents(clients, {
+        namespace,
+        seen: seenEvents,
+      });
+      for (const entry of events) {
+        send('k8s-event', entry);
       }
 
       if (isDeploymentSettled(statuses)) {
