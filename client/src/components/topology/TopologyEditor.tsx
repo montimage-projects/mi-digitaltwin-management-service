@@ -33,6 +33,7 @@ import { YamlEditor } from './YamlEditor';
 import { TopologyCanvas } from './TopologyCanvas';
 import { cn } from '@/lib/utils';
 import { dump as yamlDump } from 'js-yaml';
+import { edgeKindOf, EDGE_TYPE_SPELLING } from '@/lib/topology-roles';
 import type { ServiceDeployment } from '@/lib/services';
 
 interface TopologyNode {
@@ -51,10 +52,14 @@ interface TopologyEdge {
   id: string;
   source: string;
   target: string;
+  type?: string;
+  data?: { edgeType?: unknown; type?: unknown };
 }
 
-// Convert nodes and edges to YAML format
-function nodesToYaml(nodes: TopologyNode[], edges: TopologyEdge[]): string {
+// Convert nodes and edges to YAML format. Typed edges carry their persisted
+// spelling (`attacks`/`monitors`/`notifies`/`acts-on`, task 3.2) so the type
+// round-trips through the YAML view.
+export function nodesToYaml(nodes: TopologyNode[], edges: TopologyEdge[]): string {
   if (nodes.length === 0 && edges.length === 0) {
     return '';
   }
@@ -78,11 +83,16 @@ function nodesToYaml(nodes: TopologyNode[], edges: TopologyEdge[]): string {
       }
       return service;
     }),
-    connections: edges.map((edge) => ({
-      id: edge.id,
-      from: edge.source,
-      to: edge.target,
-    })),
+    connections: edges.map((edge) => {
+      const kind =
+        edgeKindOf(edge.data?.edgeType) ?? edgeKindOf(edge.data?.type) ?? edgeKindOf(edge.type);
+      return {
+        id: edge.id,
+        from: edge.source,
+        to: edge.target,
+        ...(kind ? { type: EDGE_TYPE_SPELLING[kind] } : {}),
+      };
+    }),
   };
 
   return yamlDump(topology, { indent: 2, lineWidth: -1 });

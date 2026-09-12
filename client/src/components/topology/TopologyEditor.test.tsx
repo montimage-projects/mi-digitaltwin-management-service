@@ -2,7 +2,9 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-import { TopologyEditor } from './TopologyEditor';
+import { load as yamlLoad } from 'js-yaml';
+import { TopologyEditor, nodesToYaml } from './TopologyEditor';
+import { edgeKindOf } from '@/lib/topology-roles';
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -94,5 +96,66 @@ describe('TopologyEditor', () => {
     render(<TopologyEditor {...defaultProps} isDirty={false} />, { wrapper: createWrapper() });
 
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
+  });
+});
+
+describe('nodesToYaml typed edges', () => {
+  interface ParsedTopology {
+    connections: { id: string; from: string; to: string; type?: string }[];
+  }
+  const parse = (yaml: string) => yamlLoad(yaml) as ParsedTopology;
+
+  it('emits the persisted edge type on each typed connection', () => {
+    const yaml = nodesToYaml(
+      [],
+      [
+        { id: 'e1', source: 'mag', target: 'http', data: { edgeType: 'attacks' } },
+        { id: 'e2', source: 'probe', target: 'http', data: { edgeType: 'monitors' } },
+        { id: 'e3', source: 'probe', target: 'soar', data: { edgeType: 'notifies' } },
+        { id: 'e4', source: 'soar', target: 'http', data: { edgeType: 'acts-on' } },
+      ]
+    );
+
+    expect(parse(yaml).connections.map((c) => c.type)).toEqual([
+      'attacks',
+      'monitors',
+      'notifies',
+      'acts-on',
+    ]);
+  });
+
+  it('round-trips: a parsed connection type resolves to the same canonical kind', () => {
+    const yaml = nodesToYaml(
+      [],
+      [{ id: 'e1', source: 'probe', target: 'http', data: { edgeType: 'monitors' } }]
+    );
+
+    expect(edgeKindOf(parse(yaml).connections[0].type)).toBe('monitor');
+  });
+
+  it('accepts legacy type spellings on edge.type and data.type', () => {
+    const yaml = nodesToYaml(
+      [],
+      [
+        { id: 'e1', source: 'mag', target: 'http', type: 'attack' },
+        { id: 'e2', source: 'probe', target: 'http', data: { type: 'monitor' } },
+      ]
+    );
+
+    expect(parse(yaml).connections.map((c) => c.type)).toEqual(['attacks', 'monitors']);
+  });
+
+  it('omits type on untyped connections', () => {
+    const yaml = nodesToYaml(
+      [],
+      [
+        { id: 'e1', source: 'a', target: 'b' },
+        { id: 'e2', source: 'a', target: 'c', type: 'default' },
+      ]
+    );
+
+    const connections = parse(yaml).connections;
+    expect(connections[0]).not.toHaveProperty('type');
+    expect(connections[1]).not.toHaveProperty('type');
   });
 });

@@ -5,6 +5,8 @@ import {
   resolveNodeAttachMode,
   computeSidecarAttachments,
   applyTopologyDecorations,
+  planTopologyEdge,
+  EDGE_TYPE_SPELLING,
   SIDECAR_DOCK,
   type RoleEdge,
   type RoleNode,
@@ -161,6 +163,84 @@ describe('computeSidecarAttachments', () => {
     const edges = [edge('e1', 'probe-1', 'ghost', { data: { edgeType: 'monitors' } })];
     const { hostByNodeId } = computeSidecarAttachments([host, sidecar], edges, services);
     expect(hostByNodeId.size).toBe(0);
+  });
+});
+
+describe('EDGE_TYPE_SPELLING', () => {
+  it('round-trips every persisted spelling through edgeKindOf', () => {
+    for (const spelling of Object.values(EDGE_TYPE_SPELLING)) {
+      const kind = edgeKindOf(spelling);
+      expect(kind).not.toBeNull();
+      expect(EDGE_TYPE_SPELLING[kind!]).toBe(spelling);
+    }
+  });
+});
+
+describe('planTopologyEdge', () => {
+  const nodes = [
+    node('att', { label: 'mag', serviceId: 's-att' }),
+    node('tgt', { label: 'http', serviceId: 's-tgt' }),
+    node('mon', { label: 'probe', serviceId: 's-mon' }),
+    node('react', { label: 'soar', serviceId: 's-react' }),
+    node('db', { label: 'db', serviceId: 's-db' }),
+  ];
+  const services = serviceMap([
+    service('s-att', { role: 'attack' }),
+    service('s-tgt', { role: 'target' }),
+    service('s-mon', { role: 'monitor' }),
+    service('s-react', { role: 'reaction' }),
+    service('s-db', { role: 'generic' }),
+  ]);
+  const plan = (source: string, target: string) =>
+    planTopologyEdge({ source, target }, nodes, services);
+
+  it('types each legal role pair with its persisted spelling', () => {
+    expect(plan('att', 'tgt')).toEqual({ ok: true, edgeType: 'attacks' });
+    expect(plan('mon', 'tgt')).toEqual({ ok: true, edgeType: 'monitors' });
+    expect(plan('mon', 'att')).toEqual({ ok: true, edgeType: 'monitors' });
+    expect(plan('mon', 'react')).toEqual({ ok: true, edgeType: 'notifies' });
+    expect(plan('react', 'tgt')).toEqual({ ok: true, edgeType: 'acts-on' });
+  });
+
+  it('rejects illegal role pairs with a descriptive error', () => {
+    const res = plan('tgt', 'att');
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toContain('target');
+      expect(res.error).toContain('attack');
+      expect(res.error).toContain('attacks');
+    }
+    expect(plan('att', 'mon').ok).toBe(false);
+    expect(plan('att', 'react').ok).toBe(false);
+    expect(plan('att', 'att').ok).toBe(false);
+    expect(plan('react', 'att').ok).toBe(false);
+    expect(plan('react', 'mon').ok).toBe(false);
+    expect(plan('tgt', 'mon').ok).toBe(false);
+  });
+
+  it('falls back to the role persisted on node data when the catalog is gone', () => {
+    const legacy = [
+      node('a', { label: 'a', role: 'attack' }),
+      node('t', { label: 't', role: 'target' }),
+    ];
+    expect(planTopologyEdge({ source: 'a', target: 't' }, legacy, new Map())).toEqual({
+      ok: true,
+      edgeType: 'attacks',
+    });
+  });
+
+  it('keeps untyped edges when either side has no scenario role', () => {
+    expect(plan('db', 'tgt')).toEqual({ ok: true, edgeType: undefined });
+    expect(plan('att', 'db')).toEqual({ ok: true, edgeType: undefined });
+    expect(plan('db', 'db')).toEqual({ ok: true, edgeType: undefined });
+  });
+
+  it('treats connections to unknown nodes as untyped', () => {
+    expect(plan('ghost', 'tgt')).toEqual({ ok: true, edgeType: undefined });
+    expect(planTopologyEdge({ source: null, target: 'tgt' }, nodes, services)).toEqual({
+      ok: true,
+      edgeType: undefined,
+    });
   });
 });
 
