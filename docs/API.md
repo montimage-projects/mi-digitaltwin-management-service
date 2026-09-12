@@ -544,7 +544,7 @@ curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
 - **GET** `/api/scenarios/:id/executions/:executionId/events`
 - **Auth:** Required
 - **Content-Type:** `text/event-stream`
-- **Events:** `progress`, `log`, `end`, `error` — see
+- **Events:** `progress`, `log`, `k8s-event`, `end`, `error` — see
   [SSE Events Protocol](integration/kubernetes-execution.md#sse-events-protocol)
 
 #### Tear Down Execution
