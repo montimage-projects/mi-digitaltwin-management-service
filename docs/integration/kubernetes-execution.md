@@ -9,10 +9,13 @@ of the scenario's assigned infrastructure. The platform talks to the cluster API
 itself (via `@kubernetes/client-node`) — there is no external orchestrator in the
 path.
 
-Each execution gets its own namespace. Every topology node becomes one
-single-container `Deployment` plus one `NodePort` `Service`. Progress and live
-pod logs stream back to the browser over Server-Sent Events (SSE), and a teardown
-deletes the namespace to reclaim everything.
+Each execution gets its own namespace. Every topology node becomes a workload —
+an `apps/v1` `Deployment`, or a `batch/v1` `Job` for finite runs — plus a
+`NodePort` `Service` when it exposes a port, with `ConfigMap`s, a
+`ServiceAccount`/`Role`/`RoleBinding` triple and egress `NetworkPolicy`s added
+as the topology requires. Progress and live pod logs stream back to the browser
+over Server-Sent Events (SSE), and a teardown deletes the namespace to reclaim
+everything.
 
 The deploy engine lives in
 [`server/src/services/kubernetesDeploy.ts`](../../server/src/services/kubernetesDeploy.ts);
@@ -98,15 +101,19 @@ deployment spec (the service's `deployment` catalog spec merged with
 `notifies`, `acts-on`); manifest builders consume those fields as later
 playbook tasks land.
 
-| Topology concept | Kubernetes resource          | Notes                                                                                                                     |
-| ---------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Execution        | `Namespace`                  | One per execution, named `secsim-<scenario>-<execution>` (DNS-1123, ≤63 chars). Deleting it cascades to everything below. |
-| Topology node    | `Deployment` (`apps/v1`)     | Single container, `replicas: 1`, image resolved from the service version.                                                 |
-| Topology node    | `Service` (`v1`, `NodePort`) | Same name as the Deployment, selects it by `app` label, exposes the container port.                                       |
+| Topology concept       | Kubernetes resource                       | Notes                                                                                                                                 |
+| ---------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Execution              | `Namespace`                               | One per execution, named `secsim-<scenario>-<execution>` (DNS-1123, ≤63 chars). Deleting it cascades to everything below.             |
+| Topology node          | `Deployment` (`apps/v1`)                  | `replicas: 1`, image resolved from the service version; the pod also carries one container per attached `attachMode: 'sidecar'` node. |
+| Topology node (finite) | `Job` (`batch/v1`)                        | `kind: 'Job'` specs (e.g. an attack profile) deploy as a finite Job with `restartPolicy: Never` and no Service.                       |
+| Topology node          | `Service` (`v1`, `NodePort`)              | Same name as the workload, selects it by `app` label, exposes the container port. Not created for Jobs or `exposePort: false`.        |
+| Node `configFiles`     | `ConfigMap` (`v1`)                        | `<node>-config`; each file mounts at its `mountPath` via `subPath`.                                                                   |
+| Node `rbac` rules      | `ServiceAccount` + `Role` + `RoleBinding` | One namespaced triple per pod (sidecar rules fold into the host's Role). The engine never creates `ClusterRole`/`ClusterRoleBinding`. |
+| `role: 'attack'` node  | `NetworkPolicy` (`networking.k8s.io/v1`)  | `<node>-egress`: egress limited to the attack-edge targets' Service ports plus DNS; selects the pod the attack actually runs in.      |
 
 - **Resource naming:** each node's `id` is normalised to an RFC-1035 label
-  (lowercase, starting with a letter, ≤50 chars); the Deployment and Service
-  share that name.
+  (lowercase, starting with a letter, ≤50 chars); the workload (Deployment or
+  Job), Service and RBAC triple share that name.
 - **Port:** a single port is mapped per node — `deployment.containerPort`
   when the service spec sets it, `80` otherwise — for both the container and
   the service.
@@ -182,9 +189,22 @@ clickable URLs backed by their NodePort.
 
 ## Teardown
 
-Tearing down an execution deletes its namespace, which cascades to the
-Deployments, Services and Pods within it. Deleting an already-gone namespace is
-treated as success (idempotent). The execution record is marked `completed`.
+Tearing down an execution issues a single `deleteNamespace` call for the
+execution's `secsim-<scenario>-<execution>` namespace. Kubernetes garbage
+collection then removes **every** object the deploy created inside it —
+Deployments, Jobs, Services, ConfigMaps, ServiceAccounts, Roles, RoleBindings,
+NetworkPolicies and their Pods — because every manifest the engine emits is
+namespaced into that namespace. The engine creates no cluster-scoped resources
+at all (RBAC is strictly `Role`/`RoleBinding`; the Namespace is the only
+non-namespaced object, and it is the one being deleted), so nothing survives
+the delete: no orphans remain outside the namespace.
+
+The same teardown runs on a mid-deploy failure — `deployTopology` deletes the
+partially-created namespace before surfacing the error — so a failed execution
+leaves no half-deployed resources behind either.
+
+Deleting an already-gone namespace is treated as success (idempotent). The
+execution record is marked `completed`.
 
 - **DELETE** `/api/scenarios/:id/executions/:executionId`
 - **Auth:** Required
