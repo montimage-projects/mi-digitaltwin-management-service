@@ -37,24 +37,24 @@ namespace secsim-<scenario>-<exec>
 ├── Deployment target-http           (2 containers, shared netns)
 │   ├── http-sim   : registry.montimage.eu/montimage-mti/http-sim:v1.0.0   :8080
 │   └── mmt-probe  : registry.montimage.eu/montimage-mti/mmt-probe:v1.0.0  caps NET_ADMIN,NET_RAW
-│       ├── ConfigMap  mmt-probe-config  (mmt-probe.conf: iface=eth0, output, alert webhook)
+│       ├── ConfigMap  mmt-probe-config  (mmt-probe.conf: iface=eth0, security output → kafka)
 │       └── emptyDir   mmt-reports
 ├── Service   target-http  (NodePort → 8080)        ← dashboardUrl
-├── Deployment ai4soar                                :3001 (Shuffle-based UI)
+├── Deployment ai4soar                                :5000 (API/UI; Shuffle stack — see Pre.2)
 │   ├── ServiceAccount ai4soar + Role/RoleBinding (namespace-scoped)
-│   └── ConfigMap ai4soar-playbook (webhook trigger → K8s action)
-├── Service   ai4soar      (NodePort → 3001)        ← dashboardUrl
-└── Job       mag                                     env TARGET_URL=http://target-http:8080
+│   └── ConfigMap ai4soar-playbook (alert ingest → K8s action)
+├── Service   ai4soar      (NodePort → 5000)        ← dashboardUrl
+└── Job       mag                                     args: mag <attack> --target-ip <svc> --target-port 8080
 ```
 
 Wiring resolved from topology edges:
 
-| Edge (source → target) | Engine effect                                                                   |
-| ---------------------- | ------------------------------------------------------------------------------- |
-| MAG → http-sim         | `TARGET_URL` env on MAG = cluster DNS of the target Service                     |
-| MMT-Probe → http-sim   | MMT-Probe injected as a **sidecar** in the target pod (no hostNetwork)          |
-| MMT-Probe → AI4SOAR    | `ALERT_WEBHOOK_URL` env on probe = `http://ai4soar:3001/api/v1/hooks/<id>`      |
-| AI4SOAR → http-sim     | Role grants: `pods` delete, `deployments` patch/scale, `networkpolicies` create |
+| Edge (source → target) | Engine effect                                                                          |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| MAG → http-sim         | attack target passed as MAG args (`--target-ip`/`--target-port` of the target Service) |
+| MMT-Probe → http-sim   | MMT-Probe injected as a **sidecar** in the target pod (no hostNetwork)                 |
+| MMT-Probe → AI4SOAR    | probe `security.output-channel={kafka}`; AI4SOAR consumes the topic (Pre.2)            |
+| AI4SOAR → http-sim     | Role grants: `pods` delete, `deployments` patch/scale, `networkpolicies` create        |
 
 Sidecar over `hostNetwork` is the recommended choice: it captures exactly the
 target's traffic, needs no node-level privileges, and works on managed
@@ -149,13 +149,96 @@ machine to close the Verify line.
 
 **Acceptance Criteria**:
 
-- [ ] A per-module contract table exists in this playbook with port, config, env, capabilities and health endpoint
-- [ ] MMT-Probe alert sink mechanism is confirmed with the module owner
-- [ ] MAG attack profile selection mechanism (env or args) is confirmed with the module owner
+- [x] A per-module contract table exists in this playbook with port, config, env, capabilities and health endpoint
+- [x] MMT-Probe alert sink mechanism is confirmed with the module owner
+- [x] MAG attack profile selection mechanism (env or args) is confirmed with the module owner
 
 **Dependencies**: Pre.1
 **Effort**: M
 **Verify**: each module starts locally with `docker run` using only the documented env/config and reports healthy
+
+**Result** (recorded 2026-09-12):
+
+| Module    | Port / listen            | Config file                         | Required env / args                          | Linux caps            | Health / readiness                     |
+| --------- | ------------------------ | ----------------------------------- | -------------------------------------------- | --------------------- | -------------------------------------- |
+| MAG       | none — CLI, runs to exit | none                                | args: `mag <attack> --target-ip … --count N` | `NET_ADMIN`,`NET_RAW` | none — Job `succeeded`/`failed`        |
+| http-sim  | `:8080` HTTP             | none (packaged)                     | none                                         | none                  | `GET /` → 200; fallback TCP :8080      |
+| MMT-Probe | none — packet sniffer    | `mmt-probe.conf` (libconfig syntax) | `HOST_INTERFACE` env or `-i <iface>` arg     | `NET_ADMIN`,`NET_RAW` | process liveness + fresh report file   |
+| AI4SOAR   | `:5000` HTTP (Flask)     | `.env` (see below)                  | `SHUFFLE_*`, `LLM_*`, `MONGODB_*`, `KAFKA_*` | none — K8s API via SA | `GET /health` → `{"status":"healthy"}` |
+
+Confirmation source for the two "module owner" criteria: the module owner is
+Montimage itself, so confirmation was taken from the owner's authoritative
+artifacts — the `Montimage/mmt-probe` source tree plus the published
+`montimage/mmt` image behaviour (verified live, see below), the
+`Montimage/mag-website` CLI documentation, and the `Montimage/ai4soar` source.
+Residual items that only the packaged `v1.0.0` images can settle are flagged
+per module and remain pending a machine with `registry.montimage.eu` access —
+the same limitation as Pre.1's pull verification.
+
+**MAG — attack profile selection: CLI args (confirmed).** `mag` is a
+finite-run CLI: `mag list` enumerates the 26 attack types, `mag info <attack>`
+shows parameters, and `mag <attack> --target-ip <ip> --target-port <port>
+--count <n>` runs it (requires root; in a container `NET_ADMIN` + `NET_RAW`).
+There is no config file and no documented `TARGET_URL` env — the profile is the
+subcommand plus its flags. Engine consequence: the MAG Job carries `args`, and
+the attack-edge resolution supplies the target flags; whether the packaged
+entrypoint also accepts a `TARGET_URL` env is confirmed at first image run.
+Health is the Job's `succeeded`/`failed` count — no port, no endpoint.
+
+**http-sim — HTTP victim on `:8080` (port recorded, rest pending).** The
+simulated target is Montimage-internal; no public source exists. The contract
+recorded for now: listens on `:8080` per the target topology, needs no env,
+config or capabilities, and readiness is `GET /` → 200 (TCP connect on :8080 as
+probe fallback). Exact health path and any packaged env are confirmed at first
+`docker run` once registry access exists.
+
+**MMT-Probe — alert sink: output channels, Kafka recommended (confirmed).**
+Verified locally against `montimage/mmt:latest` (the public packaging of the
+same probe): `docker run --cap-add NET_ADMIN --cap-add NET_RAW -e
+HOST_INTERFACE=eth0` starts live capture and writes CSV reports every
+`stats-period` (5 s) to `/opt/mmt/probe/result/report/online`. The image ships
+MMT-Probe 1.5.12, MMT-DPI 1.7.10, MMT-Security 1.2.19 and the XML security
+rules under `/opt/mmt/security/rules/`. The entrypoint supports three input
+modes: `PCAP_FILE` env → offline `-t <file>`, `HOST_INTERFACE` env → live
+`-i <iface>`, or piped pcap on stdin. Configuration is a libconfig-syntax
+`mmt-probe.conf` resolved as `-c <path>` → `./mmt-probe.conf` →
+`/opt/mmt/probe/mmt-probe.conf`, with `-X attr=value` per-attribute overrides;
+the `license.key` setting is referenced but 1.5.12 runs without the file. The
+probe has no listening port and no HTTP health endpoint — readiness is process
+liveness plus a report file refreshed within `stats-period` (a `dynamic-config`
+UNIX socket at `/tmp/mmt.sock` is an optional control channel). Alerts are
+`security` reports routed by `security.output-channel` to any of `file`,
+`socket` (TCP/UDP/UNIX, default port 5000), `redis`, `kafka`, `mqtt`,
+`mongodb`, `stdout` — **there is no native HTTP webhook output**. The channel
+AI4SOAR consumes natively is **Kafka** (`kafka-output` → the topic
+AI4SOAR's `KafkaAlertConsumer` reads); the fallback is `file`/`socket` output
+plus a small forwarder that POSTs to AI4SOAR's `/api/publish_alerts`.
+
+**AI4SOAR — `:5000` API + `/health` (confirmed from source); bundled ports
+pending.** `server.py` is a Flask app on `SERVER_HOST:SERVER_PORT` (default
+`0.0.0.0:5000`); `GET /health` returns `{"status":"healthy"}` and the web UI
+lives at `/ui/` with the orchestration dashboard at `/orchestration`. Alerts
+are ingested three ways: NATS subject `ai4soar.alerts` (SSE-observable at
+`GET /api/nats_stream`), Kafka (`POST /api/publish_alerts?scenario=<s>` and
+`GET /api/consume_alerts?scenario=<s>`), and the MongoDB alert store. The
+response path recommends a CACAO playbook and executes it through the Shuffle
+backend configured by `SHUFFLE_API_BASE_URL` / `SHUFFLE_API_TOKEN`; the
+"webhook id" the issue mentions is a **Shuffle** workflow hook, served by the
+Shuffle **backend** on `:5001` (`/api/v1/hooks/<id>`) — the `:3001` port in the
+topology sketch is Shuffle's _frontend_. Required env also includes an LLM key
+(`LLM_PROVIDER` + `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`), `MONGODB_*`,
+`NATS_*` and `KAFKA_BROKERS`; runtime dependencies are MongoDB, NATS, Kafka
+and the Shuffle stack (frontend :3001, backend :5001, OpenSearch :9200).
+AI4SOAR itself needs no Linux capabilities; Kubernetes actions use the pod's
+ServiceAccount token (Pre.3). What the packaged `ai4soar:v1.0.0` image bundles
+versus expects as external services — and therefore its effective port map —
+is confirmed at first pull.
+
+**Verify status:** MMT-Probe `docker run` verification done (above). MAG,
+http-sim and AI4SOAR `docker run` verification pending a machine with
+`registry.montimage.eu` access. The earlier wiring assumption of an
+`ALERT_WEBHOOK_URL` env on the probe and a `TARGET_URL` env on MAG is corrected
+by these findings — see the updated topology and wiring rows above.
 
 #### Task Pre.3: Confirm AI4SOAR in-cluster auth and cluster PodSecurity level
 
@@ -284,12 +367,12 @@ machine to close the Verify line.
 
 #### Task 1.4: Inject environment variables from topology edges
 
-**Description**: Resolve `env[].fromEdge` at deploy time: `fromEdge: 'target'` becomes `http://<target-service-name>:<port>` of the node connected by an attack edge; `fromEdge: 'reaction'` becomes the webhook URL of the node connected by a notify edge. Node-level `config.env` overrides win over catalog defaults.
+**Description**: Resolve edge-derived values at deploy time: `fromEdge: 'target'` produces the target Service's `host:port` (used to build MAG's `args` — Pre.2 confirmed args, not env); `fromEdge: 'reaction'` produces the AI4SOAR alert ingest address (Kafka broker/topic per Pre.2) rendered into the probe's `mmt-probe.conf` `kafka-output`. Node-level `config.env`/`config.args` overrides win over catalog defaults.
 
 **Acceptance Criteria**:
 
-- [ ] MAG's `TARGET_URL` resolves to the target Service cluster DNS name
-- [ ] MMT-Probe's `ALERT_WEBHOOK_URL` resolves to the AI4SOAR Service URL
+- [ ] MAG's attack args resolve to the target Service cluster DNS name and port
+- [ ] MMT-Probe's `kafka-output` host/topic resolves to the AI4SOAR ingest endpoint
 - [ ] A `fromEdge` env with no matching edge fails deploy with a 400 naming the node and edge type
 - [ ] Unit tests cover resolution and override precedence
 
@@ -558,4 +641,4 @@ machine to close the Verify line.
 - **Capabilities on managed clusters.** If the target cluster forbids `NET_RAW`, MMT-Probe cannot capture. Mitigation: detect the PodSecurity level at deploy time and fail early with an actionable message.
 - **AI4SOAR credentials.** Giving a reaction pod a namespace-scoped Role is safe; never fall back to the Infrastructure's admin kubeconfig inside the pod.
 - **Attack containment.** MAG must only reach the target: the default egress NetworkPolicy in 1.5 enforces this.
-- **Module contracts unknown.** Phase P1 assumes env-driven config for MAG and a webhook sink for MMT-Probe; Phase Pre must validate both before P1 starts.
+- **Module contracts (residual).** Pre.2 confirmed the runtime contracts from the owner's artifacts and a live MMT-Probe run: MAG is args-driven (no `TARGET_URL` env), MMT-Probe alerts leave via `security.output-channel` (Kafka recommended — no native webhook), AI4SOAR serves on :5000 with `/health`. Residual: packaged `v1.0.0` image specifics (entrypoint env aliases, AI4SOAR bundled ports) confirmed at first pull.
