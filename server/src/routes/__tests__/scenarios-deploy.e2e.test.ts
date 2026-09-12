@@ -11,7 +11,15 @@ import mongoose from 'mongoose';
  * database). If MongoDB is unreachable, all tests skip.
  */
 
-const { clusterCalls, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hoisted(() => {
+const {
+  clusterCalls,
+  CoreV1Api,
+  AppsV1Api,
+  BatchV1Api,
+  RbacAuthorizationV1Api,
+  KubeConfig,
+  ApiException,
+} = vi.hoisted(() => {
   class ApiException extends Error {
     code: number;
     body: unknown;
@@ -26,12 +34,15 @@ const { clusterCalls, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hois
   const clusterCalls = {
     createNamespace: vi.fn(async () => ({})),
     createNamespacedDeployment: vi.fn(async () => ({})),
+    createNamespacedJob: vi.fn(async () => ({})),
     createNamespacedService: vi.fn(async () => ({ spec: { ports: [{ nodePort: 30080 }] } })),
     deleteNamespace: vi.fn(async () => ({})),
   };
 
   class CoreV1Api {}
   class AppsV1Api {}
+  class BatchV1Api {}
+  class RbacAuthorizationV1Api {}
 
   class KubeConfig {
     loadFromString(): void {}
@@ -41,24 +52,48 @@ const { clusterCalls, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hois
         return {
           createNamespace: clusterCalls.createNamespace,
           createNamespacedService: clusterCalls.createNamespacedService,
+          createNamespacedConfigMap: async () => ({}),
+          createNamespacedServiceAccount: async () => ({}),
           deleteNamespace: clusterCalls.deleteNamespace,
           listNamespacedPod: async () => ({ items: [] }),
         };
       }
+      if (ctor === AppsV1Api) {
+        return {
+          createNamespacedDeployment: clusterCalls.createNamespacedDeployment,
+          readNamespacedDeployment: async () => ({}),
+        };
+      }
+      if (ctor === BatchV1Api) {
+        return {
+          createNamespacedJob: clusterCalls.createNamespacedJob,
+          readNamespacedJob: async () => ({ status: {} }),
+        };
+      }
       return {
-        createNamespacedDeployment: clusterCalls.createNamespacedDeployment,
-        readNamespacedDeployment: async () => ({}),
+        createNamespacedRole: async () => ({}),
+        createNamespacedRoleBinding: async () => ({}),
       };
     }
   }
 
-  return { clusterCalls, CoreV1Api, AppsV1Api, KubeConfig, ApiException };
+  return {
+    clusterCalls,
+    CoreV1Api,
+    AppsV1Api,
+    BatchV1Api,
+    RbacAuthorizationV1Api,
+    KubeConfig,
+    ApiException,
+  };
 });
 
 vi.mock('@kubernetes/client-node', () => ({
   KubeConfig,
   CoreV1Api,
   AppsV1Api,
+  BatchV1Api,
+  RbacAuthorizationV1Api,
   ApiException,
 }));
 
