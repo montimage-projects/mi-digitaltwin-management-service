@@ -4,6 +4,7 @@ import { seedSectors } from './sectors.seed.js';
 import { seedServices } from './services.seed.js';
 import { seedPartners } from './partners.seed.js';
 import { seedAdmin } from './admin.seed.js';
+import { seedDemoScenario } from './demo.seed.js';
 
 const runSeeds = async (): Promise<void> => {
   console.info('Starting database seeding...\n');
@@ -22,6 +23,10 @@ const runSeeds = async (): Promise<void> => {
     console.info('');
 
     await seedPartners();
+    console.info('');
+
+    // Demo project + scenario depend on the seeded services (task 4.1).
+    await seedDemoScenario();
     console.info('');
 
     await seedAdmin();

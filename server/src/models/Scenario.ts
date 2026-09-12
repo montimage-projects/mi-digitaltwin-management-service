@@ -68,6 +68,14 @@ export interface IScenario extends Document {
   topology: ITopology;
   infrastructureId?: Types.ObjectId;
   executions: IExecution[];
+  /**
+   * Seed bookkeeping mirroring the catalog models — a seeded scenario (the
+   * demo, task 4.1) is stamped `seedManaged`/`deprecated` so re-running the
+   * seed can tell drift from an unchanged record; the demo seed never
+   * deprecates scenarios.
+   */
+  deprecated: boolean;
+  seedManaged: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -149,6 +157,14 @@ const scenarioSchema = new Schema<IScenario>(
       ref: 'Infrastructure',
     },
     executions: [executionSchema],
+    deprecated: {
+      type: Boolean,
+      default: false,
+    },
+    seedManaged: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

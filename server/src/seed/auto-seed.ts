@@ -13,6 +13,7 @@ import { seedSectors } from './sectors.seed.js';
 import { seedServices } from './services.seed.js';
 import { seedPartners } from './partners.seed.js';
 import { seedAdmin } from './admin.seed.js';
+import { seedDemoScenario } from './demo.seed.js';
 
 // ANSI color codes
 const colors = {
@@ -76,6 +77,8 @@ async function runAllSeeds(): Promise<void> {
   await seedSectors();
   await seedServices();
   await seedPartners();
+  // Demo project + scenario depend on the seeded services (task 4.1).
+  await seedDemoScenario();
   await seedAdmin();
 }
 
