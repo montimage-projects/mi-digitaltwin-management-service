@@ -4,11 +4,15 @@ import { AppError } from './errorHandler.js';
 /**
  * Validate an :id parameter against the 24-hex ObjectId format.
  * Returns 400 with a typed error when invalid.
+ *
+ * Also accepts `:projectId` so project-scoped routes (e.g.
+ * `/projects/:projectId/scenarios`) can share the guard.
  */
 export function validateObjectIdParam(req: Request, _res: Response, next: NextFunction): void {
-  const { id } = req.params;
+  const { id, projectId } = req.params;
+  const objectId = id ?? projectId;
 
-  if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+  if (!objectId || !/^[0-9a-fA-F]{24}$/.test(objectId)) {
     next(new AppError('Invalid ID format', 400));
     return;
   }
