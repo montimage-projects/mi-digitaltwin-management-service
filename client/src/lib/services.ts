@@ -31,6 +31,29 @@ export interface ServiceVersion {
   releasedAt: string;
 }
 
+/**
+ * Optional Kubernetes deployment spec — mirrors `IDeploymentSpec` in
+ * `server/src/models/Service.ts` (playbook task 0.3). `role` drives the
+ * topology node badges and `attachMode` the sidecar rendering in the editor
+ * (task 3.1).
+ */
+export interface ServiceDeployment {
+  kind: 'Deployment' | 'Job';
+  role: 'attack' | 'target' | 'monitor' | 'reaction' | 'generic';
+  attachMode?: 'standalone' | 'sidecar';
+  containerPort?: number;
+  exposePort?: boolean;
+  args?: string[];
+  env?: { name: string; value?: string; fromEdge?: 'target' | 'reaction' }[];
+  configFiles?: { mountPath: string; content: string }[];
+  volumes?: { name: string; mountPath: string; emptyDir: true }[];
+  securityContext?: { capabilities?: string[]; privileged?: boolean };
+  hostNetwork?: boolean;
+  rbac?: { apiGroups: string[]; resources: string[]; verbs: string[] }[];
+  readinessPath?: string;
+  startOrder?: number;
+}
+
 export interface Service {
   _id: string;
   shortName: string;
@@ -51,6 +74,7 @@ export interface Service {
   interactsWith: string[];
   potentialUseCases: string[];
   repositoryTable: RepositoryTable;
+  deployment?: ServiceDeployment;
   deprecated?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -93,6 +117,7 @@ export interface CreateServiceData {
   repositoryTable?: RepositoryTable;
   currentVersion?: string;
   versions?: { version: string; dockerImage: string; releaseNotes?: string }[];
+  deployment?: ServiceDeployment;
 }
 
 export interface AddVersionData {
