@@ -173,8 +173,8 @@ jobs:
           JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
           ADMIN_PASSWORD: ci-test-admin-secret-9f2K7x
           ENCRYPTION_KEY: ci-test-encryption-key-16chr
-          MONGODB_URI: 'mongodb://intact_app:intact_pass@localhost:27017/intact?authSource=admin'
-          SEED_TEST_MONGODB_URI: 'mongodb://admin:admin123@localhost:27017/admin'
+          # No MONGODB_URI/SEED_TEST_MONGODB_URI: this job has no mongo service,
+          # so tests must fall back to the hermetic in-memory server.
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.0

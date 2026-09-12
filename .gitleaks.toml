@@ -13,7 +13,7 @@ description = "Catch generic API keys and secrets"
 regex = '''(?i)(api[_-]?key|secret[_-]?key|password|token|credential)[\s]*[=:][\s]*['"]?[^'"]{8,}['"]?'''
 
 # Paths to exclude from scanning (false-positive reduction).
-[allowlist]
+[[allowlists]]
 description = "Global path exclusions"
 paths = [
   '''node_modules/''',
@@ -28,4 +28,12 @@ paths = [
   '''k8s/components/mongodb/secret\.example\.yaml''',
   '''k8s/base/secret\.example\.yaml''',
   '''(test|spec)''',
+]
+
+# Placeholder assignments (e.g. --docker-password=<token> in docs) are not secrets.
+[[allowlists]]
+description = "Placeholder credential values"
+regexTarget = "line"
+regexes = [
+  '''(?i)(api[_-]?key|secret[_-]?key|password|token|credential)[\s]*[=:]\s*["']?<[a-z0-9_.-]+>''',
 ]
