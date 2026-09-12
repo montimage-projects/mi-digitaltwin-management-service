@@ -233,6 +233,206 @@ describe('resolveTopologyNodes', () => {
   });
 });
 
+describe('resolveTopologyNodes — deployment spec and edge context', () => {
+  test('resolves the engine defaults for a service without a deployment spec', () => {
+    const resolved = resolveTopologyNodes([makeNode('web-a')], [makeService()]);
+    expect(resolved[0].deployment).toEqual({
+      kind: 'Deployment',
+      role: 'generic',
+      attachMode: 'standalone',
+      containerPort: 80,
+      exposePort: true,
+    });
+    expect(resolved[0].containerPort).toBe(80);
+    expect(resolved[0].edgeContext).toEqual({
+      targets: [],
+      monitors: [],
+      notifies: [],
+      actsOn: [],
+    });
+  });
+
+  test('carries the service deployment spec, overriding engine defaults', () => {
+    const service = makeService({
+      deployment: {
+        kind: 'Job',
+        role: 'attack',
+        exposePort: false,
+        args: ['mag', 'http-get'],
+        securityContext: { capabilities: ['NET_ADMIN', 'NET_RAW'] },
+        startOrder: 30,
+      },
+    });
+    const resolved = resolveTopologyNodes([makeNode('mag')], [service]);
+    const spec = resolved[0].deployment;
+    expect(spec.kind).toBe('Job');
+    expect(spec.role).toBe('attack');
+    expect(spec.exposePort).toBe(false);
+    expect(spec.args).toEqual(['mag', 'http-get']);
+    expect(spec.securityContext).toEqual({ capabilities: ['NET_ADMIN', 'NET_RAW'] });
+    expect(spec.startOrder).toBe(30);
+    // Untouched defaults still apply.
+    expect(spec.attachMode).toBe('standalone');
+    expect(spec.containerPort).toBe(80);
+  });
+
+  test('takes the container port from the spec instead of the hard-coded 80', () => {
+    const service = makeService({
+      deployment: {
+        kind: 'Deployment',
+        role: 'target',
+        containerPort: 8080,
+        exposePort: true,
+      },
+    });
+    const resolved = resolveTopologyNodes([makeNode('http-sim')], [service]);
+    expect(resolved[0].containerPort).toBe(8080);
+    expect(resolved[0].deployment.containerPort).toBe(8080);
+  });
+
+  test('node config args replace the catalog args wholesale', () => {
+    const service = makeService({
+      deployment: { kind: 'Job', role: 'attack', args: ['mag', 'http-get'] },
+    });
+    const resolved = resolveTopologyNodes(
+      [makeNode('mag', { config: { args: ['mag', 'slowloris', '--count', '10'] } })],
+      [service]
+    );
+    expect(resolved[0].deployment.args).toEqual(['mag', 'slowloris', '--count', '10']);
+  });
+
+  test('node config env merges by name over the catalog env', () => {
+    const service = makeService({
+      deployment: {
+        kind: 'Deployment',
+        role: 'monitor',
+        env: [
+          { name: 'HOST_INTERFACE', value: 'eth0' },
+          { name: 'STATS_PERIOD', value: '5' },
+        ],
+      },
+    });
+    const resolved = resolveTopologyNodes(
+      [
+        makeNode('mmt', {
+          config: {
+            env: [
+              { name: 'HOST_INTERFACE', value: 'eth1' },
+              { name: 'EXTRA', value: 'x' },
+            ],
+          },
+        }),
+      ],
+      [service]
+    );
+    // Same-name entry replaced in place, untouched entry kept, new name appended.
+    expect(resolved[0].deployment.env).toEqual([
+      { name: 'HOST_INTERFACE', value: 'eth1' },
+      { name: 'STATS_PERIOD', value: '5' },
+      { name: 'EXTRA', value: 'x' },
+    ]);
+  });
+
+  test('node config env applies on a service without a deployment spec', () => {
+    const resolved = resolveTopologyNodes(
+      [makeNode('web-a', { config: { env: [{ name: 'A', value: '1' }] } })],
+      [makeService()]
+    );
+    expect(resolved[0].deployment.env).toEqual([{ name: 'A', value: '1' }]);
+  });
+
+  test('does not merge unvalidated config keys into the spec', () => {
+    const resolved = resolveTopologyNodes(
+      [
+        makeNode('web-a', {
+          config: { containerPort: 9090, privileged: true, bogus: 'x' },
+        }),
+      ],
+      [makeService()]
+    );
+    // Only env/args are the validated override surface; everything else is
+    // preserved on the scenario document but ignored by the merge.
+    expect(resolved[0].deployment.containerPort).toBe(80);
+    expect(resolved[0].deployment).not.toHaveProperty('privileged');
+    expect(resolved[0].deployment).not.toHaveProperty('bogus');
+  });
+
+  test('resolves the four typed edge kinds into per-node context', () => {
+    const edges = [
+      { id: 'e1', source: 'mag', target: 'http-sim', type: 'attacks' },
+      { id: 'e2', source: 'mmt-probe', target: 'http-sim', type: 'monitors' },
+      { id: 'e3', source: 'mmt-probe', target: 'ai4soar', type: 'notifies' },
+      { id: 'e4', source: 'ai4soar', target: 'http-sim', type: 'acts-on' },
+    ];
+    const resolved = resolveTopologyNodes(
+      [makeNode('mag'), makeNode('http-sim'), makeNode('mmt-probe'), makeNode('ai4soar')],
+      [makeService()],
+      edges
+    );
+    const byId = new Map(resolved.map((r) => [r.nodeId, r]));
+    expect(byId.get('mag')?.edgeContext.targets).toEqual(['http-sim']);
+    expect(byId.get('mmt-probe')?.edgeContext.monitors).toEqual(['http-sim']);
+    expect(byId.get('mmt-probe')?.edgeContext.notifies).toEqual(['ai4soar']);
+    expect(byId.get('ai4soar')?.edgeContext.actsOn).toEqual(['http-sim']);
+    // The target has no outgoing typed edges — all four lists stay empty.
+    expect(byId.get('http-sim')?.edgeContext).toEqual({
+      targets: [],
+      monitors: [],
+      notifies: [],
+      actsOn: [],
+    });
+  });
+
+  test('reads the edge kind from data.edgeType or data.type as well as type', () => {
+    const edges = [
+      { id: 'e1', source: 'mag', target: 'http-sim', data: { edgeType: 'attacks' } },
+      { id: 'e2', source: 'mmt', target: 'http-sim', data: { type: 'monitors' } },
+      { id: 'e3', source: 'ai4soar', target: 'http-sim', type: 'acts_on' },
+    ];
+    const resolved = resolveTopologyNodes(
+      [makeNode('mag'), makeNode('http-sim'), makeNode('mmt'), makeNode('ai4soar')],
+      [makeService()],
+      edges
+    );
+    const byId = new Map(resolved.map((r) => [r.nodeId, r]));
+    expect(byId.get('mag')?.edgeContext.targets).toEqual(['http-sim']);
+    expect(byId.get('mmt')?.edgeContext.monitors).toEqual(['http-sim']);
+    expect(byId.get('ai4soar')?.edgeContext.actsOn).toEqual(['http-sim']);
+  });
+
+  test('skips untyped, malformed and dangling edges instead of failing', () => {
+    const edges = [
+      { id: 'plain', source: 'a', target: 'b' }, // today's untyped editor edge
+      { id: 'unknown-kind', source: 'a', target: 'b', type: 'wires' },
+      { id: 'no-target', source: 'a' },
+      { source: 'a', target: 42, type: 'attacks' },
+      null,
+      { id: 'dangling', source: 'a', target: 'ghost', type: 'attacks' },
+    ];
+    const resolved = resolveTopologyNodes(
+      [makeNode('a'), makeNode('b')],
+      [makeService()],
+      edges as never
+    );
+    expect(resolved).toHaveLength(2);
+    expect(resolved[0].edgeContext.targets).toEqual([]);
+  });
+
+  test('collects multiple targets in edge order and deduplicates repeats', () => {
+    const edges = [
+      { id: 'e1', source: 'mag', target: 't1', type: 'attacks' },
+      { id: 'e2', source: 'mag', target: 't2', type: 'attacks' },
+      { id: 'e3', source: 'mag', target: 't1', type: 'attacks' },
+    ];
+    const resolved = resolveTopologyNodes(
+      [makeNode('mag'), makeNode('t1'), makeNode('t2')],
+      [makeService()],
+      edges
+    );
+    expect(resolved[0].edgeContext.targets).toEqual(['t1', 't2']);
+  });
+});
+
 describe('deployTopology', () => {
   function makeClients() {
     return {
@@ -360,6 +560,39 @@ describe('deployTopology', () => {
     expect(clients.core.createNamespacedService).toHaveBeenCalledTimes(2);
     expect(result.services).toHaveLength(2);
     expect(result.services.map((s) => s.name)).toEqual(['web-a', 'web-b']);
+  });
+
+  test('deploys on the spec container port instead of the default 80', async () => {
+    const clients = makeClients();
+    const service = makeService({
+      deployment: {
+        kind: 'Deployment',
+        role: 'target',
+        containerPort: 8080,
+        exposePort: true,
+      },
+    });
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [makeNode('http-sim')],
+      services: [service],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const depArg = firstCallArg(clients.apps.createNamespacedDeployment) as {
+      body: {
+        spec: {
+          template: { spec: { containers: { ports: { containerPort: number }[] }[] } };
+        };
+      };
+    };
+    expect(depArg.body.spec.template.spec.containers[0].ports[0].containerPort).toBe(8080);
+
+    const svcArg = firstCallArg(clients.core.createNamespacedService) as {
+      body: { spec: { ports: { port: number; targetPort: number }[] } };
+    };
+    expect(svcArg.body.spec.ports[0].port).toBe(8080);
+    expect(svcArg.body.spec.ports[0].targetPort).toBe(8080);
   });
 
   test('derives the dashboard host from a non-URL endpoint (fallback path)', async () => {

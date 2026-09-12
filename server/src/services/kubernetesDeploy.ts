@@ -9,6 +9,8 @@ import {
   type V1Pod,
 } from '@kubernetes/client-node';
 import type { IInfrastructure } from '../models/Infrastructure.js';
+import type { IDeploymentSpec } from '../models/Service.js';
+import type { INodeConfig } from '../models/Scenario.js';
 import { decrypt } from '../utils/encryption.js';
 import { AppError } from '../middleware/errorHandler.js';
 
@@ -19,7 +21,11 @@ import { AppError } from '../middleware/errorHandler.js';
  * delegating to the MAESTRO orchestrator. The engine is intentionally thin:
  * each topology node maps to a single-container `apps/v1` Deployment plus a
  * `v1` NodePort Service (NodePort so the service is reachable without an
- * Ingress controller). Edge wiring, env vars and volumes are out of scope.
+ * Ingress controller). `resolveTopologyNodes` resolves each node's merged
+ * deployment spec (service `deployment` defaults merged with
+ * `node.data.config` overrides) and its typed-edge context; env vars,
+ * volumes, capabilities and other spec fields are consumed by the manifest
+ * builders added in later playbook tasks.
  */
 
 /** Coarse per-service deploy status. */
@@ -40,6 +46,40 @@ export interface ServiceImageSource {
   currentVersion?: string;
   versions: { version: string; dockerImage: string }[];
   uiType?: 'web' | 'terminal' | 'both';
+  /** Optional Kubernetes deployment spec (models/Service.ts `IDeploymentSpec`). */
+  deployment?: IDeploymentSpec;
+}
+
+/**
+ * Deployment spec as resolved for one node: the service catalog spec merged
+ * with the node's `data.config` overrides, with engine defaults filled in for
+ * the fields a manifest builder always needs. `kind` and `role` are already
+ * required on `IDeploymentSpec`; `attachMode`, `containerPort` and
+ * `exposePort` are defaulted here so downstream tasks never re-check them.
+ */
+export interface ResolvedDeploymentSpec extends IDeploymentSpec {
+  attachMode: 'standalone' | 'sidecar';
+  containerPort: number;
+  exposePort: boolean;
+}
+
+/**
+ * Typed-edge context for one resolved node — the node ids it is wired to by
+ * each scenario edge kind (`attacks`: attack → target, `monitors`:
+ * monitor → target, `notifies`: monitor → reaction, `acts-on`:
+ * reaction → target; see the wiring table in
+ * docs/playbooks/montimage-attack-detect-respond-plan.md). Lists hold node
+ * ids in edge order; a node with no matching outgoing edges gets empty lists.
+ */
+export interface ResolvedEdgeContext {
+  /** Node ids this node attacks (`attacks` edges, attack → target). */
+  targets: string[];
+  /** Node ids this node monitors (`monitors` edges, monitor → target). */
+  monitors: string[];
+  /** Node ids this node notifies (`notifies` edges, monitor → reaction). */
+  notifies: string[];
+  /** Node ids this node acts on (`acts-on` edges, reaction → target). */
+  actsOn: string[];
 }
 
 /** A topology node resolved to a concrete, deployable image. */
@@ -51,6 +91,10 @@ export interface ResolvedNode {
   image: string;
   uiType: 'web' | 'terminal' | 'both';
   containerPort: number;
+  /** Merged deployment spec (service spec + node `data.config` overrides). */
+  deployment: ResolvedDeploymentSpec;
+  /** Typed-edge wiring context for this node. */
+  edgeContext: ResolvedEdgeContext;
 }
 
 /** Result of deploying a single topology node. */
@@ -72,6 +116,8 @@ export interface DeployResult {
 export interface DeployTopologyOptions {
   namespace: string;
   nodes: unknown[];
+  /** Topology edges (React Flow `{ source, target, type?, data? }` records). */
+  edges?: unknown[];
   services: ServiceImageSource[];
   /** Cluster API endpoint; its host is used to build reachable NodePort URLs. */
   endpoint: string;
@@ -95,7 +141,147 @@ const FAILURE_REASONS = new Set([
 
 interface RawTopologyNode {
   id?: string;
-  data?: { serviceId?: string; version?: string; label?: string };
+  data?: { serviceId?: string; version?: string; label?: string; config?: INodeConfig };
+}
+
+/** Structural view of a stored topology edge (React Flow edge record). */
+interface RawTopologyEdge {
+  source?: unknown;
+  target?: unknown;
+  type?: unknown;
+  data?: { type?: unknown; edgeType?: unknown };
+}
+
+/** Canonical scenario edge kinds resolved into {@link ResolvedEdgeContext}. */
+type EdgeKind = 'attack' | 'monitor' | 'notify' | 'acts-on';
+
+/**
+ * Accepted spellings for each edge kind. Task 3.2 of the playbook persists
+ * `attacks`/`monitors`/`notifies`/`acts-on`; the singular aliases are kept so
+ * hand-written topologies also resolve.
+ */
+const EDGE_KIND_ALIASES: Record<string, EdgeKind> = {
+  attack: 'attack',
+  attacks: 'attack',
+  monitor: 'monitor',
+  monitors: 'monitor',
+  notify: 'notify',
+  notifies: 'notify',
+  'acts-on': 'acts-on',
+  actson: 'acts-on',
+};
+
+/** Normalize a raw edge type/label into a canonical {@link EdgeKind}. */
+function edgeKindOf(raw: unknown): EdgeKind | null {
+  if (typeof raw !== 'string') return null;
+  const normalized = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-');
+  return EDGE_KIND_ALIASES[normalized] ?? null;
+}
+
+/**
+ * Merge a service catalog deployment spec with a node's `data.config`
+ * overrides and fill engine defaults. `env`/`args` are the override surface
+ * validated on scenario save (task 0.4): `config.args` replaces the catalog
+ * `args` wholesale, while `config.env` merges by name so a node can override
+ * one variable without restating the whole list. Other config keys are
+ * preserved on the scenario document for forward compatibility (e.g.
+ * `configFiles`, task 3.3) but are not merged here — they are unvalidated
+ * input, and the spec fields they would touch are security-relevant.
+ */
+function mergeDeploymentSpec(
+  base: IDeploymentSpec | undefined,
+  config: INodeConfig | undefined
+): ResolvedDeploymentSpec {
+  const merged: IDeploymentSpec = {
+    kind: 'Deployment',
+    role: 'generic',
+    attachMode: 'standalone',
+    containerPort: DEFAULT_CONTAINER_PORT,
+    exposePort: true,
+    ...base,
+  };
+
+  if (config) {
+    if (config.args !== undefined) {
+      merged.args = config.args;
+    }
+    if (config.env) {
+      merged.env = mergeEnvByName(base?.env, config.env);
+    }
+  }
+
+  return merged as ResolvedDeploymentSpec;
+}
+
+/**
+ * Merge env lists by variable name: an override replaces the catalog entry of
+ * the same name in place; new names append. Catalog order is preserved so
+ * manifests stay deterministic.
+ */
+function mergeEnvByName(
+  base: IDeploymentSpec['env'],
+  overrides: NonNullable<INodeConfig['env']>
+): IDeploymentSpec['env'] {
+  const merged = [...(base ?? [])];
+  for (const override of overrides) {
+    const idx = merged.findIndex((e) => e.name === override.name);
+    if (idx >= 0) {
+      merged[idx] = override;
+    } else {
+      merged.push(override);
+    }
+  }
+  return merged;
+}
+
+/**
+ * Build per-node edge context from the topology edges. The edge kind is read
+ * from `data.edgeType`, then `data.type`, then `type` (the React Flow field
+ * task 3.2 populates). Untyped, malformed and dangling edges (referencing a
+ * node that is not part of this resolution) are skipped rather than failing
+ * the deploy — today's untyped editor edges must keep deploying unchanged.
+ */
+function buildEdgeContexts(
+  nodeIds: ReadonlySet<string>,
+  edges: unknown[]
+): Map<string, ResolvedEdgeContext> {
+  const contexts = new Map<string, ResolvedEdgeContext>();
+  const ensure = (nodeId: string): ResolvedEdgeContext => {
+    let ctx = contexts.get(nodeId);
+    if (!ctx) {
+      ctx = { targets: [], monitors: [], notifies: [], actsOn: [] };
+      contexts.set(nodeId, ctx);
+    }
+    return ctx;
+  };
+
+  for (const raw of edges) {
+    const edge = (raw ?? {}) as RawTopologyEdge;
+    const kind =
+      edgeKindOf(edge.data?.edgeType) ?? edgeKindOf(edge.data?.type) ?? edgeKindOf(edge.type);
+    const source = typeof edge.source === 'string' ? edge.source : undefined;
+    const target = typeof edge.target === 'string' ? edge.target : undefined;
+    if (!kind || !source || !target || !nodeIds.has(source) || !nodeIds.has(target)) {
+      continue;
+    }
+
+    const ctx = ensure(source);
+    const list =
+      kind === 'attack'
+        ? ctx.targets
+        : kind === 'monitor'
+          ? ctx.monitors
+          : kind === 'notify'
+            ? ctx.notifies
+            : ctx.actsOn;
+    if (!list.includes(target)) {
+      list.push(target);
+    }
+  }
+  return contexts;
 }
 
 /**
@@ -164,13 +350,22 @@ function toResourceName(rawId: string, fallbackIndex: number): string {
 /**
  * Resolve each topology node to a concrete deployable image by matching the
  * version the node references against the service's `versions[].dockerImage`.
- * Throws `AppError(400)` for nodes without a service or without a usable image.
+ * Each resolved node also carries its merged deployment spec (service
+ * `deployment` + `node.data.config` overrides over engine defaults) and its
+ * typed-edge context from `edges` (which nodes it targets, monitors, notifies
+ * and acts on). Throws `AppError(400)` for nodes without a service or without
+ * a usable image.
  */
 export function resolveTopologyNodes(
   nodes: unknown[],
-  services: ServiceImageSource[]
+  services: ServiceImageSource[],
+  edges: unknown[] = []
 ): ResolvedNode[] {
   const byId = new Map(services.map((s) => [String(s._id), s]));
+  const nodeIds = new Set(
+    nodes.map((raw, index) => ((raw ?? {}) as RawTopologyNode).id ?? `node-${index}`)
+  );
+  const edgeContexts = buildEdgeContexts(nodeIds, edges);
 
   return nodes.map((raw, index) => {
     const node = (raw ?? {}) as RawTopologyNode;
@@ -200,13 +395,22 @@ export function resolveTopologyNodes(
       );
     }
 
+    const deployment = mergeDeploymentSpec(service.deployment, node.data?.config);
+
     return {
       nodeId,
       serviceId: String(serviceId),
       name: toResourceName(nodeId, index),
       image: entry.dockerImage,
       uiType: service.uiType ?? 'web',
-      containerPort: DEFAULT_CONTAINER_PORT,
+      containerPort: deployment.containerPort,
+      deployment,
+      edgeContext: edgeContexts.get(nodeId) ?? {
+        targets: [],
+        monitors: [],
+        notifies: [],
+        actsOn: [],
+      },
     };
   });
 }
@@ -330,7 +534,7 @@ export async function deployTopology(
   clients: K8sClients,
   opts: DeployTopologyOptions
 ): Promise<DeployResult> {
-  const resolved = resolveTopologyNodes(opts.nodes, opts.services);
+  const resolved = resolveTopologyNodes(opts.nodes, opts.services, opts.edges);
   const host = endpointHost(opts.endpoint);
 
   try {

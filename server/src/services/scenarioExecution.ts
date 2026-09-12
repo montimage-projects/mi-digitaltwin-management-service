@@ -48,7 +48,7 @@ export interface ExecutionResult {
 export async function executeScenario(
   scenario: {
     _id: Types.ObjectId;
-    topology?: { nodes?: unknown[] };
+    topology?: { nodes?: unknown[]; edges?: unknown[] };
     infrastructureId?: Types.ObjectId;
     executions: unknown[];
     save?(): Promise<unknown>;
@@ -90,6 +90,7 @@ export async function executeScenario(
     const result = await deployTopology(clients, {
       namespace,
       nodes,
+      edges: scenario.topology?.edges ?? [],
       services: resolvedServices as unknown as ServiceImageSource[],
       endpoint: infrastructure.endpoint,
     });
