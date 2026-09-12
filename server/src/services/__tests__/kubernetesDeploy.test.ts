@@ -2304,6 +2304,129 @@ describe('teardownDeployment', () => {
   });
 });
 
+describe('teardownDeployment — execution namespace teardown (issue #199)', () => {
+  const TARGET_ID = '507f1f77bcf86cd799439011';
+  const MONITOR_ID = '507f1f77bcf86cd799439014';
+  const ATTACK_ID = '507f1f77bcf86cd799439013';
+  const NS = 'secsim-scn-exec';
+  type DeploymentSpec = NonNullable<ServiceImageSource['deployment']>;
+
+  const node = (id: string, serviceId: string) => ({ id, data: { serviceId } });
+  const svc = (id: string, deployment: Partial<DeploymentSpec>) =>
+    makeService({ _id: id, deployment: deployment as DeploymentSpec });
+
+  /**
+   * Deploy a scenario exercising every resource kind the engine can create:
+   * Namespace, Deployment + Service (target), ConfigMap + SA/Role/RoleBinding
+   * (the monitor sidecar's configFiles + rbac fold into the host pod),
+   * NetworkPolicy (the attack node) and Job (the attack workload).
+   */
+  async function deployFullScenario(clients: ReturnType<typeof makeClients>) {
+    // The readiness gate (task 1.6) holds the attack Job until the target is Ready.
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [readyPod('http-sim')],
+    })) as unknown as typeof clients.core.listNamespacedPod;
+    await deployTopology(clients as never, {
+      namespace: NS,
+      nodes: [node('http-sim', TARGET_ID), node('mmt-probe', MONITOR_ID), node('mag', ATTACK_ID)],
+      edges: [
+        { source: 'mmt-probe', target: 'http-sim', type: 'monitors' },
+        { source: 'mag', target: 'http-sim', type: 'attacks' },
+      ],
+      services: [
+        svc(TARGET_ID, {
+          kind: 'Deployment',
+          role: 'target',
+          containerPort: 8080,
+          exposePort: true,
+        }),
+        svc(MONITOR_ID, {
+          kind: 'Deployment',
+          role: 'monitor',
+          attachMode: 'sidecar',
+          exposePort: false,
+          configFiles: [{ mountPath: '/opt/mmt/probe/mmt-probe.conf', content: 'security = {};' }],
+          rbac: [{ apiGroups: [''], resources: ['pods'], verbs: ['get', 'list'] }],
+        }),
+        svc(ATTACK_ID, { kind: 'Job', role: 'attack', exposePort: false }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+  }
+
+  test('creates every resource inside the execution namespace so deleting it leaves no orphans', async () => {
+    const clients = makeClients();
+    await deployFullScenario(clients);
+
+    // Every namespaced create call — both the call parameter and the manifest
+    // metadata — names the execution namespace, so a single namespace delete
+    // cascades to all of them: Deployments, Jobs, Services, ConfigMaps,
+    // ServiceAccounts, Roles, RoleBindings and NetworkPolicies.
+    const namespacedCalls: [unknown, string][] = [
+      [clients.apps.createNamespacedDeployment, 'Deployment'],
+      [clients.batch.createNamespacedJob, 'Job'],
+      [clients.core.createNamespacedService, 'Service'],
+      [clients.core.createNamespacedConfigMap, 'ConfigMap'],
+      [clients.core.createNamespacedServiceAccount, 'ServiceAccount'],
+      [clients.rbac.createNamespacedRole, 'Role'],
+      [clients.rbac.createNamespacedRoleBinding, 'RoleBinding'],
+      [clients.networking.createNamespacedNetworkPolicy, 'NetworkPolicy'],
+    ];
+    for (const [fn, kind] of namespacedCalls) {
+      const calls = (fn as ReturnType<typeof vi.fn>).mock.calls as unknown[][];
+      expect(calls.length, `${kind} should have been created`).toBeGreaterThan(0);
+      for (const [arg] of calls) {
+        const call = arg as { namespace?: string; body?: { metadata?: { namespace?: string } } };
+        expect(call.namespace, `${kind} call namespace`).toBe(NS);
+        expect(call.body?.metadata?.namespace, `${kind} manifest namespace`).toBe(NS);
+      }
+    }
+
+    // The Namespace is the one cluster-scoped object the engine creates, and
+    // teardown deletes exactly it — Kubernetes garbage collection removes
+    // everything inside.
+    expect(clients.core.createNamespace).toHaveBeenCalledTimes(1);
+    await teardownDeployment(clients as never, NS);
+    expect(clients.core.deleteNamespace).toHaveBeenCalledTimes(1);
+    expect((firstCallArg(clients.core.deleteNamespace) as { name: string }).name).toBe(NS);
+  });
+
+  test('never creates a cluster-scoped resource (no ClusterRole/ClusterRoleBinding)', async () => {
+    const clients = makeClients();
+    // Cluster-scoped create verbs reachable on these API groups. The fakes do
+    // not implement them, so wiring spies in makes a real call observable —
+    // a cluster-scoped resource would survive the namespace delete, orphaning
+    // it (and widening a scenario pod's reach cluster-wide).
+    const clusterScoped: [string, ReturnType<typeof vi.fn>][] = [
+      ['rbac.createClusterRole', vi.fn(async () => ({}))],
+      ['rbac.createClusterRoleBinding', vi.fn(async () => ({}))],
+      ['core.createPersistentVolume', vi.fn(async () => ({}))],
+      ['core.createStorageClass', vi.fn(async () => ({}))],
+    ];
+    const byName = {
+      rbac: clients.rbac as unknown as Record<string, unknown>,
+      core: clients.core as unknown as Record<string, unknown>,
+    };
+    for (const [qualified, fn] of clusterScoped) {
+      const [group, method] = qualified.split('.');
+      byName[group][method] = fn;
+    }
+
+    await deployFullScenario(clients);
+
+    for (const [qualified, fn] of clusterScoped) {
+      expect(fn, `${qualified} must never be called`).not.toHaveBeenCalled();
+    }
+
+    // The RBAC binding the engine does create is strictly namespaced: the
+    // RoleBinding references a Role, never a ClusterRole.
+    const rbArg = firstCallArg(clients.rbac.createNamespacedRoleBinding) as {
+      body: { roleRef: { kind: string } };
+    };
+    expect(rbArg.body.roleRef.kind).toBe('Role');
+  });
+});
+
 describe('isDeploymentSettled', () => {
   test('is settled once every service has left pending', () => {
     expect(isDeploymentSettled([{ status: 'running' }, { status: 'failed' }])).toBe(true);
