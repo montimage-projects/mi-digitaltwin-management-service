@@ -4,13 +4,21 @@
  * Extracted from api.ts to keep that module under 300 lines.
  */
 
-/** Coarse per-service deploy status. */
-export type DeployStatus = 'pending' | 'running' | 'failed';
+/** Coarse per-service deploy status; `completed` marks a finished Job. */
+export type DeployStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+/** Per-container status inside one workload's pods. */
+export interface ContainerDeployStatus {
+  name: string;
+  status: DeployStatus;
+}
 
 /** Status of a single service during execution. */
 export interface ExecutionServiceStatus {
   name: string;
   status: DeployStatus;
+  /** Per-container breakdown of the workload's pods (host + sidecars). */
+  containers?: ContainerDeployStatus[];
 }
 
 /** Progress snapshot emitted during execution. */
@@ -25,6 +33,8 @@ export interface ExecutionProgressEvent {
 export interface ExecutionLogEvent {
   service: string;
   pod: string;
+  /** Container the line came from (multi-container pods carry sidecars). */
+  container?: string;
   line: string;
 }
 

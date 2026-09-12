@@ -291,7 +291,14 @@ describe('GET /api/scenarios/:id/executions/:executionId/events (SSE)', () => {
       spec: { replicas: 1 },
       status: { availableReplicas: 1 }, // ready -> running -> settled
     });
-    impl.listNamespacedPod = async () => ({ items: [{ metadata: { name: 'svc-a-pod' } }] });
+    impl.listNamespacedPod = async () => ({
+      items: [
+        {
+          metadata: { name: 'svc-a-pod' },
+          spec: { containers: [{ name: 'svc-a' }] },
+        },
+      ],
+    });
     impl.readNamespacedPodLog = async () => 'hello\nworld\n';
 
     const executionId = await makeExecution({ status: 'running' });
@@ -308,6 +315,7 @@ describe('GET /api/scenarios/:id/executions/:executionId/events (SSE)', () => {
     expect(text).toContain('event: log');
     expect(text).toContain('"line":"hello"');
     expect(text).toContain('"service":"svc-a"');
+    expect(text).toContain('"container":"svc-a"');
     expect(text).toContain('event: end');
     expect(text).toContain('"status":"completed"');
 
@@ -357,8 +365,16 @@ describe('GET /api/scenarios/:id/executions/:executionId/events (SSE)', () => {
     // Return a distinct pod per service based on the label selector.
     impl.listNamespacedPod = async (...args: unknown[]) => {
       const { labelSelector } = (args[0] as { labelSelector?: string }) ?? {};
-      if (labelSelector === 'app=svc-a') return { items: [{ metadata: { name: 'svc-a-pod' } }] };
-      if (labelSelector === 'app=svc-b') return { items: [{ metadata: { name: 'svc-b-pod' } }] };
+      if (labelSelector === 'app=svc-a') {
+        return {
+          items: [{ metadata: { name: 'svc-a-pod' }, spec: { containers: [{ name: 'svc-a' }] } }],
+        };
+      }
+      if (labelSelector === 'app=svc-b') {
+        return {
+          items: [{ metadata: { name: 'svc-b-pod' }, spec: { containers: [{ name: 'svc-b' }] } }],
+        };
+      }
       return { items: [] };
     };
     impl.readNamespacedPodLog = async (...args: unknown[]) => {
@@ -386,6 +402,50 @@ describe('GET /api/scenarios/:id/executions/:executionId/events (SSE)', () => {
     expect(text).toContain('"progress":100');
     expect(text).toContain('event: end');
     expect(text).toContain('"status":"completed"');
+
+    // reset shared impl for other tests
+    impl.readNamespacedDeployment = async () => ({
+      spec: { replicas: 1 },
+      status: { availableReplicas: 0 },
+    });
+    impl.listNamespacedPod = async () => ({ items: [] });
+    impl.readNamespacedPodLog = async () => '';
+  });
+
+  test('streams each container of a multi-container pod tagged by name (issue #197)', async () => {
+    if (!mongoAvailable) return;
+    impl.readNamespacedDeployment = async () => ({
+      spec: { replicas: 1 },
+      status: { availableReplicas: 1 },
+    });
+    // One host pod carrying the mmt-probe sidecar.
+    impl.listNamespacedPod = async () => ({
+      items: [
+        {
+          metadata: { name: 'svc-a-pod' },
+          spec: { containers: [{ name: 'svc-a' }, { name: 'mmt-probe' }] },
+        },
+      ],
+    });
+    impl.readNamespacedPodLog = async (...args: unknown[]) => {
+      const { container } = (args[0] as { container?: string }) ?? {};
+      return container === 'mmt-probe' ? 'ALERT detected\n' : 'GET / 200\n';
+    };
+
+    const executionId = await makeExecution({ status: 'running' });
+
+    const res = await fetch(
+      `${baseUrl}/api/scenarios/${scenarioId}/executions/${executionId}/events`,
+      { headers: authHeader }
+    );
+    expect(res.status).toBe(200);
+
+    const text = await drain(res);
+    expect(text).toContain('"container":"svc-a"');
+    expect(text).toContain('"line":"GET / 200"');
+    expect(text).toContain('"container":"mmt-probe"');
+    expect(text).toContain('"line":"ALERT detected"');
+    expect(text).toContain('event: end');
 
     // reset shared impl for other tests
     impl.readNamespacedDeployment = async () => ({

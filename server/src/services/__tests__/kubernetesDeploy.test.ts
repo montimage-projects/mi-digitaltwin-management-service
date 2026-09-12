@@ -1864,7 +1864,7 @@ describe('getDeploymentStatus — Job workloads (issue #192)', () => {
     };
   }
 
-  test('reports a completed Job as running', async () => {
+  test('reports a finished Job as completed (issue #196)', async () => {
     const clients = jobClients({
       status: { succeeded: 1, conditions: [{ type: 'Complete', status: 'True' }] },
     });
@@ -1872,7 +1872,28 @@ describe('getDeploymentStatus — Job workloads (issue #192)', () => {
       namespace: 'secsim-a-b',
       names: ['mag'],
     });
-    expect(statuses).toEqual([{ name: 'mag', status: 'running' }]);
+    expect(statuses).toEqual([{ name: 'mag', status: 'completed', containers: [] }]);
+  });
+
+  test('reports a Job with a succeeded count but no Complete condition as completed', async () => {
+    const clients = jobClients({ status: { succeeded: 1 } });
+    const { statuses } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['mag'],
+    });
+    expect(statuses).toEqual([{ name: 'mag', status: 'completed', containers: [] }]);
+  });
+
+  test('reports a Job whose pod reached Succeeded as completed', async () => {
+    const clients = jobClients({ status: {} });
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [{ metadata: { labels: { app: 'mag' } }, status: { phase: 'Succeeded' } }],
+    }));
+    const { statuses } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['mag'],
+    });
+    expect(statuses).toEqual([{ name: 'mag', status: 'completed', containers: [] }]);
   });
 
   test('reports a Job past its backoffLimit as failed', async () => {
@@ -1881,7 +1902,7 @@ describe('getDeploymentStatus — Job workloads (issue #192)', () => {
       namespace: 'secsim-a-b',
       names: ['mag'],
     });
-    expect(statuses).toEqual([{ name: 'mag', status: 'failed' }]);
+    expect(statuses).toEqual([{ name: 'mag', status: 'failed', containers: [] }]);
   });
 
   test('reports a Job Failed condition as failed', async () => {
@@ -1890,7 +1911,7 @@ describe('getDeploymentStatus — Job workloads (issue #192)', () => {
       namespace: 'secsim-a-b',
       names: ['mag'],
     });
-    expect(statuses).toEqual([{ name: 'mag', status: 'failed' }]);
+    expect(statuses).toEqual([{ name: 'mag', status: 'failed', containers: [] }]);
   });
 
   test('reports a Job whose pod failed as failed even before backoffLimit', async () => {
@@ -1902,7 +1923,7 @@ describe('getDeploymentStatus — Job workloads (issue #192)', () => {
       namespace: 'secsim-a-b',
       names: ['mag'],
     });
-    expect(statuses).toEqual([{ name: 'mag', status: 'failed' }]);
+    expect(statuses).toEqual([{ name: 'mag', status: 'failed', containers: [] }]);
   });
 
   test('reports a Job with a running pod as running', async () => {
@@ -1914,7 +1935,7 @@ describe('getDeploymentStatus — Job workloads (issue #192)', () => {
       namespace: 'secsim-a-b',
       names: ['mag'],
     });
-    expect(statuses).toEqual([{ name: 'mag', status: 'running' }]);
+    expect(statuses).toEqual([{ name: 'mag', status: 'running', containers: [] }]);
   });
 
   test('reports an in-flight Job with no pods yet as pending', async () => {
@@ -1923,7 +1944,150 @@ describe('getDeploymentStatus — Job workloads (issue #192)', () => {
       namespace: 'secsim-a-b',
       names: ['mag'],
     });
-    expect(statuses).toEqual([{ name: 'mag', status: 'pending' }]);
+    expect(statuses).toEqual([{ name: 'mag', status: 'pending', containers: [] }]);
+  });
+});
+
+describe('getDeploymentStatus — per-container status (issue #196)', () => {
+  /**
+   * A two-container pod as produced by `podSpecFor` for a host plus a sidecar:
+   * `http-sim` is the workload container, `mmt-probe` the monitor sidecar.
+   */
+  function multiContainerPod(containers: unknown[], phase = 'Running') {
+    return {
+      metadata: { labels: { app: 'http-sim' } },
+      status: { phase, containerStatuses: containers },
+    };
+  }
+
+  function deploymentClients(pods: unknown[], availableReplicas = 0) {
+    return {
+      core: { listNamespacedPod: vi.fn(async () => ({ items: pods })) },
+      apps: {
+        readNamespacedDeployment: vi.fn(async () => ({
+          spec: { replicas: 1 },
+          status: { availableReplicas },
+        })),
+      },
+      batch: { readNamespacedJob: vi.fn(async () => ({})) },
+    };
+  }
+
+  test('a pod with one failing sidecar container reports failed for that node', async () => {
+    const clients = deploymentClients([
+      multiContainerPod([
+        { name: 'http-sim', ready: true, state: { running: {} } },
+        { name: 'mmt-probe', ready: false, state: { waiting: { reason: 'CrashLoopBackOff' } } },
+      ]),
+    ]);
+    const { statuses } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['http-sim'],
+    });
+    expect(statuses[0].status).toBe('failed');
+    expect(statuses[0].containers).toEqual([
+      { name: 'http-sim', status: 'running' },
+      { name: 'mmt-probe', status: 'failed' },
+    ]);
+  });
+
+  test('a non-zero-terminated sidecar container fails the node even while the host runs', async () => {
+    const clients = deploymentClients([
+      multiContainerPod([
+        { name: 'http-sim', ready: true, state: { running: {} } },
+        { name: 'mmt-probe', ready: false, state: { terminated: { exitCode: 1 } } },
+      ]),
+    ]);
+    const { statuses } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['http-sim'],
+    });
+    expect(statuses[0].status).toBe('failed');
+  });
+
+  test('a clean-exited sidecar container reports completed, not failed', async () => {
+    const clients = deploymentClients([
+      multiContainerPod(
+        [
+          { name: 'http-sim', ready: true, state: { running: {} } },
+          { name: 'mmt-probe', ready: false, state: { terminated: { exitCode: 0 } } },
+        ],
+        'Succeeded'
+      ),
+    ]);
+    const { statuses } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['http-sim'],
+    });
+    // The Deployment itself is not failed; the sidecar's row reads completed.
+    expect(statuses[0].status).toBe('pending');
+    expect(statuses[0].containers).toEqual([
+      { name: 'http-sim', status: 'running' },
+      { name: 'mmt-probe', status: 'completed' },
+    ]);
+  });
+
+  test('a started-but-not-Ready container reports pending, not running', async () => {
+    const clients = deploymentClients([
+      multiContainerPod([
+        { name: 'http-sim', ready: true, state: { running: {} } },
+        { name: 'mmt-probe', ready: false, state: { running: {} } },
+      ]),
+    ]);
+    const { statuses } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['http-sim'],
+    });
+    expect(statuses[0].status).toBe('pending');
+    expect(statuses[0].containers).toEqual([
+      { name: 'http-sim', status: 'running' },
+      { name: 'mmt-probe', status: 'pending' },
+    ]);
+  });
+
+  test('a fully available deployment reports all its containers running', async () => {
+    const clients = deploymentClients(
+      [
+        multiContainerPod([
+          { name: 'http-sim', ready: true, state: { running: {} } },
+          { name: 'mmt-probe', ready: true, state: { running: {} } },
+        ]),
+      ],
+      1
+    );
+    const { statuses, progress } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['http-sim'],
+    });
+    expect(statuses[0].status).toBe('running');
+    expect(statuses[0].containers).toEqual([
+      { name: 'http-sim', status: 'running' },
+      { name: 'mmt-probe', status: 'running' },
+    ]);
+    expect(progress).toBe(100);
+  });
+
+  test('progress counts a completed Job as done', async () => {
+    const clients = {
+      core: { listNamespacedPod: vi.fn(async () => ({ items: [] })) },
+      apps: {
+        readNamespacedDeployment: vi.fn(async ({ name }: { name: string }) => {
+          if (name === 'mag') throw new ApiException(404, 'no deployment');
+          return { spec: { replicas: 1 }, status: { availableReplicas: 1 } };
+        }),
+      },
+      batch: {
+        readNamespacedJob: vi.fn(async () => ({
+          status: { succeeded: 1, conditions: [{ type: 'Complete', status: 'True' }] },
+        })),
+      },
+    };
+    const { statuses, progress } = await getDeploymentStatus(clients as never, {
+      namespace: 'secsim-a-b',
+      names: ['http-sim', 'mag'],
+    });
+    expect(statuses.map((s) => s.status)).toEqual(['running', 'completed']);
+    expect(progress).toBe(100);
   });
 });
 
@@ -1958,8 +2122,12 @@ describe('getDeploymentStatus', () => {
     });
 
     expect(statuses).toEqual([
-      { name: 'ready', status: 'running' },
-      { name: 'broken', status: 'failed' },
+      { name: 'ready', status: 'running', containers: [] },
+      {
+        name: 'broken',
+        status: 'failed',
+        containers: [], // nameless containerStatus fixture is not reported
+      },
     ]);
     expect(progress).toBe(50);
   });
@@ -2015,7 +2183,7 @@ describe('getDeploymentStatus', () => {
 
     // Only ONE listNamespacedPod call despite availableReplicas=0 (batch pods used).
     expect(listNamespacedPod).toHaveBeenCalledTimes(1);
-    expect(statuses).toEqual([{ name: 'svc-a', status: 'failed' }]);
+    expect(statuses).toEqual([{ name: 'svc-a', status: 'failed', containers: [] }]);
   });
 
   test('reports failed when a pod has reached the Failed phase', async () => {
@@ -2035,7 +2203,7 @@ describe('getDeploymentStatus', () => {
       namespace: 'secsim-a-b',
       names: ['boom'],
     });
-    expect(statuses).toEqual([{ name: 'boom', status: 'failed' }]);
+    expect(statuses).toEqual([{ name: 'boom', status: 'failed', containers: [] }]);
     expect(progress).toBe(0);
   });
 
@@ -2058,7 +2226,7 @@ describe('getDeploymentStatus', () => {
       namespace: 'secsim-a-b',
       names: ['warming-up'],
     });
-    expect(statuses).toEqual([{ name: 'warming-up', status: 'pending' }]);
+    expect(statuses).toEqual([{ name: 'warming-up', status: 'pending', containers: [] }]);
     expect(progress).toBe(0);
   });
 
@@ -2099,7 +2267,7 @@ describe('getDeploymentStatus', () => {
       namespace: 'secsim-a-b',
       names: ['gone'],
     });
-    expect(statuses).toEqual([{ name: 'gone', status: 'pending' }]);
+    expect(statuses).toEqual([{ name: 'gone', status: 'pending', containers: [] }]);
     expect(progress).toBe(0);
   });
 });
@@ -2140,6 +2308,11 @@ describe('isDeploymentSettled', () => {
     expect(isDeploymentSettled([{ status: 'running' }, { status: 'failed' }])).toBe(true);
   });
 
+  test('treats a completed Job as settled (issue #196)', () => {
+    expect(isDeploymentSettled([{ status: 'running' }, { status: 'completed' }])).toBe(true);
+    expect(isDeploymentSettled([{ status: 'completed' }])).toBe(true);
+  });
+
   test('is not settled while any service is still pending', () => {
     expect(isDeploymentSettled([{ status: 'running' }, { status: 'pending' }])).toBe(false);
   });
@@ -2150,11 +2323,15 @@ describe('isDeploymentSettled', () => {
 });
 
 describe('collectNewPodLogs', () => {
-  test('emits only unseen lines, tagged by service and pod', async () => {
+  test('emits only unseen lines, tagged by service, pod and container', async () => {
     let log = 'line-1\nline-2\n';
+    const pod = {
+      metadata: { name: 'svc-a-pod' },
+      spec: { containers: [{ name: 'svc-a' }] },
+    };
     const clients = {
       core: {
-        listNamespacedPod: vi.fn(async () => ({ items: [{ metadata: { name: 'svc-a-pod' } }] })),
+        listNamespacedPod: vi.fn(async () => ({ items: [pod] })),
         readNamespacedPodLog: vi.fn(async () => log),
       },
       apps: {},
@@ -2167,9 +2344,13 @@ describe('collectNewPodLogs', () => {
       seen,
     });
     expect(first).toEqual([
-      { name: 'svc-a', pod: 'svc-a-pod', line: 'line-1' },
-      { name: 'svc-a', pod: 'svc-a-pod', line: 'line-2' },
+      { name: 'svc-a', pod: 'svc-a-pod', container: 'svc-a', line: 'line-1' },
+      { name: 'svc-a', pod: 'svc-a-pod', container: 'svc-a', line: 'line-2' },
     ]);
+    // The container name is passed through to the cluster read (issue #197).
+    expect(clients.core.readNamespacedPodLog).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'svc-a-pod', container: 'svc-a' })
+    );
 
     // A subsequent poll surfaces only the newly appended line.
     log = 'line-1\nline-2\nline-3\n';
@@ -2178,7 +2359,143 @@ describe('collectNewPodLogs', () => {
       names: ['svc-a'],
       seen,
     });
-    expect(second).toEqual([{ name: 'svc-a', pod: 'svc-a-pod', line: 'line-3' }]);
+    expect(second).toEqual([
+      { name: 'svc-a', pod: 'svc-a-pod', container: 'svc-a', line: 'line-3' },
+    ]);
+  });
+
+  test('a pod that declares no containers still gets one unqualified read', async () => {
+    const clients = {
+      core: {
+        listNamespacedPod: vi.fn(async () => ({ items: [{ metadata: { name: 'p' } }] })),
+        readNamespacedPodLog: vi.fn(async () => 'line\n'),
+      },
+      apps: {},
+    };
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['svc-a'],
+      seen: new Map(),
+    });
+    expect(clients.core.readNamespacedPodLog).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'p' })
+    );
+    expect(clients.core.readNamespacedPodLog).toHaveBeenCalledTimes(1);
+    const callArg = clients.core.readNamespacedPodLog.mock.calls[0][0] as Record<string, unknown>;
+    expect(callArg).not.toHaveProperty('container');
+    expect(out).toEqual([{ name: 'svc-a', pod: 'p', line: 'line' }]);
+  });
+
+  test('reads every container of a multi-container pod and tags each line (issue #197)', async () => {
+    // An http-sim host pod carrying the mmt-probe sidecar — the combination
+    // the playbook calls out: probe alerts must stay distinguishable from
+    // the simulator's access logs.
+    const pod = {
+      metadata: { name: 'http-sim-pod' },
+      spec: { containers: [{ name: 'http-sim' }, { name: 'mmt-probe' }] },
+    };
+    const logs: Record<string, string> = {
+      'http-sim': 'GET / 200\nGET /favicon.ico 404\n',
+      'mmt-probe': 'ALERT syn-flood detected\n',
+    };
+    const clients = {
+      core: {
+        listNamespacedPod: vi.fn(async () => ({ items: [pod] })),
+        readNamespacedPodLog: vi.fn(
+          async ({ container }: { container: string }) => logs[container]
+        ),
+      },
+      apps: {},
+    };
+
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['http-sim'],
+      seen: new Map(),
+    });
+
+    expect(clients.core.readNamespacedPodLog).toHaveBeenCalledTimes(2);
+    expect(out).toEqual([
+      { name: 'http-sim', pod: 'http-sim-pod', container: 'http-sim', line: 'GET / 200' },
+      {
+        name: 'http-sim',
+        pod: 'http-sim-pod',
+        container: 'http-sim',
+        line: 'GET /favicon.ico 404',
+      },
+      {
+        name: 'http-sim',
+        pod: 'http-sim-pod',
+        container: 'mmt-probe',
+        line: 'ALERT syn-flood detected',
+      },
+    ]);
+  });
+
+  test('tracks the per-container seen offset so one chatty container does not replay others', async () => {
+    const pod = {
+      metadata: { name: 'http-sim-pod' },
+      spec: { containers: [{ name: 'http-sim' }, { name: 'mmt-probe' }] },
+    };
+    const logs: Record<string, string> = {
+      'http-sim': 'a1\na2\n',
+      'mmt-probe': 'b1\n',
+    };
+    const clients = {
+      core: {
+        listNamespacedPod: vi.fn(async () => ({ items: [pod] })),
+        readNamespacedPodLog: vi.fn(
+          async ({ container }: { container: string }) => logs[container]
+        ),
+      },
+      apps: {},
+    };
+    const seen = new Map<string, number>();
+    await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['http-sim'],
+      seen,
+    });
+    expect(seen.get('http-sim-pod/http-sim')).toBe(2);
+    expect(seen.get('http-sim-pod/mmt-probe')).toBe(1);
+
+    // Only http-sim appends — the sidecar must not replay.
+    logs['http-sim'] = 'a1\na2\na3\n';
+    const second = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['http-sim'],
+      seen,
+    });
+    expect(second).toEqual([
+      { name: 'http-sim', pod: 'http-sim-pod', container: 'http-sim', line: 'a3' },
+    ]);
+  });
+
+  test('a container that cannot serve logs yet is skipped without starving its siblings', async () => {
+    const pod = {
+      metadata: { name: 'http-sim-pod' },
+      spec: { containers: [{ name: 'mmt-probe' }, { name: 'http-sim' }] },
+    };
+    const clients = {
+      core: {
+        listNamespacedPod: vi.fn(async () => ({ items: [pod] })),
+        readNamespacedPodLog: vi.fn(async ({ container }: { container: string }) => {
+          if (container === 'mmt-probe') {
+            throw new ApiException(400, 'container is waiting to start');
+          }
+          return 'access log\n';
+        }),
+      },
+      apps: {},
+    };
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['http-sim'],
+      seen: new Map(),
+    });
+    expect(out).toEqual([
+      { name: 'http-sim', pod: 'http-sim-pod', container: 'http-sim', line: 'access log' },
+    ]);
   });
 
   test('skips a pod that is not yet ready to serve logs (400/404)', async () => {

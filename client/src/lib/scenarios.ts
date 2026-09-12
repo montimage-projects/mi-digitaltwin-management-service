@@ -20,7 +20,7 @@ export interface DeployedService {
   /** UI presentation of the underlying service. */
   uiType?: 'web' | 'terminal' | 'both';
   /** Coarse per-service deploy status derived from the cluster. */
-  status?: 'pending' | 'running' | 'failed';
+  status?: 'pending' | 'running' | 'completed' | 'failed';
   /** Reachable NodePort URL for the deployed service. */
   dashboardUrl?: string;
 }
@@ -31,7 +31,7 @@ export interface DeployedServiceResult {
   serviceId: string;
   name: string;
   uiType: 'web' | 'terminal' | 'both';
-  status: 'pending' | 'running' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed';
   dashboardUrl?: string;
   nodePort?: number;
 }

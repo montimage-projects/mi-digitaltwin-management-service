@@ -8,7 +8,7 @@ export interface IDeployedService {
   name?: string;
   uiType?: 'web' | 'terminal' | 'both';
   /** Coarse per-service deploy status derived from the cluster. */
-  status?: 'pending' | 'running' | 'failed';
+  status?: 'pending' | 'running' | 'completed' | 'failed';
   /** Reachable NodePort URL for the deployed service. */
   dashboardUrl?: string;
 }
@@ -80,7 +80,7 @@ const deployedServiceSchema = new Schema<IDeployedService>(
     uiType: { type: String, enum: ['web', 'terminal', 'both'] },
     status: {
       type: String,
-      enum: ['pending', 'running', 'failed'],
+      enum: ['pending', 'running', 'completed', 'failed'],
       default: 'pending',
     },
     dashboardUrl: { type: String },
