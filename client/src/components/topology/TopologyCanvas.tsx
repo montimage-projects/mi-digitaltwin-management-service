@@ -29,19 +29,21 @@ import {
   Target,
   Zap,
   Link2,
+  Settings2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ServicePalette } from './ServicePalette';
+import { NodeConfigPanel } from './NodeConfigPanel';
+import type { NodeConfig } from '@/lib/node-config';
 import {
   applyTopologyDecorations,
   planTopologyEdge,
   type BadgedRole,
   type RoleEdge,
   type RoleNode,
-  type RoleService,
 } from '@/lib/topology-roles';
 import type { ServiceDeployment } from '@/lib/services';
 
@@ -181,9 +183,11 @@ function TopologyCanvasInner({
 }: TopologyCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
+  /** Node id whose config panel is open — task 3.3. */
+  const [configNodeId, setConfigNodeId] = useState<string | null>(null);
 
   const servicesById = useMemo(
-    () => new Map<string, RoleService>(services.map((s) => [s._id, s])),
+    () => new Map<string, ServiceOption>(services.map((s) => [s._id, s])),
     [services]
   );
 
@@ -290,6 +294,36 @@ function TopologyCanvasInner({
     setSelectedNodes(selectedNodesList.map((n) => n.id));
   }, []);
 
+  // The node open in the config panel, plus its catalog deployment spec for
+  // defaults (env/args/configFiles — task 3.3).
+  const configNode = useMemo(
+    () => nodes.find((n) => n.id === configNodeId) ?? null,
+    [nodes, configNodeId]
+  );
+  const configDeployment = configNode?.data?.serviceId
+    ? servicesById.get(String(configNode.data.serviceId))?.deployment
+    : undefined;
+
+  // Persist an edited `data.config` document onto the node and propagate —
+  // `undefined` removes the key entirely. (task 3.3)
+  const handleConfigChange = useCallback(
+    (nodeId: string, config: NodeConfig | undefined) => {
+      const newNodes = nodes.map((n) => {
+        if (n.id !== nodeId) return n;
+        const data = { ...n.data };
+        if (config === undefined) {
+          delete data.config;
+        } else {
+          data.config = config;
+        }
+        return { ...n, data };
+      });
+      setNodes(newNodes);
+      onNodesChangeProp(newNodes);
+    },
+    [nodes, setNodes, onNodesChangeProp]
+  );
+
   // Connect two nodes: the scenario role pair decides the persisted edge type
   // (task 3.2); an illegal pair is rejected with a visible message.
   const onConnect = useCallback(
@@ -364,6 +398,18 @@ function TopologyCanvasInner({
             variant="outline"
             size="sm"
             className="h-8"
+            onClick={() => setConfigNodeId(selectedNodes[0])}
+            disabled={selectedNodes.length !== 1}
+            title="Edit this node's env, args and config-file overrides"
+          >
+            <Settings2 className="h-4 w-4 mr-1" />
+            Configure
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
             onClick={deleteSelectedNodes}
             disabled={selectedNodes.length === 0}
           >
@@ -383,6 +429,9 @@ function TopologyCanvasInner({
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
+        onNodeDoubleClick={(_event, node) => {
+          if (!readOnly) setConfigNodeId(node.id);
+        }}
         nodeTypes={nodeTypes}
         fitView
         nodesDraggable={!readOnly}
@@ -399,6 +448,16 @@ function TopologyCanvasInner({
         />
         <MiniMap nodeStrokeWidth={3} zoomable pannable className="!bg-muted" />
       </ReactFlow>
+
+      <NodeConfigPanel
+        node={configNode}
+        deployment={configDeployment}
+        open={configNode !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setConfigNodeId(null);
+        }}
+        onConfigChange={handleConfigChange}
+      />
     </div>
   );
 }

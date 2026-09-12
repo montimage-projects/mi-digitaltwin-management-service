@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { TopologyCanvas } from './TopologyCanvas';
 
 const noop = () => {};
@@ -130,5 +130,54 @@ describe('TopologyCanvas sidecar attachment', () => {
     expect(screen.getByTestId('rf__node-n-probe')).toBeInTheDocument();
     expect(screen.getByText('sidecar — needs a monitor edge')).toBeInTheDocument();
     expect(screen.queryByTitle(/Sidecar attached/)).not.toBeInTheDocument();
+  });
+});
+
+describe('TopologyCanvas node config panel (task 3.3)', () => {
+  it('disables the Configure button until exactly one node is selected', () => {
+    render(<TopologyCanvas {...baseProps} nodes={scenarioNodes} edges={[]} services={services} />);
+
+    expect(screen.getByRole('button', { name: 'Configure' })).toBeDisabled();
+  });
+
+  it('opens the node config panel on node double-click and propagates edits', () => {
+    const onNodesChange = vi.fn();
+    render(
+      <TopologyCanvas
+        {...baseProps}
+        onNodesChange={onNodesChange}
+        nodes={[makeNode('n-probe', 'MMT-PROBE', { serviceId: 'svc-probe', type: 'monitor' })]}
+        edges={[]}
+        services={[
+          {
+            _id: 'svc-probe',
+            shortName: 'MMT-PROBE',
+            title: 'Montimage probe',
+            repositoryTable: 'INTACT_TOOLBOX' as const,
+            deployment: {
+              kind: 'Deployment' as const,
+              role: 'monitor' as const,
+              env: [{ name: 'HOST_INTERFACE', value: 'eth0' }],
+            },
+          },
+        ]}
+      />
+    );
+
+    fireEvent.doubleClick(screen.getByTestId('rf__node-n-probe'));
+
+    expect(screen.getByTestId('node-config-panel')).toBeInTheDocument();
+    expect(screen.getByLabelText('Value for HOST_INTERFACE')).toHaveValue('eth0');
+
+    fireEvent.change(screen.getByLabelText('Value for HOST_INTERFACE'), {
+      target: { value: 'eth1' },
+    });
+
+    expect(onNodesChange).toHaveBeenCalled();
+    const lastNodes = onNodesChange.mock.calls.at(-1)?.[0] as {
+      id: string;
+      data: { config?: { env?: { name: string; value?: string }[] } };
+    }[];
+    expect(lastNodes[0].data.config?.env).toEqual([{ name: 'HOST_INTERFACE', value: 'eth1' }]);
   });
 });
