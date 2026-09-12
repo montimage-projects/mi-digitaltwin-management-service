@@ -172,8 +172,11 @@ data: {"status":"completed","services":[{"name":"mmt-probe","status":"running","
 ```
 
 The **Execution** tab's `ExecutionConsole` component consumes this stream: a
-progress bar driven by `progress`, an auto-scrolling `[service:container]`-prefixed
-log console driven by `log`, and a per-service status list.
+progress bar driven by `progress`, an auto-scrolling log console driven by
+`log` with one tab per container (plus a combined **All** view) that keeps the
+`[service:container]` prefix on every line, a per-service status list that also
+shows each workload's per-container chips (a finished Job reads `completed`),
+and a dedicated **Namespace events** pane fed by `k8s-event`.
 
 ## Per-Service URLs
 
