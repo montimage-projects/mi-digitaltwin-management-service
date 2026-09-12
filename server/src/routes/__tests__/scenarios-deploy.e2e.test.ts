@@ -16,6 +16,7 @@ const {
   CoreV1Api,
   AppsV1Api,
   BatchV1Api,
+  NetworkingV1Api,
   RbacAuthorizationV1Api,
   KubeConfig,
   ApiException,
@@ -42,6 +43,7 @@ const {
   class CoreV1Api {}
   class AppsV1Api {}
   class BatchV1Api {}
+  class NetworkingV1Api {}
   class RbacAuthorizationV1Api {}
 
   class KubeConfig {
@@ -70,6 +72,9 @@ const {
           readNamespacedJob: async () => ({ status: {} }),
         };
       }
+      if (ctor === NetworkingV1Api) {
+        return { createNamespacedNetworkPolicy: async () => ({}) };
+      }
       return {
         createNamespacedRole: async () => ({}),
         createNamespacedRoleBinding: async () => ({}),
@@ -82,6 +87,7 @@ const {
     CoreV1Api,
     AppsV1Api,
     BatchV1Api,
+    NetworkingV1Api,
     RbacAuthorizationV1Api,
     KubeConfig,
     ApiException,
@@ -93,6 +99,7 @@ vi.mock('@kubernetes/client-node', () => ({
   CoreV1Api,
   AppsV1Api,
   BatchV1Api,
+  NetworkingV1Api,
   RbacAuthorizationV1Api,
   ApiException,
 }));

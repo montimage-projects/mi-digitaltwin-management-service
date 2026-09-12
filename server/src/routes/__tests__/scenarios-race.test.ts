@@ -18,83 +18,103 @@ import mongoose from 'mongoose';
 /**
  * Hoist the Kubernetes mock so every test can mutate behaviour.
  */
-const { CoreV1Api, AppsV1Api, BatchV1Api, RbacAuthorizationV1Api, KubeConfig, ApiException } =
-  vi.hoisted(() => {
-    class ApiException extends Error {
-      code: number;
-      body: unknown;
-      constructor(code: number, message: string, body?: unknown) {
-        super(message);
-        this.code = code;
-        this.body = body;
-      }
+const {
+  CoreV1Api,
+  AppsV1Api,
+  BatchV1Api,
+  NetworkingV1Api,
+  RbacAuthorizationV1Api,
+  KubeConfig,
+  ApiException,
+} = vi.hoisted(() => {
+  class ApiException extends Error {
+    code: number;
+    body: unknown;
+    constructor(code: number, message: string, body?: unknown) {
+      super(message);
+      this.code = code;
+      this.body = body;
     }
+  }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const counts = { createNamespace: 0, createNamespacedDeployment: 0 };
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const impl = {
-      createNamespace: async (): Promise<unknown> => ({ metadata: { name: 'ns' } }),
-      createNamespacedDeployment: async (): Promise<unknown> => ({
-        metadata: { name: 'svc' },
-        spec: { replicas: 1 },
-        status: { availableReplicas: 1 },
-      }),
-      listNamespacedPod: async (): Promise<unknown> => ({ items: [] }),
-      readNamespacedPodLog: async (): Promise<string> => '',
-      listNamespace: async (): Promise<unknown> => ({ items: [] }),
-    };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const counts = { createNamespace: 0, createNamespacedDeployment: 0 };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const impl = {
+    createNamespace: async (): Promise<unknown> => ({ metadata: { name: 'ns' } }),
+    createNamespacedDeployment: async (): Promise<unknown> => ({
+      metadata: { name: 'svc' },
+      spec: { replicas: 1 },
+      status: { availableReplicas: 1 },
+    }),
+    listNamespacedPod: async (): Promise<unknown> => ({ items: [] }),
+    readNamespacedPodLog: async (): Promise<string> => '',
+    listNamespace: async (): Promise<unknown> => ({ items: [] }),
+  };
 
-    class CoreV1Api {}
-    class AppsV1Api {}
-    class BatchV1Api {}
-    class RbacAuthorizationV1Api {}
+  class CoreV1Api {}
+  class AppsV1Api {}
+  class BatchV1Api {}
+  class NetworkingV1Api {}
+  class RbacAuthorizationV1Api {}
 
-    class KubeConfig {
-      loadFromString(): void {}
-      loadFromOptions(): void {}
-      makeApiClient(ctor: unknown): unknown {
-        if (ctor === CoreV1Api) {
-          return {
-            createNamespace: async (): Promise<unknown> => ({ metadata: { name: 'ns' } }),
-            createNamespacedService: async (): Promise<unknown> => ({
-              spec: { ports: [{ nodePort: 30080 }] },
-            }),
-            listNamespacedPod: async (): Promise<unknown> => ({ items: [] }),
-            readNamespacedPodLog: async (): Promise<string> => '',
-            listNamespace: async (): Promise<unknown> => ({ items: [] }),
-          };
-        }
-        if (ctor === AppsV1Api) {
-          return {
-            createNamespacedDeployment: async (): Promise<unknown> => ({
-              metadata: { name: 'svc' },
-              spec: { replicas: 1 },
-              status: { availableReplicas: 1 },
-            }),
-          };
-        }
-        if (ctor === BatchV1Api) {
-          return {
-            createNamespacedJob: async (): Promise<unknown> => ({ metadata: { name: 'job' } }),
-            readNamespacedJob: async (): Promise<unknown> => ({ status: {} }),
-          };
-        }
+  class KubeConfig {
+    loadFromString(): void {}
+    loadFromOptions(): void {}
+    makeApiClient(ctor: unknown): unknown {
+      if (ctor === CoreV1Api) {
         return {
-          createNamespacedRole: async (): Promise<unknown> => ({}),
-          createNamespacedRoleBinding: async (): Promise<unknown> => ({}),
+          createNamespace: async (): Promise<unknown> => ({ metadata: { name: 'ns' } }),
+          createNamespacedService: async (): Promise<unknown> => ({
+            spec: { ports: [{ nodePort: 30080 }] },
+          }),
+          listNamespacedPod: async (): Promise<unknown> => ({ items: [] }),
+          readNamespacedPodLog: async (): Promise<string> => '',
+          listNamespace: async (): Promise<unknown> => ({ items: [] }),
         };
       }
+      if (ctor === AppsV1Api) {
+        return {
+          createNamespacedDeployment: async (): Promise<unknown> => ({
+            metadata: { name: 'svc' },
+            spec: { replicas: 1 },
+            status: { availableReplicas: 1 },
+          }),
+        };
+      }
+      if (ctor === BatchV1Api) {
+        return {
+          createNamespacedJob: async (): Promise<unknown> => ({ metadata: { name: 'job' } }),
+          readNamespacedJob: async (): Promise<unknown> => ({ status: {} }),
+        };
+      }
+      if (ctor === NetworkingV1Api) {
+        return { createNamespacedNetworkPolicy: async (): Promise<unknown> => ({}) };
+      }
+      return {
+        createNamespacedRole: async (): Promise<unknown> => ({}),
+        createNamespacedRoleBinding: async (): Promise<unknown> => ({}),
+      };
     }
+  }
 
-    return { CoreV1Api, AppsV1Api, BatchV1Api, RbacAuthorizationV1Api, KubeConfig, ApiException };
-  });
+  return {
+    CoreV1Api,
+    AppsV1Api,
+    BatchV1Api,
+    NetworkingV1Api,
+    RbacAuthorizationV1Api,
+    KubeConfig,
+    ApiException,
+  };
+});
 
 vi.mock('@kubernetes/client-node', () => ({
   KubeConfig,
   CoreV1Api,
   AppsV1Api,
   BatchV1Api,
+  NetworkingV1Api,
   RbacAuthorizationV1Api,
   ApiException,
 
