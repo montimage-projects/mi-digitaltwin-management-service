@@ -35,6 +35,11 @@ vi.mock('../../models/Service.js', () => ({
 const CATEGORY_SLUGS = [
   'dev-services',
   'ops-services',
+  // Scenario role categories added by task 0.2 (issue #187).
+  'attack',
+  'target',
+  'monitor',
+  'reaction',
   '5g-testbeds',
   'hpc-compute',
   'manufacturing-labs',
@@ -59,6 +64,17 @@ const MONTIMAGE_IMAGES: Record<string, string> = {
   'HTTP-SIM': 'registry.montimage.eu/montimage-mti/http-sim:v1.0.0',
   'MMT-PROBE': 'registry.montimage.eu/montimage-mti/mmt-probe:v1.0.0',
   AI4SOAR: 'registry.montimage.eu/montimage-mti/ai4soar:v1.0.0',
+};
+
+/**
+ * Scenario role categories assigned by task 0.2 (issue #187) — they drive
+ * node badges and edge validation in the client.
+ */
+const MONTIMAGE_ROLE_CATEGORIES: Record<string, string> = {
+  MAG: 'attack',
+  'HTTP-SIM': 'target',
+  'MMT-PROBE': 'monitor',
+  AI4SOAR: 'reaction',
 };
 
 type VersionSet = {
@@ -138,8 +154,8 @@ describe('seedServices', () => {
       expect(doc, `${shortName} create call`).toBeDefined();
       expect(doc?.provider).toBe('Montimage (MTI)');
       expect(doc?.repositoryTable).toBe('INTACT_TOOLBOX');
-      // Placeholder category until task 0.2 adds the role categories.
-      expect(doc?.categoryId).toBe('cat-ops-services');
+      // Task 0.2 (issue #187): each module is assigned to its role category.
+      expect(doc?.categoryId).toBe(`cat-${MONTIMAGE_ROLE_CATEGORIES[shortName]}`);
     }
   });
 

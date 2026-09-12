@@ -78,12 +78,26 @@ describe('seed catalog refresh (integration)', () => {
       'MMT-PROBE': 'registry.montimage.eu/montimage-mti/mmt-probe:v1.0.0',
       AI4SOAR: 'registry.montimage.eu/montimage-mti/ai4soar:v1.0.0',
     };
+    // Issue #187 — each module is assigned to its scenario role category
+    // (attack/target/monitor/reaction), which must exist after seeding.
+    const montimageRoles: Record<string, string> = {
+      MAG: 'attack',
+      'HTTP-SIM': 'target',
+      'MMT-PROBE': 'monitor',
+      AI4SOAR: 'reaction',
+    };
     for (const [shortName, image] of Object.entries(montimageImages)) {
       const svc = await Service.findOne({ shortName });
       expect(svc, `${shortName} seeded`).not.toBeNull();
       expect(svc?.repositoryTable).toBe('INTACT_TOOLBOX');
       expect(svc?.deprecated).toBe(false);
       expect(svc?.versions[0]?.dockerImage).toBe(image);
+
+      const roleSlug = montimageRoles[shortName];
+      const roleCategory = await Category.findOne({ slug: roleSlug });
+      expect(roleCategory, `category ${roleSlug} seeded`).not.toBeNull();
+      expect(roleCategory?.deprecated).toBe(false);
+      expect(svc?.categoryId?.toString()).toBe(roleCategory?._id.toString());
     }
 
     const sector = await Sector.findOne({ slug: 'digital-infrastructure' });
