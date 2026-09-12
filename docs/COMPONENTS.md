@@ -405,6 +405,7 @@ Components for specific features located in `client/src/components/`.
 - Edge/connection visualization
 - Scenario role badges on nodes (attack / target / monitor / reaction from `Service.deployment.role`)
 - Sidecar nodes (`deployment.attachMode: 'sidecar'`) dock inside the host node their `monitors` edge targets
+- Typed edges on connect — attack → target (`attacks`), monitor → target/attack (`monitors`), monitor → reaction (`notifies`), reaction → target (`acts-on`); illegal role pairs are rejected with a toast, and the type is emitted as `connections[].type` in the YAML view
 
 **YamlEditor**
 
