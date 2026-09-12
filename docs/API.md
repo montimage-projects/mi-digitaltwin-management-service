@@ -467,6 +467,7 @@ curl -X GET "http://localhost:3000/api/projects/proj123/scenarios" \
 - **POST** `/api/projects/:projectId/scenarios`
 - **Auth:** Required
 - **Body:** `{ title: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string }`
+- **Note:** a topology node may carry `data.config` overrides for the service's `deployment` spec — `config.env` (`{ name: string, value?: string, fromEdge?: "target" | "reaction" }[]`) and `config.args` (`string[]`). Invalid overrides are rejected with `400`.
 - **Response:** `{ scenario: Scenario }` (populated with infrastructure)
 
 ```bash
@@ -500,6 +501,7 @@ curl -X GET http://localhost:3000/api/scenarios/scen123 \
 - **PUT** `/api/scenarios/:id`
 - **Auth:** Required
 - **Body:** `{ title?: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string }`
+- **Note:** `data.config` node overrides (`env`, `args`) are validated as in Create Scenario.
 - **Response:** `{ scenario: Scenario }`
 
 ```bash

@@ -30,9 +30,34 @@ export interface IExecution {
   conclusion?: IConclusion;
 }
 
+/**
+ * Per-node config overrides — task 0.4 of the Montimage attack→detect→respond
+ * plan (docs/playbooks/montimage-attack-detect-respond-plan.md). Mirrors the
+ * `env`/`args` fields of `Service.deployment` (models/Service.ts) so a scenario
+ * can override catalog defaults (e.g. the MAG attack profile) without editing
+ * the catalog. Validated by the scenario routes on save; unknown keys are
+ * preserved for forward compatibility (e.g. `configFiles`, task 3.3).
+ */
+export interface INodeConfig {
+  env?: { name: string; value?: string; fromEdge?: 'target' | 'reaction' }[];
+  args?: string[];
+  [key: string]: unknown;
+}
+
+export interface ITopologyNode {
+  id?: string;
+  data?: {
+    serviceId?: string;
+    version?: string;
+    config?: INodeConfig;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 export interface ITopology {
   yaml: string;
-  nodes: object[];
+  nodes: ITopologyNode[];
   edges: object[];
 }
 

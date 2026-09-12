@@ -63,10 +63,29 @@ const { AppError } = await import('../../middleware/errorHandler.js');
 
 describe('Scenario route — validation schemas', () => {
   // Re-define the schemas inline (same as in scenarios.routes.ts)
+  const nodeConfigEnvSchema = z.looseObject({
+    name: z.string().min(1),
+    value: z.string().optional(),
+    fromEdge: z.enum(['target', 'reaction']).optional(),
+  });
+
+  const nodeConfigSchema = z.looseObject({
+    env: z.array(nodeConfigEnvSchema).optional(),
+    args: z.array(z.string()).optional(),
+  });
+
+  const topologyNodeSchema = z.looseObject({
+    data: z
+      .looseObject({
+        config: nodeConfigSchema.optional(),
+      })
+      .optional(),
+  });
+
   const topologySchema = z.object({
     yaml: z.string().default(''),
-    nodes: z.array(z.record(z.unknown())).default([]),
-    edges: z.array(z.record(z.unknown())).default([]),
+    nodes: z.array(topologyNodeSchema).default([]),
+    edges: z.array(z.record(z.string(), z.unknown())).default([]),
   });
 
   const createScenarioSchema = z.object({
