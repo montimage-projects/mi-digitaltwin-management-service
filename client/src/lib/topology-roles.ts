@@ -20,7 +20,7 @@ type AttachMode = 'standalone' | 'sidecar';
  * `server/src/services/kubernetesDeploy.ts` (task 3.2 persists the plural
  * spellings; singulars stay valid for hand-written topologies).
  */
-type EdgeKind = 'attack' | 'monitor' | 'notify' | 'acts-on';
+export type EdgeKind = 'attack' | 'monitor' | 'notify' | 'acts-on';
 
 const EDGE_KIND_ALIASES: Record<string, EdgeKind> = {
   attack: 'attack',
@@ -41,6 +41,75 @@ export function edgeKindOf(raw: unknown): EdgeKind | null {
     .toLowerCase()
     .replace(/[\s_]+/g, '-');
   return EDGE_KIND_ALIASES[normalized] ?? null;
+}
+
+/**
+ * Persisted edge-type spellings — the values task 3.2 writes to
+ * `topology.edges[].data.edgeType` and to `connections[].type` in the YAML
+ * view. `edgeKindOf` maps every one of them back to its canonical kind, which
+ * is what makes the YAML representation round-trip.
+ */
+export type ScenarioEdgeType = 'attacks' | 'monitors' | 'notifies' | 'acts-on';
+
+/** Canonical edge kind → spelling persisted on edges and emitted in YAML. */
+export const EDGE_TYPE_SPELLING: Record<EdgeKind, ScenarioEdgeType> = {
+  attack: 'attacks',
+  monitor: 'monitors',
+  notify: 'notifies',
+  'acts-on': 'acts-on',
+};
+
+/**
+ * Legal scenario connections by role pair — the wiring table of
+ * docs/playbooks/montimage-attack-detect-respond-plan.md (task 3.2):
+ * attack → target (attacks), monitor → target or attack (monitors),
+ * monitor → reaction (notifies), reaction → target (acts-on).
+ */
+const EDGE_KIND_BY_ROLE_PAIR: Record<BadgedRole, Partial<Record<BadgedRole, EdgeKind>>> = {
+  attack: { target: 'attack' },
+  monitor: { target: 'monitor', attack: 'monitor', reaction: 'notify' },
+  reaction: { target: 'acts-on' },
+  target: {},
+};
+
+/** One-line summary of the legal role pairs, embedded in rejection messages. */
+export const EDGE_RULE_SUMMARY =
+  'attack → target (attacks), monitor → target/attack (monitors), ' +
+  'monitor → reaction (notifies), reaction → target (acts-on)';
+
+export type ConnectionPlan =
+  { ok: true; edgeType: ScenarioEdgeType | undefined } | { ok: false; error: string };
+
+/**
+ * Plan a new canvas edge between two nodes, given a React Flow connection:
+ * the persisted {@link ScenarioEdgeType} when both endpoint roles form a
+ * legal pair; an untyped edge (`edgeType: undefined`) when either side has no
+ * scenario role, so existing generic connections keep working; or a rejection
+ * error when both roles are known but the combination is not a legal scenario
+ * edge (task 3.2).
+ */
+export function planTopologyEdge(
+  connection: { source?: string | null; target?: string | null },
+  nodes: RoleNode[],
+  serviceById: ReadonlyMap<string, RoleService>
+): ConnectionPlan {
+  const roleOf = (id: string | null | undefined): BadgedRole | undefined => {
+    const node = nodes.find((n) => n.id === id);
+    return node
+      ? resolveNodeRole(node.data, serviceById.get(String(node.data?.serviceId)))
+      : undefined;
+  };
+  const sourceRole = roleOf(connection.source);
+  const targetRole = roleOf(connection.target);
+  if (!sourceRole || !targetRole) return { ok: true, edgeType: undefined };
+  const kind = EDGE_KIND_BY_ROLE_PAIR[sourceRole]?.[targetRole];
+  if (!kind) {
+    return {
+      ok: false,
+      error: `Cannot connect a ${sourceRole} node to a ${targetRole} node — valid edges: ${EDGE_RULE_SUMMARY}.`,
+    };
+  }
+  return { ok: true, edgeType: EDGE_TYPE_SPELLING[kind] };
 }
 
 /** Minimal view of a catalog service the decorator needs. */

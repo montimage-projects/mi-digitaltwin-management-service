@@ -33,9 +33,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { ServicePalette } from './ServicePalette';
 import {
   applyTopologyDecorations,
+  planTopologyEdge,
   type BadgedRole,
   type RoleEdge,
   type RoleNode,
@@ -288,14 +290,25 @@ function TopologyCanvasInner({
     setSelectedNodes(selectedNodesList.map((n) => n.id));
   }, []);
 
+  // Connect two nodes: the scenario role pair decides the persisted edge type
+  // (task 3.2); an illegal pair is rejected with a visible message.
   const onConnect = useCallback(
     (params: Connection) => {
       if (readOnly) return;
+      const plan = planTopologyEdge(params, nodes as RoleNode[], servicesById);
+      if (!plan.ok) {
+        toast.error(plan.error);
+        return;
+      }
       setEdges((eds) => {
         const newEdges = addEdge(
           {
             ...params,
             animated: true,
+            ...(plan.edgeType && {
+              label: plan.edgeType,
+              data: { edgeType: plan.edgeType },
+            }),
           },
           eds
         );
@@ -303,7 +316,7 @@ function TopologyCanvasInner({
         return newEdges;
       });
     },
-    [readOnly, setEdges, onEdgesChangeProp]
+    [readOnly, setEdges, onEdgesChangeProp, nodes, servicesById]
   );
 
   const handleNodesChange = useCallback(
