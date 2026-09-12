@@ -9,6 +9,18 @@ export interface IProject extends Document {
   description?: string;
   isComposite: boolean;
   atomicProjectIds: Types.ObjectId[];
+  /**
+   * Set when a seed refresh no longer lists this project in its source data —
+   * kept for the same seed-vs-operator bookkeeping the catalog models use;
+   * the demo seed never deprecates projects.
+   */
+  deprecated: boolean;
+  /**
+   * True for projects created/managed by a seed (`seedDemoScenario()` stamps
+   * the demo project). Operator-created projects read `false` and are never
+   * touched by seed upserts.
+   */
+  seedManaged: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +72,14 @@ const projectSchema = new Schema<IProject>(
         ref: 'Project',
       },
     ],
+    deprecated: {
+      type: Boolean,
+      default: false,
+    },
+    seedManaged: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
