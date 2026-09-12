@@ -1,9 +1,10 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { ExecutionConsole } from './ExecutionConsole';
 import * as sseModule from '@/lib/sse';
+import type { ExecutionEventHandlers } from '@/lib/api';
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -23,6 +24,21 @@ const defaultProps = {
   services: [],
   onClose: vi.fn(),
 };
+
+/**
+ * Render the console with a mocked SSE subscription and return the handlers
+ * the component registered, so tests can push synthetic events into it.
+ */
+async function renderWithMockedStream(props = defaultProps) {
+  const mockUnsubscribe = vi.fn();
+  vi.spyOn(sseModule, 'subscribeToExecutionEvents').mockReturnValue(mockUnsubscribe);
+  render(<ExecutionConsole {...props} />, { wrapper: createWrapper() });
+  await vi.waitFor(() => {
+    expect(sseModule.subscribeToExecutionEvents).toHaveBeenCalled();
+  });
+  const calls = (sseModule.subscribeToExecutionEvents as { mock: { calls: unknown[] } }).mock.calls;
+  return calls[calls.length - 1][2] as ExecutionEventHandlers;
+}
 
 describe('ExecutionConsole', () => {
   beforeEach(() => {
@@ -138,5 +154,124 @@ describe('ExecutionConsole', () => {
       const logLines = screen.getAllByTestId('log-line');
       expect(logLines.length).toBeLessThanOrEqual(2000);
     });
+  });
+
+  it('groups logs by container name with one tab per container', async () => {
+    const handlers = await renderWithMockedStream();
+
+    act(() => {
+      handlers.onLog?.({
+        service: 'mag',
+        pod: 'mag-abc',
+        container: 'mag',
+        line: 'attack started',
+      });
+      handlers.onLog?.({
+        service: 'victim',
+        pod: 'victim-xyz',
+        container: 'mmt-probe',
+        line: 'alert raised',
+      });
+      handlers.onLog?.({
+        service: 'mag',
+        pod: 'mag-abc',
+        container: 'mag',
+        line: 'attack finished',
+      });
+    });
+
+    // One tab per container plus the combined "All" view.
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('log-tab-mag')).toBeInTheDocument();
+      expect(screen.getByTestId('log-tab-mmt-probe')).toBeInTheDocument();
+    });
+    expect(screen.getAllByTestId('log-line')).toHaveLength(3);
+
+    // Selecting a container tab shows only that container's lines.
+    fireEvent.click(screen.getByTestId('log-tab-mag'));
+    await vi.waitFor(() => {
+      const lines = screen.getAllByTestId('log-line');
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toHaveTextContent('attack started');
+      expect(lines[1]).toHaveTextContent('attack finished');
+    });
+
+    // "All" restores the combined stream.
+    fireEvent.click(screen.getByTestId('log-tab-all'));
+    await vi.waitFor(() => {
+      expect(screen.getAllByTestId('log-line')).toHaveLength(3);
+    });
+  });
+
+  it('surfaces the completed state of a finished Job, incl. its containers', async () => {
+    const handlers = await renderWithMockedStream({
+      ...defaultProps,
+      services: [
+        {
+          nodeId: 'n1',
+          serviceId: 's1',
+          name: 'mag',
+          uiType: 'terminal',
+          status: 'running',
+        },
+      ],
+    });
+
+    act(() => {
+      handlers.onEnd?.({
+        status: 'completed',
+        services: [
+          {
+            name: 'mag',
+            status: 'completed',
+            containers: [{ name: 'mag', status: 'completed' }],
+          },
+        ],
+      });
+    });
+
+    await vi.waitFor(() => {
+      expect(screen.getByText('Completed')).toBeInTheDocument();
+      expect(screen.getByTestId('container-status-mag')).toHaveTextContent('mag: Completed');
+    });
+  });
+
+  it('renders k8s-event records in a dedicated namespace events pane', async () => {
+    const handlers = await renderWithMockedStream();
+
+    act(() => {
+      handlers.onK8sEvent?.({
+        uid: 'ev-1',
+        reason: 'Scheduled',
+        message: 'Successfully assigned sim/mag-abc to node-1',
+        objectKind: 'Pod',
+        objectName: 'mag-abc',
+        type: 'Normal',
+        count: 1,
+        timestamp: '2026-09-07T10:00:00Z',
+      });
+      handlers.onK8sEvent?.({
+        uid: 'ev-2',
+        reason: 'BackOff',
+        message: 'Back-off restarting failed container',
+        objectKind: 'Pod',
+        objectName: 'victim-xyz',
+        type: 'Warning',
+        count: 3,
+        timestamp: '2026-09-07T10:00:05Z',
+      });
+    });
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('events-pane')).toBeInTheDocument();
+      const rows = screen.getAllByTestId('k8s-event');
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toHaveTextContent('Scheduled');
+      expect(rows[0]).toHaveTextContent('Successfully assigned sim/mag-abc to node-1');
+      expect(rows[1]).toHaveTextContent('BackOff');
+      expect(rows[1]).toHaveTextContent('Pod/victim-xyz');
+      expect(rows[1]).toHaveTextContent('(×3)');
+    });
+    expect(screen.getByText('2 events')).toBeInTheDocument();
   });
 });

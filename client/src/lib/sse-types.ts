@@ -44,6 +44,29 @@ export interface ExecutionEndEvent {
   services?: ExecutionServiceStatus[];
 }
 
+/**
+ * A Kubernetes Event in the execution namespace, distilled for SSE.
+ * Mirrors the server's `NamespaceEventEntry` (kubernetesDeploy.ts).
+ */
+export interface ExecutionK8sEvent {
+  /** `metadata.uid` of the Event object — the dedup key alongside `count`. */
+  uid?: string;
+  /** Short machine reason, e.g. `Scheduled`, `Pulled`, `Killing`. */
+  reason?: string;
+  /** Human-readable detail of what happened. */
+  message?: string;
+  /** Kind of the object the event is about, e.g. `Pod`. */
+  objectKind?: string;
+  /** Name of the object the event is about, e.g. the pod name. */
+  objectName?: string;
+  /** `Normal` or `Warning`. */
+  type?: string;
+  /** Number of times the event has fired. */
+  count?: number;
+  /** ISO timestamp of the most recent occurrence. */
+  timestamp?: string;
+}
+
 /** Error event emitted when the stream encounters an issue. */
 export interface ExecutionErrorEvent {
   message: string;
@@ -53,6 +76,7 @@ export interface ExecutionErrorEvent {
 export interface ExecutionEventHandlers {
   onProgress?: (event: ExecutionProgressEvent) => void;
   onLog?: (event: ExecutionLogEvent) => void;
+  onK8sEvent?: (event: ExecutionK8sEvent) => void;
   onEnd?: (event: ExecutionEndEvent) => void;
   onError?: (event: ExecutionErrorEvent) => void;
 }

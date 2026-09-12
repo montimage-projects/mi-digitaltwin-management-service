@@ -11,12 +11,16 @@ import {
   Globe,
   Trash2,
   AlertTriangle,
+  Activity,
 } from 'lucide-react';
 import {
   scenariosApi,
   subscribeToExecutionEvents,
+  type ContainerDeployStatus,
   type DeployedServiceResult,
   type DeployStatus,
+  type ExecutionK8sEvent,
+  type ExecutionServiceStatus,
 } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,8 +46,27 @@ interface LogLine {
   line: string;
 }
 
+interface K8sEventLine extends ExecutionK8sEvent {
+  id: number;
+}
+
 /** Maximum number of log lines to retain in the ring buffer. */
 const MAX_LOG_LINES = 2000;
+
+/** Maximum number of namespace events retained in the events pane. */
+const MAX_K8S_EVENTS = 500;
+
+/** A service row merged with its live status, incl. per-container breakdown. */
+type MergedService = DeployedServiceResult & { containers?: ContainerDeployStatus[] };
+
+/**
+ * Key a log line belongs to when grouping by container: the container name
+ * when the stream carries one, else the workload (service) name — a pod that
+ * reports no containers has only its host container anyway.
+ */
+function logContainerKey(log: Pick<LogLine, 'service' | 'container'>): string {
+  return log.container ?? log.service;
+}
 
 type Phase = 'running' | 'completed' | 'failed' | 'torn-down';
 
@@ -81,12 +104,17 @@ export function ExecutionConsole({
 }: ExecutionConsoleProps) {
   const queryClient = useQueryClient();
   const [progress, setProgress] = useState(0);
-  const [liveStatus, setLiveStatus] = useState<Record<string, DeployStatus>>({});
+  const [liveStatus, setLiveStatus] = useState<Record<string, ExecutionServiceStatus>>({});
   const [logs, setLogs] = useState<LogLine[]>([]);
+  const [events, setEvents] = useState<K8sEventLine[]>([]);
+  /** Active log tab: a container name, or null for the combined "All" view. */
+  const [activeContainer, setActiveContainer] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('running');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const logIdRef = useRef(0);
+  const eventIdRef = useRef(0);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const eventsViewportRef = useRef<HTMLDivElement>(null);
   const unsubscribeRef = useRef<() => void>(undefined);
 
   // Subscribe to the live event stream for this execution. The subscription is
@@ -96,15 +124,18 @@ export function ExecutionConsole({
     setProgress(0);
     setLiveStatus({});
     setLogs([]);
+    setEvents([]);
+    setActiveContainer(null);
     setPhase('running');
     setErrorMessage(null);
     logIdRef.current = 0;
+    eventIdRef.current = 0;
 
-    const applyStatuses = (updates?: { name: string; status: DeployStatus }[]): void => {
+    const applyStatuses = (updates?: ExecutionServiceStatus[]): void => {
       if (!updates?.length) return;
       setLiveStatus((prev) => {
         const next = { ...prev };
-        for (const s of updates) next[s.name] = s.status;
+        for (const s of updates) next[s.name] = s;
         return next;
       });
     };
@@ -146,6 +177,15 @@ export function ExecutionConsole({
           return next;
         });
       },
+      onK8sEvent: (event) => {
+        setEvents((prev) => {
+          const next = [...prev, { ...event, id: eventIdRef.current++ }];
+          if (next.length > MAX_K8S_EVENTS) {
+            return next.slice(next.length - MAX_K8S_EVENTS);
+          }
+          return next;
+        });
+      },
       onEnd: (event) => {
         applyStatuses(event.services);
         settle(event.status);
@@ -169,13 +209,22 @@ export function ExecutionConsole({
     };
   }, [scenarioId, executionId, queryClient]);
 
-  // Keep the log viewport pinned to the newest line as logs arrive.
+  // Keep the log viewport pinned to the newest line as logs arrive or the
+  // active container tab changes.
   useEffect(() => {
     const viewport = viewportRef.current?.querySelector<HTMLDivElement>(
       '[data-radix-scroll-area-viewport]'
     );
     if (viewport) viewport.scrollTop = viewport.scrollHeight;
-  }, [logs]);
+  }, [logs, activeContainer]);
+
+  // Keep the events pane pinned to the newest event as they arrive.
+  useEffect(() => {
+    const viewport = eventsViewportRef.current?.querySelector<HTMLDivElement>(
+      '[data-radix-scroll-area-viewport]'
+    );
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
+  }, [events]);
 
   const [teardownDialogOpen, setTeardownDialogOpen] = useState(false);
 
@@ -197,9 +246,40 @@ export function ExecutionConsole({
     setTeardownDialogOpen(false);
   };
 
-  const mergedServices = useMemo(
-    () => services.map((s) => ({ ...s, status: liveStatus[s.name] ?? s.status })),
+  const mergedServices = useMemo<MergedService[]>(
+    () =>
+      services.map((s) => {
+        const live = liveStatus[s.name];
+        return { ...s, status: live?.status ?? s.status, containers: live?.containers };
+      }),
     [services, liveStatus]
+  );
+
+  // One log tab per container, ordered by first appearance: containers the
+  // cluster already reported (host first, then sidecars) come before tabs
+  // discovered only through log lines.
+  const containerKeys = useMemo(() => {
+    const keys: string[] = [];
+    const seen = new Set<string>();
+    const push = (key: string | undefined): void => {
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        keys.push(key);
+      }
+    };
+    for (const s of mergedServices) {
+      for (const c of s.containers ?? []) push(c.name);
+    }
+    for (const log of logs) push(logContainerKey(log));
+    return keys;
+  }, [mergedServices, logs]);
+
+  const visibleLogs = useMemo(
+    () =>
+      activeContainer === null
+        ? logs
+        : logs.filter((log) => logContainerKey(log) === activeContainer),
+    [logs, activeContainer]
   );
 
   const isSettled = phase !== 'running';
@@ -321,6 +401,26 @@ export function ExecutionConsole({
                       </span>
                     </div>
 
+                    {/* Per-container status — surfaces a finished Job's
+                        `completed` state at container granularity. */}
+                    {service.containers && service.containers.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {service.containers.map((container) => {
+                          const cMeta = statusMeta[container.status] ?? statusMeta.pending;
+                          return (
+                            <Badge
+                              key={container.name}
+                              variant="outline"
+                              data-testid={`container-status-${container.name}`}
+                              className={`gap-1 text-xs ${cMeta.className}`}
+                            >
+                              {container.name}: {cMeta.label}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     <div className="mt-2">
                       {canLink ? (
                         <a
@@ -357,16 +457,57 @@ export function ExecutionConsole({
               <Terminal className="h-4 w-4" />
               <span className="text-sm font-medium">Logs</span>
             </div>
-            <span className="text-xs text-zinc-400">{logs.length} lines</span>
+            <span className="text-xs text-zinc-400">{visibleLogs.length} lines</span>
           </div>
+          {/* One tab per container; "All" restores the combined stream. */}
+          {containerKeys.length > 0 && (
+            <div
+              data-testid="log-tabs"
+              className="flex flex-wrap items-center gap-1 border-b border-zinc-800 px-3 py-1.5"
+            >
+              <button
+                type="button"
+                data-testid="log-tab-all"
+                aria-pressed={activeContainer === null}
+                onClick={() => setActiveContainer(null)}
+                className={`rounded px-2 py-0.5 text-xs ${
+                  activeContainer === null
+                    ? 'bg-zinc-800 text-zinc-100'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                All
+              </button>
+              {containerKeys.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  data-testid={`log-tab-${key}`}
+                  aria-pressed={activeContainer === key}
+                  onClick={() => setActiveContainer(key)}
+                  className={`rounded px-2 py-0.5 font-mono text-xs ${
+                    activeContainer === key
+                      ? 'bg-zinc-800 text-zinc-100'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
+          )}
           <ScrollArea ref={viewportRef} className="min-h-0 flex-1">
             <div className="p-3 font-mono text-xs leading-relaxed">
-              {logs.length === 0 ? (
+              {visibleLogs.length === 0 ? (
                 <p className="text-zinc-400">
-                  {isSettled ? 'No logs were captured.' : 'Waiting for logs…'}
+                  {logs.length === 0
+                    ? isSettled
+                      ? 'No logs were captured.'
+                      : 'Waiting for logs…'
+                    : 'No logs for this container.'}
                 </p>
               ) : (
-                logs.map((log) => (
+                visibleLogs.map((log) => (
                   <div
                     key={log.id}
                     data-testid="log-line"
@@ -382,6 +523,62 @@ export function ExecutionConsole({
               )}
             </div>
           </ScrollArea>
+
+          {/* Namespace events pane — `k8s-event` SSE records (scheduling,
+              image pulls, probe failures, reaction activity…). */}
+          <div
+            data-testid="events-pane"
+            className="flex h-44 shrink-0 flex-col border-t border-zinc-800"
+          >
+            <div className="flex items-center justify-between px-4 py-1.5">
+              <div className="flex items-center gap-2 text-zinc-300">
+                <Activity className="h-4 w-4" />
+                <span className="text-sm font-medium">Namespace events</span>
+              </div>
+              <span className="text-xs text-zinc-400">{events.length} events</span>
+            </div>
+            <ScrollArea ref={eventsViewportRef} className="min-h-0 flex-1">
+              <div className="space-y-1 px-3 pb-3 font-mono text-xs leading-relaxed">
+                {events.length === 0 ? (
+                  <p className="text-zinc-500">
+                    {isSettled ? 'No namespace events were captured.' : 'Waiting for events…'}
+                  </p>
+                ) : (
+                  events.map((ev) => {
+                    const time = ev.timestamp ? new Date(ev.timestamp) : null;
+                    const timeLabel =
+                      time && !Number.isNaN(time.getTime()) ? time.toLocaleTimeString() : null;
+                    const warning = ev.type === 'Warning';
+                    return (
+                      <div
+                        key={ev.id}
+                        data-testid="k8s-event"
+                        className="flex flex-wrap items-baseline gap-x-2"
+                      >
+                        {timeLabel && (
+                          <span className="tabular-nums text-zinc-500">{timeLabel}</span>
+                        )}
+                        <span className={warning ? 'text-amber-400' : 'text-sky-400'}>
+                          {ev.reason ?? 'Event'}
+                        </span>
+                        {(ev.objectKind || ev.objectName) && (
+                          <span className="text-zinc-500">
+                            {[ev.objectKind, ev.objectName].filter(Boolean).join('/')}
+                          </span>
+                        )}
+                        {ev.message && (
+                          <span className="whitespace-pre-wrap break-all text-zinc-300">
+                            {ev.message}
+                            {ev.count !== undefined && ev.count > 1 ? ` (×${ev.count})` : ''}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </div>
         </div>
       </div>
 
