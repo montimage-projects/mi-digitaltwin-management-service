@@ -207,6 +207,7 @@ export function NodeConfigPanel({
                         size="icon"
                         className="h-8 w-8 shrink-0"
                         title="Reset to catalog default"
+                        aria-label="Reset to catalog default"
                         onClick={() => emit(removeEnvOverride(config, row.name))}
                       >
                         <RotateCcw className="h-3 w-3" />
@@ -218,6 +219,7 @@ export function NodeConfigPanel({
                         size="icon"
                         className="h-8 w-8 shrink-0"
                         title="Remove variable"
+                        aria-label="Remove variable"
                         onClick={() => emit(removeEnvOverride(config, row.name))}
                       >
                         <Trash2 className="h-3 w-3" />
@@ -367,6 +369,7 @@ export function NodeConfigPanel({
                         size="icon"
                         className="h-8 w-8 shrink-0"
                         title="Reset to catalog content"
+                        aria-label="Reset to catalog content"
                         onClick={() => emit(removeConfigFile(config, file.mountPath))}
                       >
                         <RotateCcw className="h-3 w-3" />
@@ -378,6 +381,7 @@ export function NodeConfigPanel({
                         size="icon"
                         className="h-8 w-8 shrink-0"
                         title="Remove config file"
+                        aria-label="Remove config file"
                         onClick={() => emit(removeConfigFile(config, file.mountPath))}
                       >
                         <Trash2 className="h-3 w-3" />
