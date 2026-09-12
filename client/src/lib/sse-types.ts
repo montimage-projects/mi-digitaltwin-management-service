@@ -33,6 +33,8 @@ export interface ExecutionProgressEvent {
 export interface ExecutionLogEvent {
   service: string;
   pod: string;
+  /** Container the line came from (multi-container pods carry sidecars). */
+  container?: string;
   line: string;
 }
 

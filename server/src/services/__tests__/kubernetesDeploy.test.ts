@@ -2344,9 +2344,13 @@ describe('collectNewPodLogs', () => {
       seen,
     });
     expect(first).toEqual([
-      { name: 'svc-a', pod: 'svc-a-pod', line: 'line-1' },
-      { name: 'svc-a', pod: 'svc-a-pod', line: 'line-2' },
+      { name: 'svc-a', pod: 'svc-a-pod', container: 'svc-a', line: 'line-1' },
+      { name: 'svc-a', pod: 'svc-a-pod', container: 'svc-a', line: 'line-2' },
     ]);
+    // The container name is passed through to the cluster read (issue #197).
+    expect(clients.core.readNamespacedPodLog).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'svc-a-pod', container: 'svc-a' })
+    );
 
     // A subsequent poll surfaces only the newly appended line.
     log = 'line-1\nline-2\nline-3\n';
@@ -2355,7 +2359,143 @@ describe('collectNewPodLogs', () => {
       names: ['svc-a'],
       seen,
     });
-    expect(second).toEqual([{ name: 'svc-a', pod: 'svc-a-pod', line: 'line-3' }]);
+    expect(second).toEqual([
+      { name: 'svc-a', pod: 'svc-a-pod', container: 'svc-a', line: 'line-3' },
+    ]);
+  });
+
+  test('a pod that declares no containers still gets one unqualified read', async () => {
+    const clients = {
+      core: {
+        listNamespacedPod: vi.fn(async () => ({ items: [{ metadata: { name: 'p' } }] })),
+        readNamespacedPodLog: vi.fn(async () => 'line\n'),
+      },
+      apps: {},
+    };
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['svc-a'],
+      seen: new Map(),
+    });
+    expect(clients.core.readNamespacedPodLog).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'p' })
+    );
+    expect(clients.core.readNamespacedPodLog).toHaveBeenCalledTimes(1);
+    const callArg = clients.core.readNamespacedPodLog.mock.calls[0][0] as Record<string, unknown>;
+    expect(callArg).not.toHaveProperty('container');
+    expect(out).toEqual([{ name: 'svc-a', pod: 'p', line: 'line' }]);
+  });
+
+  test('reads every container of a multi-container pod and tags each line (issue #197)', async () => {
+    // An http-sim host pod carrying the mmt-probe sidecar — the combination
+    // the playbook calls out: probe alerts must stay distinguishable from
+    // the simulator's access logs.
+    const pod = {
+      metadata: { name: 'http-sim-pod' },
+      spec: { containers: [{ name: 'http-sim' }, { name: 'mmt-probe' }] },
+    };
+    const logs: Record<string, string> = {
+      'http-sim': 'GET / 200\nGET /favicon.ico 404\n',
+      'mmt-probe': 'ALERT syn-flood detected\n',
+    };
+    const clients = {
+      core: {
+        listNamespacedPod: vi.fn(async () => ({ items: [pod] })),
+        readNamespacedPodLog: vi.fn(
+          async ({ container }: { container: string }) => logs[container]
+        ),
+      },
+      apps: {},
+    };
+
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['http-sim'],
+      seen: new Map(),
+    });
+
+    expect(clients.core.readNamespacedPodLog).toHaveBeenCalledTimes(2);
+    expect(out).toEqual([
+      { name: 'http-sim', pod: 'http-sim-pod', container: 'http-sim', line: 'GET / 200' },
+      {
+        name: 'http-sim',
+        pod: 'http-sim-pod',
+        container: 'http-sim',
+        line: 'GET /favicon.ico 404',
+      },
+      {
+        name: 'http-sim',
+        pod: 'http-sim-pod',
+        container: 'mmt-probe',
+        line: 'ALERT syn-flood detected',
+      },
+    ]);
+  });
+
+  test('tracks the per-container seen offset so one chatty container does not replay others', async () => {
+    const pod = {
+      metadata: { name: 'http-sim-pod' },
+      spec: { containers: [{ name: 'http-sim' }, { name: 'mmt-probe' }] },
+    };
+    const logs: Record<string, string> = {
+      'http-sim': 'a1\na2\n',
+      'mmt-probe': 'b1\n',
+    };
+    const clients = {
+      core: {
+        listNamespacedPod: vi.fn(async () => ({ items: [pod] })),
+        readNamespacedPodLog: vi.fn(
+          async ({ container }: { container: string }) => logs[container]
+        ),
+      },
+      apps: {},
+    };
+    const seen = new Map<string, number>();
+    await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['http-sim'],
+      seen,
+    });
+    expect(seen.get('http-sim-pod/http-sim')).toBe(2);
+    expect(seen.get('http-sim-pod/mmt-probe')).toBe(1);
+
+    // Only http-sim appends — the sidecar must not replay.
+    logs['http-sim'] = 'a1\na2\na3\n';
+    const second = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['http-sim'],
+      seen,
+    });
+    expect(second).toEqual([
+      { name: 'http-sim', pod: 'http-sim-pod', container: 'http-sim', line: 'a3' },
+    ]);
+  });
+
+  test('a container that cannot serve logs yet is skipped without starving its siblings', async () => {
+    const pod = {
+      metadata: { name: 'http-sim-pod' },
+      spec: { containers: [{ name: 'mmt-probe' }, { name: 'http-sim' }] },
+    };
+    const clients = {
+      core: {
+        listNamespacedPod: vi.fn(async () => ({ items: [pod] })),
+        readNamespacedPodLog: vi.fn(async ({ container }: { container: string }) => {
+          if (container === 'mmt-probe') {
+            throw new ApiException(400, 'container is waiting to start');
+          }
+          return 'access log\n';
+        }),
+      },
+      apps: {},
+    };
+    const out = await collectNewPodLogs(clients as never, {
+      namespace: 'ns',
+      names: ['http-sim'],
+      seen: new Map(),
+    });
+    expect(out).toEqual([
+      { name: 'http-sim', pod: 'http-sim-pod', container: 'http-sim', line: 'access log' },
+    ]);
   });
 
   test('skips a pod that is not yet ready to serve logs (400/404)', async () => {

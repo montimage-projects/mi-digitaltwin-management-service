@@ -38,6 +38,7 @@ interface LogLine {
   id: number;
   service: string;
   pod: string;
+  container?: string;
   line: string;
 }
 
@@ -130,7 +131,13 @@ export function ExecutionConsole({
         setLogs((prev) => {
           const next = [
             ...prev,
-            { id: logIdRef.current++, service: event.service, pod: event.pod, line: event.line },
+            {
+              id: logIdRef.current++,
+              service: event.service,
+              pod: event.pod,
+              container: event.container,
+              line: event.line,
+            },
           ];
           // Ring-buffer cap: drop oldest lines when over the limit.
           if (next.length > MAX_LOG_LINES) {
@@ -365,7 +372,10 @@ export function ExecutionConsole({
                     data-testid="log-line"
                     className="whitespace-pre-wrap break-all text-zinc-300"
                   >
-                    <span className="mr-2 text-emerald-400">[{log.service}]</span>
+                    <span className="mr-2 text-emerald-400">
+                      [{log.service}
+                      {log.container ? `:${log.container}` : ''}]
+                    </span>
                     {log.line}
                   </div>
                 ))

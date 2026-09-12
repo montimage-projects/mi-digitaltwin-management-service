@@ -127,8 +127,8 @@ playbook tasks land.
 
 Live progress and logs are streamed from a Server-Sent Events endpoint. The
 server polls the cluster every 2 seconds, emitting a `progress` snapshot and any
-new pod log lines, until every service has settled (all `running` or `failed`)
-or the client disconnects.
+new pod log lines, until every service has settled (all `running`, `completed`
+or `failed`) or the client disconnects.
 
 - **GET** `/api/scenarios/:id/executions/:executionId/events`
 - **Auth:** Required
@@ -141,27 +141,27 @@ a half-open connection.
 
 ### Event types
 
-| Event      | When                           | Payload                                                                                                                                                             |
-| ---------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `progress` | Each poll                      | `{ progress: number, services: [{ name, status }] }` — `progress` is the percentage of services that are `running`; `status` is `pending` \| `running` \| `failed`. |
-| `log`      | Per new pod log line           | `{ service: string, pod: string, line: string }`                                                                                                                    |
-| `end`      | Deploy settled                 | `{ status: "completed" \| "failed", services: [{ name, status }] }`                                                                                                 |
-| `error`    | Cluster read failed mid-stream | `{ message: string }` (the stream then closes)                                                                                                                      |
+| Event      | When                           | Payload                                                                                                                                                                                                                                                                                                                                                       |
+| ---------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `progress` | Each poll                      | `{ progress: number, services: [{ name, status, containers }] }` — `progress` is the percentage of services that are `running` or `completed`; `status` is `pending` \| `running` \| `completed` \| `failed` (`completed` marks a finished Job); `containers` is the per-container breakdown `[{ name, status }]` covering host and sidecar containers alike. |
+| `log`      | Per new pod log line           | `{ service: string, pod: string, container?: string, line: string }` — `container` names the container the line came from, so sidecar output (e.g. `mmt-probe` alerts) stays distinguishable from the host container's logs.                                                                                                                                  |
+| `end`      | Deploy settled                 | `{ status: "completed" \| "failed", services: [{ name, status, containers }] }`                                                                                                                                                                                                                                                                               |
+| `error`    | Cluster read failed mid-stream | `{ message: string }` (the stream then closes)                                                                                                                                                                                                                                                                                                                |
 
 ```text
 event: progress
-data: {"progress":50,"services":[{"name":"mmt-probe","status":"running"},{"name":"kafka","status":"pending"}]}
+data: {"progress":50,"services":[{"name":"mmt-probe","status":"running","containers":[{"name":"mmt-probe","status":"running"}]},{"name":"kafka","status":"pending","containers":[]}]}
 
 event: log
-data: {"service":"mmt-probe","pod":"mmt-probe-7c9f-abcde","line":"probe started on eth0"}
+data: {"service":"http-sim","pod":"http-sim-7c9f-abcde","container":"mmt-probe","line":"ALERT syn-flood detected"}
 
 event: end
-data: {"status":"completed","services":[{"name":"mmt-probe","status":"running"},{"name":"kafka","status":"running"}]}
+data: {"status":"completed","services":[{"name":"mmt-probe","status":"running","containers":[{"name":"mmt-probe","status":"running"}]},{"name":"kafka","status":"running","containers":[{"name":"kafka","status":"running"}]}]}
 ```
 
 The **Execution** tab's `ExecutionConsole` component consumes this stream: a
-progress bar driven by `progress`, an auto-scrolling `[service]`-prefixed log
-console driven by `log`, and a per-service status list.
+progress bar driven by `progress`, an auto-scrolling `[service:container]`-prefixed
+log console driven by `log`, and a per-service status list.
 
 ## Per-Service URLs
 

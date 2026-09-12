@@ -110,7 +110,12 @@ export function runSSEStream(
 
       const logs = await collectNewPodLogs(clients, { namespace, names, seen });
       for (const entry of logs) {
-        send('log', { service: entry.name, pod: entry.pod, line: entry.line });
+        send('log', {
+          service: entry.name,
+          pod: entry.pod,
+          container: entry.container,
+          line: entry.line,
+        });
       }
 
       if (isDeploymentSettled(statuses)) {

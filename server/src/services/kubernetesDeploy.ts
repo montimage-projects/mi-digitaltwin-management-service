@@ -1512,17 +1512,31 @@ export interface PodLogLine {
   pod: string;
   /** One line of container log output (no trailing newline). */
   line: string;
+  /**
+   * Container the line came from (task 2.2) — the node name for host and
+   * sidecar containers alike, so e.g. MMT-Probe alerts and http-sim access
+   * logs stay distinguishable in the stream. Absent only for the unqualified
+   * fallback read on a pod that declares no containers.
+   */
+  container?: string;
 }
 
 /**
  * Collect pod log output for the given service names and return only the lines
- * not yet emitted. `seen` is a caller-owned map of pod name -> count of lines
- * already surfaced; it is mutated in place so successive calls yield only new
- * output. The full log is re-read each call (scenario pods are short-lived and
- * low-volume) so the line-count offset is always relative to a stable base.
+ * not yet emitted. `seen` is a caller-owned map of `<pod>/<container>` ->
+ * count of lines already surfaced; it is mutated in place so successive calls
+ * yield only new output. The full log is re-read each call (scenario pods are
+ * short-lived and low-volume) so the line-count offset is always relative to
+ * a stable base.
  *
- * Pods that are missing or not yet ready to serve logs (404 / 400) are skipped
- * rather than throwing, so a transient state does not tear down a tail loop.
+ * Every container of a pod is read individually and tagged (task 2.2): a pod
+ * carrying sidecars would fail an unqualified read with a 400 ("a container
+ * name must be specified"), silently dropping all of its output. Container
+ * names come from the pod spec, falling back to reported container statuses;
+ * a pod that declares neither still gets one unqualified read, preserving the
+ * prior single-container behavior. A container that is missing or not yet
+ * ready to serve logs (404 / 400) is skipped rather than throwing, so one
+ * transient container does not tear down a tail loop or starve its siblings.
  * Any other cluster error is wrapped in an `AppError` and surfaced to the
  * caller so the stream can report it and clean up.
  */
@@ -1541,30 +1555,43 @@ export async function collectNewPodLogs(
         const podName = pod.metadata?.name;
         if (!podName) continue;
 
-        let raw: string;
-        try {
-          raw = await clients.core.readNamespacedPodLog({
-            name: podName,
-            namespace: opts.namespace,
-          });
-        } catch (err) {
-          // A pod that has not started its container yet (400) or has already
-          // been removed (404) simply has no readable logs — skip it.
-          if (err instanceof ApiException && (err.code === 400 || err.code === 404)) {
-            continue;
-          }
-          throw err;
-        }
+        const containerNames = [
+          ...new Set(
+            [
+              ...(pod.spec?.containers ?? []).map((c) => c.name),
+              ...(pod.status?.containerStatuses ?? []).map((cs) => cs.name),
+            ].filter((n): n is string => Boolean(n))
+          ),
+        ];
 
-        const lines = raw.split('\n');
-        if (lines.length && lines[lines.length - 1] === '') {
-          lines.pop();
+        for (const containerName of containerNames.length ? containerNames : [undefined]) {
+          let raw: string;
+          try {
+            raw = await clients.core.readNamespacedPodLog({
+              name: podName,
+              namespace: opts.namespace,
+              ...(containerName ? { container: containerName } : {}),
+            });
+          } catch (err) {
+            // A container that has not started yet (400) or has already been
+            // removed (404) simply has no readable logs — skip it.
+            if (err instanceof ApiException && (err.code === 400 || err.code === 404)) {
+              continue;
+            }
+            throw err;
+          }
+
+          const lines = raw.split('\n');
+          if (lines.length && lines[lines.length - 1] === '') {
+            lines.pop();
+          }
+          const seenKey = containerName ? `${podName}/${containerName}` : podName;
+          const already = opts.seen.get(seenKey) ?? 0;
+          for (let i = already; i < lines.length; i++) {
+            out.push({ name, pod: podName, container: containerName, line: lines[i] });
+          }
+          opts.seen.set(seenKey, lines.length);
         }
-        const already = opts.seen.get(podName) ?? 0;
-        for (let i = already; i < lines.length; i++) {
-          out.push({ name, pod: podName, line: lines[i] });
-        }
-        opts.seen.set(podName, lines.length);
       }
     }
     return out;
