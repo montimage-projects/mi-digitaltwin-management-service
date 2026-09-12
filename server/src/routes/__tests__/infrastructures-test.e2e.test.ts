@@ -14,55 +14,69 @@ import mongoose from 'mongoose';
  * bad credentials.
  */
 
-const { impl, CoreV1Api, AppsV1Api, BatchV1Api, RbacAuthorizationV1Api, KubeConfig, ApiException } =
-  vi.hoisted(() => {
-    class ApiException extends Error {
-      code: number;
-      body: unknown;
-      constructor(code: number, message: string, body?: unknown) {
-        super(message);
-        this.code = code;
-        this.body = body;
-      }
+const {
+  impl,
+  CoreV1Api,
+  AppsV1Api,
+  BatchV1Api,
+  NetworkingV1Api,
+  RbacAuthorizationV1Api,
+  KubeConfig,
+  ApiException,
+} = vi.hoisted(() => {
+  class ApiException extends Error {
+    code: number;
+    body: unknown;
+    constructor(code: number, message: string, body?: unknown) {
+      super(message);
+      this.code = code;
+      this.body = body;
     }
+  }
 
-    // Per-test-controllable probe behaviour.
-    const impl = {
-      listNamespace: async (): Promise<unknown> => ({ items: [] }),
-    };
+  // Per-test-controllable probe behaviour.
+  const impl = {
+    listNamespace: async (): Promise<unknown> => ({ items: [] }),
+  };
 
-    class CoreV1Api {}
-    class AppsV1Api {}
-    class BatchV1Api {}
-    class RbacAuthorizationV1Api {}
+  class CoreV1Api {}
+  class AppsV1Api {}
+  class BatchV1Api {}
+  class NetworkingV1Api {}
+  class RbacAuthorizationV1Api {}
 
-    class KubeConfig {
-      loadFromString(): void {}
-      loadFromOptions(): void {}
-      makeApiClient(ctor: unknown): unknown {
-        if (ctor === CoreV1Api) {
-          return { listNamespace: (...a: unknown[]) => impl.listNamespace(...(a as [])) };
-        }
-        return {};
+  class KubeConfig {
+    loadFromString(): void {}
+    loadFromOptions(): void {}
+    makeApiClient(ctor: unknown): unknown {
+      if (ctor === CoreV1Api) {
+        return { listNamespace: (...a: unknown[]) => impl.listNamespace(...(a as [])) };
       }
+      if (ctor === NetworkingV1Api) {
+        return { createNamespacedNetworkPolicy: async (): Promise<unknown> => ({}) };
+      }
+      return {};
     }
+  }
 
-    return {
-      impl,
-      CoreV1Api,
-      AppsV1Api,
-      BatchV1Api,
-      RbacAuthorizationV1Api,
-      KubeConfig,
-      ApiException,
-    };
-  });
+  return {
+    impl,
+    CoreV1Api,
+    AppsV1Api,
+    BatchV1Api,
+    NetworkingV1Api,
+    RbacAuthorizationV1Api,
+    KubeConfig,
+    ApiException,
+  };
+});
 
 vi.mock('@kubernetes/client-node', () => ({
   KubeConfig,
   CoreV1Api,
   AppsV1Api,
   BatchV1Api,
+  NetworkingV1Api,
   RbacAuthorizationV1Api,
   ApiException,
 }));

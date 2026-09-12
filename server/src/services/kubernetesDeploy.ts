@@ -3,6 +3,7 @@ import {
   CoreV1Api,
   AppsV1Api,
   BatchV1Api,
+  NetworkingV1Api,
   RbacAuthorizationV1Api,
   ApiException,
   type V1ConfigMap,
@@ -10,6 +11,7 @@ import {
   type V1Deployment,
   type V1Job,
   type V1Namespace,
+  type V1NetworkPolicy,
   type V1Pod,
   type V1PodSpec,
   type V1Role,
@@ -41,7 +43,11 @@ import { AppError } from '../middleware/errorHandler.js';
  * typed-edge context; `planWorkloads` then groups the resolved nodes into
  * pods. Nodes may also emit a `v1` ConfigMap (`configFiles`) and a
  * namespace-scoped `ServiceAccount`/`Role`/`RoleBinding` triple (`rbac`) —
- * never a ClusterRole or ClusterRoleBinding.
+ * never a ClusterRole or ClusterRoleBinding. The namespace itself carries the
+ * PodSecurity `enforce=privileged` admission label only when a node declares
+ * `capabilities`, `privileged` or `hostNetwork`; every `role: 'attack'` node
+ * is contained by a `networking.k8s.io/v1` NetworkPolicy restricting its
+ * egress to its attack-edge targets' Service ports plus DNS (task 1.5).
  */
 
 /** Coarse per-service deploy status. */
@@ -53,6 +59,8 @@ export interface K8sClients {
   apps: AppsV1Api;
   /** Job creation and status for `kind: 'Job'` nodes. */
   batch: BatchV1Api;
+  /** Egress NetworkPolicies containing `role: 'attack'` nodes (task 1.5). */
+  networking: NetworkingV1Api;
   /** ServiceAccount-bound Role/RoleBinding for nodes declaring `rbac`. */
   rbac: RbacAuthorizationV1Api;
 }
@@ -533,6 +541,7 @@ export function buildClientFromInfrastructure(infrastructure: IInfrastructure): 
       core: kc.makeApiClient(CoreV1Api),
       apps: kc.makeApiClient(AppsV1Api),
       batch: kc.makeApiClient(BatchV1Api),
+      networking: kc.makeApiClient(NetworkingV1Api),
       rbac: kc.makeApiClient(RbacAuthorizationV1Api),
     };
   } catch (err) {
@@ -540,13 +549,27 @@ export function buildClientFromInfrastructure(infrastructure: IInfrastructure): 
   }
 }
 
-function namespaceManifest(namespace: string): V1Namespace {
-  return {
-    metadata: {
-      name: namespace,
-      labels: { 'app.kubernetes.io/managed-by': MANAGED_BY },
-    },
-  };
+/**
+ * `v1` Namespace for one execution. Carries the PodSecurity admission label
+ * `pod-security.kubernetes.io/enforce=privileged` only when a node actually
+ * needs it (task 1.5): any resolved node — workload host or sidecar — whose
+ * spec declares container `capabilities`, `securityContext.privileged` or
+ * `hostNetwork` (e.g. MMT-Probe's NET_ADMIN/NET_RAW sidecar). A topology
+ * where nothing needs elevated privileges keeps the cluster's default
+ * admission level instead of opting every pod into `privileged`.
+ */
+function namespaceManifest(namespace: string, resolved: ResolvedNode[]): V1Namespace {
+  const needsPrivileged = resolved.some(
+    (node) =>
+      node.deployment.hostNetwork === true ||
+      node.deployment.securityContext?.privileged === true ||
+      (node.deployment.securityContext?.capabilities?.length ?? 0) > 0
+  );
+  const labels: Record<string, string> = { 'app.kubernetes.io/managed-by': MANAGED_BY };
+  if (needsPrivileged) {
+    labels['pod-security.kubernetes.io/enforce'] = 'privileged';
+  }
+  return { metadata: { name: namespace, labels } };
 }
 
 /**
@@ -883,8 +906,57 @@ function roleBindingManifest(node: ResolvedNode, namespace: string): V1RoleBindi
 }
 
 /**
+ * `networking.k8s.io/v1` NetworkPolicy containing one `role: 'attack'` node
+ * (task 1.5). Egress is limited to the pods backing the Service of each
+ * attack-edge target — selected by their `app` label on the target's Service
+ * port — plus DNS (port 53, UDP and TCP). A NetworkPolicy cannot select a
+ * Service, so the peer selector mirrors the Service's own `app` selector.
+ * `podOwner` is the node whose pod the attack actually runs in: itself for a
+ * standalone workload, or its monitor-edge host when the attack deploys as a
+ * sidecar — containment follows the pod, not the node. An attack node with
+ * no attack edge still gets the policy, reduced to DNS-only egress. Ingress
+ * is left untouched: nothing the scenario does needs it restricted.
+ */
+function networkPolicyManifest(
+  node: ResolvedNode,
+  podOwner: ResolvedNode,
+  targets: ResolvedNode[],
+  namespace: string
+): V1NetworkPolicy {
+  return {
+    metadata: {
+      name: `${node.name}-egress`,
+      namespace,
+      labels: {
+        app: node.name,
+        'app.kubernetes.io/managed-by': MANAGED_BY,
+        'secsim.io/node': node.nodeId,
+      },
+    },
+    spec: {
+      podSelector: { matchLabels: { app: podOwner.name } },
+      policyTypes: ['Egress'],
+      egress: [
+        ...targets.map((target) => ({
+          to: [{ podSelector: { matchLabels: { app: target.name } } }],
+          ports: [{ port: target.containerPort, protocol: 'TCP' }],
+        })),
+        {
+          ports: [
+            { port: 53, protocol: 'UDP' },
+            { port: 53, protocol: 'TCP' },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+/**
  * Deploy a scenario topology into a fresh per-execution namespace: create the
- * namespace, then per pod-owning node its RBAC triple (when `rbac` rules are
+ * namespace (PodSecurity-labelled when a node needs `privileged` admission),
+ * then one egress NetworkPolicy per `role: 'attack'` node, then per
+ * pod-owning node its RBAC triple (when `rbac` rules are
  * declared), ConfigMaps (`configFiles`, including sidecars'), the workload
  * (`batch/v1` Job or `apps/v1` Deployment), and a NodePort Service when the
  * spec exposes a port. Sidecar nodes own no workload or Service — they land
@@ -912,7 +984,32 @@ export async function deployTopology(
   const host = endpointHost(opts.endpoint);
 
   try {
-    await clients.core.createNamespace({ body: namespaceManifest(opts.namespace) });
+    await clients.core.createNamespace({
+      body: namespaceManifest(opts.namespace, resolved),
+    });
+
+    // Attack containment (task 1.5): one egress NetworkPolicy per
+    // `role: 'attack'` node, selecting the pod it actually runs in — its own
+    // workload pod, or its host's pod when deployed as a sidecar. Policies go
+    // up before any workload so an attack pod starts already contained.
+    const resolvedById = new Map(resolved.map((n) => [n.nodeId, n]));
+    await Promise.all(
+      resolved
+        .filter((n) => n.deployment.role === 'attack')
+        .map((n) =>
+          clients.networking.createNamespacedNetworkPolicy({
+            namespace: opts.namespace,
+            body: networkPolicyManifest(
+              n,
+              hostByNode.get(n.nodeId) ?? n,
+              n.edgeContext.targets
+                .map((id) => resolvedById.get(id))
+                .filter((t): t is ResolvedNode => t !== undefined),
+              opts.namespace
+            ),
+          })
+        )
+    );
 
     // Batch create all resources concurrently via Promise.all, one lane per
     // pod-owning node. Within a lane the supporting resources (ServiceAccount,
