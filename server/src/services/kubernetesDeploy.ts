@@ -48,6 +48,10 @@ import { AppError } from '../middleware/errorHandler.js';
  * `capabilities`, `privileged` or `hostNetwork`; every `role: 'attack'` node
  * is contained by a `networking.k8s.io/v1` NetworkPolicy restricting its
  * egress to its attack-edge targets' Service ports plus DNS (task 1.5).
+ * Workloads roll out in ascending `startOrder` tiers (task 1.6): an attack
+ * workload is created only once every already-deployed workload's pods
+ * report Ready, so the attack never starts ahead of the monitor and
+ * reaction it depends on.
  */
 
 /** Coarse per-service deploy status. */
@@ -149,10 +153,28 @@ export interface DeployTopologyOptions {
   services: ServiceImageSource[];
   /** Cluster API endpoint; its host is used to build reachable NodePort URLs. */
   endpoint: string;
+  /**
+   * Bound on the pre-attack readiness wait (task 1.6): how long the rollout
+   * waits for already-deployed workload pods to report Ready before starting
+   * an attack workload. Defaults to {@link READINESS_TIMEOUT_MS}.
+   */
+  readinessTimeoutMs?: number;
+  /** Delay between pod-list polls while waiting on readiness. */
+  readinessPollMs?: number;
 }
 
 /** Default container/service port used for the single mapped port per node. */
 const DEFAULT_CONTAINER_PORT = 80;
+
+/**
+ * Default bound on the pre-attack readiness wait (task 1.6). Five minutes
+ * leaves room for a cold pull of the private-registry images; a pod that
+ * still has not reported Ready by then almost certainly never will.
+ */
+const READINESS_TIMEOUT_MS = 300_000;
+
+/** Default delay between pod-list polls during the readiness wait. */
+const READINESS_POLL_MS = 2_000;
 
 const MANAGED_BY = 'secsim';
 
@@ -953,6 +975,97 @@ function networkPolicyManifest(
 }
 
 /**
+ * True when the pod counts as Ready for the pre-attack rollout gate: its
+ * `Ready` condition is True, or it reached `Succeeded` (a completed Job pod
+ * no longer reports Ready once finished).
+ */
+function podReady(pod: V1Pod): boolean {
+  if (pod.status?.phase === 'Succeeded') return true;
+  return (pod.status?.conditions ?? []).some(
+    (condition) => condition.type === 'Ready' && condition.status === 'True'
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Pre-attack readiness gate (task 1.6). Polls the pods backing the
+ * already-deployed workloads — one `listNamespacedPod` call per tick with a
+ * combined `app in (...)` selector — until every workload has at least one
+ * pod and all of its pods are Ready. A pod showing a hard failure (Failed
+ * phase, CrashLoopBackOff, …) aborts the wait immediately; on timeout the
+ * wait throws an `AppError` naming the pods that never reported Ready, which
+ * the caller's catch turns into a namespace teardown and a failed execution.
+ */
+async function waitForWorkloadsReady(
+  clients: K8sClients,
+  namespace: string,
+  names: string[],
+  timeoutMs: number,
+  pollMs: number
+): Promise<void> {
+  const unique = [...new Set(names)];
+  if (!unique.length) return;
+  const selector = `app in (${unique.join(',')})`;
+  const deadline = Date.now() + timeoutMs;
+
+  for (;;) {
+    const pods =
+      (await clients.core.listNamespacedPod({ namespace, labelSelector: selector })).items ?? [];
+
+    const byApp = new Map<string, V1Pod[]>();
+    for (const pod of pods) {
+      const app = pod.metadata?.labels?.app ?? '';
+      if (!app) continue;
+      const list = byApp.get(app) ?? [];
+      list.push(pod);
+      byApp.set(app, list);
+    }
+
+    // Fast-fail on a hard pod failure — waiting out the timeout would only
+    // delay the same verdict with a less specific message.
+    for (const pod of pods) {
+      if (!podFailed(pod)) continue;
+      const name = pod.metadata?.name ?? '(unnamed pod)';
+      const reason =
+        pod.status?.phase === 'Failed'
+          ? 'phase Failed'
+          : ((pod.status?.containerStatuses ?? [])
+              .map((cs) => cs.state?.waiting?.reason)
+              .find((r) => r && FAILURE_REASONS.has(r)) ?? 'failed');
+      throw new AppError(
+        `Pod ${name} failed while waiting for workloads to become Ready (${reason})`,
+        502
+      );
+    }
+
+    const notReady = unique.filter(
+      (name) => (byApp.get(name) ?? []).length === 0 || byApp.get(name)!.some((p) => !podReady(p))
+    );
+    if (!notReady.length) return;
+
+    if (Date.now() >= deadline) {
+      // Name the concrete pods still not Ready where the cluster knows them;
+      // a workload with no pod at all is named by its workload name.
+      const pending = notReady.flatMap((name) => {
+        const stuck = (byApp.get(name) ?? []).filter((p) => !podReady(p));
+        return stuck.length
+          ? stuck.map((p) => p.metadata?.name ?? name)
+          : [`${name} (no pod scheduled)`];
+      });
+      throw new AppError(
+        `Readiness timeout after ${Math.round(timeoutMs / 1000)}s waiting for pods to become ` +
+          `Ready before starting attack workloads: ${pending.join(', ')}`,
+        504
+      );
+    }
+    await sleep(pollMs);
+  }
+}
+
+/**
  * Deploy a scenario topology into a fresh per-execution namespace: create the
  * namespace (PodSecurity-labelled when a node needs `privileged` admission),
  * then one egress NetworkPolicy per `role: 'attack'` node, then per
@@ -964,9 +1077,12 @@ function networkPolicyManifest(
  * host's resource name so status and log polling resolve under the pod they
  * actually run in. Job nodes never get a Service.
  *
- * Uses `Promise.all` for batch resource creation across nodes. On mid-deploy
- * failure, tears down already-created resources (best-effort) before
- * re-throwing.
+ * Workloads roll out in ascending `startOrder` tiers (task 1.6): plans in
+ * one tier are still created concurrently, but before any plan carrying an
+ * attack-role member the gate waits for every already-deployed workload's
+ * pods to report Ready — with a bounded timeout that fails the deploy naming
+ * the pods that were not Ready. On mid-deploy failure, tears down
+ * already-created resources (best-effort) before re-throwing.
  */
 export async function deployTopology(
   clients: K8sClients,
@@ -1011,66 +1127,104 @@ export async function deployTopology(
         )
     );
 
-    // Batch create all resources concurrently via Promise.all, one lane per
-    // pod-owning node. Within a lane the supporting resources (ServiceAccount,
-    // Role, RoleBinding, ConfigMaps) are created before the workload that
-    // references them.
+    // Ordered rollout (task 1.6): workloads go up in ascending `startOrder`
+    // tiers — target and monitor first, then reaction, then attack. Plans in
+    // one tier are still created concurrently, one lane per pod-owning node;
+    // within a lane the supporting resources (ServiceAccount, Role,
+    // RoleBinding, ConfigMaps) are created before the workload that
+    // references them. Before any plan carrying an attack-role member, the
+    // gate waits for every already-deployed workload's pods to report Ready.
     const nodePorts = new Map<string, number | undefined>();
-    await Promise.all(
-      plans.map(async (plan) => {
-        const node = plan.node;
-        const namespace = opts.namespace;
 
-        // One SA/Role/RoleBinding triple per pod — named after the host and
-        // covering the union of host + sidecar rbac rules.
-        if (workloadRbacRules(plan).length) {
-          await clients.core.createNamespacedServiceAccount({
-            namespace,
-            body: serviceAccountManifest(node, namespace),
-          });
-          await clients.rbac.createNamespacedRole({
-            namespace,
-            body: roleManifest(plan, namespace),
-          });
-          await clients.rbac.createNamespacedRoleBinding({
-            namespace,
-            body: roleBindingManifest(node, namespace),
-          });
-        }
+    const createPlanResources = async (plan: WorkloadPlan): Promise<void> => {
+      const node = plan.node;
+      const namespace = opts.namespace;
 
-        await Promise.all(
-          [node, ...plan.sidecars]
-            .filter((n) => n.deployment.configFiles?.length)
-            .map((n) =>
-              clients.core.createNamespacedConfigMap({
-                namespace,
-                body: configMapManifest(n, namespace),
-              })
-            )
+      // One SA/Role/RoleBinding triple per pod — named after the host and
+      // covering the union of host + sidecar rbac rules.
+      if (workloadRbacRules(plan).length) {
+        await clients.core.createNamespacedServiceAccount({
+          namespace,
+          body: serviceAccountManifest(node, namespace),
+        });
+        await clients.rbac.createNamespacedRole({
+          namespace,
+          body: roleManifest(plan, namespace),
+        });
+        await clients.rbac.createNamespacedRoleBinding({
+          namespace,
+          body: roleBindingManifest(node, namespace),
+        });
+      }
+
+      await Promise.all(
+        [node, ...plan.sidecars]
+          .filter((n) => n.deployment.configFiles?.length)
+          .map((n) =>
+            clients.core.createNamespacedConfigMap({
+              namespace,
+              body: configMapManifest(n, namespace),
+            })
+          )
+      );
+
+      if (node.deployment.kind === 'Job') {
+        await clients.batch.createNamespacedJob({
+          namespace,
+          body: jobManifest(plan, namespace),
+        });
+      } else {
+        await clients.apps.createNamespacedDeployment({
+          namespace,
+          body: deploymentManifest(plan, namespace),
+        });
+      }
+
+      // No Service for Jobs or for specs that don't expose their port.
+      if (node.deployment.kind !== 'Job' && node.deployment.exposePort) {
+        const created = await clients.core.createNamespacedService({
+          namespace,
+          body: serviceManifest(node, namespace),
+        });
+        nodePorts.set(node.nodeId, created.spec?.ports?.[0]?.nodePort);
+      }
+    };
+
+    // A plan "carries an attack" when the workload node or one of its
+    // sidecars has `role: 'attack'` — a sidecar attack starts with the host
+    // pod, so the gate applies to the whole plan.
+    const carriesAttack = (plan: WorkloadPlan): boolean =>
+      [plan.node, ...plan.sidecars].some((n) => n.deployment.role === 'attack');
+
+    const tiers = new Map<number, WorkloadPlan[]>();
+    for (const plan of plans) {
+      const order = plan.node.deployment.startOrder ?? 0;
+      const tier = tiers.get(order) ?? [];
+      tier.push(plan);
+      tiers.set(order, tier);
+    }
+
+    const deployedNames: string[] = [];
+    for (const order of [...tiers.keys()].sort((a, b) => a - b)) {
+      const tier = tiers.get(order) ?? [];
+      // Non-attack plans of the tier go up first so an attack sharing the
+      // tier still trails the workloads it may depend on.
+      const regular = tier.filter((p) => !carriesAttack(p));
+      const attack = tier.filter(carriesAttack);
+      await Promise.all(regular.map(createPlanResources));
+      deployedNames.push(...regular.map((p) => p.node.name));
+      if (attack.length) {
+        await waitForWorkloadsReady(
+          clients,
+          opts.namespace,
+          deployedNames,
+          opts.readinessTimeoutMs ?? READINESS_TIMEOUT_MS,
+          opts.readinessPollMs ?? READINESS_POLL_MS
         );
-
-        if (node.deployment.kind === 'Job') {
-          await clients.batch.createNamespacedJob({
-            namespace,
-            body: jobManifest(plan, namespace),
-          });
-        } else {
-          await clients.apps.createNamespacedDeployment({
-            namespace,
-            body: deploymentManifest(plan, namespace),
-          });
-        }
-
-        // No Service for Jobs or for specs that don't expose their port.
-        if (node.deployment.kind !== 'Job' && node.deployment.exposePort) {
-          const created = await clients.core.createNamespacedService({
-            namespace,
-            body: serviceManifest(node, namespace),
-          });
-          nodePorts.set(node.nodeId, created.spec?.ports?.[0]?.nodePort);
-        }
-      })
-    );
+        await Promise.all(attack.map(createPlanResources));
+        deployedNames.push(...attack.map((p) => p.node.name));
+      }
+    }
 
     // One result row per topology node, in resolution order. A sidecar row
     // points at its host's resource name (no workload of its own exists to

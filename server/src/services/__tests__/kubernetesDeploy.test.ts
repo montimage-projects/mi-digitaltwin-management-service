@@ -119,6 +119,17 @@ function makeNode(id: string, data: Record<string, unknown> = {}): unknown {
   return { id, data: { serviceId: SERVICE_ID, ...data } };
 }
 
+/**
+ * A Ready pod carrying `app=<name>` — enough for the pre-attack readiness
+ * gate (task 1.6) to release the attack workloads in a mocked deploy.
+ */
+function readyPod(app: string, podName = `${app}-pod`) {
+  return {
+    metadata: { name: podName, labels: { app } },
+    status: { phase: 'Running', conditions: [{ type: 'Ready', status: 'True' }] },
+  };
+}
+
 /** Fake `K8sClients` — every cluster call is a `vi.fn` returning success. */
 function makeClients() {
   return {
@@ -1268,6 +1279,10 @@ describe('deployTopology — PodSecurity label and attack containment (issue #19
 
   test('labels the namespace enforce=privileged when a node declares capabilities', async () => {
     const clients = makeClients();
+    // The readiness gate (task 1.6) waits for the target pod before the Job.
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [readyPod('http-sim')],
+    })) as unknown as typeof clients.core.listNamespacedPod;
     await deployTopology(clients as never, {
       namespace: 'secsim-a-b',
       nodes: [node('http-sim', TARGET_ID), node('mag', ATTACK_ID)],
@@ -1327,6 +1342,10 @@ describe('deployTopology — PodSecurity label and attack containment (issue #19
 
   test('an attack node gets an egress NetworkPolicy limited to its target and DNS', async () => {
     const clients = makeClients();
+    // The readiness gate (task 1.6) waits for the target pod before the Job.
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [readyPod('http-sim')],
+    })) as unknown as typeof clients.core.listNamespacedPod;
     await deployTopology(clients as never, {
       namespace: 'secsim-a-b',
       nodes: [node('mag', ATTACK_ID), node('http-sim', TARGET_ID)],
@@ -1357,6 +1376,9 @@ describe('deployTopology — PodSecurity label and attack containment (issue #19
   test('every attack-edge target gets its own egress rule', async () => {
     const clients = makeClients();
     const TARGET2_ID = '507f1f77bcf86cd799439015';
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [readyPod('t1'), readyPod('t2')],
+    })) as unknown as typeof clients.core.listNamespacedPod;
     await deployTopology(clients as never, {
       namespace: 'secsim-a-b',
       nodes: [node('mag', ATTACK_ID), node('t1', TARGET_ID), node('t2', TARGET2_ID)],
@@ -1435,6 +1457,232 @@ describe('deployTopology — PodSecurity label and attack containment (issue #19
   });
 });
 
+describe('deployTopology — ordered rollout and readiness wait (issue #195)', () => {
+  const TARGET_ID = '507f1f77bcf86cd799439011';
+  const REACTION_ID = '507f1f77bcf86cd799439012';
+  const ATTACK_ID = '507f1f77bcf86cd799439013';
+  const MONITOR_ID = '507f1f77bcf86cd799439014';
+  type DeploymentSpec = NonNullable<ServiceImageSource['deployment']>;
+
+  const svc = (id: string, deployment: Partial<DeploymentSpec>) =>
+    makeService({ _id: id, deployment: deployment as DeploymentSpec });
+  const node = (id: string, serviceId: string) => ({ id, data: { serviceId } });
+
+  function createdWorkloadOrder(clients: ReturnType<typeof makeClients>): string[] {
+    const order: string[] = [];
+    for (const call of clients.apps.createNamespacedDeployment.mock.calls as {
+      body: { metadata: { name: string } };
+    }[][]) {
+      order.push(call[0].body.metadata.name);
+    }
+    for (const call of clients.batch.createNamespacedJob.mock.calls as {
+      body: { metadata: { name: string } };
+    }[][]) {
+      order.push(call[0].body.metadata.name);
+    }
+    return order;
+  }
+
+  test('creates workloads in ascending startOrder regardless of node order', async () => {
+    const clients = makeClients();
+    // Track cross-resource creation order with a shared event log — Job and
+    // Deployment calls land on different mocks.
+    const events: string[] = [];
+    clients.apps.createNamespacedDeployment = vi.fn(
+      async (arg: { body: { metadata: { name: string } } }) => {
+        events.push(`deploy:${arg.body.metadata.name}`);
+        return {};
+      }
+    ) as never;
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [
+        node('svc-late', TARGET_ID),
+        node('svc-early', REACTION_ID),
+        node('svc-mid', MONITOR_ID),
+      ],
+      services: [
+        svc(TARGET_ID, { kind: 'Deployment', role: 'generic', startOrder: 30 }),
+        svc(REACTION_ID, { kind: 'Deployment', role: 'generic', startOrder: 10 }),
+        svc(MONITOR_ID, { kind: 'Deployment', role: 'generic', startOrder: 20 }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    expect(events).toEqual(['deploy:svc-early', 'deploy:svc-mid', 'deploy:svc-late']);
+    // No attack workload — the readiness gate never polls the cluster.
+    expect(clients.core.listNamespacedPod).not.toHaveBeenCalled();
+  });
+
+  test('creates a lone attack Job without polling for readiness', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('mag', ATTACK_ID)],
+      services: [svc(ATTACK_ID, { kind: 'Job', role: 'attack', exposePort: false })],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    expect(clients.batch.createNamespacedJob).toHaveBeenCalledTimes(1);
+    // Nothing was deployed before the attack — the wait is vacuous and the
+    // cluster is never polled.
+    expect(clients.core.listNamespacedPod).not.toHaveBeenCalled();
+  });
+
+  test('does not create the attack Job until monitor and reaction pods report Ready', async () => {
+    const clients = makeClients();
+    let allReady = false;
+    let polls = 0;
+    let jobCreatedWhenReady = false;
+    clients.core.listNamespacedPod = vi.fn(async () => {
+      polls++;
+      return {
+        items: allReady
+          ? [readyPod('http-sim'), readyPod('ai4soar')]
+          : [
+              readyPod('http-sim'),
+              {
+                metadata: { name: 'ai4soar-pod', labels: { app: 'ai4soar' } },
+                status: { phase: 'Pending' },
+              },
+            ],
+      };
+    }) as unknown as typeof clients.core.listNamespacedPod;
+    clients.batch.createNamespacedJob = vi.fn(async () => {
+      jobCreatedWhenReady = allReady;
+      return {};
+    }) as never;
+    // Flip the reaction pod to Ready after the first poll observed it pending.
+    clients.apps.createNamespacedDeployment = vi.fn(async () => ({})) as never;
+    setTimeout(() => {
+      allReady = true;
+    }, 20);
+
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [
+        node('http-sim', TARGET_ID),
+        node('mmt-probe', MONITOR_ID),
+        node('ai4soar', REACTION_ID),
+        node('mag', ATTACK_ID),
+      ],
+      edges: [
+        { source: 'mmt-probe', target: 'http-sim', type: 'monitors' },
+        { source: 'mmt-probe', target: 'ai4soar', type: 'notifies' },
+        { source: 'mag', target: 'http-sim', type: 'attacks' },
+      ],
+      services: [
+        svc(TARGET_ID, {
+          kind: 'Deployment',
+          role: 'target',
+          containerPort: 8080,
+          exposePort: true,
+          startOrder: 10,
+        }),
+        svc(MONITOR_ID, {
+          kind: 'Deployment',
+          role: 'monitor',
+          attachMode: 'sidecar',
+          exposePort: false,
+          startOrder: 10,
+        }),
+        svc(REACTION_ID, {
+          kind: 'Deployment',
+          role: 'reaction',
+          containerPort: 5000,
+          exposePort: true,
+          startOrder: 20,
+        }),
+        svc(ATTACK_ID, {
+          kind: 'Job',
+          role: 'attack',
+          exposePort: false,
+          startOrder: 30,
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+      readinessPollMs: 5,
+      readinessTimeoutMs: 5_000,
+    });
+
+    expect(clients.batch.createNamespacedJob).toHaveBeenCalledTimes(1);
+    // The Job was created only after the poll saw every pod Ready.
+    expect(polls).toBeGreaterThanOrEqual(2);
+    expect(jobCreatedWhenReady).toBe(true);
+    // Both dependency Deployments went up before the attack Job.
+    expect(createdWorkloadOrder(clients)).toEqual(['http-sim', 'ai4soar', 'mag']);
+  });
+
+  test('a readiness timeout fails the deploy naming the not-ready pods and cleans up', async () => {
+    const clients = makeClients();
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [
+        {
+          metadata: { name: 'http-sim-stuck', labels: { app: 'http-sim' } },
+          status: { phase: 'Pending' },
+        },
+        // ai4soar has no pod at all — named by workload in the message.
+      ],
+    })) as unknown as typeof clients.core.listNamespacedPod;
+
+    try {
+      await deployTopology(clients as never, {
+        namespace: 'secsim-a-b',
+        nodes: [node('http-sim', TARGET_ID), node('ai4soar', REACTION_ID), node('mag', ATTACK_ID)],
+        edges: [{ source: 'mag', target: 'http-sim', type: 'attacks' }],
+        services: [
+          svc(TARGET_ID, { kind: 'Deployment', role: 'target', startOrder: 10 }),
+          svc(REACTION_ID, { kind: 'Deployment', role: 'reaction', startOrder: 20 }),
+          svc(ATTACK_ID, { kind: 'Job', role: 'attack', exposePort: false, startOrder: 30 }),
+        ],
+        endpoint: 'https://10.0.0.1:6443',
+        readinessPollMs: 5,
+        readinessTimeoutMs: 40,
+      });
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppError);
+      expect((err as AppError).statusCode).toBe(504);
+      expect((err as AppError).message).toContain('http-sim-stuck');
+      expect((err as AppError).message).toContain('ai4soar');
+    }
+    // The attack Job never ran and the namespace was torn down.
+    expect(clients.batch.createNamespacedJob).not.toHaveBeenCalled();
+    expect(clients.core.deleteNamespace).toHaveBeenCalledTimes(1);
+  });
+
+  test('fails fast when a pod hits a hard failure while waiting', async () => {
+    const clients = makeClients();
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [
+        {
+          metadata: { name: 'http-sim-crash', labels: { app: 'http-sim' } },
+          status: {
+            phase: 'Pending',
+            containerStatuses: [{ state: { waiting: { reason: 'CrashLoopBackOff' } } }],
+          },
+        },
+      ],
+    })) as unknown as typeof clients.core.listNamespacedPod;
+
+    await expect(
+      deployTopology(clients as never, {
+        namespace: 'secsim-a-b',
+        nodes: [node('http-sim', TARGET_ID), node('mag', ATTACK_ID)],
+        edges: [{ source: 'mag', target: 'http-sim', type: 'attacks' }],
+        services: [
+          svc(TARGET_ID, { kind: 'Deployment', role: 'target', startOrder: 10 }),
+          svc(ATTACK_ID, { kind: 'Job', role: 'attack', exposePort: false, startOrder: 30 }),
+        ],
+        endpoint: 'https://10.0.0.1:6443',
+        readinessPollMs: 5,
+        readinessTimeoutMs: 60_000,
+      })
+    ).rejects.toThrow(/http-sim-crash/);
+    // No need to wait out the timeout — the hard failure surfaces at once.
+    expect(clients.batch.createNamespacedJob).not.toHaveBeenCalled();
+    expect(clients.core.deleteNamespace).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('edge-derived environment variables (issue #193)', () => {
   const TARGET_ID = '507f1f77bcf86cd799439011';
   const REACTION_ID = '507f1f77bcf86cd799439012';
@@ -1503,6 +1751,10 @@ describe('edge-derived environment variables (issue #193)', () => {
 
   test('resolved env lands on the deployed container', async () => {
     const clients = makeClients();
+    // The readiness gate (task 1.6) waits for the target pod before the Job.
+    clients.core.listNamespacedPod = vi.fn(async () => ({
+      items: [readyPod('http-sim')],
+    })) as unknown as typeof clients.core.listNamespacedPod;
     await deployTopology(clients as never, {
       namespace: 'secsim-a-b',
       nodes: [node('mag', ATTACK_ID), node('http-sim', TARGET_ID)],

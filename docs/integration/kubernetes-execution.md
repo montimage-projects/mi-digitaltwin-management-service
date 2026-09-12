@@ -115,6 +115,13 @@ playbook tasks land.
   `secsim.io/node: <nodeId>`.
 - **Service type `NodePort`** is deliberate: it makes each service reachable
   without an Ingress controller, which is what powers the per-service URLs.
+- **Rollout order:** workloads go up in ascending `deployment.startOrder`
+  tiers (concurrently within a tier). Before any workload carrying a
+  `role: 'attack'` member is created, the engine waits — bounded by
+  `readinessTimeoutMs` (default 5 min) — for every already-deployed
+  workload's pods to report `Ready`, so an attack never starts ahead of the
+  monitor and reaction it depends on. A timeout fails the execution with the
+  names of the pods that were not Ready and tears the namespace down.
 
 ## SSE Events Protocol
 
