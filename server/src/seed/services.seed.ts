@@ -367,15 +367,16 @@ const intactToolboxServices: ServiceSeed[] = [
 // wiring in docs/playbooks/montimage-attack-detect-respond-plan.md. Each entry
 // carries the image reference confirmed in plan task Pre.1 (the `montimage-mti`
 // namespace of registry.montimage.eu, pinned to v1.0.0) instead of the
-// synthetic `<provider-slug>/<shortName>` dockerImage fallback. They sit under
-// `ops-services` until task 0.2 introduces the dedicated attack/target/
-// monitor/reaction categories and reassigns them.
+// synthetic `<provider-slug>/<shortName>` dockerImage fallback. Task 0.2
+// (issue #187) assigns each module to its scenario role category —
+// attack/target/monitor/reaction — which drives node badges and edge
+// validation in the client.
 // ---------------------------------------------------------------------------
 const montimageScenarioServices: ServiceSeed[] = [
   {
     shortName: 'MAG',
     title: 'Montimage Attack Generator (MAG)',
-    categorySlug: 'ops-services',
+    categorySlug: 'attack',
     provider: 'Montimage (MTI)',
     description:
       'Containerized attack-traffic generator distributed by Montimage. Runs as a finite CLI (`mag <attack> --target-ip <ip> --target-port <port>`) sending HTTP attack traffic at the scenario target; in the attack→detect→respond scenario it is deployed as a Kubernetes Job.',
@@ -403,7 +404,7 @@ const montimageScenarioServices: ServiceSeed[] = [
   {
     shortName: 'HTTP-SIM',
     title: 'Simulated HTTP Server (HTTP-SIM)',
-    categorySlug: 'ops-services',
+    categorySlug: 'target',
     provider: 'Montimage (MTI)',
     description:
       'Packaged HTTP victim workload listening on :8080 (`GET /` → 200). The only workload MAG is allowed to reach in the attack→detect→respond scenario; MMT-Probe is injected as a sidecar in its pod to observe the traffic.',
@@ -431,7 +432,7 @@ const montimageScenarioServices: ServiceSeed[] = [
   {
     shortName: 'MMT-PROBE',
     title: 'MMT Traffic Analysis Probe (MMT-PROBE)',
-    categorySlug: 'ops-services',
+    categorySlug: 'monitor',
     provider: 'Montimage (MTI)',
     description:
       'Montimage Monitoring Tool DPI probe (shipped publicly as the `montimage/mmt` image). Injected as a sidecar sharing the target pod network namespace — requires NET_ADMIN and NET_RAW — configured via `mmt-probe.conf` (libconfig) or the `HOST_INTERFACE` env, and emits security alerts/reports consumed by AI4SOAR.',
@@ -459,7 +460,7 @@ const montimageScenarioServices: ServiceSeed[] = [
   {
     shortName: 'AI4SOAR',
     title: 'AI-driven Security Orchestration and Response (AI4SOAR)',
-    categorySlug: 'ops-services',
+    categorySlug: 'reaction',
     provider: 'Montimage (MTI)',
     description:
       'Shuffle-based SOAR stack packaged from the Montimage/ai4soar repository, exposing its API/UI on :5000. Ingests MMT-Probe alerts and applies namespace-scoped Kubernetes playbook responses (NetworkPolicy creation, pod deletion, Job scale-down) through its ServiceAccount.',

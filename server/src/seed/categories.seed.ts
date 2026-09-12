@@ -10,6 +10,11 @@ import { upsertRecord, deprecateStale } from './sync-helpers.js';
  *     Services catalog (INTACT_TOOLBOX table, issue #5).
  *   - the remaining 8 categories back the SECASSURED partner Infrastructure
  *     list (OTHER_SERVICES table, issue #7).
+ *   - `attack` / `target` / `monitor` / `reaction` are the scenario role
+ *     categories for the Montimage attack→detect→respond Kubernetes
+ *     scenario (issue #187); they drive node badges and edge validation
+ *     in the client — see
+ *     docs/playbooks/montimage-attack-detect-respond-plan.md.
  *
  * Any category previously seeded here (the legacy INTACT toolbox taxonomy)
  * that is no longer listed below is deprecated rather than deleted the next
@@ -78,6 +83,31 @@ const categoriesData = [
     slug: 'e-mobility-iiot',
     description:
       'Charging station testing facilities and industrial IoT labs used for cybersecurity experiments',
+  },
+  // Scenario role categories — Montimage attack→detect→respond (issue #187)
+  {
+    name: 'Attack',
+    slug: 'attack',
+    description:
+      'Scenario role: attack-traffic generators launched against a target workload (e.g. Montimage MAG)',
+  },
+  {
+    name: 'Target',
+    slug: 'target',
+    description:
+      'Scenario role: victim workloads that receive attack traffic (e.g. Montimage HTTP-SIM)',
+  },
+  {
+    name: 'Monitor',
+    slug: 'monitor',
+    description:
+      'Scenario role: probes observing the target traffic and emitting detection alerts (e.g. Montimage MMT-Probe)',
+  },
+  {
+    name: 'Reaction',
+    slug: 'reaction',
+    description:
+      'Scenario role: orchestration and response services acting on detection alerts (e.g. Montimage AI4SOAR)',
   },
 ];
 
