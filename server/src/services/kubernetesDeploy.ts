@@ -3,10 +3,15 @@ import {
   CoreV1Api,
   AppsV1Api,
   ApiException,
+  type V1Container,
   type V1Deployment,
-  type V1Service,
   type V1Namespace,
   type V1Pod,
+  type V1PodSpec,
+  type V1SecurityContext,
+  type V1Service,
+  type V1Volume,
+  type V1VolumeMount,
 } from '@kubernetes/client-node';
 import type { IInfrastructure } from '../models/Infrastructure.js';
 import type { IDeploymentSpec } from '../models/Service.js';
@@ -18,14 +23,15 @@ import { AppError } from '../middleware/errorHandler.js';
  * Kubernetes deploy engine.
  *
  * Deploys a scenario topology directly to a Kubernetes cluster instead of
- * delegating to the MAESTRO orchestrator. The engine is intentionally thin:
- * each topology node maps to a single-container `apps/v1` Deployment plus a
- * `v1` NodePort Service (NodePort so the service is reachable without an
- * Ingress controller). `resolveTopologyNodes` resolves each node's merged
- * deployment spec (service `deployment` defaults merged with
- * `node.data.config` overrides) and its typed-edge context; env vars,
- * volumes, capabilities and other spec fields are consumed by the manifest
- * builders added in later playbook tasks.
+ * delegating to the MAESTRO orchestrator. Each topology node maps to a
+ * workload — an `apps/v1` Deployment — plus a `v1` NodePort Service when the
+ * spec exposes a port (NodePort so the service is reachable without an
+ * Ingress controller). A node with `attachMode: 'sidecar'` owns no workload
+ * of its own: it is injected as an extra container into the pod of the node
+ * its `monitors` edge points at. `resolveTopologyNodes` resolves each node's
+ * merged deployment spec (service `deployment` defaults merged with
+ * `node.data.config` overrides) and its typed-edge context; `planWorkloads`
+ * then groups the resolved nodes into pods.
  */
 
 /** Coarse per-service deploy status. */
@@ -475,7 +481,139 @@ function namespaceManifest(namespace: string): V1Namespace {
   };
 }
 
-function deploymentManifest(node: ResolvedNode, namespace: string): V1Deployment {
+/**
+ * One workload-owning node plus the sidecar containers injected into its pod.
+ * A node with `attachMode: 'sidecar'` owns no workload — it rides on the pod
+ * of the node its `monitors` edge points at (task 1.2 of the playbook).
+ */
+interface WorkloadPlan {
+  /** The node whose Deployment/Job owns the pod. */
+  node: ResolvedNode;
+  /** Sidecar nodes injected as extra containers, in resolution order. */
+  sidecars: ResolvedNode[];
+}
+
+/**
+ * Group resolved nodes into pod plans. A `sidecar` node attaches to the first
+ * node its `monitors` edge points at — following the edge chain when that
+ * target is itself a sidecar — and lands as an extra container in the host's
+ * pod. A sidecar with no monitor edge (or a monitor-edge cycle) fails the
+ * deploy with a 400 naming the node: a sidecar cannot exist without a host.
+ */
+function planWorkloads(resolved: ResolvedNode[]): WorkloadPlan[] {
+  const byId = new Map(resolved.map((n) => [n.nodeId, n]));
+  const attached = new Map<string, ResolvedNode[]>();
+
+  const hostFor = (sidecar: ResolvedNode): ResolvedNode => {
+    const seen = new Set<string>([sidecar.nodeId]);
+    let cur = sidecar;
+    while (cur.deployment.attachMode === 'sidecar') {
+      const nextId = cur.edgeContext.monitors[0];
+      const next = nextId ? byId.get(nextId) : undefined;
+      if (!next) {
+        throw new AppError(
+          `Topology node "${cur.nodeId}" has attachMode "sidecar" but no monitor edge to a host node`,
+          400
+        );
+      }
+      if (seen.has(next.nodeId)) {
+        throw new AppError(
+          `Topology node "${sidecar.nodeId}" has attachMode "sidecar" but its monitor edges form a cycle`,
+          400
+        );
+      }
+      seen.add(next.nodeId);
+      cur = next;
+    }
+    return cur;
+  };
+
+  for (const node of resolved) {
+    if (node.deployment.attachMode !== 'sidecar') continue;
+    const host = hostFor(node);
+    const list = attached.get(host.nodeId) ?? [];
+    list.push(node);
+    attached.set(host.nodeId, list);
+  }
+
+  // Plans come back in resolution order, one per non-sidecar node.
+  return resolved
+    .filter((n) => n.deployment.attachMode !== 'sidecar')
+    .map((n) => ({ node: n, sidecars: attached.get(n.nodeId) ?? [] }));
+}
+
+/**
+ * Build the pod container for one node from its merged deployment spec. The
+ * declared `securityContext` applies to this container only — a sidecar's
+ * capabilities never leak onto the host container. Ports are declared only
+ * when the spec exposes the port; `args`, `env`, config-file mounts and the
+ * readiness probe are added by the later manifest-builder tasks.
+ */
+function containerFor(node: ResolvedNode): V1Container {
+  const spec = node.deployment;
+  const container: V1Container = { name: node.name, image: node.image };
+  if (spec.exposePort) {
+    container.ports = [{ containerPort: node.containerPort }];
+  }
+  if (spec.securityContext) {
+    const securityContext: V1SecurityContext = {};
+    if (spec.securityContext.capabilities?.length) {
+      securityContext.capabilities = { add: spec.securityContext.capabilities };
+    }
+    if (spec.securityContext.privileged !== undefined) {
+      securityContext.privileged = spec.securityContext.privileged;
+    }
+    container.securityContext = securityContext;
+  }
+  const mounts: V1VolumeMount[] = (spec.volumes ?? []).map((v) => ({
+    name: v.name,
+    mountPath: v.mountPath,
+  }));
+  if (mounts.length) container.volumeMounts = mounts;
+  return container;
+}
+
+/**
+ * Build the shared pod spec for a workload: the host container plus one
+ * container per attached sidecar. `emptyDir` volumes declared by a sidecar
+ * are pod-level and are also mounted on the host container, so files the
+ * sidecar writes (e.g. MMT-Probe reports) are shared between the containers.
+ */
+function podSpecFor(plan: WorkloadPlan): V1PodSpec {
+  const { node, sidecars } = plan;
+  const host = containerFor(node);
+
+  // Share each sidecar's emptyDir volumes with the host container unless it
+  // already mounts a volume of that name (in which case it is shared already).
+  const hostMounts = new Set((host.volumeMounts ?? []).map((m) => m.name));
+  const shared = sidecars
+    .flatMap((s) => s.deployment.volumes ?? [])
+    .filter((v) => !hostMounts.has(v.name));
+  if (shared.length) {
+    host.volumeMounts = [
+      ...(host.volumeMounts ?? []),
+      ...shared.map((v) => ({ name: v.name, mountPath: v.mountPath })),
+    ];
+  }
+
+  const volumes: V1Volume[] = [];
+  const seen = new Set<string>();
+  for (const member of [node, ...sidecars]) {
+    for (const v of member.deployment.volumes ?? []) {
+      if (seen.has(v.name)) continue;
+      seen.add(v.name);
+      volumes.push({ name: v.name, emptyDir: {} });
+    }
+  }
+
+  const spec: V1PodSpec = { containers: [host, ...sidecars.map(containerFor)] };
+  if (volumes.length) spec.volumes = volumes;
+  if (node.deployment.hostNetwork) spec.hostNetwork = true;
+  return spec;
+}
+
+function deploymentManifest(plan: WorkloadPlan, namespace: string): V1Deployment {
+  const node = plan.node;
   const labels = {
     app: node.name,
     'app.kubernetes.io/managed-by': MANAGED_BY,
@@ -488,15 +626,7 @@ function deploymentManifest(node: ResolvedNode, namespace: string): V1Deployment
       selector: { matchLabels: { app: node.name } },
       template: {
         metadata: { labels },
-        spec: {
-          containers: [
-            {
-              name: node.name,
-              image: node.image,
-              ports: [{ containerPort: node.containerPort }],
-            },
-          ],
-        },
+        spec: podSpecFor(plan),
       },
     },
   };
@@ -525,7 +655,10 @@ function serviceManifest(node: ResolvedNode, namespace: string): V1Service {
 
 /**
  * Deploy a scenario topology into a fresh per-execution namespace: create the
- * namespace, then one Deployment + one NodePort Service per topology node.
+ * namespace, then one Deployment + one NodePort Service per pod-owning node.
+ * Sidecar nodes own no Deployment or Service — they land as extra containers
+ * in their host's pod; their result rows carry the host's resource name so
+ * status and log polling resolve under the pod they actually run in.
  *
  * Uses `Promise.all` for batch Deployment/Service creation. On mid-deploy
  * failure, tears down already-created resources (best-effort) before re-throwing.
@@ -535,34 +668,53 @@ export async function deployTopology(
   opts: DeployTopologyOptions
 ): Promise<DeployResult> {
   const resolved = resolveTopologyNodes(opts.nodes, opts.services, opts.edges);
+  // Throws AppError(400) for a sidecar with no monitor edge — before any
+  // cluster call, so nothing is created for a topology that cannot deploy.
+  const plans = planWorkloads(resolved);
+  const hostByNode = new Map<string, ResolvedNode>();
+  for (const plan of plans) {
+    hostByNode.set(plan.node.nodeId, plan.node);
+    for (const sidecar of plan.sidecars) hostByNode.set(sidecar.nodeId, plan.node);
+  }
   const host = endpointHost(opts.endpoint);
 
   try {
     await clients.core.createNamespace({ body: namespaceManifest(opts.namespace) });
 
     // Batch create all Deployments + Services concurrently via Promise.all.
-    const results = await Promise.all(
-      resolved.map(async (node) => {
+    const nodePorts = new Map<string, number | undefined>();
+    await Promise.all(
+      plans.map(async (plan) => {
+        const node = plan.node;
         await clients.apps.createNamespacedDeployment({
           namespace: opts.namespace,
-          body: deploymentManifest(node, opts.namespace),
+          body: deploymentManifest(plan, opts.namespace),
         });
         const created = await clients.core.createNamespacedService({
           namespace: opts.namespace,
           body: serviceManifest(node, opts.namespace),
         });
-        const nodePort = created.spec?.ports?.[0]?.nodePort;
-        return {
-          nodeId: node.nodeId,
-          serviceId: node.serviceId,
-          name: node.name,
-          uiType: node.uiType,
-          status: 'pending' as DeployStatus,
-          nodePort,
-          dashboardUrl: nodePort ? `http://${host}:${nodePort}` : undefined,
-        };
+        nodePorts.set(node.nodeId, created.spec?.ports?.[0]?.nodePort);
       })
     );
+
+    // One result row per topology node, in resolution order. A sidecar row
+    // points at its host's resource name (no workload of its own exists to
+    // poll) and carries no port — the host's Service is the only endpoint.
+    const results = resolved.map((node) => {
+      const owner = hostByNode.get(node.nodeId) ?? node;
+      const nodePort =
+        node.deployment.attachMode === 'sidecar' ? undefined : nodePorts.get(owner.nodeId);
+      return {
+        nodeId: node.nodeId,
+        serviceId: node.serviceId,
+        name: owner.name,
+        uiType: node.uiType,
+        status: 'pending' as DeployStatus,
+        nodePort,
+        dashboardUrl: nodePort ? `http://${host}:${nodePort}` : undefined,
+      };
+    });
 
     return { namespace: opts.namespace, services: results };
   } catch (err) {
@@ -633,8 +785,10 @@ export async function getDeploymentStatus(
     const statuses: { name: string; status: DeployStatus }[] = [];
 
     // Build a combined "app in (a,b,c)" selector so a single list call
-    // replaces the prior per-service serial loop.
-    const combinedSelector = `app in (${opts.names.join(',')})`;
+    // replaces the prior per-service serial loop. Names are deduplicated —
+    // sidecar rows share their host's resource name, and Kubernetes rejects
+    // duplicate values in a set-based selector.
+    const combinedSelector = `app in (${[...new Set(opts.names)].join(',')})`;
 
     // Fetch all pods for the requested services in one API call.
     const allPods = await clients.core.listNamespacedPod({

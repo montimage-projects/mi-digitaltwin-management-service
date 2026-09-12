@@ -95,6 +95,22 @@ function makeNode(id: string, data: Record<string, unknown> = {}): unknown {
   return { id, data: { serviceId: SERVICE_ID, ...data } };
 }
 
+/** Fake `K8sClients` — every cluster call is a `vi.fn` returning success. */
+function makeClients() {
+  return {
+    core: {
+      createNamespace: vi.fn(async () => ({})),
+      createNamespacedService: vi.fn(async () => ({ spec: { ports: [{ nodePort: 31567 }] } })),
+      deleteNamespace: vi.fn(async () => ({})),
+      listNamespacedPod: vi.fn(async () => ({ items: [] })),
+    },
+    apps: {
+      createNamespacedDeployment: vi.fn(async () => ({})),
+      readNamespacedDeployment: vi.fn(async () => ({})),
+    },
+  };
+}
+
 describe('deriveNamespace', () => {
   test('produces a deterministic, DNS-1123-safe namespace name', () => {
     const ns = deriveNamespace('507f1f77bcf86cd799439011', '507f191e810c19729de860ea');
@@ -434,21 +450,6 @@ describe('resolveTopologyNodes — deployment spec and edge context', () => {
 });
 
 describe('deployTopology', () => {
-  function makeClients() {
-    return {
-      core: {
-        createNamespace: vi.fn(async () => ({})),
-        createNamespacedService: vi.fn(async () => ({ spec: { ports: [{ nodePort: 31567 }] } })),
-        deleteNamespace: vi.fn(async () => ({})),
-        listNamespacedPod: vi.fn(async () => ({ items: [] })),
-      },
-      apps: {
-        createNamespacedDeployment: vi.fn(async () => ({})),
-        readNamespacedDeployment: vi.fn(async () => ({})),
-      },
-    };
-  }
-
   test('creates deployments and services concurrently via Promise.all', async () => {
     const depCalls: number[] = [];
     const clients = {
@@ -639,6 +640,224 @@ describe('deployTopology', () => {
       expect(err).toBeInstanceOf(AppError);
       expect((err as AppError).statusCode).toBe(502);
     }
+  });
+});
+
+describe('deployTopology — sidecar grouping (issue #191)', () => {
+  const SIDECAR_ID = '507f1f77bcf86cd799439012';
+  const HOST_ID = '507f1f77bcf86cd799439011';
+  type DeploymentSpec = NonNullable<ServiceImageSource['deployment']>;
+
+  function hostService(overrides: Partial<DeploymentSpec> = {}): ServiceImageSource {
+    return makeService({
+      _id: HOST_ID,
+      deployment: {
+        kind: 'Deployment',
+        role: 'target',
+        containerPort: 8080,
+        exposePort: true,
+        ...overrides,
+      },
+    });
+  }
+
+  function sidecarService(
+    id: string,
+    deployment: Partial<DeploymentSpec> = {}
+  ): ServiceImageSource {
+    return makeService({
+      _id: id,
+      deployment: {
+        kind: 'Deployment',
+        role: 'monitor',
+        attachMode: 'sidecar',
+        exposePort: false,
+        ...deployment,
+      },
+    });
+  }
+
+  function sidecarNode(id: string, serviceId = SIDECAR_ID): unknown {
+    return { id, data: { serviceId } };
+  }
+
+  function hostNode(id = 'http-sim'): unknown {
+    return { id, data: { serviceId: HOST_ID } };
+  }
+
+  interface DeploymentBody {
+    body: {
+      spec: {
+        template: {
+          spec: {
+            containers: {
+              name: string;
+              securityContext?: { capabilities?: { add?: string[] } };
+              volumeMounts?: { name: string; mountPath: string }[];
+            }[];
+            volumes?: { name: string; emptyDir?: object }[];
+          };
+        };
+      };
+    };
+  }
+
+  function deploymentBody(clients: ReturnType<typeof makeClients>): DeploymentBody['body'] {
+    return (firstCallArg(clients.apps.createNamespacedDeployment) as DeploymentBody).body;
+  }
+
+  test('injects a sidecar node as an extra container in the host Deployment', async () => {
+    const clients = makeClients();
+    const result = await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [hostNode(), sidecarNode('mmt-probe')],
+      edges: [{ source: 'mmt-probe', target: 'http-sim', type: 'monitors' }],
+      services: [hostService(), sidecarService(SIDECAR_ID)],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    // One Deployment for the host only; its pod holds host + sidecar.
+    expect(clients.apps.createNamespacedDeployment).toHaveBeenCalledTimes(1);
+    const podSpec = deploymentBody(clients).spec.template.spec;
+    expect(podSpec.containers.map((c) => c.name)).toEqual(['http-sim', 'mmt-probe']);
+
+    // The sidecar produces no Service and no Deployment of its own.
+    expect(clients.core.createNamespacedService).toHaveBeenCalledTimes(1);
+    expect(
+      (
+        firstCallArg(clients.core.createNamespacedService) as {
+          body: { metadata: { name: string } };
+        }
+      ).body.metadata.name
+    ).toBe('http-sim');
+
+    // Still one result row per node; the sidecar row points at the host's
+    // resource name so status/log polling finds the pod it runs in.
+    expect(result.services).toHaveLength(2);
+    const sidecarRow = result.services.find((s) => s.nodeId === 'mmt-probe');
+    expect(sidecarRow?.name).toBe('http-sim');
+    expect(sidecarRow?.nodePort).toBeUndefined();
+    expect(sidecarRow?.dashboardUrl).toBeUndefined();
+  });
+
+  test('adds one container per attached sidecar', async () => {
+    const clients = makeClients();
+    const SECOND_SIDECAR = '507f1f77bcf86cd799439013';
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [hostNode(), sidecarNode('mmt-probe'), sidecarNode('mmt-probe-2', SECOND_SIDECAR)],
+      edges: [
+        { source: 'mmt-probe', target: 'http-sim', type: 'monitors' },
+        { source: 'mmt-probe-2', target: 'http-sim', type: 'monitors' },
+      ],
+      services: [hostService(), sidecarService(SIDECAR_ID), sidecarService(SECOND_SIDECAR)],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const podSpec = deploymentBody(clients).spec.template.spec;
+    expect(podSpec.containers.map((c) => c.name)).toEqual(['http-sim', 'mmt-probe', 'mmt-probe-2']);
+  });
+
+  test('applies the sidecar securityContext only to its own container', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [hostNode(), sidecarNode('mmt-probe')],
+      edges: [{ source: 'mmt-probe', target: 'http-sim', type: 'monitors' }],
+      services: [
+        hostService(),
+        sidecarService(SIDECAR_ID, {
+          securityContext: { capabilities: ['NET_ADMIN', 'NET_RAW'] },
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const [host, sidecar] = deploymentBody(clients).spec.template.spec.containers;
+    expect(host.securityContext).toBeUndefined();
+    expect(sidecar.securityContext?.capabilities?.add).toEqual(['NET_ADMIN', 'NET_RAW']);
+  });
+
+  test('shares a sidecar emptyDir volume between host and sidecar containers', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [hostNode(), sidecarNode('mmt-probe')],
+      edges: [{ source: 'mmt-probe', target: 'http-sim', type: 'monitors' }],
+      services: [
+        hostService(),
+        sidecarService(SIDECAR_ID, {
+          volumes: [{ name: 'mmt-reports', mountPath: '/opt/mmt/reports', emptyDir: true }],
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const podSpec = deploymentBody(clients).spec.template.spec;
+    expect(podSpec.volumes).toEqual([{ name: 'mmt-reports', emptyDir: {} }]);
+    for (const container of podSpec.containers) {
+      expect(container.volumeMounts).toContainEqual({
+        name: 'mmt-reports',
+        mountPath: '/opt/mmt/reports',
+      });
+    }
+  });
+
+  test('follows a monitor edge chain when the monitored node is itself a sidecar', async () => {
+    const clients = makeClients();
+    const SECOND_SIDECAR = '507f1f77bcf86cd799439013';
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [hostNode(), sidecarNode('inner'), sidecarNode('outer', SECOND_SIDECAR)],
+      edges: [
+        { source: 'inner', target: 'http-sim', type: 'monitors' },
+        { source: 'outer', target: 'inner', type: 'monitors' },
+      ],
+      services: [hostService(), sidecarService(SIDECAR_ID), sidecarService(SECOND_SIDECAR)],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    const podSpec = deploymentBody(clients).spec.template.spec;
+    expect(podSpec.containers.map((c) => c.name)).toEqual(['http-sim', 'inner', 'outer']);
+    expect(clients.apps.createNamespacedDeployment).toHaveBeenCalledTimes(1);
+  });
+
+  test('fails deploy with a 400 naming the node when a sidecar has no monitor edge', async () => {
+    const clients = makeClients();
+    try {
+      await deployTopology(clients as never, {
+        namespace: 'secsim-a-b',
+        nodes: [hostNode(), sidecarNode('mmt-probe')],
+        edges: [],
+        services: [hostService(), sidecarService(SIDECAR_ID)],
+        endpoint: 'https://10.0.0.1:6443',
+      });
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AppError);
+      expect((err as AppError).statusCode).toBe(400);
+      expect((err as AppError).message).toContain('mmt-probe');
+    }
+    // The 400 fires before any cluster call — nothing is created or torn down.
+    expect(clients.core.createNamespace).not.toHaveBeenCalled();
+  });
+
+  test('fails deploy with a 400 on a monitor-edge cycle between sidecars', async () => {
+    const clients = makeClients();
+    const SECOND_SIDECAR = '507f1f77bcf86cd799439013';
+    await expect(
+      deployTopology(clients as never, {
+        namespace: 'secsim-a-b',
+        nodes: [hostNode(), sidecarNode('a-side'), sidecarNode('b-side', SECOND_SIDECAR)],
+        edges: [
+          { source: 'a-side', target: 'b-side', type: 'monitors' },
+          { source: 'b-side', target: 'a-side', type: 'monitors' },
+        ],
+        services: [hostService(), sidecarService(SIDECAR_ID), sidecarService(SECOND_SIDECAR)],
+        endpoint: 'https://10.0.0.1:6443',
+      })
+    ).rejects.toThrow(AppError);
+    expect(clients.core.createNamespace).not.toHaveBeenCalled();
   });
 });
 
