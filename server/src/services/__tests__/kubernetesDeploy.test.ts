@@ -1197,6 +1197,170 @@ describe('deployTopology — Job, ConfigMap and RBAC manifests (issue #192)', ()
   });
 });
 
+describe('edge-derived environment variables (issue #193)', () => {
+  const TARGET_ID = '507f1f77bcf86cd799439011';
+  const REACTION_ID = '507f1f77bcf86cd799439012';
+  const ATTACK_ID = '507f1f77bcf86cd799439013';
+  const MONITOR_ID = '507f1f77bcf86cd799439014';
+  type DeploymentSpec = NonNullable<ServiceImageSource['deployment']>;
+  type EnvEntry = NonNullable<DeploymentSpec['env']>[number];
+
+  const targetSvc = () =>
+    makeService({
+      _id: TARGET_ID,
+      deployment: {
+        kind: 'Deployment',
+        role: 'target',
+        containerPort: 8080,
+        exposePort: true,
+      },
+    });
+  const reactionSvc = () =>
+    makeService({
+      _id: REACTION_ID,
+      deployment: {
+        kind: 'Deployment',
+        role: 'reaction',
+        containerPort: 5000,
+        exposePort: true,
+      },
+    });
+  const attackSvc = (env: EnvEntry[]) =>
+    makeService({
+      _id: ATTACK_ID,
+      deployment: { kind: 'Job', role: 'attack', exposePort: false, env },
+    });
+  const monitorSvc = (env: EnvEntry[]) =>
+    makeService({
+      _id: MONITOR_ID,
+      deployment: { kind: 'Deployment', role: 'monitor', exposePort: false, env },
+    });
+
+  const node = (id: string, serviceId: string, config?: unknown) => ({
+    id,
+    data: { serviceId, ...(config ? { config } : {}) },
+  });
+
+  test("fromEdge 'target' resolves to http://<attack-target>:<port>", () => {
+    const resolved = resolveTopologyNodes(
+      [node('mag', ATTACK_ID), node('http-sim', TARGET_ID)],
+      [attackSvc([{ name: 'TARGET_URL', fromEdge: 'target' }]), targetSvc()],
+      [{ source: 'mag', target: 'http-sim', type: 'attacks' }]
+    );
+    expect(resolved[0].deployment.env).toEqual([
+      { name: 'TARGET_URL', fromEdge: 'target', value: 'http://http-sim:8080' },
+    ]);
+  });
+
+  test("fromEdge 'reaction' resolves to http://<notify-target>:<port>", () => {
+    const resolved = resolveTopologyNodes(
+      [node('mmt-probe', MONITOR_ID), node('ai4soar', REACTION_ID)],
+      [monitorSvc([{ name: 'ALERT_WEBHOOK_URL', fromEdge: 'reaction' }]), reactionSvc()],
+      [{ source: 'mmt-probe', target: 'ai4soar', type: 'notifies' }]
+    );
+    expect(resolved[0].deployment.env).toEqual([
+      { name: 'ALERT_WEBHOOK_URL', fromEdge: 'reaction', value: 'http://ai4soar:5000' },
+    ]);
+  });
+
+  test('resolved env lands on the deployed container', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [node('mag', ATTACK_ID), node('http-sim', TARGET_ID)],
+      edges: [{ source: 'mag', target: 'http-sim', type: 'attacks' }],
+      services: [attackSvc([{ name: 'TARGET_URL', fromEdge: 'target' }]), targetSvc()],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+    const jobArg = firstCallArg(clients.batch.createNamespacedJob) as {
+      body: {
+        spec: { template: { spec: { containers: { env?: { name: string; value: string }[] }[] } } };
+      };
+    };
+    expect(jobArg.body.spec.template.spec.containers[0].env).toEqual([
+      { name: 'TARGET_URL', value: 'http://http-sim:8080' },
+    ]);
+  });
+
+  test('a fromEdge target env with no attack edge fails with a 400 naming the node', () => {
+    expect(() =>
+      resolveTopologyNodes(
+        [node('mag', ATTACK_ID), node('http-sim', TARGET_ID)],
+        [attackSvc([{ name: 'TARGET_URL', fromEdge: 'target' }]), targetSvc()],
+        []
+      )
+    ).toThrow(AppError);
+    try {
+      resolveTopologyNodes(
+        [node('mag', ATTACK_ID), node('http-sim', TARGET_ID)],
+        [attackSvc([{ name: 'TARGET_URL', fromEdge: 'target' }]), targetSvc()],
+        []
+      );
+      expect.unreachable();
+    } catch (err) {
+      expect((err as AppError).statusCode).toBe(400);
+      expect((err as AppError).message).toContain('mag');
+      expect((err as AppError).message).toContain('target');
+    }
+  });
+
+  test('a fromEdge reaction env with no notify edge fails with a 400 naming the node', () => {
+    try {
+      resolveTopologyNodes(
+        [node('mmt-probe', MONITOR_ID), node('ai4soar', REACTION_ID)],
+        [monitorSvc([{ name: 'ALERT_WEBHOOK_URL', fromEdge: 'reaction' }]), reactionSvc()],
+        // An unrelated edge does not satisfy the requirement.
+        [{ source: 'mmt-probe', target: 'ai4soar', type: 'attacks' }]
+      );
+      expect.unreachable();
+    } catch (err) {
+      expect((err as AppError).statusCode).toBe(400);
+      expect((err as AppError).message).toContain('mmt-probe');
+      expect((err as AppError).message).toContain('reaction');
+    }
+  });
+
+  test('a node-level config.env literal overrides the catalog fromEdge entry', () => {
+    const resolved = resolveTopologyNodes(
+      [
+        node('mag', ATTACK_ID, {
+          env: [{ name: 'TARGET_URL', value: 'http://custom-target:1234' }],
+        }),
+        node('http-sim', TARGET_ID),
+      ],
+      [attackSvc([{ name: 'TARGET_URL', fromEdge: 'target' }]), targetSvc()],
+      // No attack edge — the literal override wins outright.
+      []
+    );
+    expect(resolved[0].deployment.env).toEqual([
+      { name: 'TARGET_URL', value: 'http://custom-target:1234' },
+    ]);
+  });
+
+  test('a node-level config.env fromEdge entry also resolves against the edges', () => {
+    const resolved = resolveTopologyNodes(
+      [
+        node('mag', ATTACK_ID, { env: [{ name: 'TARGET_URL', fromEdge: 'target' }] }),
+        node('http-sim', TARGET_ID),
+      ],
+      [attackSvc([]), targetSvc()],
+      [{ source: 'mag', target: 'http-sim', type: 'attacks' }]
+    );
+    expect(resolved[0].deployment.env).toEqual([
+      { name: 'TARGET_URL', fromEdge: 'target', value: 'http://http-sim:8080' },
+    ]);
+  });
+
+  test('literal catalog env passes through unchanged', () => {
+    const resolved = resolveTopologyNodes(
+      [node('mmt-probe', MONITOR_ID)],
+      [monitorSvc([{ name: 'HOST_INTERFACE', value: 'eth0' }])],
+      []
+    );
+    expect(resolved[0].deployment.env).toEqual([{ name: 'HOST_INTERFACE', value: 'eth0' }]);
+  });
+});
+
 describe('getDeploymentStatus — Job workloads (issue #192)', () => {
   function jobClients(job: unknown) {
     return {

@@ -387,7 +387,7 @@ export function resolveTopologyNodes(
   );
   const edgeContexts = buildEdgeContexts(nodeIds, edges);
 
-  return nodes.map((raw, index) => {
+  const resolved = nodes.map((raw, index) => {
     const node = (raw ?? {}) as RawTopologyNode;
     const nodeId = node.id ?? `node-${index}`;
     const serviceId = node.data?.serviceId;
@@ -433,6 +433,57 @@ export function resolveTopologyNodes(
       },
     };
   });
+
+  resolveEdgeEnv(resolved);
+  return resolved;
+}
+
+/**
+ * Resolve `env[].fromEdge` entries against each node's typed-edge context
+ * (issue #193 / playbook task 1.4):
+ *
+ * - `fromEdge: 'target'` → the endpoint of the node the source node reaches
+ *   through an attack edge (`edgeContext.targets`), rendered
+ *   `http://<service-name>:<port>` — the peer's cluster DNS name and Service
+ *   port (e.g. MAG's `TARGET_URL` → `http://http-sim:8080`).
+ * - `fromEdge: 'reaction'` → the endpoint of the node a notify edge points
+ *   at (`edgeContext.notifies`), rendered the same way (e.g. MMT-Probe's
+ *   `ALERT_WEBHOOK_URL` → `http://ai4soar:5000`).
+ *
+ * Resolution runs after every node has been named, so the peer's resource
+ * name is available. Declaring `fromEdge` makes the matching edge required:
+ * with no matching edge the deploy fails with a 400 naming the node and the
+ * edge type. Node-level `config.env` overrides merge by name before this
+ * pass (`mergeEnvByName`), so a literal override replaces the catalog's
+ * `fromEdge` entry outright and needs no edge at all — that is the
+ * documented override precedence.
+ */
+function resolveEdgeEnv(resolved: ResolvedNode[]): void {
+  const byNodeId = new Map(resolved.map((n) => [n.nodeId, n]));
+  for (const node of resolved) {
+    const env = node.deployment.env;
+    if (!env?.some((e) => e.fromEdge)) continue;
+    // Rebuild the list rather than mutating entries in place: catalog env
+    // entry objects are shared with the service document when no node-level
+    // override merged, and must not be polluted across deploys.
+    node.deployment.env = env.map((entry) => {
+      if (!entry.fromEdge) return entry;
+      const peerIds =
+        entry.fromEdge === 'target'
+          ? node.edgeContext.targets
+          : entry.fromEdge === 'reaction'
+            ? node.edgeContext.notifies
+            : [];
+      const peer = peerIds.length ? byNodeId.get(peerIds[0]) : undefined;
+      if (!peer) {
+        throw new AppError(
+          `Topology node "${node.nodeId}" env "${entry.name}" requires a '${entry.fromEdge}' edge but no matching edge exists`,
+          400
+        );
+      }
+      return { ...entry, value: `http://${peer.name}:${peer.containerPort}` };
+    });
+  }
 }
 
 /** Extract the host from a cluster endpoint URL for building NodePort URLs. */
@@ -589,8 +640,9 @@ function configMapName(node: ResolvedNode): string {
  * Build the pod container for one node from its merged deployment spec. The
  * declared `securityContext` applies to this container only — a sidecar's
  * capabilities never leak onto the host container. Ports are declared only
- * when the spec exposes the port; `args`, config-file mounts and the
- * readiness probe come straight from the resolved spec.
+ * when the spec exposes the port; `env` values are emitted as resolved by
+ * `resolveTopologyNodes` (edge-derived `fromEdge` entries already carry their
+ * concrete `value` by then).
  */
 function containerFor(node: ResolvedNode): V1Container {
   const spec = node.deployment;
@@ -600,6 +652,12 @@ function containerFor(node: ResolvedNode): V1Container {
   }
   if (spec.args?.length) {
     container.args = spec.args;
+  }
+  // `fromEdge` entries already carry their resolved `value` (resolveEdgeEnv
+  // throws before manifests are built when an edge is missing); a declared
+  // env with no value emits an explicitly-empty string.
+  if (spec.env?.length) {
+    container.env = spec.env.map((e) => ({ name: e.name, value: e.value ?? '' }));
   }
   if (spec.securityContext) {
     const securityContext: V1SecurityContext = {};
