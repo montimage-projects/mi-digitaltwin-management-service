@@ -2,11 +2,23 @@ import {
   KubeConfig,
   CoreV1Api,
   AppsV1Api,
+  BatchV1Api,
+  RbacAuthorizationV1Api,
   ApiException,
+  type V1ConfigMap,
+  type V1Container,
   type V1Deployment,
-  type V1Service,
+  type V1Job,
   type V1Namespace,
   type V1Pod,
+  type V1PodSpec,
+  type V1Role,
+  type V1RoleBinding,
+  type V1SecurityContext,
+  type V1Service,
+  type V1ServiceAccount,
+  type V1Volume,
+  type V1VolumeMount,
 } from '@kubernetes/client-node';
 import type { IInfrastructure } from '../models/Infrastructure.js';
 import type { IDeploymentSpec } from '../models/Service.js';
@@ -18,14 +30,18 @@ import { AppError } from '../middleware/errorHandler.js';
  * Kubernetes deploy engine.
  *
  * Deploys a scenario topology directly to a Kubernetes cluster instead of
- * delegating to the MAESTRO orchestrator. The engine is intentionally thin:
- * each topology node maps to a single-container `apps/v1` Deployment plus a
- * `v1` NodePort Service (NodePort so the service is reachable without an
- * Ingress controller). `resolveTopologyNodes` resolves each node's merged
- * deployment spec (service `deployment` defaults merged with
- * `node.data.config` overrides) and its typed-edge context; env vars,
- * volumes, capabilities and other spec fields are consumed by the manifest
- * builders added in later playbook tasks.
+ * delegating to the MAESTRO orchestrator. Each topology node maps to a
+ * workload — an `apps/v1` Deployment, or a `batch/v1` Job for finite runs —
+ * plus a `v1` NodePort Service when the spec exposes a port (NodePort so the
+ * service is reachable without an Ingress controller). A node with
+ * `attachMode: 'sidecar'` owns no workload of its own: it is injected as an
+ * extra container into the pod of the node its `monitors` edge points at.
+ * `resolveTopologyNodes` resolves each node's merged deployment spec (service
+ * `deployment` defaults merged with `node.data.config` overrides) and its
+ * typed-edge context; `planWorkloads` then groups the resolved nodes into
+ * pods. Nodes may also emit a `v1` ConfigMap (`configFiles`) and a
+ * namespace-scoped `ServiceAccount`/`Role`/`RoleBinding` triple (`rbac`) —
+ * never a ClusterRole or ClusterRoleBinding.
  */
 
 /** Coarse per-service deploy status. */
@@ -35,6 +51,10 @@ export type DeployStatus = 'pending' | 'running' | 'failed';
 export interface K8sClients {
   core: CoreV1Api;
   apps: AppsV1Api;
+  /** Job creation and status for `kind: 'Job'` nodes. */
+  batch: BatchV1Api;
+  /** ServiceAccount-bound Role/RoleBinding for nodes declaring `rbac`. */
+  rbac: RbacAuthorizationV1Api;
 }
 
 /**
@@ -367,7 +387,7 @@ export function resolveTopologyNodes(
   );
   const edgeContexts = buildEdgeContexts(nodeIds, edges);
 
-  return nodes.map((raw, index) => {
+  const resolved = nodes.map((raw, index) => {
     const node = (raw ?? {}) as RawTopologyNode;
     const nodeId = node.id ?? `node-${index}`;
     const serviceId = node.data?.serviceId;
@@ -413,6 +433,57 @@ export function resolveTopologyNodes(
       },
     };
   });
+
+  resolveEdgeEnv(resolved);
+  return resolved;
+}
+
+/**
+ * Resolve `env[].fromEdge` entries against each node's typed-edge context
+ * (issue #193 / playbook task 1.4):
+ *
+ * - `fromEdge: 'target'` → the endpoint of the node the source node reaches
+ *   through an attack edge (`edgeContext.targets`), rendered
+ *   `http://<service-name>:<port>` — the peer's cluster DNS name and Service
+ *   port (e.g. MAG's `TARGET_URL` → `http://http-sim:8080`).
+ * - `fromEdge: 'reaction'` → the endpoint of the node a notify edge points
+ *   at (`edgeContext.notifies`), rendered the same way (e.g. MMT-Probe's
+ *   `ALERT_WEBHOOK_URL` → `http://ai4soar:5000`).
+ *
+ * Resolution runs after every node has been named, so the peer's resource
+ * name is available. Declaring `fromEdge` makes the matching edge required:
+ * with no matching edge the deploy fails with a 400 naming the node and the
+ * edge type. Node-level `config.env` overrides merge by name before this
+ * pass (`mergeEnvByName`), so a literal override replaces the catalog's
+ * `fromEdge` entry outright and needs no edge at all — that is the
+ * documented override precedence.
+ */
+function resolveEdgeEnv(resolved: ResolvedNode[]): void {
+  const byNodeId = new Map(resolved.map((n) => [n.nodeId, n]));
+  for (const node of resolved) {
+    const env = node.deployment.env;
+    if (!env?.some((e) => e.fromEdge)) continue;
+    // Rebuild the list rather than mutating entries in place: catalog env
+    // entry objects are shared with the service document when no node-level
+    // override merged, and must not be polluted across deploys.
+    node.deployment.env = env.map((entry) => {
+      if (!entry.fromEdge) return entry;
+      const peerIds =
+        entry.fromEdge === 'target'
+          ? node.edgeContext.targets
+          : entry.fromEdge === 'reaction'
+            ? node.edgeContext.notifies
+            : [];
+      const peer = peerIds.length ? byNodeId.get(peerIds[0]) : undefined;
+      if (!peer) {
+        throw new AppError(
+          `Topology node "${node.nodeId}" env "${entry.name}" requires a '${entry.fromEdge}' edge but no matching edge exists`,
+          400
+        );
+      }
+      return { ...entry, value: `http://${peer.name}:${peer.containerPort}` };
+    });
+  }
 }
 
 /** Extract the host from a cluster endpoint URL for building NodePort URLs. */
@@ -425,7 +496,8 @@ function endpointHost(endpoint: string): string {
 }
 
 /**
- * Build `CoreV1Api` + `AppsV1Api` clients for a target infrastructure.
+ * Build the `CoreV1Api` + `AppsV1Api` + `BatchV1Api` +
+ * `RbacAuthorizationV1Api` clients for a target infrastructure.
  *
  * The encrypted credential is either full kubeconfig content or a bearer token
  * (per the "API token or kubeconfig content" hint in the infrastructure form).
@@ -460,6 +532,8 @@ export function buildClientFromInfrastructure(infrastructure: IInfrastructure): 
     return {
       core: kc.makeApiClient(CoreV1Api),
       apps: kc.makeApiClient(AppsV1Api),
+      batch: kc.makeApiClient(BatchV1Api),
+      rbac: kc.makeApiClient(RbacAuthorizationV1Api),
     };
   } catch (err) {
     throw toAppError(err, 'building the Kubernetes client');
@@ -475,7 +549,206 @@ function namespaceManifest(namespace: string): V1Namespace {
   };
 }
 
-function deploymentManifest(node: ResolvedNode, namespace: string): V1Deployment {
+/**
+ * One workload-owning node plus the sidecar containers injected into its pod.
+ * A node with `attachMode: 'sidecar'` owns no workload — it rides on the pod
+ * of the node its `monitors` edge points at (task 1.2 of the playbook).
+ */
+interface WorkloadPlan {
+  /** The node whose Deployment/Job owns the pod. */
+  node: ResolvedNode;
+  /** Sidecar nodes injected as extra containers, in resolution order. */
+  sidecars: ResolvedNode[];
+}
+
+/**
+ * Group resolved nodes into pod plans. A `sidecar` node attaches to the first
+ * node its `monitors` edge points at — following the edge chain when that
+ * target is itself a sidecar — and lands as an extra container in the host's
+ * pod. A sidecar with no monitor edge (or a monitor-edge cycle) fails the
+ * deploy with a 400 naming the node: a sidecar cannot exist without a host.
+ */
+function planWorkloads(resolved: ResolvedNode[]): WorkloadPlan[] {
+  const byId = new Map(resolved.map((n) => [n.nodeId, n]));
+  const attached = new Map<string, ResolvedNode[]>();
+
+  const hostFor = (sidecar: ResolvedNode): ResolvedNode => {
+    const seen = new Set<string>([sidecar.nodeId]);
+    let cur = sidecar;
+    while (cur.deployment.attachMode === 'sidecar') {
+      const nextId = cur.edgeContext.monitors[0];
+      const next = nextId ? byId.get(nextId) : undefined;
+      if (!next) {
+        throw new AppError(
+          `Topology node "${cur.nodeId}" has attachMode "sidecar" but no monitor edge to a host node`,
+          400
+        );
+      }
+      if (seen.has(next.nodeId)) {
+        throw new AppError(
+          `Topology node "${sidecar.nodeId}" has attachMode "sidecar" but its monitor edges form a cycle`,
+          400
+        );
+      }
+      seen.add(next.nodeId);
+      cur = next;
+    }
+    return cur;
+  };
+
+  for (const node of resolved) {
+    if (node.deployment.attachMode !== 'sidecar') continue;
+    const host = hostFor(node);
+    const list = attached.get(host.nodeId) ?? [];
+    list.push(node);
+    attached.set(host.nodeId, list);
+  }
+
+  // Plans come back in resolution order, one per non-sidecar node.
+  return resolved
+    .filter((n) => n.deployment.attachMode !== 'sidecar')
+    .map((n) => ({ node: n, sidecars: attached.get(n.nodeId) ?? [] }));
+}
+
+/**
+ * One `configFiles` entry resolved to its ConfigMap key. `mountPath` is a
+ * file path (e.g. `/opt/mmt/probe/mmt-probe.conf`), so the key is the
+ * filename — the ConfigMap volume then mounts each file individually via
+ * `subPath`. Non-filename-safe or colliding basenames fall back to
+ * `file-<index>` so keys stay unique and ConfigMap-key legal
+ * (`[-._a-zA-Z0-9]+`).
+ */
+function configFileEntries(
+  node: ResolvedNode
+): { key: string; mountPath: string; content: string }[] {
+  const used = new Set<string>();
+  return (node.deployment.configFiles ?? []).map((file, index) => {
+    const base = file.mountPath.split('/').filter(Boolean).pop() ?? '';
+    let key = /^[-._a-zA-Z0-9]+$/.test(base) && base !== '.' && base !== '..' ? base : '';
+    if (!key || used.has(key)) key = `file-${index}`;
+    used.add(key);
+    return { key, mountPath: file.mountPath, content: file.content };
+  });
+}
+
+/** Name of the per-node ConfigMap (and its pod volume) holding configFiles. */
+function configMapName(node: ResolvedNode): string {
+  return `${node.name}-config`;
+}
+
+/**
+ * Build the pod container for one node from its merged deployment spec. The
+ * declared `securityContext` applies to this container only — a sidecar's
+ * capabilities never leak onto the host container. Ports are declared only
+ * when the spec exposes the port; `env` values are emitted as resolved by
+ * `resolveTopologyNodes` (edge-derived `fromEdge` entries already carry their
+ * concrete `value` by then).
+ */
+function containerFor(node: ResolvedNode): V1Container {
+  const spec = node.deployment;
+  const container: V1Container = { name: node.name, image: node.image };
+  if (spec.exposePort) {
+    container.ports = [{ containerPort: node.containerPort }];
+  }
+  if (spec.args?.length) {
+    container.args = spec.args;
+  }
+  // `fromEdge` entries already carry their resolved `value` (resolveEdgeEnv
+  // throws before manifests are built when an edge is missing); a declared
+  // env with no value emits an explicitly-empty string.
+  if (spec.env?.length) {
+    container.env = spec.env.map((e) => ({ name: e.name, value: e.value ?? '' }));
+  }
+  if (spec.securityContext) {
+    const securityContext: V1SecurityContext = {};
+    if (spec.securityContext.capabilities?.length) {
+      securityContext.capabilities = { add: spec.securityContext.capabilities };
+    }
+    if (spec.securityContext.privileged !== undefined) {
+      securityContext.privileged = spec.securityContext.privileged;
+    }
+    container.securityContext = securityContext;
+  }
+  const mounts: V1VolumeMount[] = (spec.volumes ?? []).map((v) => ({
+    name: v.name,
+    mountPath: v.mountPath,
+  }));
+  // Each config file mounts individually at its declared file path via
+  // subPath off the node's single ConfigMap volume.
+  for (const file of configFileEntries(node)) {
+    mounts.push({ name: configMapName(node), mountPath: file.mountPath, subPath: file.key });
+  }
+  if (mounts.length) container.volumeMounts = mounts;
+  if (spec.readinessPath) {
+    container.readinessProbe = {
+      httpGet: { path: spec.readinessPath, port: node.containerPort },
+    };
+  }
+  return container;
+}
+
+/**
+ * Build the shared pod spec for a workload: the host container plus one
+ * container per attached sidecar. `emptyDir` volumes declared by a sidecar
+ * are pod-level and are also mounted on the host container, so files the
+ * sidecar writes (e.g. MMT-Probe reports) are shared between the containers.
+ */
+function podSpecFor(plan: WorkloadPlan): V1PodSpec {
+  const { node, sidecars } = plan;
+  const host = containerFor(node);
+
+  // Share each sidecar's emptyDir volumes with the host container unless it
+  // already mounts a volume of that name (in which case it is shared already).
+  const hostMounts = new Set((host.volumeMounts ?? []).map((m) => m.name));
+  const shared = sidecars
+    .flatMap((s) => s.deployment.volumes ?? [])
+    .filter((v) => !hostMounts.has(v.name));
+  if (shared.length) {
+    host.volumeMounts = [
+      ...(host.volumeMounts ?? []),
+      ...shared.map((v) => ({ name: v.name, mountPath: v.mountPath })),
+    ];
+  }
+
+  const volumes: V1Volume[] = [];
+  const seen = new Set<string>();
+  for (const member of [node, ...sidecars]) {
+    for (const v of member.deployment.volumes ?? []) {
+      if (seen.has(v.name)) continue;
+      seen.add(v.name);
+      volumes.push({ name: v.name, emptyDir: {} });
+    }
+    // One ConfigMap-backed volume per member declaring config files —
+    // including sidecars, whose ConfigMaps mount inside the host pod.
+    if (configFileEntries(member).length && !seen.has(configMapName(member))) {
+      seen.add(configMapName(member));
+      volumes.push({ name: configMapName(member), configMap: { name: configMapName(member) } });
+    }
+  }
+
+  const spec: V1PodSpec = { containers: [host, ...sidecars.map(containerFor)] };
+  if (volumes.length) spec.volumes = volumes;
+  if (node.deployment.hostNetwork) spec.hostNetwork = true;
+  // The pod runs as the host node's ServiceAccount whenever any member —
+  // host or sidecar — declares RBAC rules (a pod has a single SA, so the
+  // sidecar's rules fold into the host's Role; see roleManifest).
+  if (workloadRbacRules(plan).length) spec.serviceAccountName = node.name;
+  return spec;
+}
+
+/**
+ * Union of the RBAC rules declared by every member of the workload — host
+ * plus sidecars. A pod carries a single `serviceAccountName`, so a sidecar
+ * that needs API access can only get it through the pod's account; folding
+ * its rules into the host's Role keeps declared permissions effective
+ * instead of silently dropped.
+ */
+function workloadRbacRules(plan: WorkloadPlan): NonNullable<IDeploymentSpec['rbac']> {
+  return [plan.node, ...plan.sidecars].flatMap((n) => n.deployment.rbac ?? []);
+}
+
+function deploymentManifest(plan: WorkloadPlan, namespace: string): V1Deployment {
+  const node = plan.node;
   const labels = {
     app: node.name,
     'app.kubernetes.io/managed-by': MANAGED_BY,
@@ -488,15 +761,7 @@ function deploymentManifest(node: ResolvedNode, namespace: string): V1Deployment
       selector: { matchLabels: { app: node.name } },
       template: {
         metadata: { labels },
-        spec: {
-          containers: [
-            {
-              name: node.name,
-              image: node.image,
-              ports: [{ containerPort: node.containerPort }],
-            },
-          ],
-        },
+        spec: podSpecFor(plan),
       },
     },
   };
@@ -524,45 +789,209 @@ function serviceManifest(node: ResolvedNode, namespace: string): V1Service {
 }
 
 /**
+ * `batch/v1` Job for `kind: 'Job'` nodes — a finite run (e.g. MAG's attack
+ * profile), so the pod template forces `restartPolicy: 'Never'` and the pod
+ * gets the same pod spec (containers, volumes, probes) a Deployment would.
+ */
+function jobManifest(plan: WorkloadPlan, namespace: string): V1Job {
+  const node = plan.node;
+  const labels = {
+    app: node.name,
+    'app.kubernetes.io/managed-by': MANAGED_BY,
+    'secsim.io/node': node.nodeId,
+  };
+  return {
+    metadata: { name: node.name, namespace, labels },
+    spec: {
+      template: {
+        metadata: { labels },
+        spec: { ...podSpecFor(plan), restartPolicy: 'Never' },
+      },
+    },
+  };
+}
+
+/**
+ * ConfigMap holding a node's `configFiles`. Keys are the file basenames (or
+ * `file-<index>` on collisions) so each file mounts at its declared
+ * `mountPath` via `subPath` — a whole-volume mount would shadow the target
+ * directory.
+ */
+function configMapManifest(node: ResolvedNode, namespace: string): V1ConfigMap {
+  return {
+    metadata: {
+      name: configMapName(node),
+      namespace,
+      labels: { app: node.name, 'app.kubernetes.io/managed-by': MANAGED_BY },
+    },
+    data: Object.fromEntries(configFileEntries(node).map((f) => [f.key, f.content])),
+  };
+}
+
+/**
+ * ServiceAccount for a node declaring `rbac` rules — the pod runs as this
+ * account (Pre.3: in-cluster auth, no kubeconfig injection). Named after the
+ * node so the RoleBinding and `serviceAccountName` agree by convention.
+ */
+function serviceAccountManifest(node: ResolvedNode, namespace: string): V1ServiceAccount {
+  return {
+    metadata: {
+      name: node.name,
+      namespace,
+      labels: { app: node.name, 'app.kubernetes.io/managed-by': MANAGED_BY },
+    },
+  };
+}
+
+/**
+ * Namespace-scoped Role named after the host node, carrying the union of the
+ * workload's `rbac` rules (host + sidecars — one ServiceAccount per pod).
+ * The engine never creates cluster-scoped RBAC (no ClusterRole/
+ * ClusterRoleBinding) — a scenario pod must not gain cluster-wide reach.
+ */
+function roleManifest(plan: WorkloadPlan, namespace: string): V1Role {
+  const node = plan.node;
+  return {
+    metadata: {
+      name: node.name,
+      namespace,
+      labels: { app: node.name, 'app.kubernetes.io/managed-by': MANAGED_BY },
+    },
+    rules: workloadRbacRules(plan).map((rule) => ({
+      apiGroups: rule.apiGroups,
+      resources: rule.resources,
+      verbs: rule.verbs,
+    })),
+  };
+}
+
+/** RoleBinding connecting the node's ServiceAccount to its namespaced Role. */
+function roleBindingManifest(node: ResolvedNode, namespace: string): V1RoleBinding {
+  return {
+    metadata: {
+      name: node.name,
+      namespace,
+      labels: { app: node.name, 'app.kubernetes.io/managed-by': MANAGED_BY },
+    },
+    roleRef: {
+      apiGroup: 'rbac.authorization.k8s.io',
+      kind: 'Role',
+      name: node.name,
+    },
+    subjects: [{ kind: 'ServiceAccount', name: node.name, namespace }],
+  };
+}
+
+/**
  * Deploy a scenario topology into a fresh per-execution namespace: create the
- * namespace, then one Deployment + one NodePort Service per topology node.
+ * namespace, then per pod-owning node its RBAC triple (when `rbac` rules are
+ * declared), ConfigMaps (`configFiles`, including sidecars'), the workload
+ * (`batch/v1` Job or `apps/v1` Deployment), and a NodePort Service when the
+ * spec exposes a port. Sidecar nodes own no workload or Service — they land
+ * as extra containers in their host's pod; their result rows carry the
+ * host's resource name so status and log polling resolve under the pod they
+ * actually run in. Job nodes never get a Service.
  *
- * Uses `Promise.all` for batch Deployment/Service creation. On mid-deploy
- * failure, tears down already-created resources (best-effort) before re-throwing.
+ * Uses `Promise.all` for batch resource creation across nodes. On mid-deploy
+ * failure, tears down already-created resources (best-effort) before
+ * re-throwing.
  */
 export async function deployTopology(
   clients: K8sClients,
   opts: DeployTopologyOptions
 ): Promise<DeployResult> {
   const resolved = resolveTopologyNodes(opts.nodes, opts.services, opts.edges);
+  // Throws AppError(400) for a sidecar with no monitor edge — before any
+  // cluster call, so nothing is created for a topology that cannot deploy.
+  const plans = planWorkloads(resolved);
+  const hostByNode = new Map<string, ResolvedNode>();
+  for (const plan of plans) {
+    hostByNode.set(plan.node.nodeId, plan.node);
+    for (const sidecar of plan.sidecars) hostByNode.set(sidecar.nodeId, plan.node);
+  }
   const host = endpointHost(opts.endpoint);
 
   try {
     await clients.core.createNamespace({ body: namespaceManifest(opts.namespace) });
 
-    // Batch create all Deployments + Services concurrently via Promise.all.
-    const results = await Promise.all(
-      resolved.map(async (node) => {
-        await clients.apps.createNamespacedDeployment({
-          namespace: opts.namespace,
-          body: deploymentManifest(node, opts.namespace),
-        });
-        const created = await clients.core.createNamespacedService({
-          namespace: opts.namespace,
-          body: serviceManifest(node, opts.namespace),
-        });
-        const nodePort = created.spec?.ports?.[0]?.nodePort;
-        return {
-          nodeId: node.nodeId,
-          serviceId: node.serviceId,
-          name: node.name,
-          uiType: node.uiType,
-          status: 'pending' as DeployStatus,
-          nodePort,
-          dashboardUrl: nodePort ? `http://${host}:${nodePort}` : undefined,
-        };
+    // Batch create all resources concurrently via Promise.all, one lane per
+    // pod-owning node. Within a lane the supporting resources (ServiceAccount,
+    // Role, RoleBinding, ConfigMaps) are created before the workload that
+    // references them.
+    const nodePorts = new Map<string, number | undefined>();
+    await Promise.all(
+      plans.map(async (plan) => {
+        const node = plan.node;
+        const namespace = opts.namespace;
+
+        // One SA/Role/RoleBinding triple per pod — named after the host and
+        // covering the union of host + sidecar rbac rules.
+        if (workloadRbacRules(plan).length) {
+          await clients.core.createNamespacedServiceAccount({
+            namespace,
+            body: serviceAccountManifest(node, namespace),
+          });
+          await clients.rbac.createNamespacedRole({
+            namespace,
+            body: roleManifest(plan, namespace),
+          });
+          await clients.rbac.createNamespacedRoleBinding({
+            namespace,
+            body: roleBindingManifest(node, namespace),
+          });
+        }
+
+        await Promise.all(
+          [node, ...plan.sidecars]
+            .filter((n) => n.deployment.configFiles?.length)
+            .map((n) =>
+              clients.core.createNamespacedConfigMap({
+                namespace,
+                body: configMapManifest(n, namespace),
+              })
+            )
+        );
+
+        if (node.deployment.kind === 'Job') {
+          await clients.batch.createNamespacedJob({
+            namespace,
+            body: jobManifest(plan, namespace),
+          });
+        } else {
+          await clients.apps.createNamespacedDeployment({
+            namespace,
+            body: deploymentManifest(plan, namespace),
+          });
+        }
+
+        // No Service for Jobs or for specs that don't expose their port.
+        if (node.deployment.kind !== 'Job' && node.deployment.exposePort) {
+          const created = await clients.core.createNamespacedService({
+            namespace,
+            body: serviceManifest(node, namespace),
+          });
+          nodePorts.set(node.nodeId, created.spec?.ports?.[0]?.nodePort);
+        }
       })
     );
+
+    // One result row per topology node, in resolution order. A sidecar row
+    // points at its host's resource name (no workload of its own exists to
+    // poll) and carries no port — the host's Service is the only endpoint.
+    const results = resolved.map((node) => {
+      const owner = hostByNode.get(node.nodeId) ?? node;
+      const nodePort =
+        node.deployment.attachMode === 'sidecar' ? undefined : nodePorts.get(owner.nodeId);
+      return {
+        nodeId: node.nodeId,
+        serviceId: node.serviceId,
+        name: owner.name,
+        uiType: node.uiType,
+        status: 'pending' as DeployStatus,
+        nodePort,
+        dashboardUrl: nodePort ? `http://${host}:${nodePort}` : undefined,
+      };
+    });
 
     return { namespace: opts.namespace, services: results };
   } catch (err) {
@@ -572,8 +1001,76 @@ export async function deployTopology(
   }
 }
 
+/** Pods carrying `app=<name>` — the pre-fetched batch map, else a live list. */
+async function podsFor(
+  clients: K8sClients,
+  namespace: string,
+  name: string,
+  pods?: Map<string, V1Pod[]>
+): Promise<V1Pod[]> {
+  const cached = pods?.get(name) ?? [];
+  if (cached.length > 0) return cached;
+  return (
+    (
+      await clients.core.listNamespacedPod({
+        namespace,
+        labelSelector: `app=${name}`,
+      })
+    ).items ?? []
+  );
+}
+
 /**
- * Compute the coarse status of a single Deployment in a namespace.
+ * Pod-level failure scan shared by Deployment- and Job-backed services:
+ * a `Failed` phase or a container stuck on a hard waiting reason marks the
+ * service failed.
+ */
+function podFailed(pod: V1Pod): boolean {
+  if (pod.status?.phase === 'Failed') return true;
+  return (pod.status?.containerStatuses ?? []).some((cs) => {
+    const reason = cs.state?.waiting?.reason;
+    return Boolean(reason && FAILURE_REASONS.has(reason));
+  });
+}
+
+/**
+ * Status of a `batch/v1` Job node: a `Failed` condition or a saturated
+ * `backoffLimit` means `failed`; `Complete` or a succeeded pod means
+ * `running`; a Running pod also reads `running` while the job is in flight.
+ * Pod-level failure reasons still short-circuit to `failed` while the job
+ * retries. A Job that 404s propagates — the caller maps it to `pending`.
+ */
+async function jobStatus(
+  clients: K8sClients,
+  namespace: string,
+  name: string,
+  pods?: Map<string, V1Pod[]>
+): Promise<DeployStatus> {
+  const job = await clients.batch.readNamespacedJob({ name, namespace });
+  const conditions = job.status?.conditions ?? [];
+  if (conditions.some((c) => c.type === 'Failed' && c.status === 'True')) {
+    return 'failed';
+  }
+  if (
+    conditions.some((c) => c.type === 'Complete' && c.status === 'True') ||
+    (job.status?.succeeded ?? 0) >= 1
+  ) {
+    return 'running';
+  }
+  if ((job.status?.failed ?? 0) >= (job.spec?.backoffLimit ?? 6)) {
+    return 'failed';
+  }
+  for (const pod of await podsFor(clients, namespace, name, pods)) {
+    if (podFailed(pod)) return 'failed';
+    if (pod.status?.phase === 'Running' || pod.status?.phase === 'Succeeded') return 'running';
+  }
+  return 'pending';
+}
+
+/**
+ * Compute the coarse status of a single service workload in a namespace —
+ * its `apps/v1` Deployment, or its `batch/v1` Job when the node is
+ * `kind: 'Job'` (a Deployment 404 falls through to the Job read).
  *
  * When `pods` is provided, uses the pre-fetched pod list (from a combined
  * label-selector query) instead of issuing a per-service `listNamespacedPod`
@@ -585,33 +1082,24 @@ async function deploymentStatus(
   name: string,
   pods?: Map<string, V1Pod[]>
 ): Promise<DeployStatus> {
-  const deployment = await clients.apps.readNamespacedDeployment({ name, namespace });
+  let deployment: V1Deployment;
+  try {
+    deployment = await clients.apps.readNamespacedDeployment({ name, namespace });
+  } catch (err) {
+    if (err instanceof ApiException && err.code === 404) {
+      return jobStatus(clients, namespace, name, pods);
+    }
+    throw err;
+  }
   const desired = deployment.spec?.replicas ?? 1;
   const available = deployment.status?.availableReplicas ?? 0;
   if (desired > 0 && available >= desired) {
     return 'running';
   }
 
-  // Use pre-fetched pods if available; fall back to per-service listing.
-  const servicePods = pods?.get(name) ?? [];
-  const podList =
-    servicePods.length > 0
-      ? servicePods
-      : ((
-          await clients.core.listNamespacedPod({
-            namespace,
-            labelSelector: `app=${name}`,
-          })
-        ).items ?? []);
-  for (const pod of podList) {
-    if (pod.status?.phase === 'Failed') {
+  for (const pod of await podsFor(clients, namespace, name, pods)) {
+    if (podFailed(pod)) {
       return 'failed';
-    }
-    for (const cs of pod.status?.containerStatuses ?? []) {
-      const reason = cs.state?.waiting?.reason;
-      if (reason && FAILURE_REASONS.has(reason)) {
-        return 'failed';
-      }
     }
   }
   return 'pending';
@@ -633,8 +1121,10 @@ export async function getDeploymentStatus(
     const statuses: { name: string; status: DeployStatus }[] = [];
 
     // Build a combined "app in (a,b,c)" selector so a single list call
-    // replaces the prior per-service serial loop.
-    const combinedSelector = `app in (${opts.names.join(',')})`;
+    // replaces the prior per-service serial loop. Names are deduplicated —
+    // sidecar rows share their host's resource name, and Kubernetes rejects
+    // duplicate values in a set-based selector.
+    const combinedSelector = `app in (${[...new Set(opts.names)].join(',')})`;
 
     // Fetch all pods for the requested services in one API call.
     const allPods = await clients.core.listNamespacedPod({
@@ -653,17 +1143,23 @@ export async function getDeploymentStatus(
     }
 
     // Evaluate status for each requested service using the cached pods.
+    // Sidecar rows share their host's resource name — memoize per name so a
+    // duplicated row does not cost a second workload read per tick.
+    const statusByName = new Map<string, DeployStatus>();
     for (const name of opts.names) {
-      let status: DeployStatus;
-      try {
-        status = await deploymentStatus(clients, opts.namespace, name, podsByApp);
-      } catch (err) {
-        // A not-yet-created / already-removed deployment reads as pending.
-        if (err instanceof ApiException && err.code === 404) {
-          status = 'pending';
-        } else {
-          throw err;
+      let status = statusByName.get(name);
+      if (status === undefined) {
+        try {
+          status = await deploymentStatus(clients, opts.namespace, name, podsByApp);
+        } catch (err) {
+          // A not-yet-created / already-removed deployment reads as pending.
+          if (err instanceof ApiException && err.code === 404) {
+            status = 'pending';
+          } else {
+            throw err;
+          }
         }
+        statusByName.set(name, status);
       }
       statuses.push({ name, status });
     }

@@ -16,7 +16,16 @@ import mongoose from 'mongoose';
  * connection stays open, so receiving it proves the stream is not buffered.
  */
 
-const { counts, impl, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hoisted(() => {
+const {
+  counts,
+  impl,
+  CoreV1Api,
+  AppsV1Api,
+  BatchV1Api,
+  RbacAuthorizationV1Api,
+  KubeConfig,
+  ApiException,
+} = vi.hoisted(() => {
   class ApiException extends Error {
     code: number;
     body: unknown;
@@ -34,6 +43,7 @@ const { counts, impl, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hois
       spec: { replicas: 1 },
       status: { availableReplicas: 0 },
     }),
+    readNamespacedJob: async (): Promise<unknown> => ({ status: {} }),
     listNamespacedPod: async (): Promise<unknown> => ({ items: [] }),
     readNamespacedPodLog: async (): Promise<string> => '',
     listNamespace: async (): Promise<unknown> => ({ items: [] }),
@@ -41,6 +51,8 @@ const { counts, impl, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hois
 
   class CoreV1Api {}
   class AppsV1Api {}
+  class BatchV1Api {}
+  class RbacAuthorizationV1Api {}
 
   class KubeConfig {
     loadFromString(): void {}
@@ -56,22 +68,41 @@ const { counts, impl, CoreV1Api, AppsV1Api, KubeConfig, ApiException } = vi.hois
           },
         };
       }
-      return {
-        readNamespacedDeployment: (...a: unknown[]) => {
-          counts.readNamespacedDeployment += 1;
-          return impl.readNamespacedDeployment(...(a as []));
-        },
-      };
+      if (ctor === AppsV1Api) {
+        return {
+          readNamespacedDeployment: (...a: unknown[]) => {
+            counts.readNamespacedDeployment += 1;
+            return impl.readNamespacedDeployment(...(a as []));
+          },
+        };
+      }
+      if (ctor === BatchV1Api) {
+        return {
+          readNamespacedJob: (...a: unknown[]) => impl.readNamespacedJob(...(a as [])),
+        };
+      }
+      return {};
     }
   }
 
-  return { counts, impl, CoreV1Api, AppsV1Api, KubeConfig, ApiException };
+  return {
+    counts,
+    impl,
+    CoreV1Api,
+    AppsV1Api,
+    BatchV1Api,
+    RbacAuthorizationV1Api,
+    KubeConfig,
+    ApiException,
+  };
 });
 
 vi.mock('@kubernetes/client-node', () => ({
   KubeConfig,
   CoreV1Api,
   AppsV1Api,
+  BatchV1Api,
+  RbacAuthorizationV1Api,
   ApiException,
 }));
 
