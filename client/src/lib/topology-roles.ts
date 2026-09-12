@@ -91,10 +91,11 @@ export function resolveNodeRole(
   data: RoleNode['data'] | undefined,
   service: RoleService | undefined
 ): BadgedRole | undefined {
-  const role = service?.deployment?.role ?? data?.role;
+  const role = (service?.deployment?.role ?? data?.role)?.toLowerCase();
   if (isBadgedRole(role)) return role;
   if (role !== undefined) return undefined; // 'generic' or unknown — no badge
-  return isBadgedRole(data?.type) ? (data.type as BadgedRole) : undefined;
+  const type = data?.type?.toLowerCase();
+  return isBadgedRole(type) ? type : undefined;
 }
 
 /** Resolve `attachMode` — catalog spec first, persisted node data as fallback. */
@@ -103,7 +104,11 @@ export function resolveNodeAttachMode(
   service: RoleService | undefined
 ): AttachMode | undefined {
   const mode = service?.deployment?.attachMode ?? data?.attachMode;
-  return mode === 'sidecar' || mode === 'standalone' ? mode : undefined;
+  return mode?.toLowerCase() === 'sidecar'
+    ? 'sidecar'
+    : mode?.toLowerCase() === 'standalone'
+      ? 'standalone'
+      : undefined;
 }
 
 function edgeKind(edge: RoleEdge): EdgeKind | null {
