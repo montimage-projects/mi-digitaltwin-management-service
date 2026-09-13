@@ -1,7 +1,11 @@
 # Montimage attack → detect → respond scenario on Kubernetes
 
 **Project:** secSIM (MI Digital Twin Management Platform)
-**Baseline:** GREEN — v1.0.0 builds; deploy engine maps each node to one single-container Deployment + NodePort Service on port 80; edges, env, volumes, capabilities, RBAC, ordering and Jobs are unsupported
+**Baseline (at plan start):** GREEN — v1.0.0 builds; the deploy engine maps
+each node to one single-container Deployment + NodePort Service on port 80;
+edges, env, volumes, capabilities, RBAC, ordering and Jobs are unsupported
+**Status:** Delivered (epic #182) — every task below landed on `main`; see
+[Run it yourself](#run-it-yourself) for the final run steps
 **Test command of record:** `npm test`
 
 Integrate a four-module Montimage scenario into the secSIM execution engine:
@@ -17,9 +21,10 @@ Everything runs in the per-execution namespace already created by
 `server/src/services/kubernetesDeploy.ts`, on the cluster registered as the
 scenario's Infrastructure.
 
-## Current engine gaps
+## Engine gaps at plan start
 
-The engine (`kubernetesDeploy.ts`) has no:
+All gaps below were closed by the phases that follow — kept as the record of
+what the engine (`kubernetesDeploy.ts`) lacked when the plan was written:
 
 - container port / env / args / volumes per service (port 80 hard-coded);
 - edge semantics (edges are stored but ignored at deploy time);
@@ -640,13 +645,22 @@ lands (or against a hand-applied test Role in a scratch namespace):
 
 **Acceptance Criteria**:
 
-- [ ] `docs/integration/kubernetes-execution.md` describes the new engine behaviour
-- [ ] `docs/API.md` documents `Service.deployment` and the events SSE type
-- [ ] This playbook contains a run-it-yourself section
+- [x] `docs/integration/kubernetes-execution.md` describes the new engine behaviour
+- [x] `docs/API.md` documents `Service.deployment` and the events SSE type
+- [x] This playbook contains a run-it-yourself section
 
 **Dependencies**: 4.3
 **Effort**: S
 **Verify**: docs CI workflow passes
+
+**Result** (recorded 2026-09-13): `docs/API.md` carries the full
+`Service.deployment` spec table and the `k8s-event` SSE event type (grown
+alongside the engine work in earlier tasks);
+`docs/integration/kubernetes-execution.md` describes sidecars, per-container
+`securityContext`, `emptyDir` volumes, `hostNetwork`, `readinessPath`, the
+PodSecurity namespace label, ordered rollout and namespace events; the
+[Run it yourself](#run-it-yourself) section below records the final run
+steps.
 
 ## Milestones
 
@@ -697,3 +711,65 @@ lands (or against a hand-applied test Role in a scratch namespace):
 - **AI4SOAR credentials.** Giving a reaction pod a namespace-scoped Role is safe; never fall back to the Infrastructure's admin kubeconfig inside the pod.
 - **Attack containment.** MAG must only reach the target: the default egress NetworkPolicy in 1.5 enforces this.
 - **Module contracts (residual).** Pre.2 confirmed the runtime contracts from the owner's artifacts and a live MMT-Probe run: MAG is args-driven (no `TARGET_URL` env), MMT-Probe alerts leave via `security.output-channel` (Kafka recommended — no native webhook), AI4SOAR serves on :5000 with `/health`. Residual: packaged `v1.0.0` image specifics (entrypoint env aliases, AI4SOAR bundled ports) confirmed at first pull.
+
+## Run it yourself
+
+Everything above is delivered — this is the final run procedure on a fresh
+install.
+
+1. **Start the platform** with the required secrets exported (`JWT_SECRET`,
+   `ADMIN_PASSWORD`, `ENCRYPTION_KEY` — see
+   [docs/AGENT_ENV.md](../AGENT_ENV.md)) and MongoDB reachable at
+   `MONGODB_URI`: `npm run dev` from the repo root (API on `:3000`). The
+   server auto-seeds on first boot; `npm run seed` re-seeds manually. Seeding
+   creates the four catalog services (`MAG`,
+   `HTTP-SIM`, `MMT-PROBE`, `AI4SOAR`) and the `MONTIMAGE-DEMO` project
+   holding the scenario "HTTP attack → MMT detection → AI4SOAR response".
+2. **Register a cluster** as an Infrastructure (or
+   `POST /api/infrastructures`) with the cluster endpoint and a kubeconfig or
+   bearer token as credentials — see
+   [Kubernetes Execution](../integration/kubernetes-execution.md#cluster-credentials).
+   A throwaway [kind](https://kind.sigs.k8s.io/) cluster is enough:
+   `kind create cluster --name secsim-demo`.
+3. **Assign the Infrastructure** to the scenario (in the scenario editor, or
+   `PUT /api/scenarios/:id` with `infrastructureId`).
+4. **Execute** — click **Execute** in the UI, or
+   `POST /api/scenarios/:id/execute`. The engine rolls the topology out in
+   `startOrder` tiers and holds the MAG Job until the target pod (with its
+   MMT-Probe sidecar) and AI4SOAR report `Ready` inside the readiness gate.
+5. **Watch the Execution tab**: `progress` events drive the bar,
+   per-container log tabs keep MMT-Probe alerts and http-sim access logs
+   separate, and the **Namespace events** pane shows the AI4SOAR reaction
+   landing (the `ai4soar-block-mag` NetworkPolicy). The run settles when the
+   `mag` Job reports `completed`.
+6. **Tear down** — **Tear Down** in the UI or
+   `DELETE /api/scenarios/:id/executions/:executionId`; deleting the
+   `secsim-<scenario>-<execution>` namespace removes every resource the
+   engine created.
+
+> **Real images:** the four module images live in the private
+> `registry.montimage.eu` and the engine does not attach `imagePullSecrets`
+> — on a cluster that cannot pull them the pods fail with
+> `ImagePullBackOff`. Provision a node-level pull credential, preload the
+> images (`kind load docker-image …`), or use the e2e stub path below.
+
+### CI equivalent — kind e2e
+
+`.github/workflows/e2e-kind.yml` runs this whole flow on pull requests that
+touch the engine or the seed: it starts a kind cluster, boots the server
+(auto-seed included), then `scripts/e2e-kind/run-e2e.js` drives the public
+REST API — login, register the cluster as an Infrastructure, execute the demo
+scenario — and asserts the probe alert, the `ai4soar-block-mag`
+NetworkPolicy, the `mag` Job completion and a clean teardown. Because CI
+runners cannot reach `registry.montimage.eu`, the driver repoints the
+services at a locally-built stub image (`scripts/e2e-kind/stub/`) loaded with
+`kind load`; set `SECSIM_E2E_REQUIRE_REAL_IMAGES=1` to fail instead of
+falling back. To replay it locally:
+
+```bash
+kind create cluster --name secsim-e2e
+docker build -t secsim-e2e-stub:local scripts/e2e-kind/stub
+kind load docker-image secsim-e2e-stub:local --name secsim-e2e
+npm run dev          # auto-seeds catalog, demo scenario and admin
+ADMIN_PASSWORD=<your-admin-password> node scripts/e2e-kind/run-e2e.js
+```

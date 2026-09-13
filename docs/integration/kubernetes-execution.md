@@ -33,7 +33,7 @@ sequenceDiagram
   C->>S: POST /api/scenarios/:id/execute
   S->>S: Resolve topology nodes to images
   S->>K: Create namespace
-  S->>K: Create Deployment + NodePort Service per node
+  S->>K: Roll out workloads in startOrder tiers (Deployment/Job + Service/ConfigMap/RBAC as needed)
   K-->>S: Created (nodePort assigned)
   S-->>C: { executionId, namespace, status, services }
 
@@ -98,8 +98,8 @@ The engine is intentionally thin. `resolveTopologyNodes` resolves each node's
 deployment spec (the service's `deployment` catalog spec merged with
 `node.data.config` `env`/`args` overrides, defaulting to a standalone
 `Deployment` on port `80`) and its typed-edge context (`attacks`, `monitors`,
-`notifies`, `acts-on`); manifest builders consume those fields as later
-playbook tasks land.
+`notifies`, `acts-on`); the manifest builders consume those fields to emit
+the resources in the table below.
 
 | Topology concept       | Kubernetes resource                       | Notes                                                                                                                                 |
 | ---------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
@@ -117,6 +117,22 @@ playbook tasks land.
 - **Port:** a single port is mapped per node — `deployment.containerPort`
   when the service spec sets it, `80` otherwise — for both the container and
   the service.
+- **Containers:** `deployment.securityContext` (`capabilities`,
+  `privileged`) applies to the container that declares it only — a sidecar's
+  `NET_ADMIN`/`NET_RAW` never leak onto the host container.
+- **Volumes:** `deployment.volumes` render as `emptyDir` volumes shared
+  across every container in the pod (for example a probe reports directory
+  shared between the sidecar and its host container).
+- **Networking flags:** `hostNetwork: true` runs the pod on the host network
+  (a sidecar `attachMode` is the preferred alternative); `readinessPath` adds
+  an HTTP `GET` readiness probe on the container port.
+- **PodSecurity:** when any node declares `capabilities`, `privileged` or
+  `hostNetwork`, the namespace manifest carries
+  `pod-security.kubernetes.io/enforce=privileged`; otherwise the namespace
+  stays unlabelled.
+- **Image pulls:** no `imagePullSecrets` are attached — module images must be
+  pullable by the cluster's nodes (a private registry needs a node-level
+  credential or an image preloaded with `kind load`).
 - **Labels:** every managed object carries
   `app.kubernetes.io/managed-by: secsim`; Deployments also carry
   `secsim.io/node: <nodeId>`.
