@@ -718,10 +718,11 @@ Everything above is delivered — this is the final run procedure on a fresh
 install.
 
 1. **Start the platform** with the required secrets exported (`JWT_SECRET`,
-   `ADMIN_PASSWORD`, `ENCRYPTION_KEY`, `MONGODB_URI` — see
-   [docs/AGENT_ENV.md](../AGENT_ENV.md)): `npm run dev` from the repo root
-   (API on `:3000`). The server auto-seeds on first boot; `npm run seed`
-   re-seeds manually. Seeding creates the four catalog services (`MAG`,
+   `ADMIN_PASSWORD`, `ENCRYPTION_KEY` — see
+   [docs/AGENT_ENV.md](../AGENT_ENV.md)) and MongoDB reachable at
+   `MONGODB_URI`: `npm run dev` from the repo root (API on `:3000`). The
+   server auto-seeds on first boot; `npm run seed` re-seeds manually. Seeding
+   creates the four catalog services (`MAG`,
    `HTTP-SIM`, `MMT-PROBE`, `AI4SOAR`) and the `MONTIMAGE-DEMO` project
    holding the scenario "HTTP attack → MMT detection → AI4SOAR response".
 2. **Register a cluster** as an Infrastructure (or
