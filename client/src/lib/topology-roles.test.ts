@@ -6,8 +6,11 @@ import {
   computeSidecarAttachments,
   applyTopologyDecorations,
   planTopologyEdge,
+  planAutoWire,
+  AUTO_WIRE_ROLE_PAIRS,
   EDGE_TYPE_SPELLING,
   SIDECAR_DOCK,
+  type AutoWirePlan,
   type RoleEdge,
   type RoleNode,
   type RoleService,
@@ -241,6 +244,107 @@ describe('planTopologyEdge', () => {
       ok: true,
       edgeType: undefined,
     });
+  });
+});
+
+describe('planAutoWire (task 5.3)', () => {
+  const services = serviceMap([
+    service('s-att', { role: 'attack' }),
+    service('s-tgt', { role: 'target' }),
+    service('s-mon', { role: 'monitor' }),
+    service('s-react', { role: 'reaction' }),
+    service('s-db', { role: 'generic' }),
+  ]);
+  const nodes = [
+    node('att', { label: 'MAG', serviceId: 's-att' }),
+    node('tgt', { label: 'CI-SIM', serviceId: 's-tgt' }),
+    node('mon', { label: 'MMT-PROBE', serviceId: 's-mon' }),
+    node('react', { label: 'AI4SOAR', serviceId: 's-react' }),
+    node('db', { label: 'DB', serviceId: 's-db' }),
+  ];
+  const wired = (plan: AutoWirePlan) =>
+    plan.edges.map((e) => `${e.source}->${e.target}:${e.data?.edgeType}`);
+
+  it('generates exactly the four role-derived edges for the demo set', () => {
+    const plan = planAutoWire(nodes, [], services);
+    expect(wired(plan).sort()).toEqual([
+      'att->tgt:attacks',
+      'mon->react:notifies',
+      'mon->tgt:monitors',
+      'react->tgt:acts-on',
+    ]);
+    for (const e of plan.edges) {
+      expect(e.id).toBe(`edge-auto-${e.source}-${e.target}`);
+      expect(e.animated).toBe(true);
+      expect(e.label).toBe(e.data?.edgeType);
+    }
+  });
+
+  it('exposes exactly the four auto-wire pairs — monitor → attack is not generated', () => {
+    expect(AUTO_WIRE_ROLE_PAIRS).toEqual([
+      ['attack', 'target'],
+      ['monitor', 'target'],
+      ['monitor', 'reaction'],
+      ['reaction', 'target'],
+    ]);
+    const plan = planAutoWire(nodes, [], services);
+    expect(plan.edges.some((e) => e.source === 'mon' && e.target === 'att')).toBe(false);
+  });
+
+  it('skips pairs the user already wired — typed or untyped', () => {
+    const existing = [
+      edge('e1', 'att', 'tgt', { data: { edgeType: 'attacks' } }),
+      edge('e2', 'mon', 'tgt'), // hand-drawn untyped edge still counts as drawn
+    ];
+    const plan = planAutoWire(nodes, existing, services);
+    expect(wired(plan).sort()).toEqual(['mon->react:notifies', 'react->tgt:acts-on']);
+    expect(plan.edges.some((e) => e.source === 'att' && e.target === 'tgt')).toBe(false);
+    expect(plan.edges.some((e) => e.source === 'mon' && e.target === 'tgt')).toBe(false);
+  });
+
+  it('is idempotent — a second pass over the generated edges adds nothing', () => {
+    const first = planAutoWire(nodes, [], services);
+    const second = planAutoWire(nodes, [...first.edges], services);
+    expect(second.edges).toHaveLength(0);
+  });
+
+  it('produces nothing for unroled nodes only', () => {
+    const plan = planAutoWire([node('db', { serviceId: 's-db' })], [], services);
+    expect(plan.edges).toHaveLength(0);
+    expect(plan.positions.size).toBe(0);
+  });
+
+  it('lays attacks and monitors left of the target, reactions right', () => {
+    const plan = planAutoWire(nodes, [], services);
+    const pos = plan.positions;
+    expect(pos.get('att')!.x).toBeLessThan(pos.get('tgt')!.x);
+    expect(pos.get('mon')!.x).toBeLessThan(pos.get('tgt')!.x);
+    expect(pos.get('react')!.x).toBeGreaterThan(pos.get('tgt')!.x);
+    expect(pos.has('db')).toBe(false); // unroled nodes keep their position
+  });
+
+  it('stacks the left column deterministically — attacks above monitors', () => {
+    const plan = planAutoWire([...nodes, node('att2', { serviceId: 's-att' })], [], services);
+    // Same-y attacks order by id; the monitor comes after both attacks.
+    expect(plan.positions.get('att')!.y).toBeLessThan(plan.positions.get('att2')!.y);
+    expect(plan.positions.get('att2')!.y).toBeLessThan(plan.positions.get('mon')!.y);
+    // Two attacks wire to the same target.
+    expect(plan.edges.filter((e) => e.data?.edgeType === 'attacks')).toHaveLength(2);
+  });
+
+  it('keeps a single roled node untouched — nothing to wire or lay out', () => {
+    const plan = planAutoWire([node('att', { serviceId: 's-att' })], [], services);
+    expect(plan.edges).toHaveLength(0);
+    expect(plan.positions.size).toBe(0);
+  });
+
+  it('still wires when roles come only from persisted node data', () => {
+    const legacy = [
+      node('a', { label: 'a', role: 'attack' }),
+      node('t', { label: 't', role: 'target' }),
+    ];
+    const plan = planAutoWire(legacy, [], new Map());
+    expect(wired(plan)).toEqual(['a->t:attacks']);
   });
 });
 

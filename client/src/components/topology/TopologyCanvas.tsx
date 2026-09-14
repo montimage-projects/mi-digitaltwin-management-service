@@ -30,6 +30,7 @@ import {
   Zap,
   Link2,
   Settings2,
+  Waypoints,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +41,7 @@ import { NodeConfigPanel } from './NodeConfigPanel';
 import type { NodeConfig } from '@/lib/node-config';
 import {
   applyTopologyDecorations,
+  planAutoWire,
   planTopologyEdge,
   type BadgedRole,
   type RoleEdge,
@@ -72,6 +74,12 @@ interface TopologyCanvasProps {
   edges: object[];
   onNodesChange: (nodes: object[]) => void;
   onEdgesChange: (edges: object[]) => void;
+  /**
+   * Combined nodes+edges update for atomic actions (task 5.3 Auto-wire):
+   * lets the parent regenerate YAML from both final arrays in one pass.
+   * Falls back to the two single-channel callbacks when absent.
+   */
+  onTopologyChange?: (nodes: object[], edges: object[]) => void;
   services?: ServiceOption[];
   readOnly?: boolean;
 }
@@ -178,6 +186,7 @@ function TopologyCanvasInner({
   edges: initialEdges,
   onNodesChange: onNodesChangeProp,
   onEdgesChange: onEdgesChangeProp,
+  onTopologyChange: onTopologyChangeProp,
   services = [],
   readOnly = false,
 }: TopologyCanvasProps) {
@@ -353,6 +362,56 @@ function TopologyCanvasInner({
     [readOnly, setEdges, onEdgesChangeProp, nodes, servicesById]
   );
 
+  // Auto-wire (task 5.3): append every role-derived typed edge not already
+  // drawn, apply the role-column layout (attack/monitor left of the target,
+  // reaction right) and surface what was added. The nodes+edges update goes
+  // out as one combined change so the parent's YAML regen sees both.
+  const handleAutoWire = useCallback(() => {
+    if (readOnly) return;
+    const plan = planAutoWire(nodes as RoleNode[], edges as RoleEdge[], servicesById);
+    if (plan.edges.length === 0 && plan.positions.size === 0) {
+      toast.info('Nothing to auto-wire — add role-tagged services first.');
+      return;
+    }
+    const newNodes = plan.positions.size
+      ? nodes.map((n) => {
+          const position = plan.positions.get(n.id);
+          return position ? { ...n, position } : n;
+        })
+      : nodes;
+    const newEdges = plan.edges.length ? [...edges, ...(plan.edges as Edge[])] : edges;
+    setNodes(newNodes);
+    setEdges(newEdges);
+    if (onTopologyChangeProp) {
+      onTopologyChangeProp(newNodes, newEdges);
+    } else {
+      onNodesChangeProp(newNodes);
+      onEdgesChangeProp(newEdges);
+    }
+    if (plan.edges.length === 0) {
+      toast.info('All role-derived edges already exist — layout applied.');
+      return;
+    }
+    const labelOf = (id: string | undefined) =>
+      String(nodes.find((n) => n.id === id)?.data?.label ?? id);
+    toast.success(
+      `Auto-wired ${plan.edges.length} edge${plan.edges.length === 1 ? '' : 's'}: ` +
+        plan.edges
+          .map((e) => `${labelOf(e.source)} → ${labelOf(e.target)} (${String(e.data?.edgeType)})`)
+          .join(', ')
+    );
+  }, [
+    readOnly,
+    nodes,
+    edges,
+    servicesById,
+    setNodes,
+    setEdges,
+    onNodesChangeProp,
+    onEdgesChangeProp,
+    onTopologyChangeProp,
+  ]);
+
   const handleNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChange>[0]) => {
       onNodesChange(changes);
@@ -404,6 +463,17 @@ function TopologyCanvasInner({
           >
             <Settings2 className="h-4 w-4 mr-1" />
             Configure
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={handleAutoWire}
+            title="Generate the role-derived edges (attacks / monitors / notifies / acts-on) and lay out the graph"
+          >
+            <Waypoints className="h-4 w-4 mr-1" />
+            Auto-wire
           </Button>
 
           <Button

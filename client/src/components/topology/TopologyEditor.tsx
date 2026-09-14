@@ -188,6 +188,24 @@ export function TopologyEditor({
     [onEdgesChange, onYamlChange, nodes]
   );
 
+  // Combined nodes+edges update (task 5.3 Auto-wire): regenerating YAML in
+  // one pass keeps the view consistent — two sequential single-channel
+  // updates would each compose YAML with the other channel's stale prop.
+  const handleTopologyChangeWithYamlSync = useCallback(
+    (newNodes: object[], newEdges: object[]) => {
+      isUpdatingFromCanvas.current = true;
+      onNodesChange(newNodes);
+      onEdgesChange(newEdges);
+      const newYaml = nodesToYaml(newNodes as TopologyNode[], newEdges as TopologyEdge[]);
+      onYamlChange(newYaml);
+      // Reset flag after a short delay
+      setTimeout(() => {
+        isUpdatingFromCanvas.current = false;
+      }, 100);
+    },
+    [onNodesChange, onEdgesChange, onYamlChange]
+  );
+
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   const handleReset = useCallback(() => {
@@ -352,6 +370,7 @@ export function TopologyEditor({
               edges={edges}
               onNodesChange={handleNodesChangeWithYamlSync}
               onEdgesChange={handleEdgesChangeWithYamlSync}
+              onTopologyChange={handleTopologyChangeWithYamlSync}
               services={services}
             />
           </div>
@@ -393,6 +412,7 @@ export function TopologyEditor({
                 edges={edges}
                 onNodesChange={handleNodesChangeWithYamlSync}
                 onEdgesChange={handleEdgesChangeWithYamlSync}
+                onTopologyChange={handleTopologyChangeWithYamlSync}
                 services={services}
               />
             </div>
