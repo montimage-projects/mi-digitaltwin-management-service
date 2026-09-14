@@ -248,6 +248,155 @@ describe('runSSEStream', () => {
     }
   });
 
+  test('a probe JSON security report is emitted as a typed alert event (issue #234)', async () => {
+    deploy.logs = [
+      {
+        name: 'http-sim',
+        pod: 'http-sim-pod',
+        container: 'mmt-probe',
+        line: JSON.stringify({
+          'ip.src': '10.0.0.9',
+          verdict: 'http-flood',
+          timestamp: '2026-09-14T10:00:00Z',
+        }),
+      },
+      { name: 'http-sim', pod: 'http-sim-pod', container: 'mmt-probe', line: 'probe up on eth0' },
+    ];
+
+    const res = makeResponse();
+    const cleanup = stream(
+      res as unknown as Response,
+      { infrastructureId: 'infra' },
+      runningExecution,
+      infra
+    );
+
+    await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
+    cleanup();
+
+    const text = textOf(res);
+    expect(text).toContain('event: alert');
+    // The typed record carries the fields the console + playbook consume:
+    // attacker (ip.src), verdict, report timestamp and the source line.
+    expect(text).toContain('"attacker":"10.0.0.9"');
+    expect(text).toContain('"verdict":"http-flood"');
+    expect(text).toContain('"timestamp":"2026-09-14T10:00:00.000Z"');
+    expect(text).toContain('"container":"mmt-probe"');
+    // The ordinary log line did not raise a second alert.
+    expect(text.split('event: alert').length - 1).toBe(1);
+  });
+
+  test('an mmt attribute-array report surfaces ip.src as the attacker (issue #234)', async () => {
+    deploy.logs = [
+      {
+        name: 'http-sim',
+        pod: 'http-sim-pod',
+        container: 'mmt-probe',
+        line: JSON.stringify({
+          verdict: 'syn-flood',
+          properties: [
+            { att: 'ip.src', val: '192.168.10.20' },
+            { att: 'ip.dst', val: '10.0.0.5' },
+          ],
+        }),
+      },
+    ];
+
+    const res = makeResponse();
+    const cleanup = stream(
+      res as unknown as Response,
+      { infrastructureId: 'infra' },
+      runningExecution,
+      infra
+    );
+
+    await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
+    cleanup();
+
+    const text = textOf(res);
+    expect(text).toContain('"attacker":"192.168.10.20"');
+    expect(text).toContain('"verdict":"syn-flood"');
+  });
+
+  test('a plain-text ALERT line emits an alert event with the text as verdict', async () => {
+    deploy.logs = [
+      {
+        name: 'http-sim',
+        pod: 'http-sim-pod',
+        container: 'mmt-probe',
+        line: 'ALERT http-flood suspected: 12 connections to :8080 on interface eth0',
+      },
+      { name: 'http-sim', pod: 'http-sim-pod', container: 'http-sim', line: 'GET / 200' },
+    ];
+
+    const res = makeResponse();
+    const cleanup = stream(
+      res as unknown as Response,
+      { infrastructureId: 'infra' },
+      runningExecution,
+      infra
+    );
+
+    await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
+    cleanup();
+
+    const text = textOf(res);
+    expect(text).toContain('event: alert');
+    expect(text).toContain(
+      '"verdict":"http-flood suspected: 12 connections to :8080 on interface eth0"'
+    );
+    // Only the ALERT line produced an alert — and it still flows as a log.
+    expect(text.split('event: alert').length - 1).toBe(1);
+    expect(text).toContain('"line":"GET / 200"');
+  });
+
+  test('a terminal execution keeps streaming after deploy settle (issue #233)', async () => {
+    vi.useFakeTimers();
+    try {
+      deploy.settled = true;
+      const terminalExecution = {
+        status: 'running',
+        namespace: 'secsim-scn-exec',
+        deployedServices: [{ name: 'mag', uiType: 'terminal' }],
+      };
+
+      const res = makeResponse();
+      const cleanup = stream(
+        res as unknown as Response,
+        { infrastructureId: 'infra' },
+        terminalExecution,
+        infra
+      );
+
+      // First poll: deployment settles → `end` is emitted but the response
+      // stays open so shell-driven output keeps flowing.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(textOf(res)).toContain('event: end');
+      expect(res.end).not.toHaveBeenCalled();
+
+      // A `kubectl exec`-driven attack line arriving post-settle still
+      // reaches the console, and `end` is not re-emitted.
+      deploy.logs = [
+        {
+          name: 'mag',
+          pod: 'mag-pod',
+          container: 'mag',
+          line: 'http-flood → http://http-sim:8080/',
+        },
+      ];
+      await vi.advanceTimersByTimeAsync(2000);
+      const text = textOf(res);
+      expect(text).toContain('http-flood → http://http-sim:8080/');
+      expect(text.split('event: end').length - 1).toBe(1);
+      expect(res.end).not.toHaveBeenCalled();
+
+      cleanup();
+      expect(res.end).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test('a cluster read error emits an error event and closes', async () => {
     deploy.statusError = new Error('etcd unavailable');
     const res = makeResponse();

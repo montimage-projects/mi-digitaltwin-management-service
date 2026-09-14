@@ -10,6 +10,7 @@ import type {
   ExecutionProgressEvent,
   ExecutionLogEvent,
   ExecutionK8sEvent,
+  ExecutionAlertEvent,
   ExecutionEndEvent,
   ExecutionErrorEvent,
   ParsedSseEvent,
@@ -52,6 +53,9 @@ function dispatchSseEvent(parsed: ParsedSseEvent, handlers: ExecutionEventHandle
       break;
     case 'k8s-event':
       handlers.onK8sEvent?.(payload as ExecutionK8sEvent);
+      break;
+    case 'alert':
+      handlers.onAlert?.(payload as ExecutionAlertEvent);
       break;
     case 'end':
       handlers.onEnd?.(payload as ExecutionEndEvent);

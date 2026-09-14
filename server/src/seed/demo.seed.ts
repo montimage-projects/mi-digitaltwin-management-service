@@ -9,13 +9,13 @@
  * four catalog modules (issue #186, task 0.1) exactly as the playbook's
  * target runtime topology wiring table prescribes:
  *
- *   MAG       --attacks-->  HTTP-SIM   (attack target → MAG Job args)
+ *   MAG       --attacks-->  HTTP-SIM   (attack target → exec-driven attack)
  *   MMT-PROBE --monitors--> HTTP-SIM   (probe injected as target-pod sidecar)
  *   MMT-PROBE --notifies--> AI4SOAR    (probe security output → SOAR ingest)
  *   AI4SOAR   --acts-on-->  HTTP-SIM   (namespace-scoped playbook response)
  *
  * Node ids double as the Kubernetes resource names the engine derives
- * (`toResourceName`), so `http-sim` is also the cluster DNS name MAG's args
+ * (`toResourceName`), so `http-sim` is also the cluster DNS name MAG attacks
  * point at. The edge kind is persisted the way the canvas writes it (task
  * 3.2): `data.edgeType` plus the edge `label`; the deploy engine also accepts
  * `data.type`/`type`.
@@ -40,8 +40,6 @@ interface DemoNodeSpec {
   role: ScenarioRole;
   attachMode?: 'sidecar';
   position: { x: number; y: number };
-  /** `node.data.config` overrides validated on save (task 0.4 / 3.3). */
-  config?: { args?: string[] };
 }
 
 /**
@@ -50,11 +48,12 @@ interface DemoNodeSpec {
  * the `sidecar` probe onto its `monitors`-edge host at display time, so the
  * stored position is only a fallback.
  *
- * MAG's `config.args` select the attack profile (the catalog spec carries
- * none — task 3.3 made the profile a per-node override): `http-flood`, an
- * application-layer attack from MAG's catalog (`mag list`), aimed at the
- * target Service's cluster DNS name `http-sim:8080` — the value the
- * `mag → http-sim` attack edge resolves to per the wiring table.
+ * MAG carries no `config.args` — since issue #233 it is a long-running
+ * `Deployment` with an idle shell, and each attack is launched ad hoc via
+ * `kubectl exec -it deploy/mag -n <exec-ns> -- mag <attack> --target-ip
+ * http-sim --target-port 8080`, which keeps repeated runs possible without
+ * redeploying. The `mag → http-sim` attack edge still resolves the target
+ * Service's cluster DNS name per the wiring table.
  */
 const demoNodes: DemoNodeSpec[] = [
   {
@@ -62,9 +61,6 @@ const demoNodes: DemoNodeSpec[] = [
     serviceShortName: 'MAG',
     role: 'attack',
     position: { x: 40, y: 160 },
-    config: {
-      args: ['mag', 'http-flood', '--target-ip', 'http-sim', '--target-port', '8080'],
-    },
   },
   {
     id: 'http-sim',
@@ -148,11 +144,16 @@ export const seedDemoScenario = async (): Promise<void> => {
   console.info('Seeding demo project and scenario...');
 
   // Resolve the four catalog modules the demo wires together (task 0.1).
-  const serviceByShortName = new Map<string, { _id: unknown; title: string }>();
+  // `uiType` rides along so node badges/exec hints mirror the catalog entry
+  // (MAG is `terminal` since issue #233) instead of a hardcoded 'web'.
+  const serviceByShortName = new Map<
+    string,
+    { _id: unknown; title: string; uiType?: 'web' | 'terminal' | 'both' }
+  >();
   const missing: string[] = [];
   for (const spec of demoNodes) {
     const service = await Service.findOne({ shortName: spec.serviceShortName })
-      .select('_id title')
+      .select('_id title uiType')
       .lean();
     if (!service) {
       missing.push(spec.serviceShortName);
@@ -160,6 +161,7 @@ export const seedDemoScenario = async (): Promise<void> => {
       serviceByShortName.set(spec.serviceShortName, {
         _id: service._id,
         title: service.title,
+        uiType: service.uiType,
       });
     }
   }
@@ -179,7 +181,7 @@ export const seedDemoScenario = async (): Promise<void> => {
       leader: 'MI',
       involvedPartners: ['MI'],
       description:
-        'Ready-to-run demo project holding the "HTTP attack → MMT detection → AI4SOAR response" scenario from docs/playbooks/montimage-attack-detect-respond-plan.md. Assign an Infrastructure to the scenario and execute it to watch MAG attack HTTP-SIM, MMT-Probe detect the traffic, and AI4SOAR apply the Kubernetes response.',
+        'Ready-to-run demo project holding the "HTTP attack → MMT detection → AI4SOAR response" scenario from docs/playbooks/montimage-attack-detect-respond-plan.md. Assign an Infrastructure to the scenario and execute it: MAG deploys as an interactive terminal workload — run attacks with `kubectl exec -it deploy/mag -n <exec-ns> -- mag <attack> --target-ip http-sim --target-port 8080` — while MMT-Probe raises alerts the console surfaces and AI4SOAR blocks the reported attacker through CI-SIM.',
       isComposite: false,
     }
   );
@@ -211,11 +213,10 @@ export const seedDemoScenario = async (): Promise<void> => {
         type: spec.role,
         serviceId: String(service._id),
         serviceTitle: service.title,
-        uiType: 'web',
+        uiType: service.uiType ?? 'web',
         repositoryTable: 'INTACT_TOOLBOX',
         role: spec.role,
         ...(spec.attachMode && { attachMode: spec.attachMode }),
-        ...(spec.config && { config: spec.config }),
       },
     };
   });
@@ -246,7 +247,7 @@ export const seedDemoScenario = async (): Promise<void> => {
     { projectId: project._id, title: DEMO_SCENARIO_TITLE },
     {
       description:
-        'Montimage attack → detect → respond demo: MAG (Job) floods HTTP-SIM, the MMT-Probe sidecar in the target pod inspects the traffic and reports to AI4SOAR, which applies a namespace-scoped response (NetworkPolicy, pod deletion, Job scale-down) via its ServiceAccount. Wiring follows the target runtime topology of docs/playbooks/montimage-attack-detect-respond-plan.md.',
+        'Montimage attack → detect → respond demo: MAG deploys as a long-running terminal Deployment — drive attacks with `kubectl exec -it deploy/mag -n <exec-ns> -- mag <attack> --target-ip http-sim --target-port 8080` — the MMT-Probe sidecar in the target pod inspects the traffic and reports JSON alerts (Kafka, stdout, file) to AI4SOAR, whose playbook blocks the reported `ip.src` through CI-SIM /admin/block and keeps the NetworkPolicy hard-cut as a variant. Wiring follows the target runtime topology of docs/playbooks/montimage-attack-detect-respond-plan.md.',
       topology: { yaml, nodes, edges },
     }
   );

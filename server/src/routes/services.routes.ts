@@ -38,6 +38,7 @@ const deploymentSpecSchema = z.strictObject({
   attachMode: z.enum(['standalone', 'sidecar']).optional(),
   containerPort: z.number().int().min(1).max(65535).optional(),
   exposePort: z.boolean().optional(),
+  command: z.array(z.string().min(1).max(500)).max(50).optional(),
   args: z.array(z.string().min(1).max(500)).max(50).optional(),
   env: z
     .array(

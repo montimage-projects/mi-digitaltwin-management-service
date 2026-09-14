@@ -274,4 +274,70 @@ describe('ExecutionConsole', () => {
     });
     expect(screen.getByText('2 events')).toBeInTheDocument();
   });
+
+  it('renders alert events in a dedicated security alerts pane (issue #234)', async () => {
+    const handlers = await renderWithMockedStream();
+
+    act(() => {
+      handlers.onAlert?.({
+        service: 'http-sim',
+        pod: 'http-sim-abc',
+        container: 'mmt-probe',
+        timestamp: '2026-09-14T10:00:00Z',
+        verdict: 'http-flood',
+        attacker: '10.0.0.9',
+        line: '{"ip.src":"10.0.0.9","verdict":"http-flood"}',
+      });
+      handlers.onAlert?.({
+        service: 'http-sim',
+        pod: 'http-sim-abc',
+        container: 'mmt-probe',
+        verdict: 'syn-flood',
+        line: 'ALERT syn-flood suspected',
+      });
+    });
+
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('alerts-pane')).toBeInTheDocument();
+      const rows = screen.getAllByTestId('alert-row');
+      expect(rows).toHaveLength(2);
+      // Verdict + attacker address + reporting service:container.
+      expect(rows[0]).toHaveTextContent('http-flood');
+      expect(rows[0]).toHaveTextContent('src=10.0.0.9');
+      expect(rows[0]).toHaveTextContent('http-sim:mmt-probe');
+      expect(rows[1]).toHaveTextContent('syn-flood');
+    });
+    expect(screen.getByText('2 alerts')).toBeInTheDocument();
+  });
+
+  it('shows a copyable kubectl exec hint for terminal services (issue #233)', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
+    await renderWithMockedStream({
+      ...defaultProps,
+      services: [
+        {
+          nodeId: 'n1',
+          serviceId: 's1',
+          name: 'mag',
+          uiType: 'terminal',
+          status: 'running',
+        },
+      ],
+    });
+
+    const hint = await screen.findByTestId('exec-hint-mag');
+    const expected =
+      'kubectl exec -it deploy/mag -n test-ns -- mag <attack> --target-ip <target> --target-port <port>';
+    expect(hint).toHaveTextContent(expected);
+
+    fireEvent.click(hint);
+    await vi.waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(expected);
+    });
+  });
 });

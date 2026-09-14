@@ -110,12 +110,11 @@ describe('demo scenario seed (issue #204)', () => {
     const probe = nodes.find((n) => n.id === 'mmt-probe');
     expect(probe?.data?.attachMode).toBe('sidecar');
 
-    // MAG carries the demo attack profile targeting the http-sim Service DNS.
+    // MAG carries no fixed attack args (issue #233) — it is a terminal
+    // Deployment driven via `kubectl exec`; `uiType` mirrors the catalog.
     const mag = nodes.find((n) => n.id === 'mag');
-    const magArgs = (mag?.data?.config as { args?: string[] } | undefined)?.args ?? [];
-    expect(magArgs).toContain('--target-ip');
-    expect(magArgs).toContain('http-sim');
-    expect(magArgs).toContain('8080');
+    expect(mag?.data?.uiType).toBe('terminal');
+    expect(mag?.data?.config).toBeUndefined();
 
     // The YAML mirror lists the same services and typed connections.
     expect(scenario?.topology.yaml).toContain('http-sim');
@@ -140,20 +139,21 @@ describe('demo scenario seed (issue #204)', () => {
 
     expect(resolved).toHaveLength(4);
     const byId = new Map(resolved.map((n) => [n.nodeId, n]));
-    expect(byId.get('mag')?.deployment.kind).toBe('Job');
+    // Issue #233: MAG resolves to a long-running terminal Deployment whose
+    // container idles on the seeded shell command — attacks come via exec.
+    expect(byId.get('mag')?.deployment.kind).toBe('Deployment');
+    expect(byId.get('mag')?.uiType).toBe('terminal');
+    expect(byId.get('mag')?.deployment.command).toEqual([
+      'sh',
+      '-c',
+      'while true; do sleep 3600; done',
+    ]);
+    // No fixed attack args — Mongoose defaults the array field to [].
+    expect(byId.get('mag')?.deployment.args ?? []).toEqual([]);
     expect(byId.get('mmt-probe')?.edgeContext.monitors).toEqual(['http-sim']);
     expect(byId.get('mmt-probe')?.edgeContext.notifies).toEqual(['ai4soar']);
     expect(byId.get('ai4soar')?.edgeContext.actsOn).toEqual(['http-sim']);
     expect(byId.get('mag')?.edgeContext.targets).toEqual(['http-sim']);
-    // The node config override lands on the resolved Job args (task 0.4/1.4).
-    expect(byId.get('mag')?.deployment.args).toEqual([
-      'mag',
-      'http-flood',
-      '--target-ip',
-      'http-sim',
-      '--target-port',
-      '8080',
-    ]);
     // Every node resolves to its seeded docker image.
     for (const n of resolved) {
       expect(n.image, `${n.nodeId} image`).toMatch(/^registry\.montimage\.eu\//);
