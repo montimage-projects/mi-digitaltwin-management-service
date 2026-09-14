@@ -24,6 +24,7 @@ on:
       - 'server/src/services/**'
       - 'server/src/seed/**'
       - 'scripts/e2e-kind/**'
+      - 'sim/**'
       - '.github/workflows/e2e-kind.yml'
   push:
     branches: [main, develop]
@@ -31,6 +32,7 @@ on:
       - 'server/src/services/**'
       - 'server/src/seed/**'
       - 'scripts/e2e-kind/**'
+      - 'sim/**'
       - '.github/workflows/e2e-kind.yml'
   workflow_dispatch:
 

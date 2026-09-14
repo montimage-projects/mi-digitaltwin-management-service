@@ -100,6 +100,26 @@ describe('seed catalog refresh (integration)', () => {
       expect(svc?.categoryId?.toString()).toBe(roleCategory?._id.toString());
     }
 
+    // Issue #231 — CI-SIM is seeded in the OTHER_SERVICES infrastructure
+    // list (the "Add Target" dropdown source) under the `target` role
+    // category, carrying the target Deployment spec.
+    const ciSim = await Service.findOne({ shortName: 'CI-SIM' });
+    expect(ciSim).not.toBeNull();
+    expect(ciSim?.repositoryTable).toBe('OTHER_SERVICES');
+    expect(ciSim?.deprecated).toBe(false);
+    expect(ciSim?.versions[0]?.dockerImage).toBe(
+      'registry.montimage.eu/montimage-mti/ci-sim:v1.0.0'
+    );
+    const targetCategory = await Category.findOne({ slug: 'target' });
+    expect(ciSim?.categoryId?.toString()).toBe(targetCategory?._id.toString());
+    expect(ciSim?.deployment).toMatchObject({
+      kind: 'Deployment',
+      role: 'target',
+      containerPort: 8080,
+      exposePort: true,
+      readinessPath: '/',
+    });
+
     const sector = await Sector.findOne({ slug: 'digital-infrastructure' });
     expect(infraService?.sectorId?.toString()).toBe(sector?._id.toString());
 
