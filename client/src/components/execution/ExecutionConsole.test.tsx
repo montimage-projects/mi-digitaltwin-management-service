@@ -332,7 +332,7 @@ describe('ExecutionConsole', () => {
 
     const hint = await screen.findByTestId('exec-hint-mag');
     const expected =
-      'kubectl exec -it deploy/mag -n test-ns -- mag <attack> --target-ip <target> --target-port <port>';
+      "kubectl exec -it deploy/mag -n test-ns -- sh -c 'mag <attack> --target-ip <target> --target-port <port> 2>&1 | tee /proc/1/fd/1'";
     expect(hint).toHaveTextContent(expected);
 
     fireEvent.click(hint);

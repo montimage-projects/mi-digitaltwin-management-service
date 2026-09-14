@@ -404,7 +404,9 @@ async function assertMagDeploymentAndExecAttack() {
   // `kubectl exec`, so a second run needs no redeploy. The real module would
   // exec `mag <attack> --target-ip … --target-port …`; the stub image has no
   // `mag` binary, so exec runs stub.py with `mag` in argv (STUB_ROLE=attack is
-  // also inherited) and the same flag surface.
+  // also inherited) and the same flag surface. The `tee /proc/1/fd/1` wrapper
+  // mirrors the UI hint: exec output normally only reaches the exec channel,
+  // so teeing into PID 1's stdout also lands it in the MAG container log.
   try {
     const out = kubectl(
       [
@@ -413,15 +415,9 @@ async function assertMagDeploymentAndExecAttack() {
         'exec',
         `deploy/${MAG_DEPLOYMENT}`,
         '--',
-        'python3',
-        '-u',
-        '/app/stub.py',
-        'mag',
-        'http-flood',
-        '--target-ip',
-        HOST_APP,
-        '--target-port',
-        '8080',
+        'sh',
+        '-c',
+        `python3 -u /app/stub.py mag http-flood --target-ip ${HOST_APP} --target-port 8080 2>&1 | tee /proc/1/fd/1`,
       ],
       { allowFail: true }
     );
@@ -433,6 +429,21 @@ async function assertMagDeploymentAndExecAttack() {
         .split('\n')
         .find((l) => /finished|failed/.test(l))
         ?.slice(0, 120) || '(no output)'
+    );
+
+    // Issue #233 AC: attack output lands in the MAG container logs — the
+    // tee redirect above is what puts it there (exec output alone never
+    // reaches `kubectl logs`).
+    const podLog = kubectl(['-n', namespace, 'logs', `deploy/${MAG_DEPLOYMENT}`, '--tail=100'], {
+      allowFail: true,
+    });
+    record(
+      'attack output lands in the MAG container log',
+      /attack profile finished/.test(podLog),
+      podLog
+        .split('\n')
+        .find((l) => /finished|failed/.test(l))
+        ?.slice(0, 120) || '(no matching pod log line)'
     );
   } catch (err) {
     record('exec-driven attack completes in the MAG pod', false, err.message);

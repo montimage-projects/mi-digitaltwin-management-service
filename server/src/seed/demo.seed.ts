@@ -50,9 +50,11 @@ interface DemoNodeSpec {
  *
  * MAG carries no `config.args` — since issue #233 it is a long-running
  * `Deployment` with an idle shell, and each attack is launched ad hoc via
- * `kubectl exec -it deploy/mag -n <exec-ns> -- mag <attack> --target-ip
- * http-sim --target-port 8080`, which keeps repeated runs possible without
- * redeploying. The `mag → http-sim` attack edge still resolves the target
+ * `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag <attack>
+ * --target-ip http-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'`, which
+ * keeps repeated runs possible without redeploying and lands the attack
+ * output in the MAG pod's container log (exec output alone only reaches the
+ * exec channel). The `mag → http-sim` attack edge still resolves the target
  * Service's cluster DNS name per the wiring table.
  */
 const demoNodes: DemoNodeSpec[] = [
@@ -181,7 +183,7 @@ export const seedDemoScenario = async (): Promise<void> => {
       leader: 'MI',
       involvedPartners: ['MI'],
       description:
-        'Ready-to-run demo project holding the "HTTP attack → MMT detection → AI4SOAR response" scenario from docs/playbooks/montimage-attack-detect-respond-plan.md. Assign an Infrastructure to the scenario and execute it: MAG deploys as an interactive terminal workload — run attacks with `kubectl exec -it deploy/mag -n <exec-ns> -- mag <attack> --target-ip http-sim --target-port 8080` — while MMT-Probe raises alerts the console surfaces and AI4SOAR blocks the reported attacker through CI-SIM.',
+        'Ready-to-run demo project holding the "HTTP attack → MMT detection → AI4SOAR response" scenario from docs/playbooks/montimage-attack-detect-respond-plan.md. Assign an Infrastructure to the scenario and execute it: MAG deploys as an interactive terminal workload — run attacks with `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c \'mag <attack> --target-ip http-sim --target-port 8080 2>&1 | tee /proc/1/fd/1\'` — while MMT-Probe raises alerts the console surfaces and AI4SOAR blocks the reported attacker through CI-SIM.',
       isComposite: false,
     }
   );
@@ -247,7 +249,7 @@ export const seedDemoScenario = async (): Promise<void> => {
     { projectId: project._id, title: DEMO_SCENARIO_TITLE },
     {
       description:
-        'Montimage attack → detect → respond demo: MAG deploys as a long-running terminal Deployment — drive attacks with `kubectl exec -it deploy/mag -n <exec-ns> -- mag <attack> --target-ip http-sim --target-port 8080` — the MMT-Probe sidecar in the target pod inspects the traffic and reports JSON alerts (Kafka, stdout, file) to AI4SOAR, whose playbook blocks the reported `ip.src` through CI-SIM /admin/block and keeps the NetworkPolicy hard-cut as a variant. Wiring follows the target runtime topology of docs/playbooks/montimage-attack-detect-respond-plan.md.',
+        "Montimage attack → detect → respond demo: MAG deploys as a long-running terminal Deployment — drive attacks with `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag <attack> --target-ip http-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'` (the tee lands the output in the MAG container log the SSE stream ships) — the MMT-Probe sidecar in the target pod inspects the traffic and reports JSON alerts (Kafka, stdout, file) to AI4SOAR, whose playbook blocks the reported `ip.src` through CI-SIM /admin/block and keeps the NetworkPolicy hard-cut as a variant. Wiring follows the target runtime topology of docs/playbooks/montimage-attack-detect-respond-plan.md.",
       topology: { yaml, nodes, edges },
     }
   );

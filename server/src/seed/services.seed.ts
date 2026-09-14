@@ -421,7 +421,9 @@ const montimageScenarioServices: ServiceSeed[] = [
       // idles between attacks — the packaged `mag` image exits after its
       // CLI, so `command` overrides the entrypoint with an idle loop and the
       // user drives attacks with
-      // `kubectl exec -it deploy/mag -n <exec-ns> -- mag <attack> --target-ip <target> --target-port 8080`.
+      // `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag <attack>
+      // --target-ip <target> --target-port 8080 2>&1 | tee /proc/1/fd/1'`
+      // (the tee lands the attack output in the MAG container log).
       // `startOrder` still rolls it out last so monitor and reaction report
       // Ready before the attack machine is available.
       kind: 'Deployment',

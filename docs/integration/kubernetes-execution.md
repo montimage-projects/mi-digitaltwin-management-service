@@ -124,9 +124,12 @@ the resources in the table below.
   `command` (the Kubernetes `ENTRYPOINT` override), ahead of `args`. A
   CLI-only image stays alive between runs when its spec idles on a shell
   loop — e.g. MAG seeds `['sh', '-c', 'while true; do sleep 3600; done']` so
-  attacks are launched with `kubectl exec -it deploy/mag -n <exec-ns> -- mag
-<attack> --target-ip <target> --target-port <port>` instead of a
-  deploy-time Job arg set (issue #233).
+  attacks are launched with `kubectl exec -it deploy/mag -n <exec-ns> -- sh
+-c 'mag <attack> --target-ip <target> --target-port <port> 2>&1 | tee
+/proc/1/fd/1'` instead of a deploy-time Job arg set (issue #233). The
+  `tee /proc/1/fd/1` wrapper matters: exec output otherwise reaches only the
+  user's terminal — teeing into PID 1's stdout lands it in the pod's
+  container log, where the SSE stream ships it to the console.
 - **Volumes:** `deployment.volumes` render as `emptyDir` volumes shared
   across every container in the pod (for example a probe reports directory
   shared between the sidecar and its host container).

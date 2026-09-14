@@ -71,11 +71,17 @@ const MAX_ALERTS = 200;
  * `deploy/<name>` targets the workload the engine created for the node; MAG
  * carries the documented attack CLI so the hint renders the full command the
  * user pastes — other terminal services get the generic exec prefix.
+ *
+ * The `sh -c '… | tee /proc/1/fd/1'` wrapper is load-bearing: a `kubectl
+ * exec`'d process writes to the exec channel, not the container log, so
+ * without it the attack output would never reach the pod log the SSE stream
+ * tails. Teeing into PID 1's stdout shows the run in the user's terminal
+ * *and* lands it in the MAG container log.
  */
 function execHintFor(serviceName: string, namespace: string): string {
   const prefix = `kubectl exec -it deploy/${serviceName} -n ${namespace} -- `;
   return serviceName === 'mag'
-    ? `${prefix}mag <attack> --target-ip <target> --target-port <port>`
+    ? `${prefix}sh -c 'mag <attack> --target-ip <target> --target-port <port> 2>&1 | tee /proc/1/fd/1'`
     : `${prefix}<command>`;
 }
 

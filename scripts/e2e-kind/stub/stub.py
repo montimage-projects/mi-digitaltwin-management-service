@@ -23,7 +23,9 @@ image substitutes for the four modules (`mag`, `http-sim`, `mmt-probe`,
                           whose seeded `command` idles (`sleep` loop), so the
                           stub's entrypoint never runs there; run-e2e.js
                           drives each attack with `kubectl exec` invoking
-                          this script — floods --target-ip:--target-port with
+                          this script through `tee /proc/1/fd/1` so the
+                          output also lands in the pod's container log —
+                          floods --target-ip:--target-port with
                           HTTP requests, then exits 0.
 
 The role comes from the STUB_ROLE env var (injected per service by

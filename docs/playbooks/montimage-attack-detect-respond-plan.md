@@ -54,12 +54,12 @@ namespace secsim-<scenario>-<exec>
 
 Wiring resolved from topology edges:
 
-| Edge (source → target) | Engine effect                                                                                                                 |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| MAG → http-sim         | attack target for exec-driven runs: `kubectl exec -it deploy/mag -- mag <attack> --target-ip <svc> --target-port 8080` (#233) |
-| MMT-Probe → http-sim   | MMT-Probe injected as a **sidecar** in the target pod (no hostNetwork)                                                        |
-| MMT-Probe → AI4SOAR    | probe `security.output-channel={kafka,stdout,file}` (JSON reports, #234); AI4SOAR consumes the Kafka topic                    |
-| AI4SOAR → http-sim     | Role grants: `pods` delete, `deployments` patch/scale, `networkpolicies` create                                               |
+| Edge (source → target) | Engine effect                                                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MAG → http-sim         | attack target for exec-driven runs: `kubectl exec -it deploy/mag -- sh -c 'mag <attack> --target-ip <svc> --target-port 8080 2>&1 \| tee /proc/1/fd/1'` (#233) |
+| MMT-Probe → http-sim   | MMT-Probe injected as a **sidecar** in the target pod (no hostNetwork)                                                                                         |
+| MMT-Probe → AI4SOAR    | probe `security.output-channel={kafka,stdout,file}` (JSON reports, #234); AI4SOAR consumes the Kafka topic                                                     |
+| AI4SOAR → http-sim     | Role grants: `pods` delete, `deployments` patch/scale, `networkpolicies` create                                                                                |
 
 Sidecar over `hostNetwork` is the recommended choice: it captures exactly the
 target's traffic, needs no node-level privileges, and works on managed
@@ -196,8 +196,11 @@ subcommand plus its flags. Engine consequence (revised by issue #233): MAG
 deploys as a long-running `Deployment` whose `command` idles
 (`sh -c 'while true; do sleep 3600; done'`) — the `mag` CLI exits after each
 attack, so keeping the pod alive lets the user re-run attacks via
-`kubectl exec -it deploy/mag -n <exec-ns> -- mag <attack> --target-ip <svc>
---target-port <port>` without redeploying; no fixed `args` are baked in.
+`kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag <attack> --target-ip
+<svc> --target-port <port> 2>&1 | tee /proc/1/fd/1'` without redeploying; no
+fixed `args` are baked in. The `tee /proc/1/fd/1` wrapper lands the attack
+output in the pod's container log (exec output alone reaches only the exec
+channel), so it also shows in the execution console over SSE.
 Health is Deployment availability — no port, no endpoint.
 
 **http-sim — HTTP victim on `:8080` (port recorded, rest pending).** The
@@ -794,8 +797,10 @@ install.
    gate. MAG comes up idling — its pod entrypoint is the seeded sleep loop.
 5. **Launch an attack** — the MAG service row shows a copyable exec hint
    (issue #233):
-   `kubectl exec -it deploy/mag -n <exec-ns> -- mag http-flood --target-ip http-sim --target-port 8080`.
-   Re-run it as often as needed — the Deployment stays up between attacks.
+   `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag http-flood --target-ip http-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'`.
+   Re-run it as often as needed — the Deployment stays up between attacks,
+   and the `tee /proc/1/fd/1` wrapper puts each run's output into the MAG
+   pod's container log so it also streams into the console.
 6. **Watch the Execution tab**: `progress` events drive the bar,
    per-container log tabs keep MMT-Probe output and http-sim access logs
    separate, the **Security alerts** pane lists each detection the probe
