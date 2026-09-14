@@ -1,6 +1,11 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TopologyCanvas } from './TopologyCanvas';
+import { toast } from 'sonner';
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), info: vi.fn(), error: vi.fn() },
+}));
 
 const noop = () => {};
 
@@ -130,6 +135,127 @@ describe('TopologyCanvas sidecar attachment', () => {
     expect(screen.getByTestId('rf__node-n-probe')).toBeInTheDocument();
     expect(screen.getByText('sidecar — needs a monitor edge')).toBeInTheDocument();
     expect(screen.queryByTitle(/Sidecar attached/)).not.toBeInTheDocument();
+  });
+});
+
+describe('TopologyCanvas Auto-wire (task 5.3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('wires the four typed edges, applies the layout and surfaces what was added', () => {
+    const onTopologyChange = vi.fn();
+    render(
+      <TopologyCanvas
+        {...baseProps}
+        onTopologyChange={onTopologyChange}
+        nodes={scenarioNodes}
+        edges={[]}
+        services={services}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Auto-wire/ }));
+
+    expect(onTopologyChange).toHaveBeenCalledTimes(1);
+    const [newNodes, newEdges] = onTopologyChange.mock.calls[0] as [
+      { id: string; position: { x: number; y: number } }[],
+      { id: string; source: string; target: string; data?: { edgeType?: string } }[],
+    ];
+    expect(newEdges).toHaveLength(4);
+    expect(newEdges.map((e) => e.data?.edgeType).sort()).toEqual([
+      'acts-on',
+      'attacks',
+      'monitors',
+      'notifies',
+    ]);
+    expect(newEdges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: 'n-mag', target: 'n-http' }),
+        expect.objectContaining({ source: 'n-probe', target: 'n-http' }),
+        expect.objectContaining({ source: 'n-probe', target: 'n-soar' }),
+        expect.objectContaining({ source: 'n-soar', target: 'n-http' }),
+      ])
+    );
+
+    // Layout: attack and monitor left of the target, reaction right;
+    // the unroled DB node keeps its position.
+    const posOf = (id: string) => newNodes.find((n) => n.id === id)!.position;
+    expect(posOf('n-mag').x).toBeLessThan(posOf('n-http').x);
+    expect(posOf('n-probe').x).toBeLessThan(posOf('n-http').x);
+    expect(posOf('n-soar').x).toBeGreaterThan(posOf('n-http').x);
+    expect(posOf('n-db')).toEqual({ x: 0, y: 0 });
+
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Auto-wired 4 edges'));
+  });
+
+  it('does not duplicate edges the user already drew', () => {
+    const onTopologyChange = vi.fn();
+    const existing = [
+      { id: 'e1', source: 'n-mag', target: 'n-http', data: { edgeType: 'attacks' } },
+    ];
+    render(
+      <TopologyCanvas
+        {...baseProps}
+        onTopologyChange={onTopologyChange}
+        nodes={scenarioNodes}
+        edges={existing}
+        services={services}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Auto-wire/ }));
+
+    const [, newEdges] = onTopologyChange.mock.calls[0] as [
+      unknown,
+      { source: string; target: string }[],
+    ];
+    expect(newEdges).toHaveLength(4); // 1 existing + 3 generated
+    expect(newEdges.filter((e) => e.source === 'n-mag' && e.target === 'n-http')).toHaveLength(1);
+  });
+
+  it('reports when every role-derived edge already exists', () => {
+    const onTopologyChange = vi.fn();
+    const existing = [
+      { id: 'e1', source: 'n-mag', target: 'n-http', data: { edgeType: 'attacks' } },
+      { id: 'e2', source: 'n-probe', target: 'n-http', data: { edgeType: 'monitors' } },
+      { id: 'e3', source: 'n-probe', target: 'n-soar', data: { edgeType: 'notifies' } },
+      { id: 'e4', source: 'n-soar', target: 'n-http', data: { edgeType: 'acts-on' } },
+    ];
+    render(
+      <TopologyCanvas
+        {...baseProps}
+        onTopologyChange={onTopologyChange}
+        nodes={scenarioNodes}
+        edges={existing}
+        services={services}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Auto-wire/ }));
+
+    const [, newEdges] = onTopologyChange.mock.calls[0] as [unknown, unknown[]];
+    expect(newEdges).toHaveLength(4); // layout applied, no edge added
+    expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('already exist'));
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when no role-tagged services are placed', () => {
+    const onTopologyChange = vi.fn();
+    render(
+      <TopologyCanvas
+        {...baseProps}
+        onTopologyChange={onTopologyChange}
+        nodes={[makeNode('n-db', 'DB', { serviceId: 'svc-db', type: 'database' })]}
+        edges={[]}
+        services={services}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Auto-wire/ }));
+
+    expect(onTopologyChange).not.toHaveBeenCalled();
+    expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('Nothing to auto-wire'));
   });
 });
 
