@@ -228,4 +228,47 @@ describe('seedServices', () => {
     // Non-scenario services carry no deployment spec.
     expect(byName('CSAM')?.deployment).toBeUndefined();
   });
+
+  it('seeds CI-SIM under OTHER_SERVICES with the target deployment spec (issue #231)', async () => {
+    await seedServices();
+
+    // CI-SIM lives in the infrastructure list so the topology editor's
+    // "Add Target" button (repositoryTable === 'OTHER_SERVICES') lists it,
+    // grouped under the `target` role category.
+    const creates = vi.mocked(Service.create).mock.calls.map(([doc]) => doc) as {
+      shortName: string;
+      provider: string;
+      repositoryTable: string;
+      categoryId: string;
+      deployment?: {
+        kind: string;
+        role: string;
+        containerPort?: number;
+        exposePort?: boolean;
+        readinessPath?: string;
+        startOrder?: number;
+      };
+    }[];
+    const ciSim = creates.find((d) => d.shortName === 'CI-SIM');
+    expect(ciSim, 'CI-SIM create call').toBeDefined();
+    expect(ciSim?.provider).toBe('Montimage (MTI)');
+    expect(ciSim?.repositoryTable).toBe('OTHER_SERVICES');
+    expect(ciSim?.categoryId).toBe('cat-target');
+    expect(ciSim?.deployment).toMatchObject({
+      kind: 'Deployment',
+      role: 'target',
+      containerPort: 8080,
+      exposePort: true,
+      readinessPath: '/',
+    });
+
+    // Initial version carries the confirmed image ref, not the synthetic
+    // `registry.montimage.eu/montimage-mti-/ci-sim:v1.0.0` fallback (note the
+    // slug's trailing dash).
+    const update = updateFor('CI-SIM');
+    expect(update?.$set.versions[0].dockerImage).toBe(
+      'registry.montimage.eu/montimage-mti/ci-sim:v1.0.0'
+    );
+    expect(update?.$set.versions[0].dockerImage).not.toMatch(/montimage-mti-\//);
+  });
 });
