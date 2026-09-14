@@ -7,5 +7,12 @@ FROM python:3.13-alpine
 
 COPY stub.py /app/stub.py
 
+# `mag` shim (issue #237): the seeded runbook execs
+# `kubectl exec deploy/mag -- sh -c 'mag http-flood …'`, so the attack CLI
+# must exist on PATH in the idling MAG pod — the shim forwards to stub.py
+# with `mag` in argv (and STUB_ROLE=attack is set on the pod anyway).
+RUN printf '#!/bin/sh\nexec python3 -u /app/stub.py mag "$@"\n' \
+    > /usr/local/bin/mag && chmod +x /usr/local/bin/mag
+
 # -u keeps logs unbuffered so `kubectl logs` / SSE see alerts in real time.
 ENTRYPOINT ["python3", "-u", "/app/stub.py"]

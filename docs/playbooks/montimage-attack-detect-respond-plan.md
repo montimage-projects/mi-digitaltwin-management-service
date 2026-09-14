@@ -825,9 +825,12 @@ install.
 touch the engine or the seed: it starts a kind cluster, boots the server
 (auto-seed included), then `scripts/e2e-kind/run-e2e.js` drives the public
 REST API — login, register the cluster as an Infrastructure, execute the demo
-scenario — and asserts the MAG Deployment rollout, an exec-driven attack run
-(`kubectl exec` into the idling pod), the probe alert, the `ai4soar-block-mag`
-NetworkPolicy and a clean teardown. Because CI
+scenario — and asserts the R1 two-attack beats (issue #237): the MAG
+Deployment rollout, an exec-driven attack #1 (`kubectl exec` into the idling
+pod), the probe alert, CI-SIM's "service stopped" → Deployment restart, the
+attacker address landing on the ci-sim `/admin/block` blocklist, then an
+exec-driven attack #2 answered 403 with a second alert and a still-healthy
+target, and a clean teardown. Because CI
 runners cannot reach `registry.montimage.eu`, the driver repoints the
 services at a locally-built stub image (`scripts/e2e-kind/stub/`) loaded with
 `kind load`; set `SECSIM_E2E_REQUIRE_REAL_IMAGES=1` to fail instead of

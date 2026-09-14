@@ -5,28 +5,40 @@ The Montimage scenario images live in the private `registry.montimage.eu`
 registry, which does not resolve outside Montimage's network, and the deploy
 engine does not attach `imagePullSecrets` — so CI cannot pull them. This stub
 image substitutes for the four modules (`mag`, `ci-sim`, `mmt-probe`,
-`ai4soar`) while preserving the *semantics* the end-to-end test asserts:
+`ai4soar`) while preserving the *semantics* the end-to-end test asserts for
+the R1 two-attack script (issue #237):
 
-  target   (ci-sim)     — serves HTTP on :8080 so the readiness probe and the
-                          attack traffic have a real victim.
+  target   (ci-sim)     — mirrors sim/ci-sim/server.py (issue #231): health
+                          on GET /, a small /api surface, and the
+                          /admin/block|unblock|blocks blocklist; a sustained
+                          request rate from one source over CI_SIM_RATE_LIMIT
+                          per CI_SIM_RATE_WINDOW_S logs 'service stopped' and
+                          exits non-zero so the Deployment restarts it. The
+                          blocklist persists to the shared mmt-reports
+                          emptyDir so it survives that restart.
   monitor  (mmt-probe)  — watches the shared pod network namespace via
                           /proc/net/tcp and raises an alert when connection
-                          volume to :8080 spikes (the flood signature), then
-                          reports it to the reaction module — standing in for
-                          MMT-Probe's security output channel.
+                          volume to :8080 spikes (the flood signature),
+                          reporting the attacker source address as `ip.src`
+                          (the typed-alert contract from issue #234) to the
+                          reaction module — standing in for MMT-Probe's
+                          security output channel.
   reaction (ai4soar)    — serves GET /health on :5000 (readiness) and applies
-                          the playbook response on alert: creates a
-                          NetworkPolicy in the execution namespace through the
-                          Kubernetes API, authenticated with the pod's
-                          ServiceAccount token (exactly like Pre.3 describes).
-  attack   (mag)        — since issue #233 the mag workload is a Deployment
-                          whose seeded `command` idles (`sleep` loop), so the
+                          the seeded playbook response on alert (issue #235):
+                          POST the reported attacker address to the acts-on
+                          target's /admin/block endpoint — an
+                          application-level block, so the attacker's traffic
+                          stays visible to the probe for attack #2's alert.
+  attack   (mag)        — the mag workload is a Deployment whose seeded
+                          `command` idles (`sleep` loop, issue #233), so the
                           stub's entrypoint never runs there; run-e2e.js
-                          drives each attack with `kubectl exec` invoking
-                          this script through `tee /proc/1/fd/1` so the
-                          output also lands in the pod's container log —
-                          floods --target-ip:--target-port with
-                          HTTP requests, then exits 0.
+                          drives each attack with `kubectl exec` invoking the
+                          `/usr/local/bin/mag` shim (→ this script) through
+                          `tee /proc/1/fd/1` so the output also lands in the
+                          pod's container log — floods --target-ip:--target-port
+                          with HTTP requests, then exits 0. Requests answered
+                          403 by the blocklist count as reaching the target —
+                          the response proves they arrived.
 
 The role comes from the STUB_ROLE env var (injected per service by
 run-e2e.js and inherited by `kubectl exec` processes); the `mag …` argv
@@ -35,17 +47,28 @@ fallback keeps the exec-driven attack working even without it.
 
 import json
 import os
-import ssl
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
+from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TARGET_PORT_HEX = format(8080, '04X').upper()  # :1F90 in /proc/net/tcp
 ALERT_THRESHOLD = 8  # concurrent/recent connections to :8080 that read as a flood
 ALERT_RESEND_S = 15  # re-emit the alert while the flood signature persists
-SA_DIR = '/var/run/secrets/kubernetes.io/serviceaccount'
+TARGET_PORT = int(os.environ.get('PORT', '8080'))
+RATE_LIMIT = int(os.environ.get('CI_SIM_RATE_LIMIT', '50'))
+RATE_WINDOW_S = float(os.environ.get('CI_SIM_RATE_WINDOW_S', '10'))
+# The mmt-reports emptyDir the engine shares with the host container survives
+# the crash-on-attack container restart — persisting the blocklist there keeps
+# the block effective when attack #2 runs.
+BLOCKLIST_FILE = os.environ.get(
+    'CI_SIM_BLOCKLIST_FILE', '/opt/mmt/probe/result/report/ci-sim-blocklist.json'
+)
+BLOCK_TARGET_URL = os.environ.get('BLOCK_TARGET_URL', 'http://ci-sim:8080')
+BLOCK_RETRY_S = 90  # the block POST retries while the target is mid-restart
 
 
 def log(role, message):
@@ -61,26 +84,215 @@ def role():
 
 
 # ---------------------------------------------------------------------------
-# target — ci-sim substitute
+# target — ci-sim substitute (mirrors sim/ci-sim/server.py, issue #231)
 # ---------------------------------------------------------------------------
 
 
+class TargetState:
+    """Shared mutable state, guarded by `lock` (the server is threaded)."""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.blocked = set()
+        self.hits = defaultdict(deque)  # source -> deque of request timestamps
+        self.served = 0
+        self.rejected = 0
+
+
+TARGET_STATE = TargetState()
+TARGET_STARTED = time.time()
+
+
+def load_blocklist():
+    """Reload the persisted blocklist — survives the crash-restart because the
+    file lives on the pod's shared emptyDir, not the container layer."""
+    try:
+        with open(BLOCKLIST_FILE, 'r', encoding='utf-8') as handle:
+            entries = json.load(handle)
+        return {str(e) for e in entries if str(e).strip()}
+    except (OSError, ValueError):
+        return set()
+
+
+def save_blocklist(blocked):
+    try:
+        os.makedirs(os.path.dirname(BLOCKLIST_FILE), exist_ok=True)
+        with open(BLOCKLIST_FILE, 'w', encoding='utf-8') as handle:
+            json.dump(sorted(blocked), handle)
+    except OSError as exc:
+        log('target', f'blocklist persist failed: {exc}')
+
+
+def source_ip(handler):
+    """Client address — X-Forwarded-For wins so the blocklist and the rate
+    watcher still see the real source when requests arrive through a proxy."""
+    forwarded = handler.headers.get('X-Forwarded-For')
+    if forwarded:
+        first = forwarded.split(',')[0].strip()
+        if first:
+            return first
+    return handler.client_address[0]
+
+
 def run_target():
+    with TARGET_STATE.lock:
+        TARGET_STATE.blocked |= load_blocklist()
+
     class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):  # noqa: N802 — stdlib hook name
-            body = b'{"status":"ok","module":"ci-sim"}\n'
-            self.send_response(200)
+        def _json(self, code, payload):
+            body = (json.dumps(payload) + '\n').encode()
+            self.send_response(code)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             self.wfile.write(body)
 
+        def _body_json(self):
+            try:
+                length = int(self.headers.get('Content-Length') or 0)
+            except ValueError:
+                return None
+            if length <= 0:
+                return None
+            try:
+                return json.loads(self.rfile.read(length))
+            except (ValueError, OSError):
+                return None
+
+        def _admit(self):
+            """Record the hit; 403 blocklisted sources; stop the service when
+            one source sustains a rate over the threshold (crash-on-attack)."""
+            source = source_ip(self)
+            now = time.time()
+            with TARGET_STATE.lock:
+                hits = TARGET_STATE.hits[source]
+                hits.append(now)
+                while hits and hits[0] < now - RATE_WINDOW_S:
+                    hits.popleft()
+                over = len(hits) > RATE_LIMIT
+                blocked = source in TARGET_STATE.blocked
+                if blocked:
+                    TARGET_STATE.rejected += 1
+                else:
+                    TARGET_STATE.served += 1
+
+            if over:
+                # Log the contract line first — stdout is what `kubectl logs`
+                # and the engine's SSE stream ship — then shut the server
+                # down so the process exits non-zero below and the
+                # Deployment's restartPolicy: Always brings it back.
+                log(
+                    'target',
+                    f'service stopped — sustained request rate from {source} '
+                    f'exceeded {RATE_LIMIT} req/{RATE_WINDOW_S:g}s',
+                )
+                self._json(503, {'error': 'service stopped'})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return False
+            if blocked:
+                self._json(
+                    403, {'error': 'forbidden', 'reason': 'source address is blocked'}
+                )
+                return False
+            return True
+
+        def do_GET(self):  # noqa: N802 — stdlib hook name
+            if not self._admit():
+                return
+            path = self.path.split('?', 1)[0]
+            if path == '/':
+                self._json(200, {'status': 'ok', 'service': 'ci-sim'})
+            elif path == '/api/status':
+                with TARGET_STATE.lock:
+                    payload = {
+                        'status': 'ok',
+                        'service': 'ci-sim',
+                        'uptime_s': round(time.time() - TARGET_STARTED, 3),
+                        'requests_served': TARGET_STATE.served,
+                        'requests_rejected': TARGET_STATE.rejected,
+                        'blocked_sources': len(TARGET_STATE.blocked),
+                    }
+                self._json(200, payload)
+            elif path == '/api/metrics':
+                now = time.time()
+                with TARGET_STATE.lock:
+                    for hits in TARGET_STATE.hits.values():
+                        while hits and hits[0] < now - RATE_WINDOW_S:
+                            hits.popleft()
+                    per_source = {s: len(h) for s, h in TARGET_STATE.hits.items() if h}
+                self._json(
+                    200,
+                    {
+                        'window_s': RATE_WINDOW_S,
+                        'rate_limit': RATE_LIMIT,
+                        'sources': per_source,
+                    },
+                )
+            elif path == '/admin/blocks':
+                with TARGET_STATE.lock:
+                    blocks = sorted(TARGET_STATE.blocked)
+                self._json(200, {'blocks': blocks})
+            else:
+                self._json(404, {'error': 'not found'})
+
+        def do_POST(self):  # noqa: N802 — stdlib hook name
+            if not self._admit():
+                return
+            path = self.path.split('?', 1)[0]
+            if path not in ('/admin/block', '/admin/unblock'):
+                self._json(404, {'error': 'not found'})
+                return
+            payload = self._body_json()
+            # The seeded playbook posts {"ip": "<attacker>"} (#235) while the
+            # CI-SIM contract reads {"address": "<ip>"} (#231) — accept both.
+            address = (payload or {}).get('address') or (payload or {}).get('ip')
+            if not isinstance(address, str) or not address.strip():
+                self._json(
+                    400,
+                    {
+                        'error': 'bad request',
+                        'reason': 'body must be {"address": "<ip>"}',
+                    },
+                )
+                return
+            address = address.strip()
+            with TARGET_STATE.lock:
+                existed = address in TARGET_STATE.blocked
+                if path == '/admin/block':
+                    TARGET_STATE.blocked.add(address)
+                else:
+                    TARGET_STATE.blocked.discard(address)
+                save_blocklist(TARGET_STATE.blocked)
+            if path == '/admin/block':
+                if existed:
+                    log('target', f'admin: {address} already blocked')
+                    self._json(200, {'blocked': address, 'already': True})
+                else:
+                    log('target', f'admin: blocked {address}')
+                    self._json(201, {'blocked': address})
+            elif existed:
+                log('target', f'admin: unblocked {address}')
+                self._json(200, {'unblocked': address})
+            else:
+                self._json(404, {'error': 'not blocked', 'address': address})
+
         def log_message(self, fmt, *args):
             log('target', fmt % args)
 
-    server = ThreadingHTTPServer(('0.0.0.0', 8080), Handler)
-    log('target', 'serving HTTP on :8080')
-    server.serve_forever()
+    server = ThreadingHTTPServer(('0.0.0.0', TARGET_PORT), Handler)
+    log(
+        'target',
+        f'serving HTTP on :{TARGET_PORT} (rate limit {RATE_LIMIT} '
+        f'req/{RATE_WINDOW_S:g}s per source)',
+    )
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+    # serve_forever returns when the rate watcher calls shutdown() — the demo
+    # attack has stopped the service, so exit non-zero and let the
+    # Deployment's restartPolicy: Always bring the container back.
+    sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -88,25 +300,56 @@ def run_target():
 # ---------------------------------------------------------------------------
 
 
-def connections_to_target():
-    """Connections on the shared pod interface whose local port is 8080.
+def decode_remote(hex_address):
+    """Decode a /proc/net/tcp{,6} remote address to a dotted IP, or None.
+
+    IPv4 entries are little-endian hex (0100007F = 127.0.0.1). tcp6 stores
+    four little-endian 32-bit words; only v4-mapped addresses decode — the
+    kind cluster is IPv4, so other v6 remotes are counted but never reported
+    as the attacker.
+    """
+    addr = hex_address.split(':', 1)[0]
+    try:
+        raw = bytes.fromhex(addr)
+    except ValueError:
+        return None
+    if len(raw) == 4:
+        ip = '.'.join(str(b) for b in raw[::-1])
+    elif len(raw) == 16:
+        full = b''.join(raw[i : i + 4][::-1] for i in range(0, 16, 4))
+        if full[:12] != b'\x00' * 10 + b'\xff\xff':
+            return None
+        ip = '.'.join(str(b) for b in full[12:])
+    else:
+        return None
+    if ip == '0.0.0.0' or ip.startswith('127.'):
+        return None
+    return ip
+
+
+def target_traffic():
+    """(count, {remote_ip: hits}) for sockets whose local port is 8080.
 
     The sidecar shares the target's network namespace, so /proc/net/tcp shows
     the listener plus every ESTABLISHED/TIME_WAIT socket the attack creates.
     TIME_WAIT entries linger ~60 s, so even a short flood stays visible.
     """
     count = 0
+    remotes = {}
     for table in ('/proc/net/tcp', '/proc/net/tcp6'):
         try:
             with open(table, 'r', encoding='ascii') as handle:
                 next(handle)  # header
                 for line in handle:
                     parts = line.split()
-                    if len(parts) > 1 and parts[1].endswith(f':{TARGET_PORT_HEX}'):
+                    if len(parts) > 2 and parts[1].endswith(f':{TARGET_PORT_HEX}'):
                         count += 1
+                        remote = decode_remote(parts[2])
+                        if remote:
+                            remotes[remote] = remotes.get(remote, 0) + 1
         except OSError:
             continue
-    return count
+    return count, remotes
 
 
 def post_alert(url, payload):
@@ -131,16 +374,29 @@ def run_monitor():
     log('monitor', f'capturing on {iface} (pod netns), alerting to {alert_url}/api/alerts')
     last_alert = 0.0
     while True:
-        count = connections_to_target()
+        count, remotes = target_traffic()
         if count >= ALERT_THRESHOLD and time.time() - last_alert >= ALERT_RESEND_S:
             last_alert = time.time()
+            attacker = max(remotes, key=remotes.get) if remotes else None
             message = (
                 f'ALERT http-flood suspected: {count} connections to :8080 '
                 f'on interface {iface}'
             )
-            # stdout is what the engine ships as `log` SSE events and what
-            # `kubectl logs -c mmt-probe` reads — the e2e asserts on it.
-            print(message, flush=True)
+            # One JSON report line is both contracts at once: the `alert`
+            # field keeps the ALERT text the log grep matches, and `ip.src`
+            # is the typed attacker address the SSE alert event (#234) and
+            # the AI4SOAR playbook (#235) consume.
+            report = {
+                'alert': message,
+                'ip.src': attacker,
+                'ip_src': attacker,
+                'source': 'mmt-probe',
+                'connections': count,
+                'timestamp': last_alert,
+            }
+            # stdout is what the engine ships as `log`/`alert` SSE events and
+            # what `kubectl logs -c mmt-probe` reads — the e2e asserts on it.
+            print(json.dumps(report), flush=True)
             try:
                 os.makedirs(report_dir, exist_ok=True)
                 with open(
@@ -148,80 +404,68 @@ def run_monitor():
                     'w',
                     encoding='utf-8',
                 ) as handle:
-                    handle.write(message + '\n')
+                    handle.write(json.dumps(report) + '\n')
             except OSError as exc:
                 log('monitor', f'report write failed: {exc}')
-            post_alert(
-                f'{alert_url}/api/alerts',
-                {
-                    'alert': message,
-                    'source': 'mmt-probe',
-                    'connections': count,
-                    'timestamp': last_alert,
-                },
-            )
+            post_alert(f'{alert_url}/api/alerts', report)
         time.sleep(1)
 
 
 # ---------------------------------------------------------------------------
-# reaction — ai4soar substitute
+# reaction — ai4soar substitute (seeded playbook, issue #235)
 # ---------------------------------------------------------------------------
 
+ATTACKER_KEYS = ('ip.src', 'ip_src', 'src', 'attacker', 'source_ip', 'src_ip')
 
-def read_sa_file(name):
-    try:
-        with open(os.path.join(SA_DIR, name), 'r', encoding='utf-8') as handle:
-            return handle.read().strip()
-    except OSError:
+
+def attacker_of(payload):
+    """The alert's attacker source address — `ip.src` and its spellings, plus
+    a nested {"ip": {"src": …}} for safety."""
+    if not isinstance(payload, dict):
         return None
+    for key in ATTACKER_KEYS:
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    nested = payload.get('ip')
+    if isinstance(nested, dict):
+        value = nested.get('src')
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
-def apply_network_policy():
-    """Create the playbook's deny-ingress NetworkPolicy via the pod's SA.
+def block_attacker(address):
+    """POST {"address": <ip>} to the acts-on target's /admin/block.
 
-    Mirrors the AI4SOAR → ci-sim wiring row: `networkpolicies create`,
-    namespace-scoped, least-privilege — the same call the real reaction would
-    make. Returns a human-readable outcome string.
+    Retries while the target is mid-restart — the attack that triggered the
+    alert also stops the service, so the first attempts may hit a refused or
+    503 target; a definitive 4xx answer (never expected here) ends it early.
     """
-    token = read_sa_file('token')  # gitleaks:allow — reads the pod SA token at runtime
-    namespace = read_sa_file('namespace')
-    cafile = os.path.join(SA_DIR, 'ca.crt')
-    if not token or not namespace or not os.path.exists(cafile):
-        return 'no in-cluster ServiceAccount credentials — skipped'
-
-    policy = {
-        'apiVersion': 'networking.k8s.io/v1',
-        'kind': 'NetworkPolicy',
-        'metadata': {
-            'name': 'ai4soar-block-mag',
-            'labels': {'app.kubernetes.io/managed-by': 'ai4soar'},
-        },
-        'spec': {
-            'podSelector': {'matchLabels': {'app': 'ci-sim'}},
-            'policyTypes': ['Ingress'],
-            'ingress': [],  # deny all ingress to the target — the playbook response
-        },
-    }
-    request = urllib.request.Request(
-        'https://kubernetes.default.svc/apis/networking.k8s.io/v1'
-        f'/namespaces/{namespace}/networkpolicies',
-        data=json.dumps(policy).encode(),
-        headers={
-            'Authorization': f'Bearer {token}',
-            'Content-Type': 'application/json',
-        },
-        method='POST',
-    )
-    context = ssl.create_default_context(cafile=cafile)
-    try:
-        with urllib.request.urlopen(request, timeout=10, context=context) as response:
-            return f'created NetworkPolicy ai4soar-block-mag (HTTP {response.status})'
-    except urllib.error.HTTPError as exc:
-        if exc.code == 409:
-            return 'NetworkPolicy ai4soar-block-mag already exists'
-        return f'Kubernetes API error {exc.code}: {exc.read().decode(errors="replace")[:200]}'
-    except Exception as exc:
-        return f'Kubernetes API call failed: {exc}'
+    request_body = json.dumps({'address': address}).encode()
+    deadline = time.time() + BLOCK_RETRY_S
+    attempts = 0
+    while True:
+        attempts += 1
+        request = urllib.request.Request(
+            f'{BLOCK_TARGET_URL}/admin/block',
+            data=request_body,
+            headers={'Content-Type': 'application/json'},
+            method='POST',
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=5) as response:
+                return (
+                    f'blocked {address} at {BLOCK_TARGET_URL} '
+                    f'(HTTP {response.status}, attempt {attempts})'
+                )
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (429, 502, 503) or time.time() >= deadline:
+                return f'block {address} at {BLOCK_TARGET_URL} → HTTP {exc.code}'
+        except Exception as exc:
+            if time.time() >= deadline:
+                return f'block {address} at {BLOCK_TARGET_URL} failed: {exc}'
+        time.sleep(5)
 
 
 def run_reaction():
@@ -234,6 +478,18 @@ def run_reaction():
             self.end_headers()
             self.wfile.write(body)
 
+        def _body_json(self):
+            try:
+                length = int(self.headers.get('Content-Length') or 0)
+            except ValueError:
+                return None
+            if length <= 0:
+                return None
+            try:
+                return json.loads(self.rfile.read(length))
+            except (ValueError, OSError):
+                return None
+
         def do_GET(self):  # noqa: N802 — stdlib hook name
             if self.path == '/health':
                 self._json(200, {'status': 'healthy'})
@@ -242,7 +498,11 @@ def run_reaction():
 
         def do_POST(self):  # noqa: N802 — stdlib hook name
             if self.path.startswith('/api/alerts'):
-                outcome = apply_network_policy()
+                attacker = attacker_of(self._body_json())
+                if attacker:
+                    outcome = block_attacker(attacker)
+                else:
+                    outcome = 'no attacker address in the alert — skipped'
                 print(f'REACTION {outcome}', flush=True)
                 self._json(202, {'reaction': outcome})
             else:
@@ -252,7 +512,7 @@ def run_reaction():
             log('reaction', fmt % args)
 
     server = ThreadingHTTPServer(('0.0.0.0', 5000), Handler)
-    log('reaction', 'serving :5000 (/health, /api/alerts)')
+    log('reaction', f'serving :5000 (/health, /api/alerts → {BLOCK_TARGET_URL}/admin/block)')
     server.serve_forever()
 
 
@@ -278,6 +538,7 @@ def run_attack():
 
     sent = [0]
     ok = [0]
+    blocked = [0]
     lock = threading.Lock()
 
     def worker():
@@ -292,6 +553,15 @@ def run_attack():
                     response.read()
                 with lock:
                     ok[0] += 1
+            except urllib.error.HTTPError as exc:
+                if exc.code == 403:
+                    # The blocklist answered — the request reached the target
+                    # and was rejected application-side: still observable
+                    # attack traffic, which is what attack #2 needs.
+                    with lock:
+                        blocked[0] += 1
+                else:
+                    log('attack', f'request {index} failed: HTTP {exc.code}')
             except Exception as exc:
                 log('attack', f'request {index} failed: {exc}')
             if index % 50 == 0:
@@ -302,10 +572,15 @@ def run_attack():
         thread.start()
     for thread in threads:
         thread.join()
-    log('attack', f'attack profile finished — {ok[0]}/{sent[0]} requests reached the target')
+    log(
+        'attack',
+        f'attack profile finished — {ok[0]}/{sent[0]} requests reached the '
+        f'target, {blocked[0]} blocked',
+    )
     # An attack that never reached the target is a failed run, not a
-    # completed one — mirror MAG's own non-zero exit semantics.
-    sys.exit(0 if ok[0] > 0 else 1)
+    # completed one — mirror MAG's own non-zero exit semantics. A blocklisted
+    # run still reached the target (the 403 is the target answering).
+    sys.exit(0 if ok[0] + blocked[0] > 0 else 1)
 
 
 def main():
