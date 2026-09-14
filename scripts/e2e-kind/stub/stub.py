@@ -4,10 +4,10 @@
 The Montimage scenario images live in the private `registry.montimage.eu`
 registry, which does not resolve outside Montimage's network, and the deploy
 engine does not attach `imagePullSecrets` — so CI cannot pull them. This stub
-image substitutes for the four modules (`mag`, `http-sim`, `mmt-probe`,
+image substitutes for the four modules (`mag`, `ci-sim`, `mmt-probe`,
 `ai4soar`) while preserving the *semantics* the end-to-end test asserts:
 
-  target   (http-sim)   — serves HTTP on :8080 so the readiness probe and the
+  target   (ci-sim)     — serves HTTP on :8080 so the readiness probe and the
                           attack traffic have a real victim.
   monitor  (mmt-probe)  — watches the shared pod network namespace via
                           /proc/net/tcp and raises an alert when connection
@@ -61,14 +61,14 @@ def role():
 
 
 # ---------------------------------------------------------------------------
-# target — http-sim substitute
+# target — ci-sim substitute
 # ---------------------------------------------------------------------------
 
 
 def run_target():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):  # noqa: N802 — stdlib hook name
-            body = b'{"status":"ok","module":"http-sim"}\n'
+            body = b'{"status":"ok","module":"ci-sim"}\n'
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Content-Length', str(len(body)))
@@ -179,7 +179,7 @@ def read_sa_file(name):
 def apply_network_policy():
     """Create the playbook's deny-ingress NetworkPolicy via the pod's SA.
 
-    Mirrors the AI4SOAR → http-sim wiring row: `networkpolicies create`,
+    Mirrors the AI4SOAR → ci-sim wiring row: `networkpolicies create`,
     namespace-scoped, least-privilege — the same call the real reaction would
     make. Returns a human-readable outcome string.
     """
@@ -197,7 +197,7 @@ def apply_network_policy():
             'labels': {'app.kubernetes.io/managed-by': 'ai4soar'},
         },
         'spec': {
-            'podSelector': {'matchLabels': {'app': 'http-sim'}},
+            'podSelector': {'matchLabels': {'app': 'ci-sim'}},
             'policyTypes': ['Ingress'],
             'ingress': [],  # deny all ingress to the target — the playbook response
         },
@@ -270,7 +270,7 @@ def arg_value(flag, default=None):
 
 
 def run_attack():
-    target_ip = arg_value('--target-ip', 'http-sim')
+    target_ip = arg_value('--target-ip', 'ci-sim')
     target_port = arg_value('--target-port', '8080')
     total = int(os.environ.get('MAG_REQUEST_COUNT', '400'))
     url = f'http://{target_ip}:{target_port}/'

@@ -23,7 +23,8 @@ const TEST_DB_NAME = `secsim_demo_seed_test_${Date.now()}`;
 const TEST_MONGODB_URI = `${process.env.SEED_TEST_MONGODB_URI ?? process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017'}/${TEST_DB_NAME}`;
 
 const DEMO_PROJECT_SHORTNAME = 'MONTIMAGE-DEMO';
-const DEMO_SCENARIO_TITLE = 'HTTP attack → MMT detection → AI4SOAR response';
+const DEMO_SCENARIO_TITLE = 'CI attack → MMT detection → AI4SOAR block';
+const LEGACY_SCENARIO_TITLE = 'HTTP attack → MMT detection → AI4SOAR response';
 
 let mongoAvailable = true;
 
@@ -78,7 +79,7 @@ describe('demo scenario seed (issue #204)', () => {
     // badge/edge-validation layer resolves.
     const serviceByNode = new Map([
       ['mag', 'MAG'],
-      ['http-sim', 'HTTP-SIM'],
+      ['ci-sim', 'CI-SIM'],
       ['mmt-probe', 'MMT-PROBE'],
       ['ai4soar', 'AI4SOAR'],
     ] as const);
@@ -99,10 +100,10 @@ describe('demo scenario seed (issue #204)', () => {
     ]);
     expect(edgeTriples).toEqual(
       expect.arrayContaining([
-        ['mag', 'attacks', 'http-sim'],
-        ['mmt-probe', 'monitors', 'http-sim'],
+        ['mag', 'attacks', 'ci-sim'],
+        ['mmt-probe', 'monitors', 'ci-sim'],
         ['mmt-probe', 'notifies', 'ai4soar'],
-        ['ai4soar', 'acts-on', 'http-sim'],
+        ['ai4soar', 'acts-on', 'ci-sim'],
       ])
     );
 
@@ -110,14 +111,32 @@ describe('demo scenario seed (issue #204)', () => {
     const probe = nodes.find((n) => n.id === 'mmt-probe');
     expect(probe?.data?.attachMode).toBe('sidecar');
 
-    // MAG carries no fixed attack args (issue #233) — it is a terminal
-    // Deployment driven via `kubectl exec`; `uiType` mirrors the catalog.
+    // MAG is a terminal Deployment driven via `kubectl exec` (issue #233);
+    // `uiType` mirrors the catalog and `config.profiles` carries the R1
+    // two-attack script's default profiles (issue #236): attack #1 stops the
+    // CI-SIM server, attack #2 re-runs once the attacker is already blocked.
     const mag = nodes.find((n) => n.id === 'mag');
     expect(mag?.data?.uiType).toBe('terminal');
-    expect(mag?.data?.config).toBeUndefined();
+    const profiles = mag?.data?.config?.profiles as
+      { name: string; description: string; args: string[] }[] | undefined;
+    expect(profiles, 'two default attack profiles').toHaveLength(2);
+    expect(profiles?.map((p) => p.name)).toEqual([
+      'attack-1-stop-the-server',
+      'attack-2-already-blocked',
+    ]);
+    for (const profile of profiles ?? []) {
+      expect(profile.args).toEqual([
+        'mag',
+        'http-flood',
+        '--target-ip',
+        'ci-sim',
+        '--target-port',
+        '8080',
+      ]);
+    }
 
     // The YAML mirror lists the same services and typed connections.
-    expect(scenario?.topology.yaml).toContain('http-sim');
+    expect(scenario?.topology.yaml).toContain('ci-sim');
     expect(scenario?.topology.yaml).toContain('type: attacks');
     expect(scenario?.topology.yaml).toContain('type: acts-on');
   });
@@ -129,7 +148,7 @@ describe('demo scenario seed (issue #204)', () => {
     expect(scenario).not.toBeNull();
 
     const services = await Service.find({
-      shortName: { $in: ['MAG', 'HTTP-SIM', 'MMT-PROBE', 'AI4SOAR'] },
+      shortName: { $in: ['MAG', 'CI-SIM', 'MMT-PROBE', 'AI4SOAR'] },
     }).lean();
     const resolved = resolveTopologyNodes(
       scenario!.topology.nodes,
@@ -148,12 +167,13 @@ describe('demo scenario seed (issue #204)', () => {
       '-c',
       'while true; do sleep 3600; done',
     ]);
-    // No fixed attack args — Mongoose defaults the array field to [].
+    // No fixed attack args — Mongoose defaults the array field to []; the
+    // `config.profiles` runbook data is not a deployment merge key.
     expect(byId.get('mag')?.deployment.args ?? []).toEqual([]);
-    expect(byId.get('mmt-probe')?.edgeContext.monitors).toEqual(['http-sim']);
+    expect(byId.get('mmt-probe')?.edgeContext.monitors).toEqual(['ci-sim']);
     expect(byId.get('mmt-probe')?.edgeContext.notifies).toEqual(['ai4soar']);
-    expect(byId.get('ai4soar')?.edgeContext.actsOn).toEqual(['http-sim']);
-    expect(byId.get('mag')?.edgeContext.targets).toEqual(['http-sim']);
+    expect(byId.get('ai4soar')?.edgeContext.actsOn).toEqual(['ci-sim']);
+    expect(byId.get('mag')?.edgeContext.targets).toEqual(['ci-sim']);
     // Every node resolves to its seeded docker image.
     for (const n of resolved) {
       expect(n.image, `${n.nodeId} image`).toMatch(/^registry\.montimage\.eu\//);
@@ -167,6 +187,32 @@ describe('demo scenario seed (issue #204)', () => {
 
     expect(await Project.countDocuments({ shortName: DEMO_PROJECT_SHORTNAME })).toBe(1);
     expect(await Scenario.countDocuments({ title: DEMO_SCENARIO_TITLE })).toBe(1);
+  });
+
+  test('retitles the seed-managed P4 scenario instead of duplicating it', async () => {
+    if (!mongoAvailable) return;
+
+    // An install seeded before issue #236 holds the scenario under its P4
+    // title — the re-seed renames it in place rather than leaving a stale
+    // duplicate next to the R1 record.
+    const project = await Project.findOne({ shortName: DEMO_PROJECT_SHORTNAME });
+    expect(project, 'demo project seeded').not.toBeNull();
+    await Scenario.deleteMany({ projectId: project?._id, title: DEMO_SCENARIO_TITLE });
+    await Scenario.create({
+      projectId: project?._id,
+      title: LEGACY_SCENARIO_TITLE,
+      description: 'stale P4 record',
+      topology: { yaml: '', nodes: [], edges: [] },
+      seedManaged: true,
+      deprecated: false,
+    });
+
+    await seedDemoScenario();
+
+    expect(await Scenario.countDocuments({ title: LEGACY_SCENARIO_TITLE })).toBe(0);
+    const scenarios = await Scenario.find({ title: DEMO_SCENARIO_TITLE });
+    expect(scenarios, 'one R1 demo scenario').toHaveLength(1);
+    expect(scenarios[0].topology.nodes, 'topology refreshed by the upsert').toHaveLength(4);
   });
 
   test('skips cleanly when a catalog module is missing', async () => {

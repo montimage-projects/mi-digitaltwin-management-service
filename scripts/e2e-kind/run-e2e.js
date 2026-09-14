@@ -59,7 +59,7 @@ const REACTION_POLICY = 'ai4soar-block-mag';
 const CONTAINMENT_POLICY = 'mag-egress';
 // MAG is a Deployment since issue #233 — same resource name, driven via exec.
 const MAG_DEPLOYMENT = 'mag';
-const HOST_APP = 'http-sim';
+const HOST_APP = 'ci-sim';
 const PROBE_CONTAINER = 'mmt-probe';
 
 const TIMING = {
@@ -277,9 +277,12 @@ async function registerInfrastructure() {
  * `fromEdge: 'reaction'`, exercising the engine's notify-edge env resolution
  * (task 1.4) against the real topology.
  */
+// The demo scenario's target is CI-SIM since issue #236 — the stub stands in
+// for whatever catalog service the seeded `attacks`/`monitors`/`acts-on`
+// edges point at, so the map follows the seed, not the module list.
 const STUB_ROLES = {
   MAG: 'attack',
-  'HTTP-SIM': 'target',
+  'CI-SIM': 'target',
   'MMT-PROBE': 'monitor',
   AI4SOAR: 'reaction',
 };
