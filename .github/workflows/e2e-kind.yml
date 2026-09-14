@@ -6,9 +6,12 @@ name: E2E — kind (Montimage scenario)
 #
 # A kind cluster is registered as an Infrastructure and the seeded demo
 # scenario is executed through the public REST API. The driver
-# (scripts/e2e-kind/run-e2e.js) asserts that the MMT-Probe sidecar emits an
-# alert, the AI4SOAR pod creates a NetworkPolicy via its ServiceAccount, the
-# MAG Job completes, and namespace deletion leaves no resources behind.
+# (scripts/e2e-kind/run-e2e.js) drives the R1 two-attack script (issue #237):
+# `kubectl exec` attack #1 → the MMT-Probe sidecar alerts → CI-SIM logs
+# "service stopped" and is restarted by its Deployment → AI4SOAR's playbook
+# POSTs the attacker address to ci-sim /admin/block → `kubectl exec`
+# attack #2 is answered 403 while the probe alerts again and the target stays
+# healthy → namespace deletion leaves no resources behind.
 #
 # The four module images live in the private registry.montimage.eu, which does
 # not resolve on the public Internet (and the engine does not attach
@@ -24,6 +27,7 @@ on:
       - 'server/src/services/**'
       - 'server/src/seed/**'
       - 'scripts/e2e-kind/**'
+      - 'sim/**'
       - '.github/workflows/e2e-kind.yml'
   push:
     branches: [main, develop]
@@ -31,6 +35,7 @@ on:
       - 'server/src/services/**'
       - 'server/src/seed/**'
       - 'scripts/e2e-kind/**'
+      - 'sim/**'
       - '.github/workflows/e2e-kind.yml'
   workflow_dispatch:
 

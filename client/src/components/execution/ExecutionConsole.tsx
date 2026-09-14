@@ -12,6 +12,8 @@ import {
   Trash2,
   AlertTriangle,
   Activity,
+  ShieldAlert,
+  Copy,
 } from 'lucide-react';
 import {
   scenariosApi,
@@ -19,6 +21,7 @@ import {
   type ContainerDeployStatus,
   type DeployedServiceResult,
   type DeployStatus,
+  type ExecutionAlertEvent,
   type ExecutionK8sEvent,
   type ExecutionServiceStatus,
 } from '@/lib/api';
@@ -50,11 +53,52 @@ interface K8sEventLine extends ExecutionK8sEvent {
   id: number;
 }
 
+interface AlertLine extends ExecutionAlertEvent {
+  id: number;
+}
+
 /** Maximum number of log lines to retain in the ring buffer. */
 const MAX_LOG_LINES = 2000;
 
 /** Maximum number of namespace events retained in the events pane. */
 const MAX_K8S_EVENTS = 500;
+
+/** Maximum number of security alerts retained in the alerts pane. */
+const MAX_ALERTS = 200;
+
+/**
+ * The shell-access hint shown beside a terminal-typed service (issue #233).
+ * `deploy/<name>` targets the workload the engine created for the node; MAG
+ * carries the documented attack CLI so the hint renders the full command the
+ * user pastes — other terminal services get the generic exec prefix.
+ *
+ * The `sh -c '… | tee /proc/1/fd/1'` wrapper is load-bearing: a `kubectl
+ * exec`'d process writes to the exec channel, not the container log, so
+ * without it the attack output would never reach the pod log the SSE stream
+ * tails. Teeing into PID 1's stdout shows the run in the user's terminal
+ * *and* lands it in the MAG container log.
+ */
+function execHintFor(serviceName: string, namespace: string): string {
+  const prefix = `kubectl exec -it deploy/${serviceName} -n ${namespace} -- `;
+  return serviceName === 'mag'
+    ? `${prefix}sh -c 'mag <attack> --target-ip <target> --target-port <port> 2>&1 | tee /proc/1/fd/1'`
+    : `${prefix}<command>`;
+}
+
+/** Copy text to the clipboard, falling back when the async API is absent. */
+async function copyToClipboard(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Non-secure context (e.g. plain-http dashboard) — textarea fallback.
+    const el = document.createElement('textarea');
+    el.value = text;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+  }
+}
 
 /** A service row merged with its live status, incl. per-container breakdown. */
 type MergedService = DeployedServiceResult & { containers?: ContainerDeployStatus[] };
@@ -107,12 +151,14 @@ export function ExecutionConsole({
   const [liveStatus, setLiveStatus] = useState<Record<string, ExecutionServiceStatus>>({});
   const [logs, setLogs] = useState<LogLine[]>([]);
   const [events, setEvents] = useState<K8sEventLine[]>([]);
+  const [alerts, setAlerts] = useState<AlertLine[]>([]);
   /** Active log tab: a container name, or null for the combined "All" view. */
   const [activeContainer, setActiveContainer] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>('running');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const logIdRef = useRef(0);
   const eventIdRef = useRef(0);
+  const alertIdRef = useRef(0);
   const viewportRef = useRef<HTMLDivElement>(null);
   const eventsViewportRef = useRef<HTMLDivElement>(null);
   const unsubscribeRef = useRef<() => void>(undefined);
@@ -125,11 +171,13 @@ export function ExecutionConsole({
     setLiveStatus({});
     setLogs([]);
     setEvents([]);
+    setAlerts([]);
     setActiveContainer(null);
     setPhase('running');
     setErrorMessage(null);
     logIdRef.current = 0;
     eventIdRef.current = 0;
+    alertIdRef.current = 0;
 
     const applyStatuses = (updates?: ExecutionServiceStatus[]): void => {
       if (!updates?.length) return;
@@ -182,6 +230,15 @@ export function ExecutionConsole({
           const next = [...prev, { ...event, id: eventIdRef.current++ }];
           if (next.length > MAX_K8S_EVENTS) {
             return next.slice(next.length - MAX_K8S_EVENTS);
+          }
+          return next;
+        });
+      },
+      onAlert: (event) => {
+        setAlerts((prev) => {
+          const next = [...prev, { ...event, id: alertIdRef.current++ }];
+          if (next.length > MAX_ALERTS) {
+            return next.slice(next.length - MAX_ALERTS);
           }
           return next;
         });
@@ -433,10 +490,33 @@ export function ExecutionConsole({
                           Open interface
                         </a>
                       ) : service.uiType === 'terminal' ? (
-                        <Badge variant="outline" className="gap-1 text-xs">
-                          <Terminal className="h-3 w-3" />
-                          Terminal service
-                        </Badge>
+                        <div className="space-y-1.5">
+                          <Badge variant="outline" className="gap-1 text-xs">
+                            <Terminal className="h-3 w-3" />
+                            Terminal service
+                          </Badge>
+                          {/* Copyable `kubectl exec` hint (issue #233) — the
+                              terminal workload idles between shell-driven
+                              runs, so access is one paste away. */}
+                          {!tornDown && (
+                            <button
+                              type="button"
+                              data-testid={`exec-hint-${service.name}`}
+                              title="Copy the kubectl exec command"
+                              onClick={() =>
+                                void copyToClipboard(execHintFor(service.name, namespace)).then(
+                                  () => toast.success('Exec command copied')
+                                )
+                              }
+                              className="flex w-full items-start gap-1.5 rounded border border-dashed border-muted-foreground/40 bg-muted/40 px-2 py-1 text-left font-mono text-[11px] leading-snug text-muted-foreground transition-colors hover:border-muted-foreground/70 hover:text-foreground"
+                            >
+                              <span className="min-w-0 break-all">
+                                {execHintFor(service.name, namespace)}
+                              </span>
+                              <Copy className="mt-0.5 h-3 w-3 shrink-0" />
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">
                           {tornDown ? 'Removed' : 'No web interface available'}
@@ -523,6 +603,56 @@ export function ExecutionConsole({
               )}
             </div>
           </ScrollArea>
+
+          {/* Security alerts pane — `alert` SSE records distilled from probe
+              security reports (issue #234): timestamp, verdict and the
+              attacker address the reaction playbook consumes. */}
+          <div
+            data-testid="alerts-pane"
+            className="flex h-36 shrink-0 flex-col border-t border-zinc-800"
+          >
+            <div className="flex items-center justify-between px-4 py-1.5">
+              <div className="flex items-center gap-2 text-zinc-300">
+                <ShieldAlert className="h-4 w-4" />
+                <span className="text-sm font-medium">Security alerts</span>
+              </div>
+              <span className="text-xs text-zinc-400">{alerts.length} alerts</span>
+            </div>
+            <ScrollArea className="min-h-0 flex-1">
+              <div className="space-y-1 px-3 pb-3 font-mono text-xs leading-relaxed">
+                {alerts.length === 0 ? (
+                  <p className="text-zinc-500">
+                    {isSettled ? 'No security alerts were detected.' : 'Waiting for alerts…'}
+                  </p>
+                ) : (
+                  alerts.map((alert) => {
+                    const time = alert.timestamp ? new Date(alert.timestamp) : null;
+                    const timeLabel =
+                      time && !Number.isNaN(time.getTime()) ? time.toLocaleTimeString() : null;
+                    return (
+                      <div
+                        key={alert.id}
+                        data-testid="alert-row"
+                        className="flex flex-wrap items-baseline gap-x-2"
+                      >
+                        {timeLabel && (
+                          <span className="tabular-nums text-zinc-500">{timeLabel}</span>
+                        )}
+                        <span className="text-red-400">{alert.verdict ?? 'Alert'}</span>
+                        {alert.attacker && (
+                          <span className="text-amber-300">src={alert.attacker}</span>
+                        )}
+                        <span className="text-zinc-500">
+                          [{alert.service}
+                          {alert.container ? `:${alert.container}` : ''}]
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </div>
 
           {/* Namespace events pane — `k8s-event` SSE records (scheduling,
               image pulls, probe failures, reaction activity…). */}

@@ -79,12 +79,15 @@ describe('GET /api/services — deployment spec (e2e, M0)', () => {
     const { services } = (await res.json()) as {
       services: {
         shortName: string;
+        uiType?: string;
         deployment?: {
           kind: string;
           role: string;
           attachMode?: string;
           exposePort?: boolean;
           containerPort?: number;
+          command?: string[];
+          startOrder?: number;
           securityContext?: { capabilities?: string[] };
           rbac?: { apiGroups: string[]; resources: string[]; verbs: string[] }[];
         };
@@ -93,10 +96,15 @@ describe('GET /api/services — deployment spec (e2e, M0)', () => {
 
     const byName = (name: string) => services.find((s) => s.shortName === name);
 
+    // MAG — long-running terminal Deployment (issue #233): idle shell
+    // command, attacks driven via `kubectl exec`.
+    expect(byName('MAG')?.uiType).toBe('terminal');
     expect(byName('MAG')?.deployment).toMatchObject({
-      kind: 'Job',
+      kind: 'Deployment',
       role: 'attack',
       exposePort: false,
+      startOrder: 30,
+      command: ['sh', '-c', 'while true; do sleep 3600; done'],
     });
     expect(byName('HTTP-SIM')?.deployment).toMatchObject({
       kind: 'Deployment',

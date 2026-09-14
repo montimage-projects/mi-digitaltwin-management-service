@@ -97,6 +97,38 @@ describe('TopologyEditor', () => {
 
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument();
   });
+
+  it('auto-wire syncs the four typed edges and layout to YAML in one update (task 5.3)', () => {
+    const nodes = [
+      { id: 'mag', position: { x: 0, y: 0 }, data: { label: 'MAG', role: 'attack' } },
+      { id: 'sim', position: { x: 200, y: 0 }, data: { label: 'CI-SIM', role: 'target' } },
+      { id: 'probe', position: { x: 0, y: 120 }, data: { label: 'MMT-PROBE', role: 'monitor' } },
+      { id: 'soar', position: { x: 400, y: 0 }, data: { label: 'AI4SOAR', role: 'reaction' } },
+    ];
+    render(<TopologyEditor {...defaultProps} nodes={nodes} />, { wrapper: createWrapper() });
+
+    fireEvent.click(screen.getByRole('button', { name: /Auto-wire/ }));
+
+    // The combined topology change propagates nodes, edges and YAML together.
+    expect(defaultProps.onNodesChange).toHaveBeenCalled();
+    expect(defaultProps.onEdgesChange).toHaveBeenCalled();
+    const yaml = vi.mocked(defaultProps.onYamlChange).mock.calls.at(-1)?.[0] as string;
+    const parsed = yamlLoad(yaml) as {
+      services: { id: string; position: { x: number; y: number } }[];
+      connections: { from: string; to: string; type?: string }[];
+    };
+    expect(parsed.connections).toHaveLength(4);
+    expect(parsed.connections.map((c) => c.type).sort()).toEqual([
+      'acts-on',
+      'attacks',
+      'monitors',
+      'notifies',
+    ]);
+    // Laid-out positions landed in the same update: the attack node sits
+    // left of the target anchor (x=200).
+    const mag = parsed.services.find((s) => s.id === 'mag')!;
+    expect(mag.position.x).toBeLessThan(200);
+  });
 });
 
 describe('nodesToYaml typed edges', () => {

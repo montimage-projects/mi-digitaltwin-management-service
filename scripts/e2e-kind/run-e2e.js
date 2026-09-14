@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 /**
  * Kind-based end-to-end driver for the Montimage attack → detect → respond
- * demo scenario (issue #206, playbook task 4.3).
+ * demo scenario (issue #206, playbook task 4.3; two-attack R1 flow #237).
  *
  * Exercises the real engine path against a kind cluster through the public
- * REST API — deploy → status → teardown — and asserts the four scenario
- * outcomes:
+ * REST API — deploy → attack → detect → respond → attack again → teardown —
+ * and asserts the R1 scenario beats:
  *
- *   1. MMT-Probe emits an alert       (probe sidecar log line, kubectl logs)
- *   2. AI4SOAR creates a NetworkPolicy (`ai4soar-block-mag` in the exec ns)
- *   3. The MAG Job completes          (kubectl wait condition=complete)
- *   4. Namespace deletion leaves no resources behind
+ *   1. `kubectl exec` attack #1 runs the seeded `mag http-flood` profile in
+ *      the idling MAG Deployment (issue #233)
+ *   2. MMT-Probe emits an alert carrying the attacker `ip.src` (#234)
+ *   3. The flood pushes CI-SIM over its rate threshold — it logs
+ *      "service stopped", exits, and the Deployment restarts it (#231)
+ *   4. AI4SOAR's playbook POSTs the attacker address to ci-sim
+ *      `/admin/block` — the blocklist entry survives the restart (#235)
+ *   5. `kubectl exec` attack #2 re-runs the profile against the blocklisted
+ *      attacker: answered 403, the probe alerts again, the target stays up
+ *   6. Namespace deletion leaves no resources behind
  *
  * Image strategy: the four module images live in the private
  * registry.montimage.eu (does not resolve on the public Internet, and the
@@ -54,18 +60,37 @@ const REQUIRE_REAL = /^(1|true|yes)$/i.test(process.env.SECSIM_E2E_REQUIRE_REAL_
 const PRIVATE_REGISTRY = 'registry.montimage.eu';
 const DEMO_PROJECT_SHORTNAME = 'MONTIMAGE-DEMO';
 const DEMO_SCENARIO_MATCH = 'AI4SOAR';
-const REACTION_POLICY = 'ai4soar-block-mag';
 const CONTAINMENT_POLICY = 'mag-egress';
-const JOB_NAME = 'mag';
-const HOST_APP = 'http-sim';
+// MAG is a Deployment since issue #233 — same resource name, driven via exec.
+const MAG_DEPLOYMENT = 'mag';
+const HOST_APP = 'ci-sim';
 const PROBE_CONTAINER = 'mmt-probe';
+// The seeded R1 attack profiles (demo.seed.ts `config.profiles`, #236): both
+// runs exec the same `mag http-flood` command; attack #2 is rate-limited via
+// MAG_REQUEST_COUNT so it alerts the probe (≥8 concurrent connections) while
+// staying under CI-SIM's 50 req/10 s stop threshold.
+const ATTACK_1_CMD = 'mag http-flood --target-ip ci-sim --target-port 8080';
+const ATTACK_2_CMD = 'MAG_REQUEST_COUNT=25 mag http-flood --target-ip ci-sim --target-port 8080';
+// Localhost check of the ci-sim API, run inside the target container (the
+// blocklist would 403 the same request sourced from the MAG pod).
+const ADMIN_BLOCKS_PROBE =
+  'python3 -c "import urllib.request,sys;' +
+  "sys.stdout.write(urllib.request.urlopen('http://127.0.0.1:8080/admin/blocks',timeout=5).read().decode())\"";
+const HEALTH_PROBE =
+  'python3 -c "import urllib.request,sys;' +
+  "sys.stdout.write(urllib.request.urlopen('http://127.0.0.1:8080/',timeout=5).read().decode())\"";
+const METRICS_PROBE =
+  'python3 -c "import urllib.request,sys;' +
+  "sys.stdout.write(urllib.request.urlopen('http://127.0.0.1:8080/api/metrics',timeout=5).read().decode())\"";
 
 const TIMING = {
   serverWaitMs: 180_000, // server boot + auto-seed
   executeMs: 480_000, // POST /execute blocks through the readiness gate
-  jobCompleteMs: 300_000,
+  rolloutMs: 300_000, // MAG Deployment availability
+  execAttackMs: 180_000, // one exec-driven attack run
   alertMs: 180_000,
-  reactionMs: 180_000,
+  reactionMs: 180_000, // blocklist entry — alert → ai4soar → /admin/block
+  recoverMs: 300_000, // ci-sim container restart + Ready again
   teardownMs: 120_000,
   pollMs: 4_000,
 };
@@ -106,12 +131,13 @@ function fail(message) {
   throw new Error(message);
 }
 
-function kubectl(args, { allowFail = false } = {}) {
+function kubectl(args, { allowFail = false, timeoutMs } = {}) {
   try {
     return execFileSync('kubectl', args, {
       env: { ...process.env, KUBECONFIG },
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
+      ...(timeoutMs ? { timeout: timeoutMs } : {}),
     }).trim();
   } catch (err) {
     if (allowFail) return '';
@@ -274,9 +300,12 @@ async function registerInfrastructure() {
  * `fromEdge: 'reaction'`, exercising the engine's notify-edge env resolution
  * (task 1.4) against the real topology.
  */
+// The demo scenario's target is CI-SIM since issue #236 — the stub stands in
+// for whatever catalog service the seeded `attacks`/`monitors`/`acts-on`
+// edges point at, so the map follows the seed, not the module list.
 const STUB_ROLES = {
   MAG: 'attack',
-  'HTTP-SIM': 'target',
+  'CI-SIM': 'target',
   'MMT-PROBE': 'monitor',
   AI4SOAR: 'reaction',
 };
@@ -362,64 +391,305 @@ function assertNamespaceShape() {
   );
 }
 
-async function assertJobCompletes() {
+async function assertMagDeployment() {
   try {
     kubectl(
       [
         '-n',
         namespace,
-        'wait',
-        '--for=condition=complete',
-        `job/${JOB_NAME}`,
-        `--timeout=${Math.round(TIMING.jobCompleteMs / 1000)}s`,
+        'rollout',
+        'status',
+        `deploy/${MAG_DEPLOYMENT}`,
+        `--timeout=${Math.round(TIMING.rolloutMs / 1000)}s`,
       ],
       { allowFail: true }
     );
-    const succeeded = kubectl(
-      ['-n', namespace, 'get', 'job', JOB_NAME, '-o', 'jsonpath={.status.succeeded}'],
+    const available = kubectl(
+      [
+        '-n',
+        namespace,
+        'get',
+        'deploy',
+        MAG_DEPLOYMENT,
+        '-o',
+        'jsonpath={.status.availableReplicas}',
+      ],
       { allowFail: true }
     );
-    record('MAG Job completes', Number(succeeded) >= 1, `succeeded=${succeeded || '0'}`);
+    record(
+      'MAG Deployment is available',
+      Number(available) >= 1,
+      `availableReplicas=${available || '0'}`
+    );
   } catch (err) {
-    record('MAG Job completes', false, err.message);
+    record('MAG Deployment is available', false, err.message);
   }
 }
 
-async function assertProbeAlert() {
+/** The exec-driven R1 attack beat (issue #237): `kubectl exec` into the
+ * idling MAG pod runs the seeded `mag http-flood` runbook verbatim through
+ * the stub image's `mag` shim; the `tee /proc/1/fd/1` wrapper lands the run
+ * output in the MAG container log (exec output alone only reaches the exec
+ * channel), which is also what the SSE stream ships. The exec exit code is
+ * ignored on purpose — the assertions read the run's own log lines. */
+function execAttack(command) {
+  kubectl(
+    [
+      '-n',
+      namespace,
+      'exec',
+      `deploy/${MAG_DEPLOYMENT}`,
+      '--',
+      'sh',
+      '-c',
+      `${command} 2>&1 | tee /proc/1/fd/1`,
+    ],
+    { allowFail: true, timeoutMs: TIMING.execAttackMs }
+  );
+}
+
+function magLogTail(tail = 200) {
+  return kubectl(['-n', namespace, 'logs', `deploy/${MAG_DEPLOYMENT}`, `--tail=${tail}`], {
+    allowFail: true,
+  });
+}
+
+function finishedRuns(logs) {
+  return logs.split('\n').filter((l) => /attack profile finished/.test(l));
+}
+
+async function assertExecAttack(round, command) {
   try {
-    const logs = await poll(
+    execAttack(command);
+    // The exec returns as soon as the run ends; the tee'd finish line can
+    // take a beat to show in the container log, so poll briefly for it.
+    const runs = await poll(
       async () => {
-        const out = kubectl(
-          ['-n', namespace, 'logs', '-l', `app=${HOST_APP}`, '-c', PROBE_CONTAINER, '--tail=500'],
-          { allowFail: true }
-        );
-        // Case-sensitive `ALERT ` — the probe's detection line. A lowercase
-        // match would also hit the startup "alerting to …" banner.
-        return /\bALERT[:\s]/.test(out) ? out : null;
+        const found = finishedRuns(magLogTail());
+        return found.length >= round ? found : null;
+      },
+      60_000,
+      `attack #${round}'s finish line in the MAG container log`
+    );
+    record(
+      `exec-driven attack #${round} completes in the MAG pod`,
+      true,
+      runs[runs.length - 1]?.replace(/^.*attack profile finished/, 'attack profile finished')
+    );
+  } catch (err) {
+    record(`exec-driven attack #${round} completes in the MAG pod`, false, err.message);
+  }
+}
+
+function probeAlertLines() {
+  const out = kubectl(
+    ['-n', namespace, 'logs', '-l', `app=${HOST_APP}`, '-c', PROBE_CONTAINER, '--tail=500'],
+    { allowFail: true }
+  );
+  // Case-sensitive `ALERT ` — the probe's detection text (embedded in the
+  // JSON report's `alert` field since #237). A lowercase match would also
+  // hit the startup "alerting to …" banner.
+  return out.split('\n').filter((l) => /\bALERT[:\s]/.test(l));
+}
+
+async function assertProbeAlert(minCount, name) {
+  try {
+    const lines = await poll(
+      async () => {
+        const found = probeAlertLines();
+        return found.length >= minCount ? found : null;
       },
       TIMING.alertMs,
-      'an MMT-Probe alert in the sidecar logs'
+      `${minCount} MMT-Probe alert(s) in the sidecar logs`
     );
-    const line = logs.split('\n').find((l) => /\bALERT[:\s]/.test(l));
-    record('MMT-Probe emits an alert', true, line?.slice(0, 120));
+    record(name, true, lines[lines.length - 1]?.slice(0, 160));
   } catch (err) {
-    record('MMT-Probe emits an alert', false, err.message);
+    record(name, false, err.message);
   }
 }
 
-async function assertReactionPolicy() {
+function targetContainerStatus() {
+  const out = kubectl(
+    [
+      '-n',
+      namespace,
+      'get',
+      'pods',
+      '-l',
+      `app=${HOST_APP}`,
+      '-o',
+      `jsonpath={.items[0].status.containerStatuses[?(@.name=='${HOST_APP}')].restartCount} {.items[0].status.conditions[?(@.type=='Ready')].status}`,
+    ],
+    { allowFail: true }
+  );
+  const [restarts = '0', ready = ''] = out.split(/\s+/);
+  return { restarts: Number(restarts) || 0, ready: ready === 'True' };
+}
+
+function targetStoppedEvidence() {
+  // The crashed container's log — `kubectl logs -p` is only valid once a
+  // restart happened, so this is best-effort detail, not the assertion.
+  return kubectl(
+    ['-n', namespace, 'logs', '-l', `app=${HOST_APP}`, '-c', HOST_APP, '-p', '--tail=60'],
+    { allowFail: true }
+  );
+}
+
+/** Attack #1's win condition (#231): the flood pushes CI-SIM over its rate
+ * threshold, the process logs "service stopped" and exits, and the
+ * Deployment's restartPolicy brings the container back — asserted as the
+ * container restartCount rising and the pod reporting Ready again. */
+async function assertTargetStoppedAndRecovered() {
   try {
     await poll(
-      async () =>
-        kubectl(['-n', namespace, 'get', 'networkpolicy', REACTION_POLICY, '-o', 'name'], {
-          allowFail: true,
-        }),
-      TIMING.reactionMs,
-      `the AI4SOAR NetworkPolicy ${REACTION_POLICY}`
+      async () => (targetContainerStatus().restarts >= 1 ? true : null),
+      TIMING.recoverMs,
+      'the ci-sim container restart after "service stopped"'
     );
-    record('AI4SOAR creates a NetworkPolicy', true, REACTION_POLICY);
+    const stoppedLog = targetStoppedEvidence();
+    record(
+      'attack #1 stops the CI-SIM service (container restarted)',
+      /service stopped/.test(stoppedLog),
+      stoppedLog
+        .split('\n')
+        .find((l) => /service stopped/.test(l))
+        ?.slice(0, 140) || 'restartCount>=1 but no "service stopped" in previous logs'
+    );
+    const recovered = await poll(
+      async () => (targetContainerStatus().ready ? true : null),
+      TIMING.recoverMs,
+      'the ci-sim pod Ready again after the restart'
+    );
+    record('CI-SIM target recovers after the stop', Boolean(recovered), 'pod Ready');
   } catch (err) {
-    record('AI4SOAR creates a NetworkPolicy', false, err.message);
+    record('attack #1 stops the CI-SIM service (container restarted)', false, err.message);
+    record('CI-SIM target recovers after the stop', false, 'never evaluated');
+  }
+}
+
+function magPodAddress() {
+  return kubectl(
+    [
+      '-n',
+      namespace,
+      'get',
+      'pods',
+      '-l',
+      `app=${MAG_DEPLOYMENT}`,
+      '-o',
+      'jsonpath={.items[0].status.podIP}',
+    ],
+    { allowFail: true }
+  );
+}
+
+/** The R1 reaction (#235): AI4SOAR's playbook POSTs the alert's `ip.src` to
+ * ci-sim `/admin/block`. Asserted by querying the blocklist from inside the
+ * target container — the same query sourced from MAG would itself be 403.
+ * Returns the attacker address for the rate-window drain before attack #2. */
+async function assertBlocklistEntry() {
+  try {
+    const attacker = await poll(async () => magPodAddress() || null, 60_000, 'the MAG pod address');
+    const out = await poll(
+      async () => {
+        const blocks = kubectl(
+          [
+            '-n',
+            namespace,
+            'exec',
+            `deploy/${HOST_APP}`,
+            '-c',
+            HOST_APP,
+            '--',
+            'sh',
+            '-c',
+            ADMIN_BLOCKS_PROBE,
+          ],
+          { allowFail: true }
+        );
+        return blocks.includes(attacker) ? blocks : null;
+      },
+      TIMING.reactionMs,
+      `ci-sim /admin/blocks to list ${attacker}`
+    );
+    record('AI4SOAR blocklists the attacker on CI-SIM', true, out.slice(0, 120));
+    return attacker;
+  } catch (err) {
+    record('AI4SOAR blocklists the attacker on CI-SIM', false, err.message);
+    return magPodAddress();
+  }
+}
+
+/** CI-SIM's rate window is 10 s sliding per source — attack #2 must not
+ * start while enough of attack #1's flood is still in-window or even a
+ * short run would re-trip the stop threshold. `/api/metrics` reports the
+ * per-source windowed counts, so wait until the attacker's drains. */
+async function waitForRateWindowDrain(attacker) {
+  const safe = 15; // attack #2 sends 25; residual ≤15 keeps total < 50
+  try {
+    await poll(
+      async () => {
+        const out = kubectl(
+          [
+            '-n',
+            namespace,
+            'exec',
+            `deploy/${HOST_APP}`,
+            '-c',
+            HOST_APP,
+            '--',
+            'sh',
+            '-c',
+            METRICS_PROBE,
+          ],
+          { allowFail: true }
+        );
+        try {
+          const metrics = JSON.parse(out);
+          return (metrics.sources?.[attacker] ?? 0) <= safe ? true : null;
+        } catch {
+          return null;
+        }
+      },
+      120_000,
+      `the attacker's ci-sim rate-window hits to drain below ${safe}`
+    );
+    record('ci-sim rate window drained before attack #2', true, `sources[${attacker}] ≤ ${safe}`);
+  } catch (err) {
+    record('ci-sim rate window drained before attack #2', false, err.message);
+  }
+}
+
+/** After attack #2 the blocklist answers the flood 403 — the target must
+ * still be healthy: no additional restart, Ready, and `GET /` still 200
+ * (checked from inside the pod — the blocked MAG source cannot ask). */
+async function assertTargetStillHealthy(restartsBefore) {
+  try {
+    const status = targetContainerStatus();
+    const health = kubectl(
+      [
+        '-n',
+        namespace,
+        'exec',
+        `deploy/${HOST_APP}`,
+        '-c',
+        HOST_APP,
+        '--',
+        'sh',
+        '-c',
+        HEALTH_PROBE,
+      ],
+      { allowFail: true }
+    );
+    const healthy =
+      status.restarts === restartsBefore && status.ready && /"status":\s*"ok"/.test(health);
+    record(
+      'CI-SIM target still healthy after attack #2',
+      healthy,
+      `restarts=${status.restarts} (was ${restartsBefore}) ready=${status.ready} health=${health.slice(0, 80)}`
+    );
+  } catch (err) {
+    record('CI-SIM target still healthy after attack #2', false, err.message);
   }
 }
 
@@ -448,7 +718,7 @@ async function sampleStatusStream() {
     }
     record(
       'execution status streams over SSE',
-      /event:\s*(progress|log|k8s-event|end)/.test(text),
+      /event:\s*(progress|log|k8s-event|alert|end)/.test(text),
       `${text.length} bytes read`
     );
   } catch (err) {
@@ -527,7 +797,7 @@ function diagnostics() {
   for (const args of [
     ['get', 'all', '-n', namespace, '-o', 'wide'],
     ['get', 'networkpolicies,configmaps,serviceaccounts,roles,rolebindings', '-n', namespace],
-    ['describe', 'job', JOB_NAME, '-n', namespace],
+    ['describe', 'deployment', MAG_DEPLOYMENT, '-n', namespace],
   ]) {
     try {
       note(`$ kubectl ${args.join(' ')}\n${kubectl(args, { allowFail: true }) || '(empty)'}`);
@@ -542,6 +812,14 @@ function diagnostics() {
     );
     if (logs) note(`--- logs ${HOST_APP}/${container} ---\n${logs}`);
   }
+  // The crashed ci-sim container's last lines — where "service stopped" shows.
+  const previous = kubectl(
+    ['-n', namespace, 'logs', '-l', `app=${HOST_APP}`, '-c', HOST_APP, '-p', '--tail=40'],
+    { allowFail: true }
+  );
+  if (previous) note(`--- logs ${HOST_APP}/${HOST_APP} (previous) ---\n${previous}`);
+  const magLogs = magLogTail(80);
+  if (magLogs) note(`--- logs ${MAG_DEPLOYMENT} ---\n${magLogs}`);
 }
 
 async function main() {
@@ -567,11 +845,26 @@ async function main() {
     await executeScenario();
     endGroup();
 
-    group('Assert — detection, reaction, Job completion');
+    group('Assert — rollout, attack #1, detection, stop+recover, block');
     assertNamespaceShape();
-    await assertJobCompletes();
-    await assertProbeAlert();
-    await assertReactionPolicy();
+    await assertMagDeployment();
+    // Attack #1 — the seeded runbook verbatim; the flood trips the probe's
+    // connection alert AND pushes CI-SIM over its rate threshold.
+    await assertExecAttack(1, ATTACK_1_CMD);
+    await assertProbeAlert(1, 'MMT-Probe emits an alert for attack #1');
+    await assertTargetStoppedAndRecovered();
+    const attacker = await assertBlocklistEntry();
+    endGroup();
+
+    group('Assert — attack #2 blocked, second alert, target stays up');
+    // Let attack #1's hits age out of ci-sim's 10 s rate window so attack
+    // #2's 25-request burst cannot re-trip the stop threshold.
+    if (attacker) await waitForRateWindowDrain(attacker);
+    const alertsBefore = probeAlertLines().length;
+    const restartsBefore = targetContainerStatus().restarts;
+    await assertExecAttack(2, ATTACK_2_CMD);
+    await assertProbeAlert(alertsBefore + 1, 'MMT-Probe alerts again for attack #2');
+    await assertTargetStillHealthy(restartsBefore);
     await sampleStatusStream();
     endGroup();
   } finally {

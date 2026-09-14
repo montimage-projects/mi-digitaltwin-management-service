@@ -358,6 +358,23 @@ describe('resolveTopologyNodes — deployment spec and edge context', () => {
     expect(spec.containerPort).toBe(80);
   });
 
+  test('carries the spec command for a shell-idled workload (issue #233)', () => {
+    const service = makeService({
+      deployment: {
+        kind: 'Deployment',
+        role: 'attack',
+        exposePort: false,
+        command: ['sh', '-c', 'while true; do sleep 3600; done'],
+        startOrder: 30,
+      },
+    });
+    const resolved = resolveTopologyNodes([makeNode('mag')], [service]);
+    const spec = resolved[0].deployment;
+    expect(spec.command).toEqual(['sh', '-c', 'while true; do sleep 3600; done']);
+    // A terminal workload carries no fixed attack args — runs come via exec.
+    expect(spec.args).toBeUndefined();
+  });
+
   test('takes the container port from the spec instead of the hard-coded 80', () => {
     const service = makeService({
       deployment: {
@@ -1026,6 +1043,33 @@ describe('deployTopology — Job, ConfigMap and RBAC manifests (issue #192)', ()
     expect(clients.core.createNamespacedService).not.toHaveBeenCalled();
     expect(result.services[0].nodePort).toBeUndefined();
     expect(result.services[0].dashboardUrl).toBeUndefined();
+  });
+
+  test('a Deployment with command overrides the container entrypoint (issue #233)', async () => {
+    const clients = makeClients();
+    await deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes: [specNode('mag')],
+      services: [
+        specService({
+          kind: 'Deployment',
+          role: 'attack',
+          exposePort: false,
+          command: ['sh', '-c', 'while true; do sleep 3600; done'],
+        }),
+      ],
+      endpoint: 'https://10.0.0.1:6443',
+    });
+
+    expect(clients.apps.createNamespacedDeployment).toHaveBeenCalledTimes(1);
+    const podSpec = workloadBody(clients) as {
+      containers: { name: string; command?: string[]; args?: string[] }[];
+    };
+    expect(podSpec.containers[0].name).toBe('mag');
+    // The idle shell command lands as the container `command` (ENTRYPOINT
+    // override), keeping the pod alive between `kubectl exec` attack runs.
+    expect(podSpec.containers[0].command).toEqual(['sh', '-c', 'while true; do sleep 3600; done']);
+    expect(podSpec.containers[0].args).toBeUndefined();
   });
 
   test('a standalone Deployment with exposePort:false skips the Service', async () => {

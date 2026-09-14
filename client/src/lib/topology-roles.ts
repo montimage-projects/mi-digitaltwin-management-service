@@ -112,6 +112,119 @@ export function planTopologyEdge(
   return { ok: true, edgeType: EDGE_TYPE_SPELLING[kind] };
 }
 
+/**
+ * Role pairs the Auto-wire action generates (task 5.3): attack → target
+ * (`attacks`), monitor → target (`monitors`), monitor → reaction
+ * (`notifies`), reaction → target (`acts-on`). A strict subset of
+ * `EDGE_KIND_BY_ROLE_PAIR` — monitor → attack stays legal for hand-drawn
+ * edges but is never generated automatically, so the canonical
+ * four-service scenario yields exactly the four-edge wiring.
+ */
+export const AUTO_WIRE_ROLE_PAIRS: ReadonlyArray<readonly [BadgedRole, BadgedRole]> = [
+  ['attack', 'target'],
+  ['monitor', 'target'],
+  ['monitor', 'reaction'],
+  ['reaction', 'target'],
+];
+
+/** Column layout for auto-wired graphs: attacks/monitors left of the
+ * target column, reactions right (task 5.3). */
+const AUTO_WIRE_COLUMN_GAP = 280;
+const AUTO_WIRE_ROW_GAP = 160;
+const AUTO_WIRE_COLUMNS: ReadonlyArray<{ roles: readonly BadgedRole[]; offset: number }> = [
+  { roles: ['attack', 'monitor'], offset: -AUTO_WIRE_COLUMN_GAP },
+  { roles: ['target'], offset: 0 },
+  { roles: ['reaction'], offset: AUTO_WIRE_COLUMN_GAP },
+];
+
+export interface AutoWirePlan {
+  /**
+   * New edges to append — the same persisted shape as a user-drawn typed
+   * edge (`label` + `data.edgeType` carry the {@link ScenarioEdgeType}
+   * spelling), so the YAML view round-trips them.
+   */
+  edges: RoleEdge[];
+  /**
+   * Suggested position per role-tagged node id; empty when fewer than two
+   * nodes carry a scenario role. Unroled nodes are never moved.
+   */
+  positions: Map<string, { x: number; y: number }>;
+}
+
+/**
+ * Plan the Auto-wire action (task 5.3): generate every role-derived typed
+ * edge that is not already drawn — an ordered node pair counts as drawn
+ * when ANY edge (typed or not) already connects source → target, so edges
+ * the user drew are never duplicated — and compute the role-column layout
+ * (attacks and monitors left of the targets, reactions right). Pure: the
+ * canvas applies the result and propagates it, which regenerates YAML.
+ */
+export function planAutoWire(
+  nodes: RoleNode[],
+  edges: RoleEdge[],
+  serviceById: ReadonlyMap<string, RoleService>
+): AutoWirePlan {
+  const roleOf = (n: RoleNode): BadgedRole | undefined =>
+    resolveNodeRole(n.data, serviceById.get(String(n.data?.serviceId)));
+
+  const byRole = new Map<BadgedRole, RoleNode[]>();
+  for (const n of nodes) {
+    const role = roleOf(n);
+    if (role) byRole.set(role, [...(byRole.get(role) ?? []), n]);
+  }
+
+  const drawn = new Set(edges.map((e) => `${e.source}->${e.target}`));
+  const newEdges: RoleEdge[] = [];
+  for (const [sourceRole, targetRole] of AUTO_WIRE_ROLE_PAIRS) {
+    const kind = EDGE_KIND_BY_ROLE_PAIR[sourceRole][targetRole];
+    if (!kind) continue;
+    const edgeType = EDGE_TYPE_SPELLING[kind];
+    for (const source of byRole.get(sourceRole) ?? []) {
+      for (const target of byRole.get(targetRole) ?? []) {
+        if (source.id === target.id) continue;
+        const pairKey = `${source.id}->${target.id}`;
+        if (drawn.has(pairKey)) continue;
+        drawn.add(pairKey);
+        newEdges.push({
+          id: `edge-auto-${source.id}-${target.id}`,
+          source: source.id,
+          target: target.id,
+          animated: true,
+          label: edgeType,
+          data: { edgeType },
+        });
+      }
+    }
+  }
+
+  const positions = new Map<string, { x: number; y: number }>();
+  const roled = [...byRole.values()].flat();
+  if (roled.length >= 2) {
+    // Anchor on the target column when targets exist so the layout arranges
+    // around them; otherwise keep the graph's current center of mass.
+    const anchors = byRole.get('target')?.length ? byRole.get('target')! : roled;
+    const anchorX = anchors.reduce((sum, n) => sum + (n.position?.x ?? 0), 0) / anchors.length;
+    const anchorY = anchors.reduce((sum, n) => sum + (n.position?.y ?? 0), 0) / anchors.length;
+    for (const { roles, offset } of AUTO_WIRE_COLUMNS) {
+      // Role order first (attacks stack above monitors), then the node's
+      // current vertical position — deterministic regardless of drop order.
+      const column = roles.flatMap((role) =>
+        (byRole.get(role) ?? [])
+          .slice()
+          .sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0) || a.id.localeCompare(b.id))
+      );
+      column.forEach((n, i) => {
+        positions.set(n.id, {
+          x: anchorX + offset,
+          y: anchorY + (i - (column.length - 1) / 2) * AUTO_WIRE_ROW_GAP,
+        });
+      });
+    }
+  }
+
+  return { edges: newEdges, positions };
+}
+
 /** Minimal view of a catalog service the decorator needs. */
 export interface RoleService {
   _id: string;

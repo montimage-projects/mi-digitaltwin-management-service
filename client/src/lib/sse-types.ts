@@ -38,6 +38,29 @@ export interface ExecutionLogEvent {
   line: string;
 }
 
+/**
+ * A security alert detected in the pod log stream (issue #234). Mirrors the
+ * server's `SecurityAlertEvent` (scenarioSSE.ts) — a monitor probe's
+ * security report re-emitted as a typed event so the console can list
+ * detections with the attacker address the reaction playbook consumes.
+ */
+export interface ExecutionAlertEvent {
+  /** Workload resource name the reporting container belongs to. */
+  service: string;
+  /** Concrete pod the report line came from. */
+  pod: string;
+  /** Container the report line came from (e.g. the `mmt-probe` sidecar). */
+  container?: string;
+  /** ISO timestamp carried by the report, when the probe supplied one. */
+  timestamp?: string;
+  /** Detection summary (the report's verdict / alert text). */
+  verdict?: string;
+  /** Attacker source address — the report's `ip.src` when present. */
+  attacker?: string;
+  /** The original log line the alert was parsed from. */
+  line: string;
+}
+
 /** Terminal execution outcome (completed or failed). */
 export interface ExecutionEndEvent {
   status: 'completed' | 'failed';
@@ -77,6 +100,7 @@ export interface ExecutionEventHandlers {
   onProgress?: (event: ExecutionProgressEvent) => void;
   onLog?: (event: ExecutionLogEvent) => void;
   onK8sEvent?: (event: ExecutionK8sEvent) => void;
+  onAlert?: (event: ExecutionAlertEvent) => void;
   onEnd?: (event: ExecutionEndEvent) => void;
   onError?: (event: ExecutionErrorEvent) => void;
 }

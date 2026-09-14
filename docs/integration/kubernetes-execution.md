@@ -105,7 +105,7 @@ the resources in the table below.
 | ---------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | Execution              | `Namespace`                               | One per execution, named `secsim-<scenario>-<execution>` (DNS-1123, ≤63 chars). Deleting it cascades to everything below.             |
 | Topology node          | `Deployment` (`apps/v1`)                  | `replicas: 1`, image resolved from the service version; the pod also carries one container per attached `attachMode: 'sidecar'` node. |
-| Topology node (finite) | `Job` (`batch/v1`)                        | `kind: 'Job'` specs (e.g. an attack profile) deploy as a finite Job with `restartPolicy: Never` and no Service.                       |
+| Topology node (finite) | `Job` (`batch/v1`)                        | `kind: 'Job'` specs deploy as a finite Job with `restartPolicy: Never` and no Service.                                                |
 | Topology node          | `Service` (`v1`, `NodePort`)              | Same name as the workload, selects it by `app` label, exposes the container port. Not created for Jobs or `exposePort: false`.        |
 | Node `configFiles`     | `ConfigMap` (`v1`)                        | `<node>-config`; each file mounts at its `mountPath` via `subPath`.                                                                   |
 | Node `rbac` rules      | `ServiceAccount` + `Role` + `RoleBinding` | One namespaced triple per pod (sidecar rules fold into the host's Role). The engine never creates `ClusterRole`/`ClusterRoleBinding`. |
@@ -120,6 +120,16 @@ the resources in the table below.
 - **Containers:** `deployment.securityContext` (`capabilities`,
   `privileged`) applies to the container that declares it only — a sidecar's
   `NET_ADMIN`/`NET_RAW` never leak onto the host container.
+- **Command override:** `deployment.command` lands as the container
+  `command` (the Kubernetes `ENTRYPOINT` override), ahead of `args`. A
+  CLI-only image stays alive between runs when its spec idles on a shell
+  loop — e.g. MAG seeds `['sh', '-c', 'while true; do sleep 3600; done']` so
+  attacks are launched with `kubectl exec -it deploy/mag -n <exec-ns> -- sh
+-c 'mag <attack> --target-ip <target> --target-port <port> 2>&1 | tee
+/proc/1/fd/1'` instead of a deploy-time Job arg set (issue #233). The
+  `tee /proc/1/fd/1` wrapper matters: exec output otherwise reaches only the
+  user's terminal — teeing into PID 1's stdout lands it in the pod's
+  container log, where the SSE stream ships it to the console.
 - **Volumes:** `deployment.volumes` render as `emptyDir` volumes shared
   across every container in the pod (for example a probe reports directory
   shared between the sidecar and its host container).
@@ -152,7 +162,11 @@ Live progress and logs are streamed from a Server-Sent Events endpoint. The
 server polls the cluster every 2 seconds, emitting a `progress` snapshot, any
 new pod log lines and any new Kubernetes namespace events, until every service
 has settled (all `running`, `completed` or `failed`) or the client
-disconnects.
+disconnects. When the execution carries a terminal-typed (`uiType:
+"terminal"` or `"both"`) workload — e.g. MAG — `end` still marks deploy
+settle, but the stream stays open so shell-driven (`kubectl exec`) output,
+probe alerts and reaction events keep reaching an attached console until the
+client disconnects or the execution is torn down (issue #233).
 
 - **GET** `/api/scenarios/:id/executions/:executionId/events`
 - **Auth:** Required
@@ -165,34 +179,49 @@ a half-open connection.
 
 ### Event types
 
-| Event       | When                                                | Payload                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ----------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `progress`  | Each poll                                           | `{ progress: number, services: [{ name, status, containers }] }` — `progress` is the percentage of services that are `running` or `completed`; `status` is `pending` \| `running` \| `completed` \| `failed` (`completed` marks a finished Job); `containers` is the per-container breakdown `[{ name, status }]` covering host and sidecar containers alike.                                                                                                              |
-| `log`       | Per new pod log line                                | `{ service: string, pod: string, container?: string, line: string }` — `container` names the container the line came from, so sidecar output (e.g. `mmt-probe` alerts) stays distinguishable from the host container's logs.                                                                                                                                                                                                                                               |
-| `k8s-event` | Per new Kubernetes Event in the execution namespace | `{ uid?: string, reason?: string, message?: string, objectKind?: string, objectName?: string, type?: string, count?: number, timestamp?: string }` — `reason`/`message`/`objectKind`/`objectName` distil the Event's involved object (e.g. `Pod`/`svc-a-pod`), `type` is `Normal` or `Warning`, and `timestamp` is the ISO time of the most recent occurrence. Events are deduplicated across polls on `<uid>:<count>`; a recurring event re-emits when its `count` grows. |
-| `end`       | Deploy settled                                      | `{ status: "completed" \| "failed", services: [{ name, status, containers }] }`                                                                                                                                                                                                                                                                                                                                                                                            |
-| `error`     | Cluster read failed mid-stream                      | `{ message: string }` (the stream then closes)                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Event       | When                                                | Payload                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `progress`  | Each poll                                           | `{ progress: number, services: [{ name, status, containers }] }` — `progress` is the percentage of services that are `running` or `completed`; `status` is `pending` \| `running` \| `completed` \| `failed` (`completed` marks a finished Job); `containers` is the per-container breakdown `[{ name, status }]` covering host and sidecar containers alike.                                                                                                                                                               |
+| `log`       | Per new pod log line                                | `{ service: string, pod: string, container?: string, line: string }` — `container` names the container the line came from, so sidecar output (e.g. `mmt-probe` alerts) stays distinguishable from the host container's logs.                                                                                                                                                                                                                                                                                                |
+| `k8s-event` | Per new Kubernetes Event in the execution namespace | `{ uid?: string, reason?: string, message?: string, objectKind?: string, objectName?: string, type?: string, count?: number, timestamp?: string }` — `reason`/`message`/`objectKind`/`objectName` distil the Event's involved object (e.g. `Pod`/`svc-a-pod`), `type` is `Normal` or `Warning`, and `timestamp` is the ISO time of the most recent occurrence. Events are deduplicated across polls on `<uid>:<count>`; a recurring event re-emits when its `count` grows.                                                  |
+| `alert`     | A pod log line parses as a security report          | `{ service: string, pod: string, container?: string, timestamp?: string, verdict?: string, attacker?: string, line: string }` — a typed detection distilled from a monitor's stdout security report (issue #234): `attacker` is the report's `ip.src` (the address the AI4SOAR playbook blocks, issue #235), `verdict` the detection summary, `line` the original log line. JSON reports (the seeded `output.format = "JSON"`) and plain-text `ALERT …` lines both qualify; every alert also flows as a normal `log` event. |
+| `end`       | Deploy settled                                      | `{ status: "completed" \| "failed", services: [{ name, status, containers }] }` — with a terminal-typed workload in the execution the stream stays open after `end` (see above); a `failed` settle always closes it.                                                                                                                                                                                                                                                                                                        |
+| `error`     | Cluster read failed mid-stream                      | `{ message: string }` (the stream then closes)                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 ```text
 event: progress
-data: {"progress":50,"services":[{"name":"mmt-probe","status":"running","containers":[{"name":"mmt-probe","status":"running"}]},{"name":"kafka","status":"pending","containers":[]}]}
+data: {"progress":50,"services":[{"name":"mag","status":"pending","containers":[]},{"name":"ci-sim","status":"running","containers":[{"name":"ci-sim","status":"running"},{"name":"mmt-probe","status":"running"}]},{"name":"ci-sim","status":"running","containers":[{"name":"ci-sim","status":"running"},{"name":"mmt-probe","status":"running"}]},{"name":"ai4soar","status":"pending","containers":[]}]}
 
 event: log
-data: {"service":"http-sim","pod":"http-sim-7c9f-abcde","container":"mmt-probe","line":"ALERT syn-flood detected"}
+data: {"service":"ci-sim","pod":"ci-sim-7c9f-abcde","container":"mmt-probe","line":"ALERT http-flood detected"}
 
 event: k8s-event
-data: {"uid":"f7a2...","reason":"Killing","message":"Killing container http-sim in pod http-sim-7c9f-abcde","objectKind":"Pod","objectName":"http-sim-7c9f-abcde","type":"Normal","count":1,"timestamp":"2026-09-07T10:00:00.000Z"}
+data: {"uid":"f7a2...","reason":"BackOff","message":"Back-off restarting failed container ci-sim in pod ci-sim-7c9f-abcde","objectKind":"Pod","objectName":"ci-sim-7c9f-abcde","type":"Warning","count":2,"timestamp":"2026-09-14T10:00:00.000Z"}
+
+event: alert
+data: {"service":"ci-sim","pod":"ci-sim-7c9f-abcde","container":"mmt-probe","timestamp":"2026-09-14T10:00:00.000Z","verdict":"http-flood","attacker":"10.244.1.7","line":"{\"ip.src\":\"10.244.1.7\",\"verdict\":\"http-flood\"}"}
 
 event: end
-data: {"status":"completed","services":[{"name":"mmt-probe","status":"running","containers":[{"name":"mmt-probe","status":"running"}]},{"name":"kafka","status":"running","containers":[{"name":"kafka","status":"running"}]}]}
+data: {"status":"completed","services":[{"name":"mag","status":"running","containers":[{"name":"mag","status":"running"}]},{"name":"ci-sim","status":"running","containers":[{"name":"ci-sim","status":"running"},{"name":"mmt-probe","status":"running"}]},{"name":"ci-sim","status":"running","containers":[{"name":"ci-sim","status":"running"},{"name":"mmt-probe","status":"running"}]},{"name":"ai4soar","status":"running","containers":[{"name":"ai4soar","status":"running"}]}]}
 ```
+
+The examples use the seeded R1 demo topology (`mag` → `ci-sim`, monitored by
+the `mmt-probe` sidecar, reacted to by `ai4soar` — see
+[the playbook](../playbooks/montimage-attack-detect-respond-plan.md#run-it-yourself)).
+`services` carries one row per topology node, in node order: a sidecar node's
+row shares its host's resource name, which is why `ci-sim` appears twice —
+the second row is the `mmt-probe` node. `service` in `log`/`alert` payloads
+is likewise the workload resource name; `container` names the actual
+container the line came from.
 
 The **Execution** tab's `ExecutionConsole` component consumes this stream: a
 progress bar driven by `progress`, an auto-scrolling log console driven by
 `log` with one tab per container (plus a combined **All** view) that keeps the
 `[service:container]` prefix on every line, a per-service status list that also
 shows each workload's per-container chips (a finished Job reads `completed`),
-and a dedicated **Namespace events** pane fed by `k8s-event`.
+a dedicated **Security alerts** pane fed by `alert` (timestamp, verdict and
+the `src=<attacker>` address), and a dedicated **Namespace events** pane fed
+by `k8s-event`.
 
 ## Per-Service URLs
 
@@ -203,8 +232,10 @@ clickable URLs backed by their NodePort.
   host and the assigned NodePort: `http://<cluster-host>:<nodePort>`.
 - **Web-facing services** (`uiType: "web"` or `"both"`) render an **Open
   interface** link to that URL once the service is running.
-- **Terminal-only services** (`uiType: "terminal"`) show a plain status badge —
-  no link, no fake terminal.
+- **Terminal-only services** (`uiType: "terminal"`) show a status badge plus a
+  copyable `kubectl exec -it deploy/<name> -n <exec-ns> -- …` hint — the shell
+  access contract for long-running interactive workloads like MAG (issue
+  #233). No link, no fake terminal.
 
 ## Teardown
 

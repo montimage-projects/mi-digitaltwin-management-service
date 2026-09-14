@@ -199,9 +199,12 @@ runs end-to-end on a real Kubernetes cluster (issue #206 / playbook task 4.3)
    the registry is unreachable instead of using the stub
 3. **Execute** — `scripts/e2e-kind/run-e2e.js` registers the kind cluster as an
    Infrastructure over the REST API and executes the seeded demo scenario
-4. **Assert** — the MMT-Probe sidecar emits an alert, the AI4SOAR pod creates a
-   NetworkPolicy through its ServiceAccount, the MAG Job completes, and
-   namespace deletion leaves no resources behind
+4. **Assert** — the R1 two-attack script (issue #237): `kubectl exec` attack
+   #1 trips an MMT-Probe alert, stops CI-SIM (rate threshold → "service
+   stopped" → Deployment restart) and lands the attacker on the ci-sim
+   blocklist via AI4SOAR's `/admin/block` playbook; `kubectl exec` attack #2
+   is answered 403 while the probe alerts again and the target stays
+   healthy; namespace deletion leaves no resources behind
 5. **Teardown** — diagnostics are dumped on failure and the cluster is always
    deleted
 

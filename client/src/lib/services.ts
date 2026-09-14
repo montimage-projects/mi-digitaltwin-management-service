@@ -43,6 +43,7 @@ export interface ServiceDeployment {
   attachMode?: 'standalone' | 'sidecar';
   containerPort?: number;
   exposePort?: boolean;
+  command?: string[];
   args?: string[];
   env?: { name: string; value?: string; fromEdge?: 'target' | 'reaction' }[];
   configFiles?: { mountPath: string; content: string }[];
