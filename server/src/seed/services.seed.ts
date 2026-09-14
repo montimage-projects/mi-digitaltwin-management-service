@@ -20,6 +20,12 @@ interface ServiceSeed {
   potentialUseCases: string[];
   repositoryTable: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
   /**
+   * UI affordance for the service in the execution view — `web` (default when
+   * absent) renders the dashboard link, `terminal` renders a shell-access
+   * hint instead (issue #233).
+   */
+  uiType?: 'web' | 'terminal' | 'both';
+  /**
    * Explicit `versions[0].dockerImage` for the initial seeded version. When
    * absent, `seedServices()` generates a synthetic
    * `registry.montimage.eu/<provider-slug>/<shortName>:v1.0.0` reference.
@@ -386,7 +392,7 @@ const montimageScenarioServices: ServiceSeed[] = [
     categorySlug: 'attack',
     provider: 'Montimage (MTI)',
     description:
-      'Containerized attack-traffic generator distributed by Montimage. Runs as a finite CLI (`mag <attack> --target-ip <ip> --target-port <port>`) sending HTTP attack traffic at the scenario target; in the attack→detect→respond scenario it is deployed as a Kubernetes Job.',
+      'Containerized attack-traffic generator distributed by Montimage. Runs its CLI (`mag <attack> --target-ip <ip> --target-port <port>`) sending HTTP attack traffic at the scenario target; in the attack→detect→respond scenario it is deployed as a long-running Deployment the user drives from a shell via `kubectl exec`.',
     type: 'Software',
     trl: { current: 6, expected: 8 },
     license: 'TBD',
@@ -407,14 +413,23 @@ const montimageScenarioServices: ServiceSeed[] = [
     potentialUseCases: ['Attack module in the Montimage attack→detect→respond scenario'],
     repositoryTable: 'INTACT_TOOLBOX',
     dockerImage: 'registry.montimage.eu/montimage-mti/mag:v1.0.0',
+    // Terminal UI (issue #233): the execution view shows a copyable
+    // `kubectl exec` hint instead of a dashboard link.
+    uiType: 'terminal',
     deployment: {
-      // Finite CLI run — deployed as a Kubernetes Job. The attack-edge
-      // resolution supplies `--target-ip`/`--target-port` args (playbook
-      // wiring table); `startOrder` keeps it last so monitor and reaction
-      // are Ready before traffic starts.
-      kind: 'Job',
+      // Long-running attack machine (issue #233): a Deployment whose pod
+      // idles between attacks — the packaged `mag` image exits after its
+      // CLI, so `command` overrides the entrypoint with an idle loop and the
+      // user drives attacks with
+      // `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag <attack>
+      // --target-ip <target> --target-port 8080 2>&1 | tee /proc/1/fd/1'`
+      // (the tee lands the attack output in the MAG container log).
+      // `startOrder` still rolls it out last so monitor and reaction report
+      // Ready before the attack machine is available.
+      kind: 'Deployment',
       role: 'attack',
       exposePort: false,
+      command: ['sh', '-c', 'while true; do sleep 3600; done'],
       securityContext: { capabilities: ['NET_ADMIN', 'NET_RAW'] },
       startOrder: 30,
     },
@@ -498,10 +513,35 @@ const montimageScenarioServices: ServiceSeed[] = [
           content: [
             '# mmt-probe.conf — Montimage attack→detect→respond scenario',
             '# (libconfig syntax). Captures on the pod interface and emits',
-            '# security reports to the Kafka topic AI4SOAR consumes — see',
-            '# playbook task Pre.2 for the confirmed runtime contract.',
+            '# security reports over a *set* of channels — see playbook task',
+            '# Pre.2 for the confirmed runtime contract (issue #234):',
+            '#   kafka  → the broker AI4SOAR consumes alerts from',
+            '#   stdout → each alert on the container log the SSE stream ships',
+            '#   file   → CSV archive in the mmt-reports emptyDir (forensics)',
+            '#',
+            '# output-channel takes a set {…}, not a scalar; every channel is',
+            '# gated by its own *-output.enable block.',
+            'output = {',
+            '  format = "JSON";',
+            '};',
             'security = {',
-            '  output-channel = "kafka";',
+            '  output-channel = { kafka, stdout, file };',
+            '};',
+            'kafka-output = {',
+            '  enable = true;',
+            '  # The ai4soar deployment bundles the broker its',
+            '  # KafkaAlertConsumer reads (Pre.2).',
+            '  host = "ai4soar";',
+            '  port = 9092;',
+            '  topic = "mmt-security-alerts";',
+            '};',
+            'stdout-output = {',
+            '  enable = true;',
+            '};',
+            'file-output = {',
+            '  enable = true;',
+            '  # Mounted mmt-reports emptyDir — shared with the host container.',
+            '  path = "/opt/mmt/probe/result/report";',
             '};',
           ].join('\n'),
         },
@@ -548,6 +588,60 @@ const montimageScenarioServices: ServiceSeed[] = [
       containerPort: 5000,
       exposePort: true,
       readinessPath: '/health',
+      // The ai4soar-playbook document (issue #235) — mounted into the pod
+      // via the node's `<node>-config` ConfigMap. The default reaction is
+      // an application-level block: parse the attacker source address
+      // (`ip.src`) from the MMT security report and POST it to the acts-on
+      // target's `/admin/block` endpoint, so the blocked attacker's traffic
+      // stays visible to the probe for attack #2's alert. The delivered
+      // NetworkPolicy playbook remains as a variant for a hard network cut.
+      configFiles: [
+        {
+          mountPath: '/opt/ai4soar/playbooks/block-attacker.yaml',
+          content: [
+            '# ai4soar playbook — Montimage attack→detect→respond scenario',
+            '# (issue #235). Default reaction: application-level block of the',
+            '# attacker address on the acts-on target. The MMT security alert',
+            '# carries the attacker source address as `ip.src` (JSON format —',
+            '# see the seeded mmt-probe.conf, issue #234).',
+            'name: block-attacker-address',
+            'description: >-',
+            '  On each MMT security alert, parse the attacker source address',
+            '  (ip.src) and POST it to the acts-on target /admin/block',
+            '  endpoint. The block is application-level, so attack traffic',
+            '  remains observable by MMT-Probe for the second detection.',
+            'trigger:',
+            '  on: mmt-security-alert',
+            '  # Alerts arrive over the Kafka channel enabled in mmt-probe.conf',
+            '  # (topic mmt-security-alerts); the report format is JSON.',
+            '  source: kafka:mmt-security-alerts',
+            'steps:',
+            '  - name: extract-attacker',
+            '    # The attacker source address the alert carries (#234).',
+            '    set: { attacker: "${alert.ip.src}" }',
+            '  - name: block-attacker',
+            '    action: http-request',
+            '    method: POST',
+            '    # The acts-on edge target — the CI-SIM endpoint from #231.',
+            '    url: "http://ci-sim:8080/admin/block"',
+            '    body: { "ip": "${attacker}" }',
+            '    expect: [200, 201, 202, 204, 409]',
+            'variants:',
+            '  - name: networkpolicy-hard-cut',
+            '    description: >-',
+            '      Hard network cut instead of the application block: create',
+            '      the ai4soar-block-mag NetworkPolicy denying ingress to the',
+            '      target pod (the pre-#235 default). Keeps using the pod',
+            '      ServiceAccount RBAC rules below.',
+            '    steps:',
+            '      - name: deny-ingress',
+            '        action: kubernetes-create-networkpolicy',
+            '        podSelector: { app: ci-sim }',
+            '        policyTypes: [Ingress]',
+            '        ingress: []',
+          ].join('\n'),
+        },
+      ],
       rbac: [
         { apiGroups: [''], resources: ['pods'], verbs: ['delete'] },
         {
@@ -1057,6 +1151,12 @@ export const seedServices = async (): Promise<void> => {
       potentialUseCases: serviceData.potentialUseCases,
       repositoryTable: serviceData.repositoryTable,
     };
+
+    // Tracked only when the seed entry declares one — the schema default
+    // ('web') applies to entries without it.
+    if (serviceData.uiType) {
+      desiredFields.uiType = serviceData.uiType;
+    }
 
     // Tracked only when the seed entry declares one — a manually-set
     // `deployment` on a service the seed doesn't specify is left untouched.

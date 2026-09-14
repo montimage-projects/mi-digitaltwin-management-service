@@ -13,10 +13,139 @@ import {
   collectNewPodLogs,
   collectNewNamespaceEvents,
   isDeploymentSettled,
+  type PodLogLine,
 } from './kubernetesDeploy.js';
 
 /** Interval between cluster status/log polls for the SSE progress stream. */
 export const SSE_POLL_INTERVAL_MS = 2000;
+
+/**
+ * A security alert distilled from a monitor probe's log line (issue #234).
+ * Emitted as the `alert` SSE event alongside the line's normal `log` event so
+ * the execution view can list detections — timestamp, verdict and the
+ * attacker source address the AI4SOAR playbook consumes (`ip.src`, #235).
+ */
+export interface SecurityAlertEvent {
+  /** Workload resource name the reporting container belongs to. */
+  service: string;
+  /** Concrete pod the line came from. */
+  pod: string;
+  /** Container the line came from (e.g. the `mmt-probe` sidecar). */
+  container?: string;
+  /** ISO timestamp carried by the report, when the probe supplied one. */
+  timestamp?: string;
+  /** Detection summary (the report's verdict / alert text). */
+  verdict?: string;
+  /** Attacker source address — the report's `ip.src` when present. */
+  attacker?: string;
+  /** The original log line the alert was parsed from. */
+  line: string;
+}
+
+/** Field spellings that carry the attacker source address in a report. */
+const ATTACKER_KEYS = ['ip.src', 'ip_src', 'src', 'attacker', 'source_ip', 'src_ip'];
+/** Field spellings that carry the detection verdict/summary. */
+const VERDICT_KEYS = [
+  'verdict',
+  'verdicts',
+  'attack',
+  'attack_type',
+  'attack-type',
+  'alert',
+  'description',
+  'message',
+];
+/** Field spellings that carry the report timestamp. */
+const TIMESTAMP_KEYS = ['timestamp', 'time', 'ts', 'date'];
+/** Sub-objects one level down that may hold the report fields. */
+const NESTED_KEYS = ['properties', 'property', 'security', 'report', 'alert', 'attributes', 'data'];
+
+function readField(obj: Record<string, unknown>, keys: string[], depth: number): unknown {
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === 'string' && value.length) return value;
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  if (depth <= 0) return undefined;
+  for (const nest of NESTED_KEYS) {
+    const sub = obj[nest];
+    // mmt-security also emits `properties` as an array of
+    // `{ att|name|key, val|value }` attribute pairs — normalize it first.
+    const record = Array.isArray(sub)
+      ? Object.fromEntries(
+          sub
+            .filter((e): e is Record<string, unknown> => e !== null && typeof e === 'object')
+            .map((e) => [String(e.att ?? e.name ?? e.key ?? ''), e.val ?? e.value] as const)
+            .filter(([k]) => k.length > 0)
+        )
+      : sub;
+    if (record !== null && typeof record === 'object' && !Array.isArray(record)) {
+      const value = readField(record as Record<string, unknown>, keys, depth - 1);
+      if (value !== undefined) return value;
+    }
+  }
+  return undefined;
+}
+
+function readTimestamp(obj: Record<string, unknown>): string | undefined {
+  const raw = readField(obj, TIMESTAMP_KEYS, 1);
+  if (raw === undefined) return undefined;
+  // Numeric epochs arrive in seconds or milliseconds; strings are taken
+  // as-is when they parse as a date.
+  const date =
+    typeof raw === 'number' ? new Date(raw > 1e12 ? raw : raw * 1000) : new Date(String(raw));
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+/**
+ * Detect an MMT security report in a pod log line (issue #234).
+ *
+ * With `output.format = JSON` the probe writes one JSON report per detection
+ * on stdout; a report is recognized by carrying an attacker address (`ip.src`
+ * and spellings) or a verdict field — the shapes are unambiguous enough that
+ * no container-name gate is needed. A plain-text `ALERT …` line (e.g. the
+ * e2e stub's detection banner) also counts, with the text as the verdict.
+ * Returns null for ordinary log lines.
+ */
+export function parseSecurityAlert(entry: PodLogLine): SecurityAlertEvent | null {
+  const line = entry.line;
+  const trimmed = line.trim();
+
+  if (trimmed.startsWith('{')) {
+    try {
+      const report = JSON.parse(trimmed) as Record<string, unknown>;
+      if (report !== null && typeof report === 'object' && !Array.isArray(report)) {
+        const attacker = readField(report, ATTACKER_KEYS, 1);
+        const verdict = readField(report, VERDICT_KEYS, 1);
+        if (attacker !== undefined || verdict !== undefined) {
+          return {
+            service: entry.name,
+            pod: entry.pod,
+            container: entry.container,
+            timestamp: readTimestamp(report),
+            verdict: verdict === undefined ? undefined : String(verdict),
+            attacker: attacker === undefined ? undefined : String(attacker),
+            line,
+          };
+        }
+      }
+    } catch {
+      /* not a JSON object line — fall through to the text check */
+    }
+  }
+
+  const text = /^\[?ALERT[\s:]+(.+)$/i.exec(trimmed);
+  if (text) {
+    return {
+      service: entry.name,
+      pod: entry.pod,
+      container: entry.container,
+      verdict: text[1].trim() || undefined,
+      line,
+    };
+  }
+  return null;
+}
 
 /** A single SSE event sent to the client. */
 
@@ -28,9 +157,13 @@ export const SSE_POLL_INTERVAL_MS = 2000;
  *  - Calling `res.flushHeaders()`.
  *
  * This function:
- *  - Writes `progress`, `log`, `k8s-event`, `end`, and `error` events to the
- *    response.
+ *  - Writes `progress`, `log`, `k8s-event`, `alert`, `end`, and `error`
+ *    events to the response.
  *  - Cleans up the interval on client disconnect or when the deploy settles.
+ *    For executions carrying a terminal-typed (`uiType`) service the stream
+ *    stays open after `end` — a long-running workload like MAG is driven
+ *    from a shell after rollout, so log lines, probe alerts and namespace
+ *    events keep flowing to an attached console until disconnect/teardown.
  *  - Returns a cleanup function that the caller should invoke on `req.close`.
  *
  * @param res        — Express response already configured for SSE.
@@ -45,7 +178,7 @@ export function runSSEStream(
   execution: {
     status: string;
     namespace?: string;
-    deployedServices?: { name?: string }[];
+    deployedServices?: { name?: string; uiType?: string }[];
   },
   infrastructure: {
     endpoint: string;
@@ -53,9 +186,13 @@ export function runSSEStream(
   } | null
 ): () => void {
   const namespace = execution.namespace;
-  const names = (execution.deployedServices ?? [])
-    .map((s) => s.name)
-    .filter((n): n is string => Boolean(n));
+  const deployed = execution.deployedServices ?? [];
+  const names = deployed.map((s) => s.name).filter((n): n is string => Boolean(n));
+  // A terminal-typed workload stays up for shell access after rollout — its
+  // stream keeps flowing past deploy settle so `kubectl exec`-driven output
+  // still reaches the console (issue #233).
+  const interactive = deployed.some((s) => s.uiType === 'terminal' || s.uiType === 'both');
+  let ended = false;
 
   // Nothing was deployed, or the execution has already reached a terminal
   // state — there is nothing to poll for. Emit a single snapshot and close.
@@ -120,6 +257,10 @@ export function runSSEStream(
           container: entry.container,
           line: entry.line,
         });
+        // A probe security report on stdout also surfaces as a typed `alert`
+        // event so the console can list detections (issue #234).
+        const alert = parseSecurityAlert(entry);
+        if (alert) send('alert', alert);
       }
 
       // Namespace events (pod scheduled, image pulled, container started,
@@ -133,12 +274,26 @@ export function runSSEStream(
         send('k8s-event', entry);
       }
 
-      if (isDeploymentSettled(statuses)) {
+      if (!ended && isDeploymentSettled(statuses)) {
         const status = statuses.some((s) => s.status === 'failed') ? 'failed' : 'completed';
         send('end', { status, services: statuses });
-        cleanup();
+        if (status === 'failed' || !interactive) {
+          cleanup();
+          return;
+        }
+        // Interactive (terminal-typed) execution: `end` marks deploy settle,
+        // but the stream stays attached so shell-driven attack output, probe
+        // alerts and reaction events keep reaching the console (issue #233).
+        ended = true;
       }
     } catch (err) {
+      // Post-settle a failing read most likely means the namespace was torn
+      // down — the deploy already ended cleanly, so close quietly instead of
+      // flipping a finished execution to an error state.
+      if (ended) {
+        cleanup();
+        return;
+      }
       send('error', { message: err instanceof Error ? err.message : String(err) });
       cleanup();
     }

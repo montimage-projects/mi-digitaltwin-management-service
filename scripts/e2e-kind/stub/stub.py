@@ -19,13 +19,18 @@ image substitutes for the four modules (`mag`, `http-sim`, `mmt-probe`,
                           NetworkPolicy in the execution namespace through the
                           Kubernetes API, authenticated with the pod's
                           ServiceAccount token (exactly like Pre.3 describes).
-  attack   (mag)        — a finite job: floods --target-ip:--target-port with
-                          HTTP requests, then exits 0 so the Job completes.
+  attack   (mag)        — since issue #233 the mag workload is a Deployment
+                          whose seeded `command` idles (`sleep` loop), so the
+                          stub's entrypoint never runs there; run-e2e.js
+                          drives each attack with `kubectl exec` invoking
+                          this script through `tee /proc/1/fd/1` so the
+                          output also lands in the pod's container log —
+                          floods --target-ip:--target-port with
+                          HTTP requests, then exits 0.
 
 The role comes from the STUB_ROLE env var (injected per service by
-run-e2e.js); MAG's seeded `config.args` (`mag http-flood --target-ip …`) are
-parsed for the target flags, so the real scenario document is executed
-unchanged.
+run-e2e.js and inherited by `kubectl exec` processes); the `mag …` argv
+fallback keeps the exec-driven attack working even without it.
 """
 
 import json

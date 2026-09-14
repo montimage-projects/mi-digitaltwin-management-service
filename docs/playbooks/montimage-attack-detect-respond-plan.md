@@ -47,37 +47,44 @@ namespace secsim-<scenario>-<exec>
 ├── Service   target-http  (NodePort → 8080)        ← dashboardUrl
 ├── Deployment ai4soar                                :5000 (API/UI; Shuffle stack — see Pre.2)
 │   ├── ServiceAccount ai4soar + Role/RoleBinding (namespace-scoped)
-│   └── ConfigMap ai4soar-playbook (alert ingest → K8s action)
+│   └── ConfigMap ai4soar-config (block-attacker.yaml playbook — issue #235)
 ├── Service   ai4soar      (NodePort → 5000)        ← dashboardUrl
-└── Job       mag                                     args: mag <attack> --target-ip <svc> --target-port 8080
+└── Deployment mag                                    terminal, idles — attacks via kubectl exec (#233)
 ```
 
 Wiring resolved from topology edges:
 
-| Edge (source → target) | Engine effect                                                                          |
-| ---------------------- | -------------------------------------------------------------------------------------- |
-| MAG → http-sim         | attack target passed as MAG args (`--target-ip`/`--target-port` of the target Service) |
-| MMT-Probe → http-sim   | MMT-Probe injected as a **sidecar** in the target pod (no hostNetwork)                 |
-| MMT-Probe → AI4SOAR    | probe `security.output-channel={kafka}`; AI4SOAR consumes the topic (Pre.2)            |
-| AI4SOAR → http-sim     | Role grants: `pods` delete, `deployments` patch/scale, `networkpolicies` create        |
+| Edge (source → target) | Engine effect                                                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MAG → http-sim         | attack target for exec-driven runs: `kubectl exec -it deploy/mag -- sh -c 'mag <attack> --target-ip <svc> --target-port 8080 2>&1 \| tee /proc/1/fd/1'` (#233) |
+| MMT-Probe → http-sim   | MMT-Probe injected as a **sidecar** in the target pod (no hostNetwork)                                                                                         |
+| MMT-Probe → AI4SOAR    | probe `security.output-channel={kafka,stdout,file}` (JSON reports, #234); AI4SOAR consumes the Kafka topic                                                     |
+| AI4SOAR → http-sim     | Role grants: `pods` delete, `deployments` patch/scale, `networkpolicies` create                                                                                |
 
 Sidecar over `hostNetwork` is the recommended choice: it captures exactly the
 target's traffic, needs no node-level privileges, and works on managed
 clusters. `hostNetwork` stays as an optional per-service flag.
 
-Reaction the playbook applies (demo default first, others as playbook
-variants): create a `NetworkPolicy` denying ingress to `target-http` from the
-MAG pod label; delete the MAG pod; scale the MAG Job to 0.
+Reaction the playbook applies (issue #235 — the seeded
+`/opt/ai4soar/playbooks/block-attacker.yaml`): on each MMT security alert,
+parse the attacker source address (`ip.src` — the #234 JSON report field) and
+POST it to the acts-on target's `/admin/block` endpoint
+(`http://ci-sim:8080/admin/block`, the CI-SIM API from #231). The block is
+application-level, so attack traffic stays observable by MMT-Probe and the
+second attack still raises an alert. The earlier hard-cut remains a playbook
+variant (`networkpolicy-hard-cut`): create a `NetworkPolicy` denying ingress
+to the target pod; pod deletion and scale-down remain available RBAC actions.
 
 Proposed `Service.deployment` spec:
 
 ```ts
 deployment?: {
-  kind: 'Deployment' | 'Job';                 // MAG = Job
+  kind: 'Deployment' | 'Job';                 // MAG = Deployment (terminal, #233)
   role: 'attack' | 'target' | 'monitor' | 'reaction' | 'generic';
   attachMode?: 'standalone' | 'sidecar';      // MMT-Probe = sidecar
   containerPort?: number;                     // replaces hard-coded 80
   exposePort?: boolean;                       // sidecar/Job → false
+  command?: string[];                         // container ENTRYPOINT override (#233)
   args?: string[];
   env?: { name: string; value?: string; fromEdge?: 'target' | 'reaction' }[];
   configFiles?: { mountPath: string; content: string }[];   // → ConfigMap
@@ -185,10 +192,16 @@ finite-run CLI: `mag list` enumerates the 26 attack types, `mag info <attack>`
 shows parameters, and `mag <attack> --target-ip <ip> --target-port <port>
 --count <n>` runs it (requires root; in a container `NET_ADMIN` + `NET_RAW`).
 There is no config file and no documented `TARGET_URL` env — the profile is the
-subcommand plus its flags. Engine consequence: the MAG Job carries `args`, and
-the attack-edge resolution supplies the target flags; whether the packaged
-entrypoint also accepts a `TARGET_URL` env is confirmed at first image run.
-Health is the Job's `succeeded`/`failed` count — no port, no endpoint.
+subcommand plus its flags. Engine consequence (revised by issue #233): MAG
+deploys as a long-running `Deployment` whose `command` idles
+(`sh -c 'while true; do sleep 3600; done'`) — the `mag` CLI exits after each
+attack, so keeping the pod alive lets the user re-run attacks via
+`kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag <attack> --target-ip
+<svc> --target-port <port> 2>&1 | tee /proc/1/fd/1'` without redeploying; no
+fixed `args` are baked in. The `tee /proc/1/fd/1` wrapper lands the attack
+output in the pod's container log (exec output alone reaches only the exec
+channel), so it also shows in the execution console over SSE.
+Health is Deployment availability — no port, no endpoint.
 
 **http-sim — HTTP victim on `:8080` (port recorded, rest pending).** The
 simulated target is Montimage-internal; no public source exists. The contract
@@ -779,14 +792,23 @@ install.
    `PUT /api/scenarios/:id` with `infrastructureId`).
 4. **Execute** — click **Execute** in the UI, or
    `POST /api/scenarios/:id/execute`. The engine rolls the topology out in
-   `startOrder` tiers and holds the MAG Job until the target pod (with its
-   MMT-Probe sidecar) and AI4SOAR report `Ready` inside the readiness gate.
-5. **Watch the Execution tab**: `progress` events drive the bar,
-   per-container log tabs keep MMT-Probe alerts and http-sim access logs
-   separate, and the **Namespace events** pane shows the AI4SOAR reaction
-   landing (the `ai4soar-block-mag` NetworkPolicy). The run settles when the
-   `mag` Job reports `completed`.
-6. **Tear down** — **Tear Down** in the UI or
+   `startOrder` tiers and holds the MAG Deployment until the target pod (with
+   its MMT-Probe sidecar) and AI4SOAR report `Ready` inside the readiness
+   gate. MAG comes up idling — its pod entrypoint is the seeded sleep loop.
+5. **Launch an attack** — the MAG service row shows a copyable exec hint
+   (issue #233):
+   `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag http-flood --target-ip http-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'`.
+   Re-run it as often as needed — the Deployment stays up between attacks,
+   and the `tee /proc/1/fd/1` wrapper puts each run's output into the MAG
+   pod's container log so it also streams into the console.
+6. **Watch the Execution tab**: `progress` events drive the bar,
+   per-container log tabs keep MMT-Probe output and http-sim access logs
+   separate, the **Security alerts** pane lists each detection the probe
+   reports (verdict + `src=<ip.src>` attacker address, issue #234), and the
+   **Namespace events** pane shows the AI4SOAR reaction landing. The event
+   stream stays open after deploy settle so the exec-driven attack and the
+   reaction keep flowing into the console.
+7. **Tear down** — **Tear Down** in the UI or
    `DELETE /api/scenarios/:id/executions/:executionId`; deleting the
    `secsim-<scenario>-<execution>` namespace removes every resource the
    engine created.
@@ -803,8 +825,9 @@ install.
 touch the engine or the seed: it starts a kind cluster, boots the server
 (auto-seed included), then `scripts/e2e-kind/run-e2e.js` drives the public
 REST API — login, register the cluster as an Infrastructure, execute the demo
-scenario — and asserts the probe alert, the `ai4soar-block-mag`
-NetworkPolicy, the `mag` Job completion and a clean teardown. Because CI
+scenario — and asserts the MAG Deployment rollout, an exec-driven attack run
+(`kubectl exec` into the idling pod), the probe alert, the `ai4soar-block-mag`
+NetworkPolicy and a clean teardown. Because CI
 runners cannot reach `registry.montimage.eu`, the driver repoints the
 services at a locally-built stub image (`scripts/e2e-kind/stub/`) loaded with
 `kind load`; set `SECSIM_E2E_REQUIRE_REAL_IMAGES=1` to fail instead of

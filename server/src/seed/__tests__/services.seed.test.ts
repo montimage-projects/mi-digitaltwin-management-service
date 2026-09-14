@@ -174,24 +174,34 @@ describe('seedServices', () => {
 
     const creates = vi.mocked(Service.create).mock.calls.map(([doc]) => doc) as {
       shortName: string;
+      uiType?: string;
       deployment?: {
         kind: string;
         role: string;
         attachMode?: string;
         exposePort?: boolean;
         containerPort?: number;
+        command?: string[];
+        args?: string[];
+        startOrder?: number;
         securityContext?: { capabilities?: string[] };
         rbac?: { apiGroups: string[]; resources: string[]; verbs: string[] }[];
       };
     }[];
     const byName = (name: string) => creates.find((d) => d.shortName === name);
 
-    // MAG — finite attack run deployed as a Job.
-    expect(byName('MAG')?.deployment).toMatchObject({
-      kind: 'Job',
+    // MAG — long-running terminal Deployment (issue #233): the pod idles on
+    // a shell loop so attacks are driven via `kubectl exec` — no fixed args.
+    const mag = byName('MAG');
+    expect(mag?.uiType).toBe('terminal');
+    expect(mag?.deployment).toMatchObject({
+      kind: 'Deployment',
       role: 'attack',
       exposePort: false,
+      startOrder: 30,
     });
+    expect(mag?.deployment?.command).toEqual(['sh', '-c', 'while true; do sleep 3600; done']);
+    expect(mag?.deployment?.args).toBeUndefined();
 
     // http-sim — victim workload serving HTTP on :8080.
     expect(byName('HTTP-SIM')?.deployment).toMatchObject({
@@ -270,5 +280,52 @@ describe('seedServices', () => {
       'registry.montimage.eu/montimage-mti/ci-sim:v1.0.0'
     );
     expect(update?.$set.versions[0].dockerImage).not.toMatch(/montimage-mti-\//);
+  });
+
+  it('seeds the MMT-Probe config with JSON output on kafka, stdout and file (issue #234)', async () => {
+    await seedServices();
+
+    const creates = vi.mocked(Service.create).mock.calls.map(([doc]) => doc) as {
+      shortName: string;
+      deployment?: { configFiles?: { mountPath: string; content: string }[] };
+    }[];
+    const conf = creates
+      .find((d) => d.shortName === 'MMT-PROBE')
+      ?.deployment?.configFiles?.find((f) => f.mountPath.endsWith('mmt-probe.conf'));
+    expect(conf, 'mmt-probe.conf configFiles entry').toBeDefined();
+
+    // JSON report format — the contract the SSE alert parser and the
+    // AI4SOAR playbook's `ip.src` extraction rely on.
+    expect(conf?.content).toContain('format = "JSON";');
+    // The multi-channel set, not a scalar, plus a gate block per channel.
+    expect(conf?.content).toContain('output-channel = { kafka, stdout, file };');
+    expect(conf?.content).toContain('kafka-output = {');
+    expect(conf?.content).toContain('topic = "mmt-security-alerts";');
+    expect(conf?.content).toContain('stdout-output = {');
+    expect(conf?.content).toContain('file-output = {');
+    // File output lands on the mounted mmt-reports volume (forensics).
+    expect(conf?.content).toContain('/opt/mmt/probe/result/report');
+  });
+
+  it('seeds the AI4SOAR playbook blocking the alert ip.src via /admin/block (issue #235)', async () => {
+    await seedServices();
+
+    const creates = vi.mocked(Service.create).mock.calls.map(([doc]) => doc) as {
+      shortName: string;
+      deployment?: { configFiles?: { mountPath: string; content: string }[] };
+    }[];
+    const playbook = creates
+      .find((d) => d.shortName === 'AI4SOAR')
+      ?.deployment?.configFiles?.find((f) => f.mountPath.includes('playbooks'));
+    expect(playbook, 'ai4soar playbook configFiles entry').toBeDefined();
+    expect(playbook?.mountPath).toBe('/opt/ai4soar/playbooks/block-attacker.yaml');
+
+    // The #234 → #235 contract: the attacker address is the report's ip.src,
+    // posted to the acts-on target's application-level block endpoint.
+    expect(playbook?.content).toContain('${alert.ip.src}');
+    expect(playbook?.content).toContain('http://ci-sim:8080/admin/block');
+    expect(playbook?.content).toContain('method: POST');
+    // The pre-#235 NetworkPolicy response is retained as a variant.
+    expect(playbook?.content).toContain('networkpolicy-hard-cut');
   });
 });

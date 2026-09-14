@@ -703,6 +703,12 @@ function containerFor(node: ResolvedNode): V1Container {
   if (spec.exposePort) {
     container.ports = [{ containerPort: node.containerPort }];
   }
+  // `command` overrides the image ENTRYPOINT — a CLI-only image (e.g. MAG)
+  // stays alive between `kubectl exec` runs via an idle command instead of
+  // exiting after its one-shot CLI.
+  if (spec.command?.length) {
+    container.command = spec.command;
+  }
   if (spec.args?.length) {
     container.args = spec.args;
   }

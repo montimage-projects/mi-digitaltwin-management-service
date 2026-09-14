@@ -35,6 +35,12 @@ export interface IDeploymentSpec {
   containerPort?: number;
   /** Whether a Kubernetes Service exposes the port (sidecar/Job → false). */
   exposePort?: boolean;
+  /**
+   * Container entrypoint override (Kubernetes `command`) — replaces the
+   * image's ENTRYPOINT, e.g. an idle loop keeping a CLI-only image like MAG
+   * alive between `kubectl exec` runs. `args` still maps to CMD.
+   */
+  command?: string[];
   /** Container arguments (e.g. `mag <attack> --target-ip …`). */
   args?: string[];
   /** `fromEdge` marks a value the engine derives from a topology edge. */
@@ -162,6 +168,7 @@ const deploymentSchema = new Schema<IDeploymentSpec>(
     attachMode: { type: String, enum: ['standalone', 'sidecar'] },
     containerPort: { type: Number, min: 1, max: 65535 },
     exposePort: { type: Boolean },
+    command: [{ type: String }],
     args: [{ type: String }],
     env: [deploymentEnvSchema],
     configFiles: [deploymentConfigFileSchema],

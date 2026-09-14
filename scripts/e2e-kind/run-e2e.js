@@ -9,7 +9,8 @@
  *
  *   1. MMT-Probe emits an alert       (probe sidecar log line, kubectl logs)
  *   2. AI4SOAR creates a NetworkPolicy (`ai4soar-block-mag` in the exec ns)
- *   3. The MAG Job completes          (kubectl wait condition=complete)
+ *   3. The MAG Deployment rolls out and an exec-driven attack run succeeds
+ *      (issue #233 — MAG is a long-running terminal workload now)
  *   4. Namespace deletion leaves no resources behind
  *
  * Image strategy: the four module images live in the private
@@ -56,14 +57,16 @@ const DEMO_PROJECT_SHORTNAME = 'MONTIMAGE-DEMO';
 const DEMO_SCENARIO_MATCH = 'AI4SOAR';
 const REACTION_POLICY = 'ai4soar-block-mag';
 const CONTAINMENT_POLICY = 'mag-egress';
-const JOB_NAME = 'mag';
+// MAG is a Deployment since issue #233 — same resource name, driven via exec.
+const MAG_DEPLOYMENT = 'mag';
 const HOST_APP = 'http-sim';
 const PROBE_CONTAINER = 'mmt-probe';
 
 const TIMING = {
   serverWaitMs: 180_000, // server boot + auto-seed
   executeMs: 480_000, // POST /execute blocks through the readiness gate
-  jobCompleteMs: 300_000,
+  rolloutMs: 300_000, // MAG Deployment availability
+  execAttackMs: 180_000, // one exec-driven attack run
   alertMs: 180_000,
   reactionMs: 180_000,
   teardownMs: 120_000,
@@ -362,26 +365,88 @@ function assertNamespaceShape() {
   );
 }
 
-async function assertJobCompletes() {
+async function assertMagDeploymentAndExecAttack() {
   try {
     kubectl(
       [
         '-n',
         namespace,
-        'wait',
-        '--for=condition=complete',
-        `job/${JOB_NAME}`,
-        `--timeout=${Math.round(TIMING.jobCompleteMs / 1000)}s`,
+        'rollout',
+        'status',
+        `deploy/${MAG_DEPLOYMENT}`,
+        `--timeout=${Math.round(TIMING.rolloutMs / 1000)}s`,
       ],
       { allowFail: true }
     );
-    const succeeded = kubectl(
-      ['-n', namespace, 'get', 'job', JOB_NAME, '-o', 'jsonpath={.status.succeeded}'],
+    const available = kubectl(
+      [
+        '-n',
+        namespace,
+        'get',
+        'deploy',
+        MAG_DEPLOYMENT,
+        '-o',
+        'jsonpath={.status.availableReplicas}',
+      ],
       { allowFail: true }
     );
-    record('MAG Job completes', Number(succeeded) >= 1, `succeeded=${succeeded || '0'}`);
+    record(
+      'MAG Deployment is available',
+      Number(available) >= 1,
+      `availableReplicas=${available || '0'}`
+    );
   } catch (err) {
-    record('MAG Job completes', false, err.message);
+    record('MAG Deployment is available', false, err.message);
+    return;
+  }
+
+  // Issue #233 contract: attacks are launched into the idling pod via
+  // `kubectl exec`, so a second run needs no redeploy. The real module would
+  // exec `mag <attack> --target-ip … --target-port …`; the stub image has no
+  // `mag` binary, so exec runs stub.py with `mag` in argv (STUB_ROLE=attack is
+  // also inherited) and the same flag surface. The `tee /proc/1/fd/1` wrapper
+  // mirrors the UI hint: exec output normally only reaches the exec channel,
+  // so teeing into PID 1's stdout also lands it in the MAG container log.
+  try {
+    const out = kubectl(
+      [
+        '-n',
+        namespace,
+        'exec',
+        `deploy/${MAG_DEPLOYMENT}`,
+        '--',
+        'sh',
+        '-c',
+        `python3 -u /app/stub.py mag http-flood --target-ip ${HOST_APP} --target-port 8080 2>&1 | tee /proc/1/fd/1`,
+      ],
+      { allowFail: true }
+    );
+    const finished = /attack profile finished/.test(out);
+    record(
+      'exec-driven attack completes in the MAG pod',
+      finished,
+      out
+        .split('\n')
+        .find((l) => /finished|failed/.test(l))
+        ?.slice(0, 120) || '(no output)'
+    );
+
+    // Issue #233 AC: attack output lands in the MAG container logs — the
+    // tee redirect above is what puts it there (exec output alone never
+    // reaches `kubectl logs`).
+    const podLog = kubectl(['-n', namespace, 'logs', `deploy/${MAG_DEPLOYMENT}`, '--tail=100'], {
+      allowFail: true,
+    });
+    record(
+      'attack output lands in the MAG container log',
+      /attack profile finished/.test(podLog),
+      podLog
+        .split('\n')
+        .find((l) => /finished|failed/.test(l))
+        ?.slice(0, 120) || '(no matching pod log line)'
+    );
+  } catch (err) {
+    record('exec-driven attack completes in the MAG pod', false, err.message);
   }
 }
 
@@ -448,7 +513,7 @@ async function sampleStatusStream() {
     }
     record(
       'execution status streams over SSE',
-      /event:\s*(progress|log|k8s-event|end)/.test(text),
+      /event:\s*(progress|log|k8s-event|alert|end)/.test(text),
       `${text.length} bytes read`
     );
   } catch (err) {
@@ -527,7 +592,7 @@ function diagnostics() {
   for (const args of [
     ['get', 'all', '-n', namespace, '-o', 'wide'],
     ['get', 'networkpolicies,configmaps,serviceaccounts,roles,rolebindings', '-n', namespace],
-    ['describe', 'job', JOB_NAME, '-n', namespace],
+    ['describe', 'deployment', MAG_DEPLOYMENT, '-n', namespace],
   ]) {
     try {
       note(`$ kubectl ${args.join(' ')}\n${kubectl(args, { allowFail: true }) || '(empty)'}`);
@@ -567,9 +632,9 @@ async function main() {
     await executeScenario();
     endGroup();
 
-    group('Assert — detection, reaction, Job completion');
+    group('Assert — rollout, exec attack, detection, reaction');
     assertNamespaceShape();
-    await assertJobCompletes();
+    await assertMagDeploymentAndExecAttack();
     await assertProbeAlert();
     await assertReactionPolicy();
     await sampleStatusStream();
