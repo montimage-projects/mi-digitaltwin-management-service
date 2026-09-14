@@ -948,6 +948,55 @@ const infrastructureServices: ServiceSeed[] = [
     potentialUseCases: ['Research infrastructure support'],
     repositoryTable: 'OTHER_SERVICES',
   },
+  {
+    // CI-SIM — in-repo critical-infrastructure simulation (issue #231,
+    // playbook task 5.1). Seeded into OTHER_SERVICES so the topology
+    // editor's "Add Target" button lists it, and grouped under the `target`
+    // role category (task 0.2) that matches its deployment spec. The image
+    // builds from `sim/ci-sim/` in this repository — `docker build -t
+    // ci-sim:local sim/ci-sim && kind load docker-image ci-sim:local` —
+    // pending the registry.montimage.eu publish.
+    shortName: 'CI-SIM',
+    title: 'Critical Infrastructure Simulation (CI-SIM)',
+    categorySlug: 'target',
+    provider: 'Montimage (MTI)',
+    description:
+      'In-repo critical-infrastructure HTTP simulation serving on :8080. Exposes GET / health plus a small service API (/api/status, /api/metrics); POST /admin/block {"address":"<ip>"} blocklists a source (answered 403 while other sources keep being served), POST /admin/unblock removes it and GET /admin/blocks lists the entries. A sustained request rate from one source over the threshold makes the process log "service stopped" and exit, so the Deployment\'s restartPolicy: Always restarts it while the monitor sidecar holds the pod netns.',
+    type: 'Software',
+    trl: { current: 6, expected: 8 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'HTTP Requests',
+        description:
+          'Inbound HTTP traffic, including attack traffic that can exceed the service rate threshold',
+      },
+    ],
+    outputs: [
+      {
+        name: 'HTTP Responses & Admin State',
+        description:
+          'Served responses plus the /admin blocklist surface used by the response playbook',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: [
+      'Interactive attack→detect→respond demo target: block the attacker via /admin/block, let the attack stop the process, and watch Kubernetes restart it',
+    ],
+    repositoryTable: 'OTHER_SERVICES',
+    dockerImage: 'registry.montimage.eu/montimage-mti/ci-sim:v1.0.0',
+    deployment: {
+      // Victim workload: HTTP on :8080, readiness `GET /` → 200 — same
+      // target-tier contract as HTTP-SIM (Pre.2), ordered with it.
+      kind: 'Deployment',
+      role: 'target',
+      containerPort: 8080,
+      exposePort: true,
+      readinessPath: '/',
+      startOrder: 10,
+    },
+  },
 ];
 
 const servicesData: ServiceSeed[] = [
