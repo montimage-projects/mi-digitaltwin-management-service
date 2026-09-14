@@ -733,11 +733,12 @@ Validated on `POST`/`PUT /api/services`; invalid specs are rejected with
 
 | Field             | Type                                                                    | Description                                                                      |
 | ----------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `kind`            | `'Deployment' \| 'Job'`                                                 | **Required.** Workload resource — `Job` for finite runs (e.g. MAG).              |
+| `kind`            | `'Deployment' \| 'Job'`                                                 | **Required.** `Job` for finite runs; MAG is a terminal `Deployment` (#233).      |
 | `role`            | `'attack' \| 'target' \| 'monitor' \| 'reaction' \| 'generic'`          | **Required.** Scenario role — drives node badges and edge validation.            |
 | `attachMode`      | `'standalone' \| 'sidecar'`                                             | `sidecar` injects the container into the target pod's network namespace.         |
 | `containerPort`   | number (int, 1–65535)                                                   | Container port — replaces the engine's default of 80.                            |
 | `exposePort`      | boolean                                                                 | Whether a Kubernetes Service exposes the port (`false` for sidecars and Jobs).   |
+| `command`         | string[]                                                                | Container ENTRYPOINT override, ahead of `args` — e.g. MAG's idle shell loop.     |
 | `args`            | string[]                                                                | Container arguments (e.g. `mag <attack> --target-ip …`).                         |
 | `env`             | `{ name: string; value?: string; fromEdge?: 'target' \| 'reaction' }[]` | Env vars — `fromEdge` marks a value the engine resolves from a topology edge.    |
 | `configFiles`     | `{ mountPath: string; content: string }[]`                              | Files rendered into a ConfigMap mounted at `mountPath`.                          |

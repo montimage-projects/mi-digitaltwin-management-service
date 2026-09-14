@@ -4,8 +4,9 @@
 **Baseline (at plan start):** GREEN — v1.0.0 builds; the deploy engine maps
 each node to one single-container Deployment + NodePort Service on port 80;
 edges, env, volumes, capabilities, RBAC, ordering and Jobs are unsupported
-**Status:** Delivered (epic #182) — every task below landed on `main`; see
-[Run it yourself](#run-it-yourself) for the final run steps
+**Status:** Delivered (epic #182, revised by phase P5) — every task below
+landed on `main`; the delivered demo is the interactive R1 two-attack flow —
+see [Run it yourself](#run-it-yourself) for the final run steps
 **Test command of record:** `npm test`
 
 Integrate a four-module Montimage scenario into the secSIM execution engine:
@@ -13,7 +14,7 @@ Integrate a four-module Montimage scenario into the secSIM execution engine:
 | Role     | Module                           | Purpose in the scenario                                  |
 | -------- | -------------------------------- | -------------------------------------------------------- |
 | Attack   | MAG (Montimage Attack Generator) | Sends HTTP attack traffic at the target                  |
-| Target   | Simulated HTTP server            | Victim workload; the only thing MAG is allowed to reach  |
+| Target   | CI-SIM (CI HTTP simulation)      | Victim workload; the only thing MAG is allowed to reach  |
 | Monitor  | MMT-Probe                        | DPI on the target's traffic, emits alerts/reports        |
 | Reaction | AI4SOAR                          | Receives alerts, runs a playbook, applies a K8s response |
 
@@ -719,6 +720,219 @@ while the seeded ref is `registry.montimage.eu/montimage-mti/ci-sim:v1.0.0`.
 Deployment on :8080); the e2e workflow watches `sim/**`. Covered by
 `services.seed.test.ts` and the mongo-gated `seed.integration.test.ts`.
 
+#### Task 5.2: Make MAG a long-running, terminal-accessible attack module
+
+**Description**: Replace MAG's `kind:'Job'` with `kind:'Deployment'` and set
+`uiType:'terminal'` so the attack machine stays up and the user drives it from
+a shell — no trigger API needed. The pod idles between attacks: add an
+optional `command` field to `IDeploymentSpec` (the spec carries `args` only)
+that overrides the packaged entrypoint with a sleep loop. The user then runs
+attacks with `kubectl exec -it deploy/mag -n <exec-ns> -- mag <attack>
+--target-ip ci-sim --target-port 8080`; surface that command in the execution
+view for terminal-typed services (a copyable hint beside the
+`uiType:'terminal'` badge) and in the runbook, so "access MAG" is one paste
+away. Keep `startOrder: 30` so the module still rolls out last.
+
+**Acceptance Criteria**:
+
+- [x] The MAG pod runs as a long-lived Deployment and stays `Ready` between attacks
+- [x] `kubectl exec` into the MAG pod runs `mag <attack> --target-ip ci-sim --target-port 8080` repeatedly
+- [x] The execution view shows the copyable exec command for terminal services
+- [x] Attack output lands in the MAG container logs over SSE
+
+**Dependencies**: 5.1 (target contract)
+**Effort**: M
+**Verify**: exec into the MAG pod on a deployed scenario, run two attacks, see both in logs
+
+**Result** (recorded 2026-09-14, PR #240): `IDeploymentSpec.command` landed
+(`server/src/models/Service.ts`) as the Kubernetes `command` (ENTRYPOINT)
+override, ahead of `args`; MAG's seed deploys as a `Deployment` idling on
+`['sh', '-c', 'while true; do sleep 3600; done']` with `uiType: 'terminal'`.
+The execution view renders a copyable
+`kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag <attack> … | tee
+/proc/1/fd/1'` hint for terminal services — the `tee` wrapper lands exec
+output in the MAG container log, which is what the SSE stream ships. For an
+execution carrying a terminal-typed workload the stream now stays open after
+deploy settle (`end` still marks the settle point) so shell-driven output,
+probe alerts and reaction events keep flowing until disconnect or teardown.
+
+#### Task 5.3: Auto-wire scenario components from roles
+
+**Description**: In the topology editor, generate the typed edges from
+`deployment.role` via an explicit "Auto-wire" action: every `attack` → each
+`target` (`attacks`), each `monitor` → each `target` (`monitors`), each
+`monitor` → each `reaction` (`notifies`), each `reaction` → each `target`
+(`acts-on`); then lay the graph out (attack and monitor left of the target,
+reaction right) and sync the YAML view. Do not duplicate edges the user
+already drew; surface what was added.
+
+**Acceptance Criteria**:
+
+- [x] Dropping `CI-SIM` + `MMT-PROBE` + `MAG` + `AI4SOAR` produces the four-edge wired graph with no manual edge drawing
+- [x] The generated edges round-trip through the YAML editor
+- [x] Existing edge validation still rejects incompatible connections
+
+**Dependencies**: None (client-only; uses the `deployment.role` already on the services)
+**Effort**: M
+**Verify**: `npm run typecheck && npm run lint`; UI walkthrough of beats 2–4
+
+**Result** (recorded 2026-09-14, PR #241): `planAutoWire()` — a pure planner
+in `client/src/lib/topology-roles.ts` — generates the four role-derived typed
+edges, skipping any ordered pair the user already wired, plus the role-column
+layout. `TopologyCanvas` gained an **Auto-wire** toolbar action that applies
+the plan in one combined nodes+edges update (new `onTopologyChange` channel)
+so the YAML view regenerates from both final arrays in a single pass, and a
+toast lists exactly what was added. Covered by `topology-roles.test.ts` and
+`TopologyCanvas.test.tsx`; the action is documented in `docs/COMPONENTS.md`.
+
+#### Task 5.4: Surface MMT-Probe's native security alerts on the dashboard
+
+**Description**: Use the alerts MMT-Probe emits natively (mmt-security).
+`security.output-channel` takes a **set** of channels — `{file, kafka, redis,
+mongodb, socket, stdout}` — each gated by its own `*-output.enable`, and
+`output.format` is `CSV` or `JSON`. Wire the seeded config to
+`output.format = "JSON"` and `security.output-channel = {kafka, stdout,
+file}`: `kafka` feeds AI4SOAR (unchanged ingest path), `stdout` puts each
+alert on the container log the SSE stream already ships, and `file` keeps
+the CSV archive in the `mmt-reports` emptyDir for forensics. This also fixes
+the seeded `output-channel = "kafka"` — a scalar where libconfig expects a
+set — plus the missing `kafka-output.enable`/host/port. Server side, tag
+probe stdout security-report lines as a new `alert` SSE event type so the
+execution view lists each detection — timestamp, verdict, attacker address —
+for both attacks.
+
+**Acceptance Criteria**:
+
+- [x] `security.output-channel = {kafka, stdout, file}` with the matching output blocks enabled
+- [x] Attack #1 and attack #2 each produce an alert entry in the execution view
+- [x] Alert entries carry the attacker source address (needed by 5.5)
+- [x] `docs/API.md` documents the alert event if a new SSE type is added
+
+**Dependencies**: 5.1
+**Effort**: M
+**Verify**: `npm test -- scenarioSSE` plus a live or stubbed run
+
+**Result** (recorded 2026-09-14, PR #240): the seeded `mmt-probe.conf` emits
+JSON security reports on `{kafka, stdout, file}` with the matching output
+blocks enabled (`server/src/seed/services.seed.ts`). `scenarioSSE.ts`'s
+`parseSecurityAlert` distils a probe stdout report into a typed `alert` SSE
+event — `{service, pod, container, timestamp, verdict, attacker, line}` where
+`attacker` is the report's `ip.src` — emitted alongside the line's normal
+`log` event so every alert is also in the raw log stream. The execution
+view's **Security alerts** pane lists each detection; `docs/API.md` and
+`docs/integration/kubernetes-execution.md` document the event.
+
+#### Task 5.5: AI4SOAR playbook — block the attacker address on CI-SIM
+
+**Description**: Update the `ai4soar-playbook` ConfigMap/seeded playbook: on
+alert, parse the source address from the MMT security report and `POST` it to
+the `acts-on` target's `/admin/block`. Confirm the MMT alert carries `ip.src`
+(record in the playbook). Keep the delivered NetworkPolicy playbook as a
+variant for a hard network cut.
+
+**Acceptance Criteria**:
+
+- [x] After attack #1, `GET ci-sim:8080/admin/blocks` contains the MAG pod address
+- [x] Attack #2 from MAG is answered 403 while the server keeps serving other clients
+- [x] The reaction lands as a namespace event in the execution view
+
+**Dependencies**: 5.1, 5.4
+**Effort**: M
+**Verify**: block endpoint populated after a triggered alert; target still healthy
+
+**Result** (recorded 2026-09-14, PR #240): the `ai4soar-config` ConfigMap
+seeds `/opt/ai4soar/playbooks/block-attacker.yaml` — on each MMT security
+alert it parses `ip.src` (the #234 JSON report field) and POSTs it to the
+acts-on target's `http://ci-sim:8080/admin/block`. The block is
+application-level, so attack traffic stays observable by MMT-Probe and the
+second attack still raises an alert; the blocklist entry survives CI-SIM's
+crash restart. The earlier hard cut remains available as the
+`networkpolicy-hard-cut` playbook variant; the reaction still lands as a
+namespace event and the Role still grants `pods` delete, `deployments`
+patch/scale and `networkpolicies` create.
+
+#### Task 5.6: Re-seed the demo scenario for the R1 flow
+
+**Description**: Update `server/src/seed/demo.seed.ts`: swap `HTTP-SIM` for
+`CI-SIM`, retitle the scenario, keep the four nodes and four typed edges, and
+carry the default attack profiles — #1 stops the server, #2 is already
+blocked — in the MAG node's `config`.
+
+**Acceptance Criteria**:
+
+- [x] `npm run seed` produces the R1 demo scenario
+- [x] The scenario topology matches the revised runtime topology in the playbook
+
+**Dependencies**: 5.1, 5.2, 5.3
+**Effort**: S
+**Verify**: `npm run seed` then `curl /api/scenarios?search=AI4SOAR`
+
+**Result** (recorded 2026-09-14, PR #242): the demo seeds as "CI attack →
+MMT detection → AI4SOAR block" under the `MONTIMAGE-DEMO` project with the
+nodes `mag`, `ci-sim` (+ `mmt-probe` sidecar) and `ai4soar` wired by the four
+typed edges of the wiring table. The MAG node's `config.profiles` carries the
+two runbook profiles — `attack-1-stop-the-server` and
+`attack-2-already-blocked` — as data (validation preserves the key; the
+deploy merge only reads `config.args`/`config.env`). Re-seeding retitles a
+seed-managed P4 scenario ("HTTP attack → MMT detection → AI4SOAR response")
+in place instead of leaving a stale duplicate, and the e2e stub mapping
+follows the seeded target.
+
+#### Task 5.7: Extend the kind e2e to the two-attack script
+
+**Description**: Extend `scripts/e2e-kind/stub/stub.py` with per-role
+behaviours (ci-sim mode: health, blocklist, crash-on-attack; mag mode: an
+exec-able shell so `kubectl exec` can run the attack) and drive the R1 script
+in `run-e2e.js`: deploy → `kubectl exec` attack #1 → assert the alert, the
+target down and recovered, and the blocklist entry → `kubectl exec` attack #2
+→ assert the second alert and a still-healthy target → teardown leaves
+nothing.
+
+**Acceptance Criteria**:
+
+- [x] The e2e asserts both attack beats end-to-end on kind
+- [x] Teardown still leaves no resources
+
+**Dependencies**: 5.1, 5.2, 5.5, 5.6
+**Effort**: L
+**Verify**: the kind e2e CI job is green
+
+**Result** (recorded 2026-09-14, PR #243): `run-e2e.js` drives the full R1
+script against the seeded demo — MAG Deployment rollout, an exec-driven first
+attack (`mag http-flood --target-ip ci-sim --target-port 8080` with the `tee`
+wrapper), a probe alert carrying `ip.src`, CI-SIM's "service stopped" →
+container restart → Ready again, the MAG pod address landing in
+`ci-sim:8080/admin/blocks` (read over localhost inside the target container),
+then exec-driven attack #2 (`MAG_REQUEST_COUNT=25 mag http-flood …` — over
+the probe's alert threshold, under CI-SIM's stop threshold) answered 403 with
+a second alert and a still-healthy target, and a clean teardown. `stub.py`
+serves the per-role modes and `docs/WORKFLOWS.md` describes the asserted
+beats. The `e2e-kind` CI job is green.
+
+#### Task 5.8: Update docs for the R1 flow
+
+**Description**: Update the playbook (results sections), `docs/API.md` for
+any new endpoints (blocklist proxy if the server exposes one, alert SSE
+type), and `docs/integration/kubernetes-execution.md` for the interactive MAG
+module.
+
+**Acceptance Criteria**:
+
+- [x] The R1 demo script is reproducible from the docs alone
+
+**Dependencies**: 5.7
+**Effort**: S
+**Verify**: docs CI workflow passes
+
+**Result** (recorded 2026-09-14): this pass — the P5 task entries and M5
+milestone below, the dependency table rows and critical path, and the
+two-attack [Run it yourself](#run-it-yourself) script in this playbook;
+the `command` field row and the `alert` SSE type in `docs/API.md` (no
+blocklist proxy exists server-side — `/admin/block` is CI-SIM's own
+in-cluster API, called by AI4SOAR's playbook); and the R1 demo pod names in
+the SSE examples of `docs/integration/kubernetes-execution.md`, whose
+interactive-MAG sections were written alongside #233.
+
 ## Milestones
 
 | ID  | Phase | Exit condition                                                                       | Verify with                         |
@@ -729,6 +943,7 @@ Deployment on :8080); the e2e workflow watches `sim/**`. Covered by
 | M2  | P2    | per-container status/logs, Job completion, events streamed                           | `npm test -- scenarioSSE`           |
 | M3  | P3    | scenario buildable and runnable from the UI                                          | `npm run typecheck && npm run lint` |
 | M4  | P4    | kind E2E green: alert, NetworkPolicy, Job complete, clean teardown                   | CI                                  |
+| M5  | P5    | two-attack R1 flow proven — exec MAG, `alert` SSE, CI-SIM blocklist; e2e green       | CI                                  |
 
 ## Dependency table
 
@@ -759,8 +974,17 @@ Deployment on :8080); the e2e workflow watches `sim/**`. Covered by
 | 4.2   | 1.6, 2.1           | 4.3                | 10   |
 | 4.3   | 4.1, 4.2           | 4.4                | 11   |
 | 4.4   | 4.3                | —                  | 12   |
+| 5.1   | —                  | 5.2, 5.4–5.7       | 13   |
+| 5.2   | 5.1                | 5.6, 5.7           | 14   |
+| 5.3   | —                  | 5.6                | 13   |
+| 5.4   | 5.1                | 5.5, 5.7           | 14   |
+| 5.5   | 5.1, 5.4           | 5.7                | 15   |
+| 5.6   | 5.1, 5.2, 5.3      | 5.7                | 15   |
+| 5.7   | 5.1, 5.2, 5.5, 5.6 | 5.8                | 16   |
+| 5.8   | 5.7                | —                  | 17   |
 
 **Critical path:** Pre.1 → Pre.2 → 0.3 → 0.4 → 1.1 → 1.3 → 1.5 → 1.6 → 2.1 → 4.2 → 4.3 → 4.4
+**P5 tail:** 5.1 → 5.2 → 5.6 → 5.7 → 5.8 (5.4 → 5.5 joins at 5.7)
 
 ## Risks
 
@@ -795,20 +1019,59 @@ install.
    `startOrder` tiers and holds the MAG Deployment until the target pod (with
    its MMT-Probe sidecar) and AI4SOAR report `Ready` inside the readiness
    gate. MAG comes up idling — its pod entrypoint is the seeded sleep loop.
-5. **Launch an attack** — the MAG service row shows a copyable exec hint
-   (issue #233):
-   `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'`.
-   Re-run it as often as needed — the Deployment stays up between attacks,
-   and the `tee /proc/1/fd/1` wrapper puts each run's output into the MAG
-   pod's container log so it also streams into the console.
-6. **Watch the Execution tab**: `progress` events drive the bar,
+5. **Run attack #1 — stop the service.** The MAG service row shows a
+   copyable exec hint (issue #233); the seeded `attack-1-stop-the-server`
+   profile (the MAG node's `config.profiles`, issue #236) runs:
+
+   ```bash
+   kubectl exec -it deploy/mag -n <exec-ns> -- \
+     sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'
+   ```
+
+   The `tee /proc/1/fd/1` wrapper puts the run's output into the MAG pod's
+   container log so it also streams into the console, and the Deployment
+   stays up between attacks. Watch the R1 beats land in the Execution tab:
+   an `alert` event in the **Security alerts** pane (verdict +
+   `src=<ip.src>` attacker address, issue #234); CI-SIM logging
+   `service stopped` as the flood crosses its rate threshold, then its
+   container restarting (the `mmt-probe` sidecar holds the pod's network
+   namespace); and the AI4SOAR reaction landing in the **Namespace events**
+   pane — the playbook POSTs the attacker address to
+   `ci-sim:8080/admin/block` (issue #235).
+
+6. **Confirm the block.** Read the blocklist from inside the target
+   container — a request sourced from the MAG pod would itself be answered
+   403 once the entry lands:
+
+   ```bash
+   kubectl exec -n <exec-ns> deploy/ci-sim -c ci-sim -- \
+     python3 -c "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8080/admin/blocks').read().decode())"
+   ```
+
+   The MAG pod's address is in the list.
+
+7. **Run attack #2 — already blocked.** Re-run the profile (the seeded
+   `attack-2-already-blocked` entry is the same command), capped so the
+   second run still trips the probe without pushing CI-SIM over its stop
+   threshold — `--count 25` on the real `mag` CLI, `MAG_REQUEST_COUNT=25`
+   under the e2e stub:
+
+   ```bash
+   kubectl exec -it deploy/mag -n <exec-ns> -- \
+     sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 --count 25 2>&1 | tee /proc/1/fd/1'
+   ```
+
+   CI-SIM answers the attack with 403 while other sources keep being
+   served, a second alert lands in the **Security alerts** pane, and the
+   target stays healthy.
+
+8. **Watch the Execution tab** throughout: `progress` events drive the bar,
    per-container log tabs keep MMT-Probe output and ci-sim access logs
    separate, the **Security alerts** pane lists each detection the probe
-   reports (verdict + `src=<ip.src>` attacker address, issue #234), and the
-   **Namespace events** pane shows the AI4SOAR reaction landing. The event
-   stream stays open after deploy settle so the exec-driven attack and the
-   reaction keep flowing into the console.
-7. **Tear down** — **Tear Down** in the UI or
+   reports, and the **Namespace events** pane shows the AI4SOAR reaction
+   landing. The event stream stays open after deploy settle so the
+   exec-driven attacks and the reaction keep flowing into the console.
+9. **Tear down** — **Tear Down** in the UI or
    `DELETE /api/scenarios/:id/executions/:executionId`; deleting the
    `secsim-<scenario>-<execution>` namespace removes every resource the
    engine created.
