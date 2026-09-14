@@ -39,12 +39,12 @@ what the engine (`kubernetesDeploy.ts`) lacked when the plan was written:
 
 ```
 namespace secsim-<scenario>-<exec>
-├── Deployment target-http           (2 containers, shared netns)
-│   ├── http-sim   : registry.montimage.eu/montimage-mti/http-sim:v1.0.0   :8080
+├── Deployment target-ci             (2 containers, shared netns)
+│   ├── ci-sim     : registry.montimage.eu/montimage-mti/ci-sim:v1.0.0    :8080
 │   └── mmt-probe  : registry.montimage.eu/montimage-mti/mmt-probe:v1.0.0  caps NET_ADMIN,NET_RAW
 │       ├── ConfigMap  mmt-probe-config  (mmt-probe.conf: iface=eth0, security output → kafka)
 │       └── emptyDir   mmt-reports
-├── Service   target-http  (NodePort → 8080)        ← dashboardUrl
+├── Service   target-ci    (NodePort → 8080)        ← dashboardUrl
 ├── Deployment ai4soar                                :5000 (API/UI; Shuffle stack — see Pre.2)
 │   ├── ServiceAccount ai4soar + Role/RoleBinding (namespace-scoped)
 │   └── ConfigMap ai4soar-config (block-attacker.yaml playbook — issue #235)
@@ -56,10 +56,10 @@ Wiring resolved from topology edges:
 
 | Edge (source → target) | Engine effect                                                                                                                                                  |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| MAG → http-sim         | attack target for exec-driven runs: `kubectl exec -it deploy/mag -- sh -c 'mag <attack> --target-ip <svc> --target-port 8080 2>&1 \| tee /proc/1/fd/1'` (#233) |
-| MMT-Probe → http-sim   | MMT-Probe injected as a **sidecar** in the target pod (no hostNetwork)                                                                                         |
+| MAG → ci-sim           | attack target for exec-driven runs: `kubectl exec -it deploy/mag -- sh -c 'mag <attack> --target-ip <svc> --target-port 8080 2>&1 \| tee /proc/1/fd/1'` (#233) |
+| MMT-Probe → ci-sim     | MMT-Probe injected as a **sidecar** in the target pod (no hostNetwork)                                                                                         |
 | MMT-Probe → AI4SOAR    | probe `security.output-channel={kafka,stdout,file}` (JSON reports, #234); AI4SOAR consumes the Kafka topic                                                     |
-| AI4SOAR → http-sim     | Role grants: `pods` delete, `deployments` patch/scale, `networkpolicies` create                                                                                |
+| AI4SOAR → ci-sim       | Role grants: `pods` delete, `deployments` patch/scale, `networkpolicies` create; the seeded playbook POSTs the attacker `ip.src` to `ci-sim:8080/admin/block`  |
 
 Sidecar over `hostNetwork` is the recommended choice: it captures exactly the
 target's traffic, needs no node-level privileges, and works on managed
@@ -779,9 +779,9 @@ install.
    [docs/AGENT_ENV.md](../AGENT_ENV.md)) and MongoDB reachable at
    `MONGODB_URI`: `npm run dev` from the repo root (API on `:3000`). The
    server auto-seeds on first boot; `npm run seed` re-seeds manually. Seeding
-   creates the four catalog services (`MAG`,
-   `HTTP-SIM`, `MMT-PROBE`, `AI4SOAR`) and the `MONTIMAGE-DEMO` project
-   holding the scenario "HTTP attack → MMT detection → AI4SOAR response".
+   creates the demo catalog services (`MAG`,
+   `CI-SIM`, `MMT-PROBE`, `AI4SOAR`) and the `MONTIMAGE-DEMO` project
+   holding the scenario "CI attack → MMT detection → AI4SOAR block".
 2. **Register a cluster** as an Infrastructure (or
    `POST /api/infrastructures`) with the cluster endpoint and a kubeconfig or
    bearer token as credentials — see
@@ -797,12 +797,12 @@ install.
    gate. MAG comes up idling — its pod entrypoint is the seeded sleep loop.
 5. **Launch an attack** — the MAG service row shows a copyable exec hint
    (issue #233):
-   `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag http-flood --target-ip http-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'`.
+   `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'`.
    Re-run it as often as needed — the Deployment stays up between attacks,
    and the `tee /proc/1/fd/1` wrapper puts each run's output into the MAG
    pod's container log so it also streams into the console.
 6. **Watch the Execution tab**: `progress` events drive the bar,
-   per-container log tabs keep MMT-Probe output and http-sim access logs
+   per-container log tabs keep MMT-Probe output and ci-sim access logs
    separate, the **Security alerts** pane lists each detection the probe
    reports (verdict + `src=<ip.src>` attacker address, issue #234), and the
    **Namespace events** pane shows the AI4SOAR reaction landing. The event

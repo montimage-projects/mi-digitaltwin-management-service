@@ -1,36 +1,43 @@
 /**
- * Demo project + scenario seed — task 4.1 of the Montimage
+ * Demo project + scenario seed — tasks 4.1 and 5.6 of the Montimage
  * attack→detect→respond plan
  * (docs/playbooks/montimage-attack-detect-respond-plan.md).
  *
- * Seeds a ready-to-run demo so a fresh install can execute the scenario
- * end-to-end: a "Montimage Demo" project holding the scenario
- * "HTTP attack → MMT detection → AI4SOAR response" whose topology wires the
- * four catalog modules (issue #186, task 0.1) exactly as the playbook's
- * target runtime topology wiring table prescribes:
+ * Seeds a ready-to-run demo so a fresh install can execute the R1 two-attack
+ * flow end-to-end: a "Montimage Demo" project holding the scenario
+ * "CI attack → MMT detection → AI4SOAR block" whose topology wires the
+ * four catalog modules (issue #186, task 0.1; CI-SIM from issue #231)
+ * exactly as the playbook's revised runtime topology wiring table
+ * prescribes:
  *
- *   MAG       --attacks-->  HTTP-SIM   (attack target → exec-driven attack)
- *   MMT-PROBE --monitors--> HTTP-SIM   (probe injected as target-pod sidecar)
+ *   MAG       --attacks-->  CI-SIM     (attack target → exec-driven attack)
+ *   MMT-PROBE --monitors--> CI-SIM     (probe injected as target-pod sidecar)
  *   MMT-PROBE --notifies--> AI4SOAR    (probe security output → SOAR ingest)
- *   AI4SOAR   --acts-on-->  HTTP-SIM   (namespace-scoped playbook response)
+ *   AI4SOAR   --acts-on-->  CI-SIM     (playbook POSTs /admin/block — #235)
  *
  * Node ids double as the Kubernetes resource names the engine derives
- * (`toResourceName`), so `http-sim` is also the cluster DNS name MAG attacks
- * point at. The edge kind is persisted the way the canvas writes it (task
- * 3.2): `data.edgeType` plus the edge `label`; the deploy engine also accepts
- * `data.type`/`type`.
+ * (`toResourceName`), so `ci-sim` is also the cluster DNS name MAG attacks
+ * point at and the AI4SOAR playbook POSTs to
+ * (`http://ci-sim:8080/admin/block`). The edge kind is persisted the way the
+ * canvas writes it (task 3.2): `data.edgeType` plus the edge `label`; the
+ * deploy engine also accepts `data.type`/`type`.
  */
 
 import { Project } from '../models/Project.js';
-import { Scenario } from '../models/Scenario.js';
+import { Scenario, type INodeConfig } from '../models/Scenario.js';
 import { Service } from '../models/Service.js';
 import { upsertRecord } from './sync-helpers.js';
 
 const DEMO_PROJECT_SHORTNAME = 'MONTIMAGE-DEMO';
-const DEMO_SCENARIO_TITLE = 'HTTP attack → MMT detection → AI4SOAR response';
+const DEMO_SCENARIO_TITLE = 'CI attack → MMT detection → AI4SOAR block';
+// The P4 title the demo shipped under before the R1 re-seed (issue #236):
+// re-running `npm run seed` on an existing install renames the seed-managed
+// record in place instead of leaving a stale duplicate next to the R1
+// scenario.
+const LEGACY_SCENARIO_TITLE = 'HTTP attack → MMT detection → AI4SOAR response';
 
 type ScenarioRole = 'attack' | 'target' | 'monitor' | 'reaction';
-type DemoNodeId = 'mag' | 'http-sim' | 'mmt-probe' | 'ai4soar';
+type DemoNodeId = 'mag' | 'ci-sim' | 'mmt-probe' | 'ai4soar';
 
 interface DemoNodeSpec {
   /** Topology node id — also the derived Kubernetes resource name. */
@@ -40,6 +47,8 @@ interface DemoNodeSpec {
   role: ScenarioRole;
   attachMode?: 'sidecar';
   position: { x: number; y: number };
+  /** `node.data.config` payload — preserved verbatim on save (task 0.4). */
+  config?: INodeConfig;
 }
 
 /**
@@ -48,14 +57,22 @@ interface DemoNodeSpec {
  * the `sidecar` probe onto its `monitors`-edge host at display time, so the
  * stored position is only a fallback.
  *
- * MAG carries no `config.args` — since issue #233 it is a long-running
- * `Deployment` with an idle shell, and each attack is launched ad hoc via
- * `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag <attack>
- * --target-ip http-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'`, which
- * keeps repeated runs possible without redeploying and lands the attack
- * output in the MAG pod's container log (exec output alone only reaches the
- * exec channel). The `mag → http-sim` attack edge still resolves the target
- * Service's cluster DNS name per the wiring table.
+ * MAG is a long-running `Deployment` with an idle shell (issue #233) — each
+ * attack is launched ad hoc via `kubectl exec -it deploy/mag -n <exec-ns> --
+ * sh -c 'mag <attack> --target-ip ci-sim --target-port 8080 2>&1 | tee
+ * /proc/1/fd/1'`, which keeps repeated runs possible without redeploying and
+ * lands the attack output in the MAG pod's container log (exec output alone
+ * only reaches the exec channel). Its `config.profiles` carries the R1
+ * two-attack script's default profiles as runbook data (issue #236):
+ * scenario validation preserves the key untouched and the deploy merge only
+ * reads `config.args`/`config.env`, so the profiles never alter the pod
+ * spec. Attack #1's sustained `http-flood` pushes CI-SIM over its rate
+ * threshold (`CI_SIM_RATE_LIMIT`/`CI_SIM_RATE_WINDOW_S`, default 50 req/10
+ * s) so the target logs "service stopped" and exits before the Deployment
+ * restarts it; attack #2 re-runs the same profile after AI4SOAR's
+ * `/admin/block`, so CI-SIM answers 403 while the probe still alerts. The
+ * `mag → ci-sim` attack edge resolves the target Service's cluster DNS name
+ * per the wiring table.
  */
 const demoNodes: DemoNodeSpec[] = [
   {
@@ -63,10 +80,26 @@ const demoNodes: DemoNodeSpec[] = [
     serviceShortName: 'MAG',
     role: 'attack',
     position: { x: 40, y: 160 },
+    config: {
+      profiles: [
+        {
+          name: 'attack-1-stop-the-server',
+          description:
+            'Attack #1 — sustained `mag http-flood` at ci-sim:8080 pushes the target over its rate threshold; CI-SIM logs "service stopped" and exits, then the Deployment restarts it.',
+          args: ['mag', 'http-flood', '--target-ip', 'ci-sim', '--target-port', '8080'],
+        },
+        {
+          name: 'attack-2-already-blocked',
+          description:
+            'Attack #2 — the same profile re-run after AI4SOAR POSTs the MAG pod address to ci-sim:8080/admin/block; CI-SIM answers 403 while the MMT-Probe sidecar still raises the alert.',
+          args: ['mag', 'http-flood', '--target-ip', 'ci-sim', '--target-port', '8080'],
+        },
+      ],
+    },
   },
   {
-    id: 'http-sim',
-    serviceShortName: 'HTTP-SIM',
+    id: 'ci-sim',
+    serviceShortName: 'CI-SIM',
     role: 'target',
     position: { x: 320, y: 160 },
   },
@@ -87,11 +120,11 @@ const demoNodes: DemoNodeSpec[] = [
 
 /** The four typed edges of the wiring table (task 3.2 spellings). */
 const demoEdges: { id: string; source: DemoNodeId; target: DemoNodeId; edgeType: string }[] = [
-  { id: 'edge-mag-attacks-http-sim', source: 'mag', target: 'http-sim', edgeType: 'attacks' },
+  { id: 'edge-mag-attacks-ci-sim', source: 'mag', target: 'ci-sim', edgeType: 'attacks' },
   {
-    id: 'edge-mmt-probe-monitors-http-sim',
+    id: 'edge-mmt-probe-monitors-ci-sim',
     source: 'mmt-probe',
-    target: 'http-sim',
+    target: 'ci-sim',
     edgeType: 'monitors',
   },
   {
@@ -101,9 +134,9 @@ const demoEdges: { id: string; source: DemoNodeId; target: DemoNodeId; edgeType:
     edgeType: 'notifies',
   },
   {
-    id: 'edge-ai4soar-acts-on-http-sim',
+    id: 'edge-ai4soar-acts-on-ci-sim',
     source: 'ai4soar',
-    target: 'http-sim',
+    target: 'ci-sim',
     edgeType: 'acts-on',
   },
 ];
@@ -183,7 +216,7 @@ export const seedDemoScenario = async (): Promise<void> => {
       leader: 'MI',
       involvedPartners: ['MI'],
       description:
-        'Ready-to-run demo project holding the "HTTP attack → MMT detection → AI4SOAR response" scenario from docs/playbooks/montimage-attack-detect-respond-plan.md. Assign an Infrastructure to the scenario and execute it: MAG deploys as an interactive terminal workload — run attacks with `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c \'mag <attack> --target-ip http-sim --target-port 8080 2>&1 | tee /proc/1/fd/1\'` — while MMT-Probe raises alerts the console surfaces and AI4SOAR blocks the reported attacker through CI-SIM.',
+        'Ready-to-run demo project holding the "CI attack → MMT detection → AI4SOAR block" scenario from docs/playbooks/montimage-attack-detect-respond-plan.md. Assign an Infrastructure to the scenario and execute it: MAG deploys as an interactive terminal workload — run the seeded attack profiles with `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c \'mag http-flood --target-ip ci-sim --target-port 8080 2>&1 | tee /proc/1/fd/1\'` — while MMT-Probe raises alerts the console surfaces and AI4SOAR blocks the reported attacker through CI-SIM /admin/block.',
       isComposite: false,
     }
   );
@@ -219,6 +252,7 @@ export const seedDemoScenario = async (): Promise<void> => {
         repositoryTable: 'INTACT_TOOLBOX',
         role: spec.role,
         ...(spec.attachMode && { attachMode: spec.attachMode }),
+        ...(spec.config && { config: spec.config }),
       },
     };
   });
@@ -244,12 +278,25 @@ export const seedDemoScenario = async (): Promise<void> => {
     new Map(demoNodes.map((n) => [n.id, n.position]))
   );
 
+  // Retitle the seed-managed P4 record in place (issue #236): the upsert
+  // below keys on the R1 title, so without the rename an existing install
+  // would keep a stale "HTTP attack → …" scenario next to the re-seeded one.
+  // Records an operator created by hand (`seedManaged: false`) are never
+  // touched — the same guard `deprecateStale` applies.
+  const retitled = await Scenario.updateMany(
+    { projectId: project._id, title: LEGACY_SCENARIO_TITLE, seedManaged: { $ne: false } },
+    { $set: { title: DEMO_SCENARIO_TITLE } }
+  );
+  if (retitled.modifiedCount > 0) {
+    console.info(`  Retitled scenario: ${LEGACY_SCENARIO_TITLE} → ${DEMO_SCENARIO_TITLE}`);
+  }
+
   const action = await upsertRecord(
     Scenario,
     { projectId: project._id, title: DEMO_SCENARIO_TITLE },
     {
       description:
-        "Montimage attack → detect → respond demo: MAG deploys as a long-running terminal Deployment — drive attacks with `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag <attack> --target-ip http-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'` (the tee lands the output in the MAG container log the SSE stream ships) — the MMT-Probe sidecar in the target pod inspects the traffic and reports JSON alerts (Kafka, stdout, file) to AI4SOAR, whose playbook blocks the reported `ip.src` through CI-SIM /admin/block and keeps the NetworkPolicy hard-cut as a variant. Wiring follows the target runtime topology of docs/playbooks/montimage-attack-detect-respond-plan.md.",
+        "Montimage attack → detect → respond demo (R1): MAG deploys as a long-running terminal Deployment carrying the two default attack profiles in its node `config.profiles` — drive them with `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'` (the tee lands the output in the MAG container log the SSE stream ships). Attack #1 stops the CI-SIM server (rate over its threshold → 'service stopped' → restart); attack #2 re-runs after AI4SOAR's playbook POSTs the reported `ip.src` to ci-sim:8080/admin/block, so it is answered 403 while the MMT-Probe sidecar still reports JSON alerts (Kafka, stdout, file). Wiring follows the revised runtime topology of docs/playbooks/montimage-attack-detect-respond-plan.md.",
       topology: { yaml, nodes, edges },
     }
   );
