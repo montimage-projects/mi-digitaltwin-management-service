@@ -62,7 +62,9 @@ def source_ip(handler):
     a `kubectl port-forward`."""
     forwarded = handler.headers.get('X-Forwarded-For')
     if forwarded:
-        return forwarded.split(',')[0].strip()
+        first = forwarded.split(',')[0].strip()
+        if first:
+            return first
     return handler.client_address[0]
 
 
@@ -80,7 +82,10 @@ class CISimHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _body_json(self):
-        length = int(self.headers.get('Content-Length') or 0)
+        try:
+            length = int(self.headers.get('Content-Length') or 0)
+        except ValueError:
+            return None
         if length <= 0:
             return None
         try:
