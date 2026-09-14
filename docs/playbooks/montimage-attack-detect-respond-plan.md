@@ -662,6 +662,50 @@ PodSecurity namespace label, ordered rollout and namespace events; the
 [Run it yourself](#run-it-yourself) section below records the final run
 steps.
 
+## Phase P5 — Demo revision
+
+**Goal:** the interactive two-attack R1 flow — an operator can block the
+attacker on the target and watch the stopped service come back · **Milestone
+M5:** the CI-SIM target is seeded and deployable, the extended scenario runs
+both attack rounds, and the kind e2e proves the flow
+
+### Sprint P5 — Demo revision
+
+#### Task 5.1: Build the CI-SIM simulation image and seed it
+
+**Description**: Build `CI-SIM`, a small critical-infrastructure HTTP
+simulation in `sim/ci-sim/`: `GET /` health (200) plus a service API surface
+(`/api/status`, `/api/metrics`); `POST /admin/block {"address": "<ip>"}` adds
+a source to a blocklist answered with 403 while other sources keep being
+served; `POST /admin/unblock` removes an entry; `GET /admin/blocks` lists
+them. A sustained request rate from one source over the threshold
+(`CI_SIM_RATE_LIMIT` per `CI_SIM_RATE_WINDOW_S`, default 50 req/10 s) makes
+the process log `service stopped` and exit, so the Deployment's
+`restartPolicy: Always` brings it back (the sidecar holds the pod netns).
+Seed it under `OTHER_SERVICES` (it appears under "Add Target"), category
+`target`, `deployment.role: 'target'`, `kind: 'Deployment'`,
+`containerPort: 8080`, `exposePort: true`, `readinessPath: '/'`. Publish to
+`registry.montimage.eu` or make it `kind load`-able for the e2e — the
+`sim/ci-sim/Dockerfile` builds locally
+(`docker build -t ci-sim:local sim/ci-sim && kind load docker-image ci-sim:local`)
+while the seeded ref is `registry.montimage.eu/montimage-mti/ci-sim:v1.0.0`.
+
+**Acceptance Criteria**:
+
+- [x] `CI-SIM` serves on :8080 and returns 403 only to blocklisted sources
+- [x] The demo attack stops the process and Kubernetes restarts it
+- [x] `GET /api/services` returns `CI-SIM` with a validated `deployment` spec
+
+**Dependencies**: None
+**Effort**: M
+**Verify**: `docker run` locally: block/unblock round-trip and attack→stop→restart
+
+**Result** (recorded 2026-09-14): `sim/ci-sim/server.py` +
+`sim/ci-sim/Dockerfile` implement the contract above; the seed entry sits in
+`infrastructureServices` (`OTHER_SERVICES`, category `target`, role `target`
+Deployment on :8080); the e2e workflow watches `sim/**`. Covered by
+`services.seed.test.ts` and the mongo-gated `seed.integration.test.ts`.
+
 ## Milestones
 
 | ID  | Phase | Exit condition                                                                       | Verify with                         |
