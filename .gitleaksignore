@@ -1,0 +1,12 @@
+# False positives from the generic-secret rule — see the matching fixes on
+# this branch (auth= kwarg rename, gitleaks:allow comments). Entries remain
+# so the per-commit diff scan does not re-flag the original lines.
+ce6016d093543fe3f4c50bf0d6054f6891a72882:docs/playbooks/montimage-attack-detect-respond-plan.md:generic-secret:1154
+ce6016d093543fe3f4c50bf0d6054f6891a72882:docs/playbooks/montimage-attack-detect-respond-plan.md:generic-secret:1176
+ce6016d093543fe3f4c50bf0d6054f6891a72882:docs/playbooks/montimage-attack-detect-respond-plan.md:generic-secret:1179
+ce6016d093543fe3f4c50bf0d6054f6891a72882:docs/playbooks/montimage-attack-detect-respond-plan.md:generic-secret:1192
+ce6016d093543fe3f4c50bf0d6054f6891a72882:docs/playbooks/montimage-attack-detect-respond-plan.md:generic-secret:1195
+ce6016d093543fe3f4c50bf0d6054f6891a72882:docs/playbooks/montimage-attack-detect-respond-plan.md:generic-secret:1198
+c885ab6d3d35f9282c001d959999f0971517c41b:docker-compose.deploy.yml:generic-secret:11
+9b1a7d63d1cda9cca30e436cf67c515b9c490865:client/src/store/auth-store.ts:generic-secret:51
+b63293d70e0e3b65bbdac6012f1adc40c8dba87d:docker-compose.prod.yml:generic-secret:39

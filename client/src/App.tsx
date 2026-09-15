@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { Loader2 } from 'lucide-react';
@@ -64,128 +64,131 @@ function PageLoader() {
   );
 }
 
+// Data router (createBrowserRouter) is required for navigation-blocking APIs
+// such as useBlocker, used by the scenario editor's unsaved-changes guard.
+const router = createBrowserRouter([
+  { path: '/login', element: <Login /> },
+  {
+    element: (
+      <ProtectedRoute>
+        <MainLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      { path: '/', element: <Dashboard /> },
+      {
+        path: '/services',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Services />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/services/add',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <AddService />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/services/:id/edit',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <EditService />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/projects',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Projects />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/projects/add',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <AddProject />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/projects/:id',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <ProjectDetail />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/projects/:id/edit',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <EditProject />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/projects/:projectId/scenarios/add',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <AddScenario />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/scenarios/:id',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <ScenarioDetail />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/scenarios/:id/edit',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <EditScenario />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/infrastructure',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Infrastructure />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/analytics',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Analytics />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/settings',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Settings />
+          </Suspense>
+        ),
+      },
+      { path: '*', element: <NotFound /> },
+    ],
+  },
+]);
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            element={
-              <ProtectedRoute>
-                <MainLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/" element={<Dashboard />} />
-            <Route
-              path="/services"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <Services />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/services/add"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <AddService />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/services/:id/edit"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <EditService />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/projects"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <Projects />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/projects/add"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <AddProject />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/projects/:id"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <ProjectDetail />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/projects/:id/edit"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <EditProject />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/projects/:projectId/scenarios/add"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <AddScenario />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/scenarios/:id"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <ScenarioDetail />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/scenarios/:id/edit"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <EditScenario />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/infrastructure"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <Infrastructure />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/analytics"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <Analytics />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <Suspense fallback={<PageLoader />}>
-                  <Settings />
-                </Suspense>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <RouterProvider router={router} />
       <Toaster position="top-right" richColors />
     </QueryClientProvider>
   );

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { authApi } from '@/lib/api';
 import { LOGO_SRC, LOGO_ALT, LOGO_BACKDROP, ORG_NAME } from '@/lib/branding';
@@ -21,6 +21,7 @@ export function Login() {
   const { isAuthenticated, login } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -100,12 +101,22 @@ export function Login() {
               <div className="login-input-wrapper">
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="Enter your password"
                   disabled={isLoading}
-                  className="login-input"
+                  className="login-input login-input-password"
                   {...register('password', { required: 'Password is required' })}
                 />
+                <button
+                  type="button"
+                  className="login-password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  disabled={isLoading}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
               {errors.password && <p className="login-field-error">{errors.password.message}</p>}
             </div>
