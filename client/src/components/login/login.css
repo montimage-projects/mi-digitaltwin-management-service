@@ -426,7 +426,7 @@
 }
 
 .login-input-password {
-  padding-right: 3rem !important;
+  padding-right: 3.5rem !important;
 }
 
 /* Hide Edge/Chromium native password controls — the custom toggle below is the single reveal affordance */
@@ -443,8 +443,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem;
+  height: 2.75rem;
   padding: 0;
   background: transparent;
   border: none;
