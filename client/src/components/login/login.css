@@ -429,6 +429,12 @@
   padding-right: 3rem !important;
 }
 
+/* Hide Edge/Chromium native password controls — the custom toggle below is the single reveal affordance */
+.login-input-password::-ms-reveal, /* gitleaks:allow — 'password:' here is part of the class selector, not a credential */
+.login-input-password::-ms-clear {
+  display: none;
+}
+
 .login-password-toggle {
   position: absolute;
   right: 0.75rem;
