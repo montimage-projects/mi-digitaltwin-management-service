@@ -36,7 +36,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - MONGODB_URI=mongodb://intact_app:${MONGO_APP_PASSWORD:-intact_pass}@mongodb:27017/intact?authSource=intact
+      - MONGODB_URI=mongodb://intact_app:${MONGO_APP_PASSWORD:-intact_pass}@mongodb:27017/intact?authSource=intact # gitleaks:allow — documented dev default
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}

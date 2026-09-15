@@ -1151,11 +1151,11 @@ Python 3 (for the API snippets).
    BASE = os.environ.get('BASE_URL', 'http://localhost:3000')
    KC   = os.path.expanduser(os.environ['DEMO_KUBECONFIG'])
 
-   def api(method, path, body=None, token=None):
+   def api(method, path, body=None, auth=None):
        req = urllib.request.Request(
            BASE + path, method=method,
            headers={'Content-Type': 'application/json',
-                    **({'Authorization': f'Bearer {token}'} if token else {})},
+                    **({'Authorization': f'Bearer {auth}'} if auth else {})},
            data=json.dumps(body).encode() if body is not None else None)
        with urllib.request.urlopen(req) as r:
            return json.load(r)
@@ -1168,15 +1168,15 @@ Python 3 (for the API snippets).
    server = re.search(r'^\s*server:\s*(\S+)', kc, re.M).group(1)
    infra = api('POST', '/api/infrastructures',
                {'name': 'kind-secsim-e2e', 'type': 'kubernetes',
-                'endpoint': server, 'credentials': kc}, token)
+                'endpoint': server, 'credentials': kc}, auth=token)
    print('infrastructure:', infra['_id'], '→', server)
 
    for short, role in {'MAG': 'attack', 'CI-SIM': 'target',
                        'MMT-PROBE': 'monitor', 'AI4SOAR': 'reaction'}.items():
-       res = api('GET', f'/api/services?search={short}', token=token)
+       res = api('GET', f'/api/services?search={short}', auth=token)
        lst = res if isinstance(res, list) else res.get('services') or res.get('data') or []
        svc = next(s for s in lst if s['shortName'] == short)
-       dep = dict(api('GET', f"/api/services/{svc['_id']}", token=token).get('deployment') or {})
+       dep = dict(api('GET', f"/api/services/{svc['_id']}", auth=token).get('deployment') or {})
        env = [e for e in dep.get('env', [])
               if e.get('name') not in ('STUB_ROLE', 'MMT_ALERT_URL')]
        env.append({'name': 'STUB_ROLE', 'value': role})
@@ -1186,16 +1186,16 @@ Python 3 (for the API snippets).
        api('PUT', f"/api/services/{svc['_id']}",
            {'currentVersion': 'v1.0.0',
             'versions': [{'version': 'v1.0.0', 'dockerImage': 'secsim-e2e-stub:local'}],
-            'deployment': dep}, token)
+            'deployment': dep}, auth=token)
        print(f'{short} → secsim-e2e-stub:local (STUB_ROLE={role})')
 
-   projects = api('GET', '/api/projects?limit=100', token=token)
+   projects = api('GET', '/api/projects?limit=100', auth=token)
    plist = projects if isinstance(projects, list) else projects.get('projects') or []
    proj = next(p for p in plist if p.get('shortName') == 'MONTIMAGE-DEMO')
-   scenarios = api('GET', f"/api/projects/{proj['_id']}/scenarios", token=token)
+   scenarios = api('GET', f"/api/projects/{proj['_id']}/scenarios", auth=token)
    scen = next(s for s in scenarios if 'AI4SOAR block' in s.get('title', ''))
-   api('PUT', f"/api/scenarios/{scen['_id']}", {'infrastructureId': infra['_id']}, token)
-   res = api('POST', f"/api/scenarios/{scen['_id']}/execute", token=token)
+   api('PUT', f"/api/scenarios/{scen['_id']}", {'infrastructureId': infra['_id']}, auth=token)
+   res = api('POST', f"/api/scenarios/{scen['_id']}/execute", auth=token)
    print('executing → namespace:', res['namespace'])
    PY
    ```

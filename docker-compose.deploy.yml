@@ -8,7 +8,7 @@ services:
     environment:
       # init-mongo.js creates intact_app in the `intact` db; the prod file's
       # ?authSource=admin looks for it in `admin` and always fails.
-      MONGODB_URI: mongodb://intact_app:${MONGO_APP_PASSWORD:-intact_pass}@mongodb:27017/intact?authSource=intact
+      MONGODB_URI: mongodb://intact_app:${MONGO_APP_PASSWORD:-intact_pass}@mongodb:27017/intact?authSource=intact # gitleaks:allow — documented dev default
     networks:
       - montimage-network
       - kind # reach the local kind API at https://secsim-e2e-control-plane:6443

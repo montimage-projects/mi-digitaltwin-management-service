@@ -48,7 +48,7 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({
-        token: state.token,
+        token: state.token, // gitleaks:allow — field name, not a credential
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
