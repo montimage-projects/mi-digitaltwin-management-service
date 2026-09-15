@@ -1082,6 +1082,162 @@ install.
 > `ImagePullBackOff`. Provision a node-level pull credential, preload the
 > images (`kind load docker-image …`), or use the e2e stub path below.
 
+### Scripted end-to-end setup — one machine, kind + stub
+
+The numbered flow above assumes a running platform and a registered cluster.
+This variant provisions everything on a single machine with copyable
+snippets — the same path `scripts/e2e-kind/run-e2e.js` drives, executed by
+hand so each step can be shown live.
+
+**Prerequisites:** Docker, [kind](https://kind.sigs.k8s.io/), `kubectl`, and
+Python 3 (for the API snippets).
+
+1. **Create the cluster and load the stub image.** The four module images
+   live in the private `registry.montimage.eu` which does not resolve
+   publicly, so the e2e stub (`scripts/e2e-kind/stub/`) stands in for all
+   four roles:
+
+   ```bash
+   kind create cluster --name secsim-e2e
+   docker build -t secsim-e2e-stub:local scripts/e2e-kind/stub
+   kind load docker-image secsim-e2e-stub:local --name secsim-e2e
+   ```
+
+   > `kind load` skips the copy when the image ID is already on the node —
+   > after changing `stub/`, rebuild first so the tag carries a new ID.
+   > `kubectl exec deploy/mag -- which mag` must print
+   > `/usr/local/bin/mag` in a running pod.
+
+2. **Start the platform.** Either run the server on the host — kind's
+   published `127.0.0.1:<port>` API endpoint is then directly reachable:
+
+   ```bash
+   export JWT_SECRET="$(openssl rand -base64 48)"
+   export ADMIN_PASSWORD="<strong-password>"
+   export ENCRYPTION_KEY="$(openssl rand -hex 16)"
+   export MONGODB_URI="mongodb://127.0.0.1:27017/intact"
+   npm run dev          # auto-seeds the catalog + demo scenario on first boot
+   ```
+
+   …or run the containerized stack (`docker-compose.prod.yml`). The app
+   container cannot see the host's loopback, so attach it to the `kind`
+   docker network and rewrite the kubeconfig server to the node container
+   name — `secsim-e2e-control-plane` is a DNS SAN on the kind API cert, so
+   TLS still verifies:
+
+   ```bash
+   docker network connect kind montimage-app
+   sed -E 's|server: https://127\.0\.0\.1:[0-9]+|server: https://secsim-e2e-control-plane:6443|' \
+     ~/.kube/config > ~/.kube/secsim-e2e-container.yaml
+   ```
+
+   Use `~/.kube/secsim-e2e-container.yaml` (not `~/.kube/config`) as the
+   credentials below, and `https://secsim-e2e-control-plane:6443` as the
+   endpoint — the server inside the kubeconfig wins over the endpoint
+   field. The `kind` attachment can also be declared as an external
+   network in a compose override so it survives container recreation.
+
+3. **Register the cluster, repoint the services, assign the infra and
+   execute** — one script driving the public API (the same repointing
+   `run-e2e.js` applies: `STUB_ROLE` selects each module's behaviour,
+   `MMT_ALERT_URL` wires the probe's alert delivery to the reaction):
+
+   ```bash
+   export ADMIN_PASSWORD DEMO_KUBECONFIG=~/.kube/config   # or the container
+                                                         # kubeconfig from step 2
+   python3 - <<'PY'
+   import json, os, re, urllib.request
+
+   BASE = os.environ.get('BASE_URL', 'http://localhost:3000')
+   KC   = os.path.expanduser(os.environ['DEMO_KUBECONFIG'])
+
+   def api(method, path, body=None, token=None):
+       req = urllib.request.Request(
+           BASE + path, method=method,
+           headers={'Content-Type': 'application/json',
+                    **({'Authorization': f'Bearer {token}'} if token else {})},
+           data=json.dumps(body).encode() if body is not None else None)
+       with urllib.request.urlopen(req) as r:
+           return json.load(r)
+
+   token = api('POST', '/api/auth/login',
+               {'username': os.environ.get('ADMIN_USERNAME', 'admin'),
+                'password': os.environ['ADMIN_PASSWORD']})['token']
+
+   kc = open(KC).read()
+   server = re.search(r'^\s*server:\s*(\S+)', kc, re.M).group(1)
+   infra = api('POST', '/api/infrastructures',
+               {'name': 'kind-secsim-e2e', 'type': 'kubernetes',
+                'endpoint': server, 'credentials': kc}, token)
+   print('infrastructure:', infra['_id'], '→', server)
+
+   for short, role in {'MAG': 'attack', 'CI-SIM': 'target',
+                       'MMT-PROBE': 'monitor', 'AI4SOAR': 'reaction'}.items():
+       res = api('GET', f'/api/services?search={short}', token=token)
+       lst = res if isinstance(res, list) else res.get('services') or res.get('data') or []
+       svc = next(s for s in lst if s['shortName'] == short)
+       dep = dict(api('GET', f"/api/services/{svc['_id']}", token=token).get('deployment') or {})
+       env = [e for e in dep.get('env', [])
+              if e.get('name') not in ('STUB_ROLE', 'MMT_ALERT_URL')]
+       env.append({'name': 'STUB_ROLE', 'value': role})
+       if role == 'monitor':
+           env.append({'name': 'MMT_ALERT_URL', 'fromEdge': 'reaction'})
+       dep['env'] = env
+       api('PUT', f"/api/services/{svc['_id']}",
+           {'currentVersion': 'v1.0.0',
+            'versions': [{'version': 'v1.0.0', 'dockerImage': 'secsim-e2e-stub:local'}],
+            'deployment': dep}, token)
+       print(f'{short} → secsim-e2e-stub:local (STUB_ROLE={role})')
+
+   projects = api('GET', '/api/projects?limit=100', token=token)
+   plist = projects if isinstance(projects, list) else projects.get('projects') or []
+   proj = next(p for p in plist if p.get('shortName') == 'MONTIMAGE-DEMO')
+   scenarios = api('GET', f"/api/projects/{proj['_id']}/scenarios", token=token)
+   scen = next(s for s in scenarios if 'AI4SOAR block' in s.get('title', ''))
+   api('PUT', f"/api/scenarios/{scen['_id']}", {'infrastructureId': infra['_id']}, token)
+   res = api('POST', f"/api/scenarios/{scen['_id']}/execute", token=token)
+   print('executing → namespace:', res['namespace'])
+   PY
+   ```
+
+4. **Wait for Ready, then run the two attacks** (namespace printed by the
+   script above):
+
+   ```bash
+   NS=<secsim-…>
+   kubectl get pods -n "$NS" -w        # all Ready, then Ctrl-C
+
+   # Attack #1 — flood until CI-SIM stops
+   kubectl exec -it deploy/mag -n "$NS" -- \
+     sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'
+
+   # Confirm: attacker address on the blocklist, ci-sim restarted (RESTARTS=1)
+   kubectl exec deploy/ci-sim -c ci-sim -n "$NS" -- \
+     python3 -c "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8080/admin/blocks').read().decode())"
+   kubectl get pods -n "$NS"
+
+   # Attack #2 — same profile, capped; every request answered 403/refused
+   kubectl exec -it deploy/mag -n "$NS" -- \
+     sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 --count 25 2>&1 | tee /proc/1/fd/1'
+   ```
+
+   Expected beats: a JSON alert from the `mmt-probe` sidecar (surfaced in the
+   console's **Security alerts** pane), `service stopped` → container restart,
+   the AI4SOAR playbook POSTing `ip.src` to `ci-sim:8080/admin/block`, then a
+   second alert while the target stays healthy on attack #2.
+
+5. **Tear down:**
+
+   ```bash
+   kubectl delete ns "$NS"    # or Tear Down in the UI
+   ```
+
+> **Stub quirks worth knowing:** the probe sidecar counts every connection
+> to `:8080` — including kubelet readiness probes arriving via the pod
+> gateway — so an alert reaction can land the gateway address on the
+> blocklist and wedge CI-SIM's readiness (probes answered 403). Recover with
+> `POST /admin/unblock` for that address; the MAG pod address stays blocked.
+
 ### CI equivalent — kind e2e
 
 `.github/workflows/e2e-kind.yml` runs this whole flow on pull requests that
