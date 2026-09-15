@@ -3,9 +3,10 @@
 #
 # Monorepo note: this is an npm workspaces repository — the ROOT
 # package-lock.json is the sole dependency resolution source (the
-# per-workspace lockfiles are stale leftovers). Both builder stages therefore
-# install from the root lockfile with --workspace filters; server deps land in
-# the hoisted /app/node_modules directory.
+# per-workspace lockfiles are stale leftovers). Both builder stages run a full
+# `npm ci` because the client build (Vite) and server build (tsc) need every
+# devDependency; the server-builder then reinstalls server-only production
+# deps, which npm hoists to /app/node_modules for the runtime stage.
 
 # Stage 1: Build client
 FROM node:22-bookworm-slim AS client-builder
@@ -53,9 +54,17 @@ COPY server/tsconfig.json ./
 # Compile TypeScript
 RUN npm run build
 
-# Trim dev dependencies before copying the runtime image (runs at the
-# workspace root — --workspace resolves against the root manifest).
-RUN cd /app && npm prune --omit=dev --workspace=server && npm cache clean --force
+# Reinstall server-only production deps for the runtime stage. `npm ci` wipes
+# node_modules first, so this replaces the full install with just the server
+# workspace's prod deps — client packages never reach the production image.
+# `npm pkg delete scripts.prepare` drops the root husky hook first: husky is a
+# devDependency that is absent from this prod-only install, and the script
+# would fail the layer (runs at the workspace root — --workspace resolves
+# against the root manifest).
+RUN cd /app \
+    && npm pkg delete scripts.prepare \
+    && npm ci --omit=dev --workspace=server --include-workspace-root=false \
+    && npm cache clean --force
 
 # Pre-create the data dir here: the distroless runtime has no shell, so it
 # cannot mkdir. A named volume mounted at this path inherits the directory's
