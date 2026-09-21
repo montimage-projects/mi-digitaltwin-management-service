@@ -15,8 +15,13 @@ let healthCheckTriggered = false;
 
 function getAgentConfig(): AgentConfig {
   return {
+    chatProvider: env.CHAT_PROVIDER,
     ollamaBaseUrl: env.OLLAMA_BASE_URL,
-    chatModel: env.OLLAMA_MODEL,
+    chatBaseUrl: env.CHAT_BASE_URL,
+    chatApiKey: env.CHAT_API_KEY,
+    // For the openai provider the model must come from CHAT_MODEL; for ollama
+    // it falls back to OLLAMA_MODEL so the default path is unchanged.
+    chatModel: env.CHAT_MODEL || env.OLLAMA_MODEL,
     embedModel: env.OLLAMA_EMBED_MODEL,
     numPredict: env.OLLAMA_NUM_PREDICT,
     numCtx: env.OLLAMA_NUM_CTX,
@@ -37,8 +42,10 @@ export function getLLMGateway(): LLMGateway {
       .then((health) => {
         logger.info('LLM gateway initialized', {
           status: health.status,
-          host: env.OLLAMA_BASE_URL,
-          chatModel: env.OLLAMA_MODEL,
+          chatProvider: env.CHAT_PROVIDER,
+          chatHost: env.CHAT_PROVIDER === 'openai' ? env.CHAT_BASE_URL : env.OLLAMA_BASE_URL,
+          chatModel: env.CHAT_MODEL || env.OLLAMA_MODEL,
+          embedHost: env.OLLAMA_BASE_URL,
           embedModel: env.OLLAMA_EMBED_MODEL,
           availableModels: health.availableModels,
         });

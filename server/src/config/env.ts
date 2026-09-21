@@ -36,6 +36,16 @@ const envSchema = z.object({
   OLLAMA_NUM_CTX: z.string().default('4096').transform(Number),
   OLLAMA_TEMPERATURE: z.string().default('0.2').transform(Number),
   VECTOR_DB_TYPE: z.enum(['mongodb', 'qdrant']).default('mongodb'),
+  // Chat generator provider — used to swap the Boss Agent's LLM for model
+  // comparison (e.g. local Ollama vs an open frontier model via OpenRouter).
+  // 'ollama' (default) uses OLLAMA_MODEL on OLLAMA_BASE_URL; 'openai' uses any
+  // OpenAI-compatible endpoint (CHAT_BASE_URL) for the CHAT model only.
+  // Embeddings always stay on Ollama so retrieval is held constant.
+  CHAT_PROVIDER: z.enum(['ollama', 'openai']).default('ollama'),
+  CHAT_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
+  CHAT_API_KEY: z.string().default(''),
+  // Empty falls back to OLLAMA_MODEL (so the default ollama path is unchanged).
+  CHAT_MODEL: z.string().default(''),
 });
 
 const parseEnv = () => {

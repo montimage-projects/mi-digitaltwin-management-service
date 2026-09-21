@@ -79,10 +79,11 @@ copilot-instructions.md
 .gitissue/
 .pi-subagents/
 
-# Thesis and articles related to the project
-article/
-literature/
-scripts/
+# Thesis and articles related to the project (repo-root only — do NOT match
+# server/scripts, client/scripts, etc.)
+/article/
+/literature/
+/scripts/
 
 # No need to track testbed files.
 testbed/*

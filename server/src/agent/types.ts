@@ -6,7 +6,13 @@ export interface ChatMessage {
 }
 
 export interface AgentConfig {
+  // 'ollama' uses the local Ollama chat model; 'openai' uses an
+  // OpenAI-compatible endpoint (e.g. OpenRouter) for chat generation only.
+  chatProvider: 'ollama' | 'openai';
   ollamaBaseUrl: string;
+  // Base URL for the OpenAI-compatible chat endpoint (chatProvider === 'openai').
+  chatBaseUrl: string;
+  chatApiKey: string;
   chatModel: string;
   embedModel: string;
   numPredict: number;

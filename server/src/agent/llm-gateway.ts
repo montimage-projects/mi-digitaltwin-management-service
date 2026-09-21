@@ -32,33 +32,11 @@ export class LLMGateway {
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const generationPromise = (async () => {
-        const response = await this.client.chat({
-          model: this.config.chatModel,
-          messages,
-          options: {
-            num_predict: this.config.numPredict,
-            num_ctx: this.config.numCtx,
-            temperature: this.config.temperature,
-          },
-          stream: true,
-        });
-
-        let fullResponse = '';
-
-        for await (const part of response) {
-          const token = part.message?.content ?? '';
-          if (!token) {
-            continue;
-          }
-          fullResponse += token;
-          if (onToken) {
-            onToken(token);
-          }
-        }
-
-        return fullResponse;
-      })();
+      // Only the generator is swapped; retrieval + embeddings stay on Ollama.
+      const generationPromise =
+        this.config.chatProvider === 'openai'
+          ? this.chatOpenAI(messages, onToken)
+          : this.chatOllama(messages, onToken);
 
       const timeoutPromise = new Promise<never>((_resolve, reject) => {
         timeoutHandle = setTimeout(() => {
@@ -69,6 +47,7 @@ export class LLMGateway {
       return await Promise.race([generationPromise, timeoutPromise]);
     } catch (error) {
       logger.error('LLMGateway chat request failed', {
+        provider: this.config.chatProvider,
         model: this.config.chatModel,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -78,6 +57,117 @@ export class LLMGateway {
         clearTimeout(timeoutHandle);
       }
     }
+  }
+
+  /** Local Ollama chat generation (the default Boss Agent path). */
+  private async chatOllama(
+    messages: ChatMessage[],
+    onToken?: (token: string) => void
+  ): Promise<string> {
+    const response = await this.client.chat({
+      model: this.config.chatModel,
+      messages,
+      options: {
+        num_predict: this.config.numPredict,
+        num_ctx: this.config.numCtx,
+        temperature: this.config.temperature,
+      },
+      stream: true,
+    });
+
+    let fullResponse = '';
+    for await (const part of response) {
+      const token = part.message?.content ?? '';
+      if (!token) {
+        continue;
+      }
+      fullResponse += token;
+      onToken?.(token);
+    }
+
+    return fullResponse;
+  }
+
+  /**
+   * OpenAI-compatible chat generation (OpenRouter or any /v1 endpoint), used to
+   * compare the Boss Agent against hosted frontier models. Streams the response
+   * so the SSE token flow to the client is identical to the Ollama path.
+   */
+  private async chatOpenAI(
+    messages: ChatMessage[],
+    onToken?: (token: string) => void
+  ): Promise<string> {
+    if (!this.config.chatApiKey) {
+      throw new Error('CHAT_API_KEY is required when CHAT_PROVIDER=openai');
+    }
+
+    const response = await fetch(`${this.config.chatBaseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.config.chatApiKey}`,
+        // Optional OpenRouter attribution headers (ignored by other providers).
+        'HTTP-Referer': 'https://montimage.com',
+        'X-Title': 'SecSim Boss Agent',
+      },
+      body: JSON.stringify({
+        model: this.config.chatModel,
+        messages,
+        temperature: this.config.temperature,
+        max_tokens: this.config.numPredict,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok || !response.body) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(
+        `OpenAI-compatible chat failed: ${response.status} ${response.statusText} ${detail}`.trim()
+      );
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullResponse = '';
+
+    // Parse the SSE stream: lines beginning with `data:` carry JSON chunks,
+    // terminated by `data: [DONE]`. Comment/keepalive lines are ignored.
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) {
+          continue;
+        }
+        const data = trimmed.slice(5).trim();
+        if (data === '' || data === '[DONE]') {
+          continue;
+        }
+        try {
+          const parsed = JSON.parse(data) as {
+            choices?: { delta?: { content?: string } }[];
+          };
+          const token = parsed.choices?.[0]?.delta?.content ?? '';
+          if (token) {
+            fullResponse += token;
+            onToken?.(token);
+          }
+        } catch {
+          // Ignore partial/keepalive frames; the next chunk completes them.
+        }
+      }
+    }
+
+    return fullResponse;
   }
 
   /**
@@ -123,7 +213,12 @@ export class LLMGateway {
       const modelList = await this.client.list();
       const availableModels = modelList.models.map((model) => model.name);
 
-      const chatModelAvailable = modelExists(this.config.chatModel, availableModels);
+      // For the openai provider the chat model is remote (not in the local
+      // Ollama list), so gate it on having credentials + a model id instead.
+      const chatModelAvailable =
+        this.config.chatProvider === 'openai'
+          ? Boolean(this.config.chatApiKey && this.config.chatModel)
+          : modelExists(this.config.chatModel, availableModels);
       const embedModelAvailable = modelExists(this.config.embedModel, availableModels);
 
       const status: GatewayHealthStatus['status'] =
