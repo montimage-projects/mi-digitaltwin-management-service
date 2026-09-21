@@ -5,10 +5,10 @@
   "author": "Montimage",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/app.ts",
-    "start": "tsx src/app.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/app.ts",
+    "start": "tsx --env-file-if-exists=.env src/app.ts",
     "build": "tsc",
-    "seed": "tsx src/seed/index.ts",
+    "seed": "tsx --env-file-if-exists=.env src/seed/index.ts",
     "migrate:sectors": "tsx src/migrations/add-sectors-to-services.ts",
     "migrate:category-to-sector": "tsx src/migrations/migrate-category-to-sector.ts",
     "lint": "eslint src",
