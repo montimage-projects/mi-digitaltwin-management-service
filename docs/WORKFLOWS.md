@@ -180,6 +180,45 @@ The MI Digital Twin Management Service includes several GitHub Actions workflows
 - Check workflow run logs for detailed report
 - Look for GitHub Issues with `documentation` label
 
+### 5. Kind E2E — Montimage Scenario (`e2e-kind.yml`)
+
+**Trigger:** Pull requests and pushes to `main` that touch `server/src/services/`,
+`server/src/seed/`, or the e2e assets themselves; also `workflow_dispatch`
+
+**Purpose:** Prove the seeded Montimage attack → detect → respond demo scenario
+runs end-to-end on a real Kubernetes cluster (issue #206 / playbook task 4.3)
+
+**Steps:**
+
+1. **Provision** — installs `kind` + `kubectl` and creates a throwaway cluster
+2. **Stub image** — builds `scripts/e2e-kind/stub/` and loads it into kind. The
+   four module images live in the private `registry.montimage.eu` (not
+   resolvable on the public Internet), so the stub stands in for them while the
+   real scenario topology, deployment specs, RBAC and ordering are exercised.
+   Setting `SECSIM_E2E_REQUIRE_REAL_IMAGES=1` makes the job fail clearly when
+   the registry is unreachable instead of using the stub
+3. **Execute** — `scripts/e2e-kind/run-e2e.js` registers the kind cluster as an
+   Infrastructure over the REST API and executes the seeded demo scenario
+4. **Assert** — the R1 two-attack script (issue #237): `kubectl exec` attack
+   #1 trips an MMT-Probe alert, stops CI-SIM (rate threshold → "service
+   stopped" → Deployment restart) and lands the attacker on the ci-sim
+   blocklist via AI4SOAR's `/admin/block` playbook; `kubectl exec` attack #2
+   is answered 403 while the probe alerts again and the target stays
+   healthy; namespace deletion leaves no resources behind
+5. **Teardown** — diagnostics are dumped on failure and the cluster is always
+   deleted
+
+**When It Runs:**
+
+- On pull requests to `main` or `develop` touching the paths above
+- On pushes to `main` or `develop` touching the same paths
+- Manually via workflow dispatch
+
+**View Results:**
+
+- Check the "Kind E2E — Montimage demo scenario" job logs; assertion results
+  print as `PASS`/`FAIL` lines with a summary at the end
+
 ## Configuration Files
 
 ### `.markdownlintrc`
@@ -492,6 +531,10 @@ For workflow issues or questions:
 2. Review this guide for solutions
 3. Check project issues for similar problems
 4. Contact documentation team
+
+## GitLab CI
+
+The project also provides a `.gitlab-ci.yml` at the repository root that mirrors the GitHub Actions CI pipeline. It runs on pushes to `main` and merge requests, executing the same quality, typecheck, test, build, and security audit jobs using GitLab-native CI syntax.
 
 ---
 

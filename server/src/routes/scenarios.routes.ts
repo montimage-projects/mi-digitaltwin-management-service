@@ -2,17 +2,64 @@ import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { Scenario } from '../models/Scenario.js';
 import { Project } from '../models/Project.js';
+import { Infrastructure } from '../models/Infrastructure.js';
+import { Service } from '../models/Service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateBody, objectIdSchema } from '../middleware/validation.js';
+import { buildClientFromInfrastructure, teardownDeployment } from '../services/kubernetesDeploy.js';
+import { asyncHandler, findById, validateObjectIdParam } from '../middleware/entityLoader.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { executeScenario } from '../services/scenarioExecution.js';
+import { runSSEStream } from '../services/scenarioSSE.js';
+
+/** Extract unique service IDs from a scenario's topology nodes. */
+function resolveServiceIds(scenario: { topology?: { nodes?: unknown[] } }): string[] {
+  const nodes = scenario.topology?.nodes ?? [];
+  return [
+    ...new Set(
+      nodes
+        .map((n) => (n as { data?: { serviceId?: string } }).data?.serviceId)
+        .filter((sid): sid is string => Boolean(sid))
+    ),
+  ];
+}
 
 const router: RouterType = Router();
 
 // Validation schemas
+
+/**
+ * Per-node config overrides — task 0.4 of the Montimage attack→detect→respond
+ * plan (docs/playbooks/montimage-attack-detect-respond-plan.md). A scenario may
+ * override the service catalog's `deployment` defaults without editing the
+ * catalog (e.g. selecting a MAG attack profile via `args`). `env` mirrors
+ * `IDeploymentSpec.env` entries. `looseObject` at every level preserves keys
+ * the schema does not know (React Flow fields, future override fields like
+ * `configFiles`) so saved topologies reload intact.
+ */
+const nodeConfigEnvSchema = z.looseObject({
+  name: z.string().min(1),
+  value: z.string().optional(),
+  fromEdge: z.enum(['target', 'reaction']).optional(),
+});
+
+const nodeConfigSchema = z.looseObject({
+  env: z.array(nodeConfigEnvSchema).optional(),
+  args: z.array(z.string()).optional(),
+});
+
+const topologyNodeSchema = z.looseObject({
+  data: z
+    .looseObject({
+      config: nodeConfigSchema.optional(),
+    })
+    .optional(),
+});
+
 const topologySchema = z.object({
   yaml: z.string().default(''),
-  nodes: z.array(z.record(z.unknown())).default([]),
-  edges: z.array(z.record(z.unknown())).default([]),
+  nodes: z.array(topologyNodeSchema).default([]),
+  edges: z.array(z.record(z.string(), z.unknown())).default([]),
 });
 
 const createScenarioSchema = z.object({
@@ -32,249 +79,286 @@ const conclusionSchema = z.object({
   author: z.string().min(1),
 });
 
-const updateExecutionStatusSchema = z.object({
-  status: z.enum(['pending', 'running', 'completed', 'failed']),
-});
-
 // GET /api/projects/:projectId/scenarios - List scenarios for a project
-router.get('/projects/:projectId/scenarios', authMiddleware, async (req, res, next) => {
-  try {
+// Excludes heavy fields (topology, executions) from list responses.
+// Use GET /api/scenarios/:id for the full detail payload.
+router.get(
+  '/projects/:projectId/scenarios',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
     const { projectId } = req.params;
 
-    const parseResult = objectIdSchema.safeParse(projectId);
-    if (!parseResult.success) {
-      throw new AppError('Invalid project ID', 400);
-    }
-
-    const project = await Project.findById(projectId);
-    if (!project) {
-      throw new AppError('Project not found', 404);
-    }
+    await findById(Project, projectId);
 
     const scenarios = await Scenario.find({ projectId })
       .populate('infrastructureId', 'name type status')
       .sort({ updatedAt: -1 })
       .lean();
 
-    // Add latest execution status to each scenario
-    const scenariosWithStatus = scenarios.map((scenario) => {
-      const latestExecution = scenario.executions[scenario.executions.length - 1];
-      return {
-        ...scenario,
-        latestExecution: latestExecution
-          ? {
-              status: latestExecution.status,
-              executedAt: latestExecution.executedAt,
-              executedBy: latestExecution.executedBy,
-            }
-          : null,
-      };
+    // Slim response: exclude topology and executions arrays.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const slimScenarios = (scenarios as any[]).map((scenario) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { topology, executions, ...rest } = scenario;
+      const latestExecution = scenario.executions?.length
+        ? {
+            status: scenario.executions[scenario.executions.length - 1].status,
+            executedAt: scenario.executions[scenario.executions.length - 1].executedAt,
+            executedBy: scenario.executions[scenario.executions.length - 1].executedBy,
+          }
+        : null;
+      return { ...rest, latestExecution };
     });
 
-    res.json(scenariosWithStatus);
-  } catch (error) {
-    next(error);
-  }
-});
+    res.json(slimScenarios);
+  })
+);
 
 // POST /api/projects/:projectId/scenarios - Create scenario
 router.post(
   '/projects/:projectId/scenarios',
   authMiddleware,
+  validateObjectIdParam,
   validateBody(createScenarioSchema),
-  async (req, res, next) => {
-    try {
-      const { projectId } = req.params;
-      const data = req.body;
+  asyncHandler(async (req, res) => {
+    const { projectId } = req.params;
+    const data = req.body;
 
-      const parseResult = objectIdSchema.safeParse(projectId);
-      if (!parseResult.success) {
-        throw new AppError('Invalid project ID', 400);
-      }
+    await findById(Project, projectId);
 
-      const project = await Project.findById(projectId);
-      if (!project) {
-        throw new AppError('Project not found', 404);
-      }
+    const scenario = new Scenario({
+      ...data,
+      projectId,
+    });
+    await scenario.save();
 
-      const scenario = new Scenario({
-        ...data,
-        projectId,
-      });
-      await scenario.save();
+    const populatedScenario = await Scenario.findById(scenario._id)
+      .populate('infrastructureId', 'name type status')
+      .lean();
 
-      const populatedScenario = await Scenario.findById(scenario._id)
-        .populate('infrastructureId', 'name type status')
-        .lean();
-
-      res.status(201).json(populatedScenario);
-    } catch (error) {
-      next(error);
-    }
-  }
+    res.status(201).json(populatedScenario);
+  })
 );
 
 // GET /api/scenarios/:id - Get scenario detail
-router.get('/scenarios/:id', authMiddleware, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid scenario ID', 400);
-    }
-
-    const scenario = await Scenario.findById(id)
-      .populate('projectId', 'shortName title sector')
-      .populate('infrastructureId', 'name type status endpoint')
-      .populate('executions.deployedServices.serviceId', 'shortName title')
-      .lean();
-
-    if (!scenario) {
-      throw new AppError('Scenario not found', 404);
-    }
+router.get(
+  '/scenarios/:id',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
+    const scenario = await findById(Scenario, req.params.id, [
+      { path: 'projectId', select: 'shortName title sector' },
+      { path: 'infrastructureId', select: 'name type status endpoint' },
+      { path: 'executions.deployedServices.serviceId', select: 'shortName title' },
+    ]);
 
     res.json(scenario);
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // PUT /api/scenarios/:id - Update scenario
 router.put(
   '/scenarios/:id',
   authMiddleware,
+  validateObjectIdParam,
   validateBody(updateScenarioSchema),
-  async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const data = req.body;
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const data = req.body;
 
-      const parseResult = objectIdSchema.safeParse(id);
-      if (!parseResult.success) {
-        throw new AppError('Invalid scenario ID', 400);
-      }
+    const scenario = await Scenario.findByIdAndUpdate(
+      id,
+      { $set: data },
+      { new: true, runValidators: true }
+    )
+      .populate('infrastructureId', 'name type status')
+      .lean();
 
-      const scenario = await Scenario.findByIdAndUpdate(
-        id,
-        { $set: data },
-        { new: true, runValidators: true }
-      )
-        .populate('infrastructureId', 'name type status')
-        .lean();
-
-      if (!scenario) {
-        throw new AppError('Scenario not found', 404);
-      }
-
-      res.json(scenario);
-    } catch (error) {
-      next(error);
-    }
-  }
+    res.json(scenario);
+  })
 );
 
 // DELETE /api/scenarios/:id - Delete scenario
-router.delete('/scenarios/:id', authMiddleware, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid scenario ID', 400);
-    }
-
-    const scenario = await Scenario.findByIdAndDelete(id);
-
-    if (!scenario) {
-      throw new AppError('Scenario not found', 404);
-    }
-
+router.delete(
+  '/scenarios/:id',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
+    await Scenario.findByIdAndDelete(req.params.id);
     res.json({ message: 'Scenario deleted successfully' });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // POST /api/scenarios/:id/execute - Trigger execution
-router.post('/scenarios/:id/execute', authMiddleware, async (req, res, next) => {
-  try {
+router.post(
+  '/scenarios/:id/execute',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const user = (req as unknown as { user: { username: string } }).user;
-
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid scenario ID', 400);
-    }
+    const user = req.user!;
 
     const scenario = await Scenario.findById(id);
 
     if (!scenario) {
-      throw new AppError('Scenario not found', 404);
+      throw new Error('Scenario not found');
     }
 
     if (!scenario.infrastructureId) {
       throw new AppError('Scenario has no infrastructure assigned', 400);
     }
 
-    // Create execution record
-    const execution = {
-      executedAt: new Date(),
-      executedBy: user?.username || 'admin',
-      status: 'pending' as const,
-      deployedServices: [],
+    const infrastructure = await findById(Infrastructure, scenario.infrastructureId.toString());
+
+    // Resolve the services referenced by the topology nodes.
+    const serviceIds = resolveServiceIds(scenario);
+    const services = await Service.find({ _id: { $in: serviceIds } }).lean();
+
+    // Atomically push a new execution record using $push with positional
+    // operator, so concurrent POSTs each get their own execution slot.
+    const pushResult = await Scenario.findOneAndUpdate(
+      { _id: id },
+      {
+        $push: {
+          executions: {
+            executedAt: new Date(),
+            executedBy: user?.username || 'admin',
+            status: 'pending',
+            deployedServices: [],
+          },
+        },
+      },
+      { new: true }
+    );
+
+    if (!pushResult) {
+      throw new Error('Scenario not found');
+    }
+
+    const infraForExec = {
+      endpoint: String(infrastructure.endpoint),
+      credentials: infrastructure.credentials as { iv: string; encrypted: string; authTag: string },
     };
+    const result = await executeScenario(pushResult, infraForExec, services);
 
-    scenario.executions.push(execution);
+    res.json(result);
+  })
+);
+
+// DELETE /api/scenarios/:id/executions/:executionId - Tear down a deployment
+router.delete(
+  '/scenarios/:id/executions/:executionId',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const { id, executionId } = req.params;
+
+    if (!/^[0-9a-fA-F]{24}$/.test(id) || !/^[0-9a-fA-F]{24}$/.test(executionId)) {
+      throw new Error('Invalid ID format');
+    }
+
+    const scenario = await Scenario.findById(id);
+    if (!scenario) throw new Error('Scenario not found');
+
+    const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
+    if (!execution) throw new AppError('Execution not found', 404);
+
+    // Only reach the cluster when something was actually deployed.
+    if (execution.namespace && scenario.infrastructureId) {
+      const infra = await findById(Infrastructure, scenario.infrastructureId.toString());
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await teardownDeployment(buildClientFromInfrastructure(infra as any), execution.namespace);
+    }
+
+    execution.status = 'completed';
     await scenario.save();
-
-    const executionId = scenario.executions[scenario.executions.length - 1]._id;
 
     res.json({
       executionId,
-      status: 'pending',
+      namespace: execution.namespace,
+      status: execution.status,
+      message: 'Deployment torn down',
     });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
+
+// GET /api/scenarios/:id/executions/:executionId/events - Stream deploy progress + logs (SSE)
+router.get(
+  '/scenarios/:id/executions/:executionId/events',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const { id, executionId } = req.params;
+
+    if (!/^[0-9a-fA-F]{24}$/.test(id) || !/^[0-9a-fA-F]{24}$/.test(executionId)) {
+      throw new Error('Invalid ID format');
+    }
+
+    const scenario = await Scenario.findById(id);
+    if (!scenario) throw new Error('Scenario not found');
+
+    const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
+    if (!execution) throw new AppError('Execution not found', 404);
+
+    // Build the cluster client before switching to SSE, so a failure returns
+    // a normal JSON error rather than a half-open stream.
+    const infrastructure = scenario.infrastructureId
+      ? await findById(Infrastructure, scenario.infrastructureId.toString())
+      : null;
+
+    // Switch to Server-Sent Events stream, bypassing compression/buffering.
+    res.status(200).set({
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.flushHeaders();
+
+    const infraView = infrastructure
+      ? {
+          endpoint: String(infrastructure.endpoint),
+          credentials: infrastructure.credentials as {
+            iv: string;
+            encrypted: string;
+            authTag: string;
+          },
+        }
+      : null;
+    const cleanup = runSSEStream(res, scenario, execution, infraView);
+
+    req.on('close', cleanup);
+  })
+);
 
 // PUT /api/scenarios/:id/executions/:executionId/status - Update execution status
 router.put(
   '/scenarios/:id/executions/:executionId/status',
   authMiddleware,
-  validateBody(updateExecutionStatusSchema),
-  async (req, res, next) => {
-    try {
-      const { id, executionId } = req.params;
-      const { status } = req.body;
+  asyncHandler(async (req, res) => {
+    const { id, executionId } = req.params;
+    const { status } = req.body;
 
-      const parseResult1 = objectIdSchema.safeParse(id);
-      const parseResult2 = objectIdSchema.safeParse(executionId);
-      if (!parseResult1.success || !parseResult2.success) {
-        throw new AppError('Invalid ID', 400);
-      }
-
-      const scenario = await Scenario.findById(id);
-
-      if (!scenario) {
-        throw new AppError('Scenario not found', 404);
-      }
-
-      const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
-      if (!execution) {
-        throw new AppError('Execution not found', 404);
-      }
-
-      execution.status = status;
-
-      await scenario.save();
-
-      res.json(execution);
-    } catch (error) {
-      next(error);
+    if (!/^[0-9a-fA-F]{24}$/.test(id) || !/^[0-9a-fA-F]{24}$/.test(executionId)) {
+      throw new Error('Invalid ID format');
     }
-  }
+
+    const scenario = await Scenario.findById(id);
+
+    if (!scenario) {
+      throw new Error('Scenario not found');
+    }
+
+    const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
+    if (!execution) {
+      throw new Error('Execution not found');
+    }
+
+    execution.status = status;
+
+    await scenario.save();
+
+    res.json(execution);
+  })
 );
 
 // POST /api/scenarios/:id/executions/:executionId/conclusion - Add conclusion
@@ -282,41 +366,35 @@ router.post(
   '/scenarios/:id/executions/:executionId/conclusion',
   authMiddleware,
   validateBody(conclusionSchema),
-  async (req, res, next) => {
-    try {
-      const { id, executionId } = req.params;
-      const { text, author } = req.body;
+  asyncHandler(async (req, res) => {
+    const { id, executionId } = req.params;
+    const { text, author } = req.body;
 
-      const parseResult1 = objectIdSchema.safeParse(id);
-      const parseResult2 = objectIdSchema.safeParse(executionId);
-      if (!parseResult1.success || !parseResult2.success) {
-        throw new AppError('Invalid ID', 400);
-      }
-
-      const scenario = await Scenario.findById(id);
-
-      if (!scenario) {
-        throw new AppError('Scenario not found', 404);
-      }
-
-      const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
-      if (!execution) {
-        throw new AppError('Execution not found', 404);
-      }
-
-      execution.conclusion = {
-        text,
-        author,
-        createdAt: new Date(),
-      };
-
-      await scenario.save();
-
-      res.json(execution);
-    } catch (error) {
-      next(error);
+    if (!/^[0-9a-fA-F]{24}$/.test(id) || !/^[0-9a-fA-F]{24}$/.test(executionId)) {
+      throw new Error('Invalid ID format');
     }
-  }
+
+    const scenario = await Scenario.findById(id);
+
+    if (!scenario) {
+      throw new Error('Scenario not found');
+    }
+
+    const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
+    if (!execution) {
+      throw new Error('Execution not found');
+    }
+
+    execution.conclusion = {
+      text,
+      author,
+      createdAt: new Date(),
+    };
+
+    await scenario.save();
+
+    res.json(execution);
+  })
 );
 
 export default router;

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useEffect, useState } from 'react';
 import {
-  ReactFlow,
   ReactFlowProvider,
+  ReactFlow,
   Background,
   Controls,
   MiniMap,
@@ -18,18 +18,36 @@ import {
   useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Database, Network, Shield, Monitor, Trash2, Search } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Database,
+  Network,
+  Shield,
+  Monitor,
+  Server,
+  Trash2,
+  Swords,
+  Target,
+  Zap,
+  Link2,
+  Settings2,
+  Waypoints,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { ServicePalette } from './ServicePalette';
+import { NodeConfigPanel } from './NodeConfigPanel';
+import type { NodeConfig } from '@/lib/node-config';
+import {
+  applyTopologyDecorations,
+  planAutoWire,
+  planTopologyEdge,
+  type BadgedRole,
+  type RoleEdge,
+  type RoleNode,
+} from '@/lib/topology-roles';
+import type { ServiceDeployment } from '@/lib/services';
 
 interface ServiceVersion {
   version: string;
@@ -48,6 +66,7 @@ interface ServiceOption {
   currentVersion?: string;
   versions?: ServiceVersion[];
   uiType?: string;
+  deployment?: ServiceDeployment;
 }
 
 interface TopologyCanvasProps {
@@ -55,12 +74,39 @@ interface TopologyCanvasProps {
   edges: object[];
   onNodesChange: (nodes: object[]) => void;
   onEdgesChange: (edges: object[]) => void;
+  /**
+   * Combined nodes+edges update for atomic actions (task 5.3 Auto-wire):
+   * lets the parent regenerate YAML from both final arrays in one pass.
+   * Falls back to the two single-channel callbacks when absent.
+   */
+  onTopologyChange?: (nodes: object[], edges: object[]) => void;
   services?: ServiceOption[];
   readOnly?: boolean;
 }
 
+interface ServiceNodeData {
+  label: string;
+  type?: string;
+  version?: string;
+  /** Scenario role resolved from `Service.deployment.role` (task 3.1). */
+  role?: BadgedRole;
+  attachMode?: 'standalone' | 'sidecar';
+  /** Host node id when this sidecar is docked inside its host. */
+  attachedTo?: string;
+  /** Display label of the host node this sidecar is attached to. */
+  hostLabel?: string;
+}
+
+/** Badge colors per scenario role — task 3.1 (attack/target/monitor/reaction). */
+const ROLE_BADGE_STYLES: Record<BadgedRole, string> = {
+  attack: 'border-red-500/60 bg-red-500/10 text-red-700 dark:text-red-400',
+  target: 'border-blue-500/60 bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  monitor: 'border-amber-500/60 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  reaction: 'border-emerald-500/60 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+};
+
 // Custom node component
-function ServiceNode({ data }: { data: { label: string; type?: string; version?: string } }) {
+function ServiceNode({ data }: { data: ServiceNodeData }) {
   const getIcon = () => {
     switch (data.type) {
       case 'database':
@@ -71,21 +117,57 @@ function ServiceNode({ data }: { data: { label: string; type?: string; version?:
         return <Shield className="h-5 w-5" />;
       case 'monitor':
         return <Monitor className="h-5 w-5" />;
+      case 'attack':
+        return <Swords className="h-5 w-5" />;
+      case 'target':
+        return <Target className="h-5 w-5" />;
+      case 'reaction':
+        return <Zap className="h-5 w-5" />;
       default:
         return <Server className="h-5 w-5" />;
     }
   };
 
+  const isSidecar = data.attachMode === 'sidecar';
+  const attached = isSidecar && Boolean(data.attachedTo);
+
   return (
-    <div className="px-4 py-2 shadow-md rounded-md bg-card border-2 border-border min-w-[120px]">
+    <div
+      className={cn(
+        'px-4 py-2 shadow-md rounded-md bg-card border-2 border-border min-w-[120px] h-full',
+        isSidecar && 'border-dashed border-teal-500/70',
+        attached && 'min-w-[100px] px-3 py-1.5 shadow-sm'
+      )}
+      title={attached ? `Sidecar attached to ${data.hostLabel ?? 'host'}` : undefined}
+    >
       <Handle type="target" position={Position.Top} className="w-3 h-3 !bg-teal-500" />
       <div className="flex items-center gap-2">
         <div className="text-muted-foreground">{getIcon()}</div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-card-foreground">{data.label}</div>
+          <div className="flex items-center gap-1 text-sm font-medium text-card-foreground">
+            {attached && <Link2 className="h-3 w-3 text-teal-500 shrink-0" aria-hidden />}
+            <span className="truncate">{data.label}</span>
+          </div>
           {data.version && (
             <div className="text-[10px] text-muted-foreground bg-muted/50 rounded px-1 py-0.5 inline-block mt-0.5">
               v{data.version}
+            </div>
+          )}
+          {data.role && (
+            <Badge
+              variant="outline"
+              data-testid={`role-badge-${data.role}`}
+              className={cn(
+                'mt-0.5 h-4 px-1.5 py-0 text-[10px] leading-none font-semibold uppercase tracking-wide',
+                ROLE_BADGE_STYLES[data.role]
+              )}
+            >
+              {data.role}
+            </Badge>
+          )}
+          {isSidecar && !attached && (
+            <div className="text-[10px] italic text-muted-foreground mt-0.5">
+              sidecar — needs a monitor edge
             </div>
           )}
         </div>
@@ -104,75 +186,42 @@ function TopologyCanvasInner({
   edges: initialEdges,
   onNodesChange: onNodesChangeProp,
   onEdgesChange: onEdgesChangeProp,
+  onTopologyChange: onTopologyChangeProp,
   services = [],
   readOnly = false,
 }: TopologyCanvasProps) {
   const { screenToFlowPosition } = useReactFlow();
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
+  /** Node id whose config panel is open — task 3.3. */
+  const [configNodeId, setConfigNodeId] = useState<string | null>(null);
 
-  // Separate state for each dropdown
-  const [toolboxOpen, setToolboxOpen] = useState(false);
-  const [toolboxSearch, setToolboxSearch] = useState('');
-  const [infraOpen, setInfraOpen] = useState(false);
-  const [infraSearch, setInfraSearch] = useState('');
+  const servicesById = useMemo(
+    () => new Map<string, ServiceOption>(services.map((s) => [s._id, s])),
+    [services]
+  );
 
-  // Selected service and version for version selection
-  const [selectedService, setSelectedService] = useState<ServiceOption | null>(null);
-  const [selectedVersion, setSelectedVersion] = useState<string>('');
-
-  // Filter services by repository table
-  const toolboxServices = useMemo(() => {
-    return services.filter((s) => s.repositoryTable === 'INTACT_TOOLBOX');
-  }, [services]);
-
-  const infraServices = useMemo(() => {
-    return services.filter((s) => s.repositoryTable === 'OTHER_SERVICES');
-  }, [services]);
-
-  // Helper function to group and filter services
-  const getGroupedServices = (serviceList: ServiceOption[], searchQuery: string) => {
-    const filtered = serviceList.filter((s) => {
-      const query = searchQuery.toLowerCase();
-      return (
-        s.shortName.toLowerCase().includes(query) ||
-        s.title.toLowerCase().includes(query) ||
-        s.categoryId?.name?.toLowerCase().includes(query) ||
-        (s.description && s.description.toLowerCase().includes(query))
-      );
-    });
-
-    const groups: Record<string, ServiceOption[]> = {};
-    filtered.forEach((service) => {
-      const category = service.categoryId?.name || 'Uncategorized';
-      if (!groups[category]) {
-        groups[category] = [];
-      }
-      groups[category].push(service);
-    });
-
-    return groups;
-  };
-
-  // Grouped services for each dropdown
-  const groupedToolboxServices = useMemo(() => {
-    return getGroupedServices(toolboxServices, toolboxSearch);
-  }, [toolboxServices, toolboxSearch]);
-
-  const groupedInfraServices = useMemo(() => {
-    return getGroupedServices(infraServices, infraSearch);
-  }, [infraServices, infraSearch]);
+  // Resolve roles onto nodes and dock sidecars under their monitor-edge host.
+  const decorated = useMemo(
+    () =>
+      applyTopologyDecorations(
+        initialNodes as RoleNode[],
+        initialEdges as RoleEdge[],
+        servicesById
+      ),
+    [initialNodes, initialEdges, servicesById]
+  );
 
   // Convert to React Flow format
   const flowNodes = useMemo(
     () =>
-      (initialNodes as Node[]).map((node) => ({
+      decorated.nodes.map((node) => ({
         ...node,
         type: 'service',
-      })),
-    [initialNodes]
+      })) as Node[],
+    [decorated]
   );
 
-  const flowEdges = useMemo(() => initialEdges as Edge[], [initialEdges]);
+  const flowEdges = useMemo(() => decorated.edges as Edge[], [decorated]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(flowNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(flowEdges);
@@ -188,7 +237,7 @@ function TopologyCanvasInner({
 
   // Add a new node from a service with optional version
   const addNode = useCallback(
-    (service: ServiceOption, isToolbox: boolean, version?: string) => {
+    (service: ServiceOption, _isToolbox?: boolean, version?: string) => {
       const newNode = {
         id: `node-${Date.now()}`,
         type: 'service',
@@ -203,6 +252,10 @@ function TopologyCanvasInner({
           serviceTitle: service.title,
           uiType: service.uiType || 'web',
           repositoryTable: service.repositoryTable || 'OTHER_SERVICES',
+          // Persist the deployment spec's scenario role/attach mode so badges
+          // and sidecar docking still resolve if the catalog entry is gone.
+          ...(service.deployment?.role && { role: service.deployment.role }),
+          ...(service.deployment?.attachMode && { attachMode: service.deployment.attachMode }),
           // Only include version if it's explicitly selected and not the current/latest version
           ...(version && version !== service.currentVersion && { version }),
         },
@@ -212,83 +265,93 @@ function TopologyCanvasInner({
         onNodesChangeProp(newNodes);
         return newNodes;
       });
-      if (isToolbox) {
-        setToolboxOpen(false);
-        setToolboxSearch('');
-      } else {
-        setInfraOpen(false);
-        setInfraSearch('');
-      }
-      // Reset selected service and version
-      setSelectedService(null);
-      setSelectedVersion('');
     },
     [setNodes, onNodesChangeProp, screenToFlowPosition]
   );
 
-  // Handle service selection (opens version selector if multiple versions available)
-  const handleServiceSelect = useCallback(
-    (service: ServiceOption, isToolbox: boolean) => {
-      if (service.versions && service.versions.length > 1) {
-        // Service has multiple versions - show version selector
-        setSelectedService(service);
-        setSelectedVersion(service.currentVersion || service.versions[0]?.version || '');
-      } else {
-        // Single version or no versions - add directly
-        addNode(service, isToolbox);
-      }
-    },
-    [addNode]
-  );
-
-  // Confirm adding service with selected version
-  const confirmAddService = useCallback(
-    (isToolbox: boolean) => {
-      if (selectedService) {
-        addNode(selectedService, isToolbox, selectedVersion);
-      }
-    },
-    [selectedService, selectedVersion, addNode]
-  );
-
-  // Cancel version selection
-  const cancelVersionSelection = useCallback(() => {
-    setSelectedService(null);
-    setSelectedVersion('');
-  }, []);
-
-  // Delete selected nodes
+  // Delete selected nodes — deleting a host also removes the sidecar nodes
+  // docked inside it (parentId), transitively.
   const deleteSelectedNodes = useCallback(() => {
     if (selectedNodes.length === 0) return;
+    const removed = new Set(selectedNodes);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const n of nodes) {
+        const parentId = (n as Node).parentId;
+        if (!removed.has(n.id) && parentId && removed.has(parentId)) {
+          removed.add(n.id);
+          grew = true;
+        }
+      }
+    }
     setNodes((nds) => {
-      const newNodes = nds.filter((n) => !selectedNodes.includes(n.id));
+      const newNodes = nds.filter((n) => !removed.has(n.id));
       onNodesChangeProp(newNodes);
       return newNodes;
     });
     setEdges((eds) => {
-      const newEdges = eds.filter(
-        (e) => !selectedNodes.includes(e.source) && !selectedNodes.includes(e.target)
-      );
+      const newEdges = eds.filter((e) => !removed.has(e.source) && !removed.has(e.target));
       onEdgesChangeProp(newEdges);
       return newEdges;
     });
     setSelectedNodes([]);
-  }, [selectedNodes, setNodes, setEdges, onNodesChangeProp, onEdgesChangeProp]);
+  }, [selectedNodes, nodes, setNodes, setEdges, onNodesChangeProp, onEdgesChangeProp]);
 
   // Track selection
   const onSelectionChange = useCallback(({ nodes: selectedNodesList }: { nodes: Node[] }) => {
     setSelectedNodes(selectedNodesList.map((n) => n.id));
   }, []);
 
+  // The node open in the config panel, plus its catalog deployment spec for
+  // defaults (env/args/configFiles — task 3.3).
+  const configNode = useMemo(
+    () => nodes.find((n) => n.id === configNodeId) ?? null,
+    [nodes, configNodeId]
+  );
+  const configDeployment = configNode?.data?.serviceId
+    ? servicesById.get(String(configNode.data.serviceId))?.deployment
+    : undefined;
+
+  // Persist an edited `data.config` document onto the node and propagate —
+  // `undefined` removes the key entirely. (task 3.3)
+  const handleConfigChange = useCallback(
+    (nodeId: string, config: NodeConfig | undefined) => {
+      const newNodes = nodes.map((n) => {
+        if (n.id !== nodeId) return n;
+        const data = { ...n.data };
+        if (config === undefined) {
+          delete data.config;
+        } else {
+          data.config = config;
+        }
+        return { ...n, data };
+      });
+      setNodes(newNodes);
+      onNodesChangeProp(newNodes);
+    },
+    [nodes, setNodes, onNodesChangeProp]
+  );
+
+  // Connect two nodes: the scenario role pair decides the persisted edge type
+  // (task 3.2); an illegal pair is rejected with a visible message.
   const onConnect = useCallback(
     (params: Connection) => {
       if (readOnly) return;
+      const plan = planTopologyEdge(params, nodes as RoleNode[], servicesById);
+      if (!plan.ok) {
+        toast.error(plan.error);
+        return;
+      }
       setEdges((eds) => {
         const newEdges = addEdge(
           {
             ...params,
             animated: true,
-            style: { stroke: '#64748b' },
+            ...(plan.edgeType && {
+              label: plan.edgeType,
+              data: { edgeType: plan.edgeType },
+            }),
           },
           eds
         );
@@ -296,19 +359,71 @@ function TopologyCanvasInner({
         return newEdges;
       });
     },
-    [readOnly, setEdges, onEdgesChangeProp]
+    [readOnly, setEdges, onEdgesChangeProp, nodes, servicesById]
   );
+
+  // Auto-wire (task 5.3): append every role-derived typed edge not already
+  // drawn, apply the role-column layout (attack/monitor left of the target,
+  // reaction right) and surface what was added. The nodes+edges update goes
+  // out as one combined change so the parent's YAML regen sees both.
+  const handleAutoWire = useCallback(() => {
+    if (readOnly) return;
+    const plan = planAutoWire(nodes as RoleNode[], edges as RoleEdge[], servicesById);
+    if (plan.edges.length === 0 && plan.positions.size === 0) {
+      toast.info('Nothing to auto-wire — add role-tagged services first.');
+      return;
+    }
+    const newNodes = plan.positions.size
+      ? nodes.map((n) => {
+          const position = plan.positions.get(n.id);
+          return position ? { ...n, position } : n;
+        })
+      : nodes;
+    const newEdges = plan.edges.length ? [...edges, ...(plan.edges as Edge[])] : edges;
+    setNodes(newNodes);
+    setEdges(newEdges);
+    if (onTopologyChangeProp) {
+      onTopologyChangeProp(newNodes, newEdges);
+    } else {
+      onNodesChangeProp(newNodes);
+      onEdgesChangeProp(newEdges);
+    }
+    if (plan.edges.length === 0) {
+      toast.info('All role-derived edges already exist — layout applied.');
+      return;
+    }
+    const labelOf = (id: string | undefined) =>
+      String(nodes.find((n) => n.id === id)?.data?.label ?? id);
+    toast.success(
+      `Auto-wired ${plan.edges.length} edge${plan.edges.length === 1 ? '' : 's'}: ` +
+        plan.edges
+          .map((e) => `${labelOf(e.source)} → ${labelOf(e.target)} (${String(e.data?.edgeType)})`)
+          .join(', ')
+    );
+  }, [
+    readOnly,
+    nodes,
+    edges,
+    servicesById,
+    setNodes,
+    setEdges,
+    onNodesChangeProp,
+    onEdgesChangeProp,
+    onTopologyChangeProp,
+  ]);
 
   const handleNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChange>[0]) => {
       onNodesChange(changes);
-      // Defer the callback to avoid state update during render
-      setTimeout(() => {
+      // Notify parent after React Flow has processed changes internally.
+      // Using requestAnimationFrame avoids the race-condition risk of setTimeout
+      // while still deferring past the current render cycle.
+      requestAnimationFrame(() => {
         setNodes((nds) => {
           onNodesChangeProp(nds);
           return nds;
         });
-      }, 0);
+      });
     },
     [onNodesChange, setNodes, onNodesChangeProp]
   );
@@ -316,12 +431,12 @@ function TopologyCanvasInner({
   const handleEdgesChange = useCallback(
     (changes: Parameters<typeof onEdgesChange>[0]) => {
       onEdgesChange(changes);
-      setTimeout(() => {
+      requestAnimationFrame(() => {
         setEdges((eds) => {
           onEdgesChangeProp(eds);
           return eds;
         });
-      }, 0);
+      });
     },
     [onEdgesChange, setEdges, onEdgesChangeProp]
   );
@@ -331,249 +446,35 @@ function TopologyCanvasInner({
       {/* Toolbar */}
       {!readOnly && (
         <div className="absolute top-2 left-2 z-10 flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-lg border p-1 shadow-sm">
-          {/* Add Security Tool (INTACT Toolbox) */}
-          <Popover open={toolboxOpen} onOpenChange={setToolboxOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                disabled={toolboxServices.length === 0}
-              >
-                <Shield className="h-4 w-4 mr-1" />
-                Add Security Tool
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-80 p-0">
-              {selectedService && selectedService.repositoryTable === 'INTACT_TOOLBOX' ? (
-                // Version selection view
-                <div className="p-3">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm">{selectedService.shortName}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {selectedService.title}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                      Select Version
-                    </label>
-                    <Select value={selectedVersion} onValueChange={setSelectedVersion}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Select version" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {selectedService.versions?.map((v) => (
-                          <SelectItem key={v.version} value={v.version}>
-                            {v.version}
-                            {v.version === selectedService.currentVersion && ' (latest)'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={cancelVersionSelection}
-                    >
-                      Cancel
-                    </Button>
-                    <Button size="sm" className="flex-1" onClick={() => confirmAddService(true)}>
-                      Add Service
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                // Service list view
-                <>
-                  <div className="p-3 border-b">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search security tools..."
-                        value={toolboxSearch}
-                        onChange={(e) => setToolboxSearch(e.target.value)}
-                        className="pl-8 h-9"
-                      />
-                    </div>
-                  </div>
-                  <ScrollArea className="h-72">
-                    {toolboxServices.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-muted-foreground">
-                        No security tools available
-                      </div>
-                    ) : Object.keys(groupedToolboxServices).length === 0 ? (
-                      <div className="p-4 text-center text-sm text-muted-foreground">
-                        No security tools match your search
-                      </div>
-                    ) : (
-                      <div className="p-2">
-                        {Object.entries(groupedToolboxServices).map(
-                          ([category, categoryServices]) => (
-                            <div key={category} className="mb-3">
-                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                {category}
-                              </div>
-                              {categoryServices.map((service) => (
-                                <button
-                                  key={service._id}
-                                  onClick={() => handleServiceSelect(service, true)}
-                                  className="w-full flex items-center gap-2 px-2 py-2 text-left rounded-md hover:bg-accent transition-colors"
-                                >
-                                  <Shield className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-sm truncate">
-                                      {service.shortName}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground truncate">
-                                      {service.title}
-                                      {service.versions && service.versions.length > 1 && (
-                                        <span className="ml-1 text-muted-foreground/60">
-                                          ({service.versions.length} versions)
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          )
-                        )}
-                      </div>
-                    )}
-                  </ScrollArea>
-                </>
-              )}
-            </PopoverContent>
-          </Popover>
+          <ServicePalette
+            services={services}
+            readOnly={readOnly}
+            onAddToolboxService={(service, version) => addNode(service, true, version)}
+            onAddInfraService={(service, version) => addNode(service, false, version)}
+          />
 
-          {/* Add Infrastructure Service (Critical Infrastructure) */}
-          <Popover open={infraOpen} onOpenChange={setInfraOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
-                disabled={infraServices.length === 0}
-              >
-                <Server className="h-4 w-4 mr-1" />
-                Add Target
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-80 p-0">
-              {selectedService && selectedService.repositoryTable === 'OTHER_SERVICES' ? (
-                // Version selection view
-                <div className="p-3">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Server className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm">{selectedService.shortName}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {selectedService.title}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                      Select Version
-                    </label>
-                    <Select value={selectedVersion} onValueChange={setSelectedVersion}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Select version" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {selectedService.versions?.map((v) => (
-                          <SelectItem key={v.version} value={v.version}>
-                            {v.version}
-                            {v.version === selectedService.currentVersion && ' (latest)'}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={cancelVersionSelection}
-                    >
-                      Cancel
-                    </Button>
-                    <Button size="sm" className="flex-1" onClick={() => confirmAddService(false)}>
-                      Add Service
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                // Service list view
-                <>
-                  <div className="p-3 border-b">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search infrastructure services..."
-                        value={infraSearch}
-                        onChange={(e) => setInfraSearch(e.target.value)}
-                        className="pl-8 h-9"
-                      />
-                    </div>
-                  </div>
-                  <ScrollArea className="h-72">
-                    {infraServices.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-muted-foreground">
-                        No infrastructure services available
-                      </div>
-                    ) : Object.keys(groupedInfraServices).length === 0 ? (
-                      <div className="p-4 text-center text-sm text-muted-foreground">
-                        No infrastructure services match your search
-                      </div>
-                    ) : (
-                      <div className="p-2">
-                        {Object.entries(groupedInfraServices).map(
-                          ([category, categoryServices]) => (
-                            <div key={category} className="mb-3">
-                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                                {category}
-                              </div>
-                              {categoryServices.map((service) => (
-                                <button
-                                  key={service._id}
-                                  onClick={() => handleServiceSelect(service, false)}
-                                  className="w-full flex items-center gap-2 px-2 py-2 text-left rounded-md hover:bg-accent transition-colors"
-                                >
-                                  <Server className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-medium text-sm truncate">
-                                      {service.shortName}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground truncate">
-                                      {service.title}
-                                      {service.versions && service.versions.length > 1 && (
-                                        <span className="ml-1 text-muted-foreground/60">
-                                          ({service.versions.length} versions)
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          )
-                        )}
-                      </div>
-                    )}
-                  </ScrollArea>
-                </>
-              )}
-            </PopoverContent>
-          </Popover>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={() => setConfigNodeId(selectedNodes[0])}
+            disabled={selectedNodes.length !== 1}
+            title="Edit this node's env, args and config-file overrides"
+          >
+            <Settings2 className="h-4 w-4 mr-1" />
+            Configure
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={handleAutoWire}
+            title="Generate the role-derived edges (attacks / monitors / notifies / acts-on) and lay out the graph"
+          >
+            <Waypoints className="h-4 w-4 mr-1" />
+            Auto-wire
+          </Button>
 
           <Button
             variant="outline"
@@ -598,6 +499,9 @@ function TopologyCanvasInner({
         onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onSelectionChange={onSelectionChange}
+        onNodeDoubleClick={(_event, node) => {
+          if (!readOnly) setConfigNodeId(node.id);
+        }}
         nodeTypes={nodeTypes}
         fitView
         nodesDraggable={!readOnly}
@@ -614,6 +518,16 @@ function TopologyCanvasInner({
         />
         <MiniMap nodeStrokeWidth={3} zoomable pannable className="!bg-muted" />
       </ReactFlow>
+
+      <NodeConfigPanel
+        node={configNode}
+        deployment={configDeployment}
+        open={configNode !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setConfigNodeId(null);
+        }}
+        onConfigChange={handleConfigChange}
+      />
     </div>
   );
 }

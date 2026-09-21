@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ServiceTable } from '@/components/services/ServiceTable';
+import { ServiceTableWithState } from '@/components/services/ServiceTable';
 import { ServiceDrawer } from '@/components/services/ServiceDrawer';
 
 export function Services() {
@@ -43,7 +43,7 @@ export function Services() {
     queryFn: sectorsApi.list,
   });
 
-  // Fetch all services for INTACT Toolbox
+  // Fetch all services for the Security Toolbox (INTACT_TOOLBOX)
   const { data: toolboxData, isLoading: toolboxLoading } = useQuery({
     queryKey: ['services', 'INTACT_TOOLBOX'],
     queryFn: () => servicesApi.list({ table: 'INTACT_TOOLBOX', limit: 100 }),
@@ -151,6 +151,10 @@ export function Services() {
     setDrawerOpen(true);
   };
 
+  const handleRetry = () => {
+    window.location.reload();
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -165,7 +169,7 @@ export function Services() {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="toolbox" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
-            INTACT Toolbox
+            Security Toolbox
             <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs">
               {toolboxData?.services?.length || 0}
             </span>
@@ -228,9 +232,11 @@ export function Services() {
               Add Tool
             </Button>
           </div>
-          <ServiceTable
+          <ServiceTableWithState
             services={toolboxServices}
             isLoading={toolboxLoading}
+            error={null}
+            onRetry={handleRetry}
             onRowClick={handleRowClick}
           />
         </TabsContent>
@@ -285,9 +291,11 @@ export function Services() {
               Add Service
             </Button>
           </div>
-          <ServiceTable
+          <ServiceTableWithState
             services={infrastructureServices}
             isLoading={infrastructureLoading}
+            error={null}
+            onRetry={handleRetry}
             onRowClick={handleRowClick}
             showSector
           />

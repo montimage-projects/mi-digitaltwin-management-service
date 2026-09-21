@@ -1,13 +1,14 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { ArrowLeft, Loader2, Pencil, Plus, Layers } from 'lucide-react';
+import { ArrowLeft, Loader2, Pencil, Plus, Layers, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { projectsApi, scenariosApi } from '@/lib/api';
 import { useWorkspaceStore } from '@/store/workspace-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ScenarioTable } from '@/components/scenarios/ScenarioTable';
+import { ScenarioTableWithState } from '@/components/scenarios/ScenarioTable';
 
 const sectorColors: Record<string, string> = {
   Telecommunications: 'bg-blue-100 text-blue-800',
@@ -104,8 +105,27 @@ export function ProjectDetail() {
                   <p className="font-medium">{project.leader}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Type</p>
-                  <p className="font-medium">{project.isComposite ? 'Composite' : 'Atomic'}</p>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    Type
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[250px]">
+                          <p className="text-xs">
+                            <strong>Atomic:</strong> A standalone digital twin project.
+                            <br />
+                            <strong>Composite:</strong> A project that combines multiple atomic
+                            projects into a cross-sector digital twin.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </p>
+                  <p className="font-medium">
+                    {project.isComposite ? 'Composite Project' : 'Atomic Project'}
+                  </p>
                 </div>
               </div>
 
@@ -162,13 +182,13 @@ export function ProjectDetail() {
                 Add Scenario
               </Button>
             </div>
-            {scenariosLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <ScenarioTable scenarios={scenarios} projectId={id!} />
-            )}
+            <ScenarioTableWithState
+              scenarios={scenarios}
+              projectId={id!}
+              isLoading={scenariosLoading}
+              error={null}
+              onRetry={() => window.location.reload()}
+            />
           </div>
         </div>
 

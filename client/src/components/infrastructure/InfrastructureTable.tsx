@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { MoreHorizontal, Edit, Trash2, RefreshCw, Server, Cloud, Box } from 'lucide-react';
 import { Infrastructure, infrastructuresApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { ErrorState } from '@/components/ui/error-state';
 
 interface InfrastructureTableProps {
   infrastructures: Infrastructure[];
@@ -204,4 +205,21 @@ export function InfrastructureTable({ infrastructures, onEdit }: InfrastructureT
       </AlertDialog>
     </>
   );
+}
+
+export function InfrastructureTableWithState({
+  infrastructures,
+  onEdit,
+  error,
+  onRetry,
+}: {
+  infrastructures: Infrastructure[];
+  onEdit: (infra: Infrastructure) => void;
+  error: Error | string | null;
+  onRetry?: () => void;
+}) {
+  if (error) {
+    return <ErrorState error={error} onRetry={onRetry} />;
+  }
+  return <InfrastructureTable infrastructures={infrastructures} onEdit={onEdit} />;
 }

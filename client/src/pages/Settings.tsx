@@ -6,6 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { categoriesApi } from '@/lib/api';
 import { agentApi } from '@/lib/agent-api';
+import {
+  ORG_NAME,
+  ORG_URL,
+  ORG_DESCRIPTION,
+  LOGO_SRC,
+  LOGO_ALT,
+  LOGO_BACKDROP,
+} from '@/lib/branding';
 import { UserManagement } from './UserManagement';
 
 export function Settings() {
@@ -78,6 +86,28 @@ export function Settings() {
                 <p className="font-medium">{new Date().toLocaleDateString()}</p>
               </div>
             </div>
+
+            <div className="mt-6 flex items-start gap-4 border-t pt-6">
+              <img
+                src={LOGO_SRC}
+                alt={LOGO_ALT}
+                className={`h-10 w-auto max-w-[160px] object-contain${LOGO_BACKDROP ? ' bg-white rounded px-1.5 py-0.5' : ''}`}
+              />
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">
+                  About{' '}
+                  <a
+                    href={ORG_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-foreground hover:underline"
+                  >
+                    {ORG_NAME}
+                  </a>
+                </p>
+                <p className="text-sm text-muted-foreground">{ORG_DESCRIPTION}</p>
+              </div>
+            </div>
           </div>
 
           <div className="rounded-lg border bg-background p-6">
@@ -111,12 +141,6 @@ export function Settings() {
                     Refresh
                   </Button>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">API URL</p>
-                <p className="font-mono text-sm bg-muted px-3 py-2 rounded">
-                  {import.meta.env.VITE_API_URL || '/api'}
-                </p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Chat model</p>

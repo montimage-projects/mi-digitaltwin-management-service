@@ -1,0 +1,15 @@
+# ConfigMap for MongoDB init script — creates the app user on first start.
+# Applied alongside the StatefulSet via kustomization.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-init-script
+data:
+  init-mongo.js: |
+    // Create the application user with readWrite access to the 'intact' database.
+    db = db.getSiblingDB('intact');
+    db.createUser({
+      user: 'intact_app',
+      pwd: 'intact_pass',
+      roles: [{ role: 'readWrite', db: 'intact' }],
+    });

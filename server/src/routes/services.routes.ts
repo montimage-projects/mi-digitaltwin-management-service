@@ -5,11 +5,24 @@ import { Category } from '../models/Category.js';
 import { Sector } from '../models/Sector.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateQuery, validateBody, objectIdSchema } from '../middleware/validation.js';
-import { AppError } from '../middleware/errorHandler.js';
+import {
+  asyncHandler,
+  findById,
+  findByIdAndUpdate,
+  findByIdAndDelete,
+  validateObjectIdParam,
+} from '../middleware/entityLoader.js';
+import { buildCaseInsensitiveFilter, buildSearchOrFilter } from '../utils/search.js';
+import { REPOSITORY_TABLES } from '../lib/constants.js';
 import { getRAGRetriever } from '../agent/index.js';
 
 const router: RouterType = Router();
 
+/** Fields a free-text `?search=` term is matched against. */
+const SEARCH_FIELDS = ['shortName', 'title', 'description'] as const;
+
+// Re-index a service in the Boss Agent's RAG vector store after catalog writes.
+// Best-effort: never blocks or fails the service API if indexing errors.
 function triggerAsyncIndex(serviceId: string): void {
   getRAGRetriever()
     .indexServiceById(serviceId)
@@ -23,6 +36,75 @@ const inputOutputSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   format: z.string().max(100).optional(),
+});
+
+/**
+ * Optional Kubernetes deployment spec — mirrors `IDeploymentSpec` in
+ * `models/Service.ts` (issue #188, playbook task 0.3). Strict at every level
+ * so a misspelled field is rejected with 400 instead of silently stripped.
+ */
+const deploymentSpecSchema = z.strictObject({
+  kind: z.enum(['Deployment', 'Job']),
+  role: z.enum(['attack', 'target', 'monitor', 'reaction', 'generic']),
+  attachMode: z.enum(['standalone', 'sidecar']).optional(),
+  containerPort: z.number().int().min(1).max(65535).optional(),
+  exposePort: z.boolean().optional(),
+  command: z.array(z.string().min(1).max(500)).max(50).optional(),
+  args: z.array(z.string().min(1).max(500)).max(50).optional(),
+  env: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1).max(200),
+        value: z.string().max(4000).optional(),
+        fromEdge: z.enum(['target', 'reaction']).optional(),
+      })
+    )
+    .max(100)
+    .optional(),
+  configFiles: z
+    .array(
+      z.strictObject({
+        mountPath: z.string().min(1).max(500),
+        content: z.string().max(65536),
+      })
+    )
+    .max(20)
+    .optional(),
+  volumes: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1).max(100),
+        mountPath: z.string().min(1).max(500),
+        emptyDir: z.literal(true),
+      })
+    )
+    .max(20)
+    .optional(),
+  securityContext: z
+    .strictObject({
+      capabilities: z.array(z.string().min(1).max(100)).max(50).optional(),
+      privileged: z.boolean().optional(),
+    })
+    .optional(),
+  hostNetwork: z.boolean().optional(),
+  rbac: z
+    .array(
+      z.strictObject({
+        // '' names the core API group (e.g. pods), so items allow empty strings
+        apiGroups: z.array(z.string().max(200)).min(1).max(20),
+        resources: z.array(z.string().min(1).max(200)).min(1).max(20),
+        verbs: z.array(z.string().min(1).max(50)).min(1).max(20),
+      })
+    )
+    .max(20)
+    .optional(),
+  readinessPath: z
+    .string()
+    .min(1)
+    .max(500)
+    .regex(/^\//, 'readinessPath must be an absolute path')
+    .optional(),
+  startOrder: z.number().int().min(0).max(1000).optional(),
 });
 
 const createServiceSchema = z.object({
@@ -55,7 +137,9 @@ const createServiceSchema = z.object({
   outputs: z.array(inputOutputSchema).default([]),
   interactsWith: z.array(z.string().max(100)).default([]),
   potentialUseCases: z.array(z.string().max(500)).default([]),
-  repositoryTable: z.enum(['INTACT_TOOLBOX', 'OTHER_SERVICES']).default('INTACT_TOOLBOX'),
+  repositoryTable: z
+    .enum([REPOSITORY_TABLES.INTACT_TOOLBOX, REPOSITORY_TABLES.OTHER_SERVICES])
+    .default(REPOSITORY_TABLES.INTACT_TOOLBOX),
   currentVersion: z.string().max(50).optional(),
   versions: z
     .array(
@@ -67,6 +151,7 @@ const createServiceSchema = z.object({
       })
     )
     .default([]),
+  deployment: deploymentSpecSchema.optional(),
 });
 
 const updateServiceSchema = createServiceSchema.partial();
@@ -78,11 +163,19 @@ const addVersionSchema = z.object({
 });
 
 const listServicesSchema = z.object({
-  table: z.enum(['INTACT_TOOLBOX', 'OTHER_SERVICES']).optional(),
+  table: z.enum([REPOSITORY_TABLES.INTACT_TOOLBOX, REPOSITORY_TABLES.OTHER_SERVICES]).optional(),
   category: z.string().optional(),
   sector: z.string().optional(),
   provider: z.string().optional(),
   search: z.string().optional(),
+  includeDeprecated: z
+    .string()
+    .optional()
+    .transform((val) => val === 'true'),
+  slim: z
+    .string()
+    .optional()
+    .transform((val) => val === 'true'),
   limit: z
     .string()
     .optional()
@@ -96,12 +189,27 @@ const listServicesSchema = z.object({
 type ListServicesQuery = z.infer<typeof listServicesSchema>;
 
 // GET /api/services
-router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, res, next) => {
-  try {
-    const { table, category, sector, provider, search, limit, skip } =
-      req.query as unknown as ListServicesQuery;
+// By default, services deprecated by a catalog refresh (see
+// `seed/services.seed.ts`) are excluded. Pass `?includeDeprecated=true` to
+// see the full history, e.g. for admin/audit views.
+// Pass `?slim=true` to return only `shortName` and `title` — ideal for
+// dropdown pickers that need to display up to 1000 services without
+// transferring the full catalog payload.
+router.get(
+  '/',
+  authMiddleware,
+  validateQuery(listServicesSchema),
+  asyncHandler(async (req, res) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parsedQuery = req.query as any as ListServicesQuery;
+    const { table, category, sector, provider, search, includeDeprecated, slim, limit, skip } =
+      parsedQuery;
 
     const query: Record<string, unknown> = {};
+
+    if (!includeDeprecated) {
+      query.deprecated = { $ne: true };
+    }
 
     if (table) {
       query.repositoryTable = table;
@@ -116,15 +224,26 @@ router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, r
     }
 
     if (provider) {
-      query.provider = { $regex: new RegExp(provider, 'i') };
+      query.provider = buildCaseInsensitiveFilter(provider);
     }
 
     if (search) {
-      query.$or = [
-        { shortName: { $regex: new RegExp(search, 'i') } },
-        { title: { $regex: new RegExp(search, 'i') } },
-        { description: { $regex: new RegExp(search, 'i') } },
-      ];
+      query.$or = buildSearchOrFilter(SEARCH_FIELDS, search);
+    }
+
+    if (slim) {
+      // Slim mode: only shortName + title — no population, no extra fields.
+      const [services, total] = await Promise.all([
+        Service.find(query, 'shortName title')
+          .sort({ shortName: 1 })
+          .skip(skip as number)
+          .limit(limit as number)
+          .lean(),
+        Service.countDocuments(query),
+      ]);
+
+      res.json({ services, total, limit, skip });
+      return;
     }
 
     const [services, total] = await Promise.all([
@@ -144,60 +263,44 @@ router.get('/', authMiddleware, validateQuery(listServicesSchema), async (req, r
       limit,
       skip,
     });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // GET /api/services/:id
-router.get('/:id', authMiddleware, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    // Validate ObjectId format
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid service ID', 400);
-    }
-
-    const service = await Service.findById(id)
-      .populate('categoryId', 'name slug')
-      .populate('sectorId', 'name slug category')
-      .lean();
-
-    if (!service) {
-      throw new AppError('Service not found', 404);
-    }
+router.get(
+  '/:id',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
+    const service = await findById(Service, req.params.id, [
+      'categoryId',
+      { path: 'sectorId', select: 'name slug category' },
+    ]);
 
     res.json(service);
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // POST /api/services - Create new service
-router.post('/', authMiddleware, validateBody(createServiceSchema), async (req, res, next) => {
-  try {
+router.post(
+  '/',
+  authMiddleware,
+  validateBody(createServiceSchema),
+  asyncHandler(async (req, res) => {
     const data = req.body;
 
     // Check if category exists
-    const category = await Category.findById(data.categoryId);
-    if (!category) {
-      throw new AppError('Category not found', 400);
-    }
+    await findById(Category, data.categoryId);
 
     // Check if sector exists (if provided)
     if (data.sectorId) {
-      const sector = await Sector.findById(data.sectorId);
-      if (!sector) {
-        throw new AppError('Sector not found', 400);
-      }
+      await findById(Sector, data.sectorId);
     }
 
     // Check for duplicate shortName
     const existingService = await Service.findOne({ shortName: data.shortName });
     if (existingService) {
-      throw new AppError('Service with this short name already exists', 409);
+      throw new Error('Service with this short name already exists');
     }
 
     // Set currentVersion from versions if provided
@@ -216,37 +319,27 @@ router.post('/', authMiddleware, validateBody(createServiceSchema), async (req, 
     triggerAsyncIndex(String(service._id));
 
     res.status(201).json(populatedService);
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // PUT /api/services/:id - Update service
-router.put('/:id', authMiddleware, validateBody(updateServiceSchema), async (req, res, next) => {
-  try {
+router.put(
+  '/:id',
+  authMiddleware,
+  validateObjectIdParam,
+  validateBody(updateServiceSchema),
+  asyncHandler(async (req, res) => {
     const { id } = req.params;
     const data = req.body;
 
-    // Validate ObjectId format
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid service ID', 400);
-    }
-
     // Check if category exists (if being updated)
     if (data.categoryId) {
-      const category = await Category.findById(data.categoryId);
-      if (!category) {
-        throw new AppError('Category not found', 400);
-      }
+      await findById(Category, data.categoryId);
     }
 
     // Check if sector exists (if being updated)
     if (data.sectorId) {
-      const sector = await Sector.findById(data.sectorId);
-      if (!sector) {
-        throw new AppError('Sector not found', 400);
-      }
+      await findById(Sector, data.sectorId);
     }
 
     // Check for duplicate shortName (if being updated)
@@ -256,105 +349,76 @@ router.put('/:id', authMiddleware, validateBody(updateServiceSchema), async (req
         _id: { $ne: id },
       });
       if (existingService) {
-        throw new AppError('Service with this short name already exists', 409);
+        throw new Error('Service with this short name already exists');
       }
     }
 
-    const service = await Service.findByIdAndUpdate(
+    const service = await findByIdAndUpdate(
+      Service,
       id,
       { $set: data },
-      { new: true, runValidators: true }
-    )
-      .populate('categoryId', 'name slug')
-      .populate('sectorId', 'name slug category')
-      .lean();
-
-    if (!service) {
-      throw new AppError('Service not found', 404);
-    }
+      { new: true, runValidators: true },
+      ['categoryId', { path: 'sectorId', select: 'name slug category' }]
+    );
 
     triggerAsyncIndex(id);
 
     res.json(service);
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // DELETE /api/services/:id - Delete service
-router.delete('/:id', authMiddleware, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    // Validate ObjectId format
-    const parseResult = objectIdSchema.safeParse(id);
-    if (!parseResult.success) {
-      throw new AppError('Invalid service ID', 400);
-    }
-
-    const service = await Service.findByIdAndDelete(id);
-
-    if (!service) {
-      throw new AppError('Service not found', 404);
-    }
-
+router.delete(
+  '/:id',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
+    await findByIdAndDelete(Service, req.params.id);
     res.json({ message: 'Service deleted successfully' });
-  } catch (error) {
-    next(error);
-  }
-});
+  })
+);
 
 // POST /api/services/:id/versions - Add new version
 router.post(
   '/:id/versions',
   authMiddleware,
+  validateObjectIdParam,
   validateBody(addVersionSchema),
-  async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const { version, dockerImage, releaseNotes } = req.body;
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { version, dockerImage, releaseNotes } = req.body;
 
-      // Validate ObjectId format
-      const parseResult = objectIdSchema.safeParse(id);
-      if (!parseResult.success) {
-        throw new AppError('Invalid service ID', 400);
-      }
-
-      const service = await Service.findById(id);
-
-      if (!service) {
-        throw new AppError('Service not found', 404);
-      }
-
-      // Check for duplicate version
-      const existingVersion = service.versions.find((v) => v.version === version);
-      if (existingVersion) {
-        throw new AppError('Version already exists', 409);
-      }
-
-      // Add new version
-      service.versions.push({
-        version,
-        dockerImage,
-        releaseNotes,
-        releasedAt: new Date(),
-      });
-
-      // Update currentVersion
-      service.currentVersion = version;
-
-      await service.save();
-
-      const populatedService = await Service.findById(id)
-        .populate('categoryId', 'name slug')
-        .populate('sectorId', 'name slug category')
-        .lean();
-
-      res.json(populatedService);
-    } catch (error) {
-      next(error);
+    const service = await Service.findById(id);
+    if (!service) {
+      throw new Error('Service not found');
     }
-  }
+
+    // Check for duplicate version
+    const existingVersion = service.versions.find((v) => v.version === version);
+    if (existingVersion) {
+      throw new Error('Version already exists');
+    }
+
+    // Add new version
+    service.versions.push({
+      version,
+      dockerImage,
+      releaseNotes,
+      releasedAt: new Date(),
+    });
+
+    // Update currentVersion
+    service.currentVersion = version;
+
+    await service.save();
+
+    const populatedService = await Service.findById(id)
+      .populate('categoryId', 'name slug')
+      .populate('sectorId', 'name slug category')
+      .lean();
+
+    res.json(populatedService);
+  })
 );
 
 export default router;

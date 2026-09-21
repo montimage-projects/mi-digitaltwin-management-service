@@ -24,7 +24,7 @@ import {
 import { Scenario, infrastructuresApi } from '@/lib/api';
 
 const scenarioSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(200),
+  title: z.string().min(1, { error: 'Title is required' }).max(200),
   description: z.string().max(2000).optional(),
   infrastructureId: z.string().optional(),
 });
@@ -112,7 +112,7 @@ export function ScenarioForm({ scenario, onSubmit, isSubmitting }: ScenarioFormP
             <FormItem>
               <FormLabel>Target Infrastructure</FormLabel>
               <Select
-                onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}
+                onValueChange={(value: string) => field.onChange(value === 'none' ? '' : value)}
                 defaultValue={field.value || 'none'}
               >
                 <FormControl>

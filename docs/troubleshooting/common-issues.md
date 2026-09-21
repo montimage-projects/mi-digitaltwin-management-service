@@ -18,7 +18,7 @@ lsof -i :3000
 kill -9 <PID>
 
 # Or use a different port
-PORT=3001 bun run dev
+PORT=3001 npm run dev
 ```
 
 ### MongoDB Connection Failed
@@ -63,18 +63,18 @@ docker-compose restart mongodb
 1. **Clean reinstall:**
 
 ```bash
-rm -rf node_modules bun.lock
-bun install
+rm -rf node_modules package-lock.json
+npm install
 ```
 
 2. **Check you're in the correct directory:**
 
 ```bash
 # For client packages
-cd client && bun install
+cd client && npm install
 
 # For server packages
-cd server && bun install
+cd server && npm install
 ```
 
 ### TypeScript Errors
@@ -86,7 +86,7 @@ cd server && bun install
 1. **Run type check:**
 
 ```bash
-bun run typecheck
+npm run typecheck
 ```
 
 2. **Clear TypeScript cache:**
@@ -134,7 +134,7 @@ cat server/.env | grep JWT_SECRET
 1. **Reseed the database:**
 
 ```bash
-cd server && bun run seed
+cd server && npm run seed
 ```
 
 2. **Check password in database:**
@@ -172,7 +172,7 @@ volumes:
 
 ### Database Seeding Fails
 
-**Symptom:** `bun run seed` fails or times out
+**Symptom:** `npm run seed` fails or times out
 
 **Solutions:**
 
@@ -193,7 +193,7 @@ docker-compose exec mongodb mongosh --eval "db.adminCommand('ping')"
 ```bash
 # Clear existing data
 docker-compose exec mongodb mongosh intact --eval "db.dropDatabase()"
-bun run seed
+npm run seed
 ```
 
 ## Frontend Issues
@@ -282,7 +282,7 @@ import '@xyflow/react/dist/style.css';
 
 ```bash
 # Increase Node.js memory limit
-NODE_OPTIONS="--max-old-space-size=4096" bun run build
+NODE_OPTIONS="--max-old-space-size=4096" npm run build
 ```
 
 ### ESLint Errors Block Commit
@@ -294,7 +294,7 @@ NODE_OPTIONS="--max-old-space-size=4096" bun run build
 1. **Fix lint errors:**
 
 ```bash
-bun run lint:fix
+npm run lint:fix
 ```
 
 2. **Bypass for urgent commits (not recommended):**

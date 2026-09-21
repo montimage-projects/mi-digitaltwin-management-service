@@ -2,6 +2,25 @@
 
 Complete guide to deploying the MI Digital Twin Management Service to production environments.
 
+## Upgrade Note: Montimage Rebrand (Docker Volume Names)
+
+The Docker Compose files (`docker-compose.yml`, `docker-compose.prod.yml`, `docker-compose.atlas.yml`)
+were updated as part of the Montimage rebrand: container names, the network name, and the named
+volumes (e.g. `intact-mongodb-data` → `montimage-mongodb-data`) all changed. If you have an
+existing deployment, Docker will **not** reuse your old volume under the new name — it will
+silently provision a fresh, empty volume instead. Before (or immediately after) upgrading,
+migrate your MongoDB data volume, for example:
+
+```bash
+docker run --rm \
+  -v intact-mongodb-data:/from \
+  -v montimage-mongodb-data:/to \
+  alpine sh -c "cd /from && cp -a . /to"
+```
+
+Adjust the source/target volume names above to match the compose file you use (e.g. append
+`-prod` or `-atlas`), then restart the stack.
+
 ## Prerequisites
 
 Before deploying, ensure you have:
@@ -15,11 +34,20 @@ Before deploying, ensure you have:
 
 ## Deployment Options
 
-Choose one based on your infrastructure:
+Choose based on your infrastructure. **Kubernetes is the recommended path
+for new deployments**; **Docker Compose remains fully supported** for
+existing and new single-server deployments alike:
 
-1. **Docker Compose** - Single server with Docker (recommended for small deployments)
-2. **Kubernetes** - Container orchestration for scalability
-3. **MongoDB Atlas** - Managed MongoDB in the cloud
+1. **Kubernetes** - Recommended. Kustomize-based, scalable container
+   orchestration — see [Option 3](#option-3-kubernetes-deployment-recommended)
+2. **Docker Compose** - Fully supported single server with Docker — see
+   [Option 1](#option-1-docker-compose-single-server)
+3. **MongoDB Atlas** - Managed MongoDB in the cloud, usable with either
+   option above — see [Option 2](#option-2-mongodb-atlas-cloud-database)
+4. **Render (free demo hosting)** - Not for production. A single free
+   container plus MongoDB Atlas M0 for an occasional public demo; spins down
+   when idle — see the
+   [Render Demo Playbook](playbooks/render-demo-deployment.md)
 
 ## Option 1: Docker Compose (Single Server)
 
@@ -39,6 +67,7 @@ Create `.env.prod` in project root:
 # General
 NODE_ENV=production
 LOG_LEVEL=info
+BRANDING_PROFILE=secassured
 
 # Backend
 PORT=3000
@@ -56,12 +85,20 @@ MONGODB_PASSWORD=secure_password_here
 JWT_SECRET=your-very-secure-random-secret-key
 CORS_ORIGIN=https://yourdomain.com
 
-# Agent / Ollama
-OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=qwen3:14b
-OLLAMA_EMBED_MODEL=nomic-embed-text
-VECTOR_DB_TYPE=mongodb
 ```
+
+> **Branding in the Compose path.** `BRANDING_PROFILE`, `APP_NAME`, `ORG_NAME`, and
+> `ORG_URL` are forwarded from this `.env` into the container by
+> `docker-compose.prod.yml` / `docker-compose.atlas.yml`, so **server-rendered**
+> branding (OpenAPI docs title, startup boot banner) follows the profile you set
+> here (defaults to `secassured`). **Client-rendered** branding (logo, favicon,
+> browser tab title) is baked into the client bundle at build time from
+> `VITE_BRANDING_PROFILE` (also defaults to `secassured` via
+> `client/.env.example`). The unified single-container image's client-builder
+> stage in `server/Dockerfile.unified` does not forward `VITE_BRANDING_PROFILE`
+> as a Docker env var — the value is compiled in during the client build stage.
+> To change the client branding, set `VITE_BRANDING_PROFILE` in the client
+> `.env` before building.
 
 ### Step 2: Update Docker Compose
 
@@ -212,123 +249,45 @@ docker-compose -f docker-compose.atlas.yml up -d
 
 ```bash
 # Seed Atlas database with initial data
-docker-compose exec server bun run seed
+docker-compose exec server npm run seed
 ```
 
-## Option 3: Kubernetes Deployment
+## Option 3: Kubernetes Deployment (Recommended)
 
-For scalable, containerized deployments:
+For scalable, container-orchestrated deployments, use the Kustomize-based
+manifests under [`k8s/`](../k8s/README.md) — no Helm required, just
+`kubectl apply -k`. This is the recommended path for new deployments; Docker
+Compose (Option 1 above) remains fully supported alongside it.
 
-### Prerequisites
+**Full guide:** [Kubernetes Deployment Playbook](playbooks/kubernetes-deployment.md)
+— prerequisites, building/pushing your image, configuring secrets, deploying
+the dev/prod/atlas overlays, verification, updates, re-seeding,
+backup/restore, rollback, troubleshooting, and scaling considerations.
 
-- Kubernetes cluster (EKS, GKE, AKS, or self-managed)
-- kubectl configured
-- Docker images pushed to registry
-
-### Step 1: Build and Push Images
+Quick summary:
 
 ```bash
-# Build images
-docker build -t myregistry.azurecr.io/intact-client:latest ./client
-docker build -t myregistry.azurecr.io/intact-server:latest ./server
+# 1. Build and push your image (there is no CI image-publish pipeline yet)
+docker build -f server/Dockerfile.unified -t <your-registry>/<image>:<tag> .
+docker push <your-registry>/<image>:<tag>
 
-# Push to registry
-docker push myregistry.azurecr.io/intact-client:latest
-docker push myregistry.azurecr.io/intact-server:latest
+# 2. Create the namespace and configure the secret (see the full guide)
+kubectl apply -f k8s/overlays/prod/namespace.yaml
+cp k8s/base/secret.example.yaml k8s/base/secret.yaml   # fill in real values
+kubectl apply -f k8s/base/secret.yaml -n montimage-prod
+
+# 3. Deploy
+kubectl apply -k k8s/overlays/prod   # or overlays/dev, overlays/atlas
+
+# 4. Verify
+kubectl get pods -n montimage-prod
+curl http://localhost:3000/api/health   # after kubectl port-forward svc/app 3000:3000 -n montimage-prod
 ```
 
-### Step 2: Create Kubernetes Manifests
-
-**`k8s/namespace.yaml`:**
-
-```yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: intact
-```
-
-**`k8s/configmap.yaml`:**
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: intact-config
-  namespace: intact
-data:
-  ENVIRONMENT: production
-  MONGODB_URI: mongodb+srv://user:pass@atlas.mongodb.net/intact
-```
-
-**`k8s/deployment-server.yaml`:**
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
- name: intact-server
- namespace: intact
-spec:
- replicas: 2
- selector:
- matchLabels:
- app: intact-server
- template:
- metadata:
- labels:
- app: intact-server
- spec:
- containers:
- - name: server
- image: myregistry.azurecr.io/intact-server:latest
- ports:
- - containerPort: 3000
- envFrom:
- - configMapRef:
- name: intact-config
- resources:
- requests:
- memory: '512Mi'
- cpu: '250m'
- limits:
- memory: '1Gi'
- cpu: '500m'
-```
-
-**`k8s/service.yaml`:**
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: intact-server
-  namespace: intact
-spec:
-  selector:
-  app: intact-server
-  ports:
-    - protocol: TCP
-  port: 3000
-  targetPort: 3000
-  type: LoadBalancer
-```
-
-### Step 3: Deploy
-
-```bash
-# Create namespace
-kubectl apply -f k8s/namespace.yaml
-
-# Apply configurations
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/deployment-server.yaml
-kubectl apply -f k8s/service.yaml
-
-# Check deployment
-kubectl get pods -n intact
-kubectl logs -f deployment/intact-server -n intact
-```
+If you're moving an existing Docker Compose deployment to Kubernetes rather
+than starting fresh, see
+[Migrating from Docker Compose](playbooks/kubernetes-deployment.md#migrating-from-docker-compose)
+in the full guide — it is not required, Compose keeps working as-is.
 
 ## Production Checklist
 
@@ -380,9 +339,7 @@ kubectl logs -f deployment/intact-server -n intact
 ```bash
 # Backend health
 curl https://yourdomain.com/api/health
-
-# Database connectivity
-docker-compose exec server npm run health-check
+# {"status":"ok","database":"connected","environment":"production"}
 ```
 
 ### Backup & Recovery
@@ -425,7 +382,6 @@ docker-compose logs --tail 100 service-name
 
 ```bash
 docker stats
-docker-compose exec server npm run memory-profiling
 ```
 
 **Database connection issues?**

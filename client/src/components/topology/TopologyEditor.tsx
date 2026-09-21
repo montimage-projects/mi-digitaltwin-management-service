@@ -19,10 +19,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { YamlEditor } from './YamlEditor';
 import { TopologyCanvas } from './TopologyCanvas';
 import { cn } from '@/lib/utils';
-import yaml from 'js-yaml';
+import { dump as yamlDump } from 'js-yaml';
+import { edgeKindOf, EDGE_TYPE_SPELLING } from '@/lib/topology-roles';
+import type { ServiceDeployment } from '@/lib/services';
 
 interface TopologyNode {
   id: string;
@@ -40,10 +52,14 @@ interface TopologyEdge {
   id: string;
   source: string;
   target: string;
+  type?: string;
+  data?: { edgeType?: unknown; type?: unknown };
 }
 
-// Convert nodes and edges to YAML format
-function nodesToYaml(nodes: TopologyNode[], edges: TopologyEdge[]): string {
+// Convert nodes and edges to YAML format. Typed edges carry their persisted
+// spelling (`attacks`/`monitors`/`notifies`/`acts-on`, task 3.2) so the type
+// round-trips through the YAML view.
+export function nodesToYaml(nodes: TopologyNode[], edges: TopologyEdge[]): string {
   if (nodes.length === 0 && edges.length === 0) {
     return '';
   }
@@ -67,14 +83,19 @@ function nodesToYaml(nodes: TopologyNode[], edges: TopologyEdge[]): string {
       }
       return service;
     }),
-    connections: edges.map((edge) => ({
-      id: edge.id,
-      from: edge.source,
-      to: edge.target,
-    })),
+    connections: edges.map((edge) => {
+      const kind =
+        edgeKindOf(edge.data?.edgeType) ?? edgeKindOf(edge.data?.type) ?? edgeKindOf(edge.type);
+      return {
+        id: edge.id,
+        from: edge.source,
+        to: edge.target,
+        ...(kind ? { type: EDGE_TYPE_SPELLING[kind] } : {}),
+      };
+    }),
   };
 
-  return yaml.dump(topology, { indent: 2, lineWidth: -1 });
+  return yamlDump(topology, { indent: 2, lineWidth: -1 });
 }
 
 type ViewMode = 'code' | 'visual' | 'split';
@@ -85,6 +106,7 @@ interface ServiceOption {
   title: string;
   description?: string;
   categoryId?: { name: string };
+  deployment?: ServiceDeployment;
 }
 
 interface Infrastructure {
@@ -111,6 +133,8 @@ interface TopologyEditorProps {
   onInfrastructureChange?: (id: string | null) => void;
   onValidate?: () => void;
   onHelpClick?: () => void;
+  /** Callback invoked when the user confirms clearing the canvas. */
+  onClearCanvas?: () => void;
 }
 
 export function TopologyEditor({
@@ -129,6 +153,7 @@ export function TopologyEditor({
   onInfrastructureChange,
   onValidate,
   onHelpClick,
+  onClearCanvas,
 }: TopologyEditorProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('visual');
   const [codeCollapsed, setCodeCollapsed] = useState(false);
@@ -163,12 +188,38 @@ export function TopologyEditor({
     [onEdgesChange, onYamlChange, nodes]
   );
 
+  // Combined nodes+edges update (task 5.3 Auto-wire): regenerating YAML in
+  // one pass keeps the view consistent — two sequential single-channel
+  // updates would each compose YAML with the other channel's stale prop.
+  const handleTopologyChangeWithYamlSync = useCallback(
+    (newNodes: object[], newEdges: object[]) => {
+      isUpdatingFromCanvas.current = true;
+      onNodesChange(newNodes);
+      onEdgesChange(newEdges);
+      const newYaml = nodesToYaml(newNodes as TopologyNode[], newEdges as TopologyEdge[]);
+      onYamlChange(newYaml);
+      // Reset flag after a short delay
+      setTimeout(() => {
+        isUpdatingFromCanvas.current = false;
+      }, 100);
+    },
+    [onNodesChange, onEdgesChange, onYamlChange]
+  );
+
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+
   const handleReset = useCallback(() => {
     // Reset to empty topology
     onYamlChange('');
     onNodesChange([]);
     onEdgesChange([]);
   }, [onYamlChange, onNodesChange, onEdgesChange]);
+
+  const handleResetConfirm = useCallback(() => {
+    handleReset();
+    onClearCanvas?.();
+    setResetDialogOpen(false);
+  }, [handleReset, onClearCanvas]);
 
   return (
     <div className="flex flex-col h-full">
@@ -181,7 +232,7 @@ export function TopologyEditor({
             </label>
             <Select
               value={selectedInfrastructure || 'none'}
-              onValueChange={(value) => {
+              onValueChange={(value: string) => {
                 onInfrastructureChange?.(value === 'none' ? null : value);
               }}
             >
@@ -268,10 +319,35 @@ export function TopologyEditor({
             <CheckCircle2 className="h-4 w-4 mr-1" />
             Validate
           </Button>
-          <Button variant="outline" size="sm" onClick={handleReset} disabled={isSaving}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setResetDialogOpen(true)}
+            disabled={isSaving}
+          >
             <RotateCcw className="h-4 w-4 mr-1" />
-            Reset
+            Clear canvas
           </Button>
+          <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Clear canvas</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will remove all services and connections from the topology. This action
+                  cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleResetConfirm}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Clear canvas
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button size="sm" onClick={onSave} disabled={isSaving || !isDirty}>
             <Save className="h-4 w-4 mr-1" />
             {isSaving ? 'Saving...' : 'Save'}
@@ -294,6 +370,7 @@ export function TopologyEditor({
               edges={edges}
               onNodesChange={handleNodesChangeWithYamlSync}
               onEdgesChange={handleEdgesChangeWithYamlSync}
+              onTopologyChange={handleTopologyChangeWithYamlSync}
               services={services}
             />
           </div>
@@ -335,6 +412,7 @@ export function TopologyEditor({
                 edges={edges}
                 onNodesChange={handleNodesChangeWithYamlSync}
                 onEdgesChange={handleEdgesChangeWithYamlSync}
+                onTopologyChange={handleTopologyChangeWithYamlSync}
                 services={services}
               />
             </div>

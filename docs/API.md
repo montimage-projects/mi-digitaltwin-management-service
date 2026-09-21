@@ -26,7 +26,7 @@ Request:
 ```json
 {
   "username": "admin",
-  "password": "intact2025"
+  "password": "<ADMIN_PASSWORD>"
 }
 ```
 
@@ -84,7 +84,7 @@ Response:
 ```bash
 curl -X POST http://localhost:3000/api/auth/login \
  -H "Content-Type: application/json" \
- -d '{"username":"admin","password":"intact2025"}'
+ -d '{"username":"admin","password":"<ADMIN_PASSWORD>"}'
 ```
 
 #### Get Current User
@@ -109,16 +109,187 @@ curl -X POST http://localhost:3000/api/auth/logout \
  -H "Authorization: Bearer $TOKEN"
 ```
 
+### Users
+
+#### List Users
+
+- **GET** `/api/users`
+- **Auth:** Required
+- **Response:** `User[]` (password hash excluded)
+
+```bash
+curl -X GET http://localhost:3000/api/users \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+#### Create User
+
+- **POST** `/api/users`
+- **Auth:** Required
+- **Body:** `{ username: string, password: string, role?: 'admin' }`
+- **Response:** `{ _id, username, role, createdAt, updatedAt }`
+
+```bash
+curl -X POST http://localhost:3000/api/users \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"username":"newuser","password":"securepass123"}'
+```
+
+#### Update User
+
+- **PUT** `/api/users/:id`
+- **Auth:** Required (admin only)
+- **Body:** `{ username?: string, role?: 'admin' }`
+- **Response:** `{ _id, username, role, updatedAt }`
+
+```bash
+curl -X PUT http://localhost:3000/api/users/user123 \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"username":"updateduser"}'
+```
+
+#### Change Password
+
+- **PUT** `/api/users/:id/password`
+- **Auth:** Required
+- **Body:** `{ currentPassword: string, newPassword: string }`
+- **Response:** `{ message: "Password updated successfully" }`
+
+```bash
+curl -X PUT http://localhost:3000/api/users/user123/password \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"currentPassword":"oldpass","newPassword":"newpass123"}'
+```
+
+#### Reset Password (Admin)
+
+- **PATCH** `/api/users/:id/password`
+- **Auth:** Required (admin only)
+- **Body:** `{ password: string }`
+- **Response:** `{ message: "Password updated successfully" }`
+
+```bash
+curl -X PATCH http://localhost:3000/api/users/user123/password \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"password":"newpass123"}'
+```
+
+#### Delete User
+
+- **DELETE** `/api/users/:id`
+- **Auth:** Required (admin only)
+- **Response:** `{ message: "User deleted successfully" }`
+
+```bash
+curl -X DELETE http://localhost:3000/api/users/user123 \
+ -H "Authorization: Bearer $TOKEN"
+```
+
 ### Health Check
 
 #### Application Health
 
 - **GET** `/api/health`
 - **Auth:** None
-- **Response:** `{ status: "ok", timestamp: string }`
+- **Response:** `{ status: "ok", timestamp: string, database: "connected"|"disconnected", environment: string }`
 
 ```bash
 curl http://localhost:3000/api/health
+```
+
+### API Documentation (Development)
+
+#### OpenAPI Spec
+
+- **GET** `/api/docs`
+- **Auth:** None (development only)
+- **Response:** OpenAPI 3.0 JSON specification
+
+```bash
+curl http://localhost:3000/api/docs
+```
+
+### Categories
+
+#### List Categories
+
+- **GET** `/api/categories`
+- **Auth:** Required
+- **Response:** `{ categories: Category[] }`
+
+```bash
+curl -X GET http://localhost:3000/api/categories \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+#### Get Category
+
+- **GET** `/api/categories/:id`
+- **Auth:** Required
+- **Response:** `{ category: Category }`
+
+```bash
+curl -X GET http://localhost:3000/api/categories/cat1 \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+#### Create Category
+
+- **POST** `/api/categories`
+- **Auth:** Required (admin only)
+- **Body:** `{ name: string, description?: string }`
+- **Response:** `{ category: Category }`
+
+```bash
+curl -X POST http://localhost:3000/api/categories \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{
+ "name": "Category Name",
+ "description": "Category description"
+ }'
+```
+
+#### Update Category
+
+- **PUT** `/api/categories/:id`
+- **Auth:** Required (admin only)
+- **Body:** `{ name?: string, description?: string }`
+- **Response:** `{ category: Category }`
+
+```bash
+curl -X PUT http://localhost:3000/api/categories/cat1 \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"name": "Updated Category"}'
+```
+
+#### Delete Category
+
+- **DELETE** `/api/categories/:id`
+- **Auth:** Required (admin only)
+- **Response:** `{ message: "Category deleted" }`
+
+```bash
+curl -X DELETE http://localhost:3000/api/categories/cat1 \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+### Sectors
+
+#### List Sectors
+
+- **GET** `/api/sectors`
+- **Auth:** Required
+- **Response:** `Sector[]` (sorted by category then name)
+
+```bash
+curl -X GET http://localhost:3000/api/sectors \
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Services
@@ -129,7 +300,7 @@ curl http://localhost:3000/api/health
 - **Auth:** Required
 - **Query Parameters:**
 - `category` (string, optional) - Filter by category ID
-- `search` (string, optional) - Full-text search
+- `search` (string, optional) - Case-insensitive literal substring match on short name, title, and description
 - `page` (number, default: 1) - Page number
 - `limit` (number, default: 20) - Items per page
 - **Response:** `{ services: Service[], meta: Pagination }`
@@ -154,7 +325,7 @@ curl -X GET http://localhost:3000/api/services/service123 \
 
 - **POST** `/api/services`
 - **Auth:** Required
-- **Body:** `{ name: string, description: string, categoryId: string, ... }`
+- **Body:** `{ shortName: string, title: string, provider: string, categoryId: string, deployment?: DeploymentSpec, ... }`
 - **Response:** `{ service: Service }`
 
 ```bash
@@ -172,7 +343,7 @@ curl -X POST http://localhost:3000/api/services \
 
 - **PUT** `/api/services/:id`
 - **Auth:** Required
-- **Body:** `{ name?: string, description?: string, ... }`
+- **Body:** `{ shortName?: string, title?: string, deployment?: DeploymentSpec, ... }` — all fields optional, including `deployment`
 - **Response:** `{ service: Service }`
 
 ```bash
@@ -190,6 +361,21 @@ curl -X PUT http://localhost:3000/api/services/service123 \
 
 ```bash
 curl -X DELETE http://localhost:3000/api/services/service123 \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+### Partners
+
+#### List Partners
+
+- **GET** `/api/partners`
+- **Auth:** Required
+- **Query Parameters:**
+- `includeDeprecated` (boolean, optional) - Set to `true` to include partners deprecated by a catalog refresh
+- **Response:** `Partner[]` (sorted by shortName, deprecated excluded by default)
+
+```bash
+curl -X GET "http://localhost:3000/api/partners?includeDeprecated=true" \
  -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -265,29 +451,14 @@ curl -X DELETE http://localhost:3000/api/projects/proj123 \
 
 ### Scenarios
 
-#### List Scenarios
+#### List Scenarios (by Project)
 
-- **GET** `/api/scenarios`
+- **GET** `/api/projects/:projectId/scenarios`
 - **Auth:** Required
-- **Query Parameters:**
-- `projectId` (string, optional) - Filter by project
-- `page` (number, default: 1)
-- `limit` (number, default: 20)
-- **Response:** `{ scenarios: Scenario[], meta: Pagination }`
+- **Response:** `Scenario[]` (slim — excludes topology and executions arrays; includes `latestExecution`)
 
 ```bash
-curl -X GET "http://localhost:3000/api/scenarios?projectId=proj123" \
- -H "Authorization: Bearer $TOKEN"
-```
-
-#### Get Scenario
-
-- **GET** `/api/scenarios/:id`
-- **Auth:** Required
-- **Response:** `{ scenario: Scenario }`
-
-```bash
-curl -X GET http://localhost:3000/api/scenarios/scen123 \
+curl -X GET "http://localhost:3000/api/projects/proj123/scenarios" \
  -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -295,25 +466,42 @@ curl -X GET http://localhost:3000/api/scenarios/scen123 \
 
 - **POST** `/api/projects/:projectId/scenarios`
 - **Auth:** Required
-- **Body:** `{ name: string, description: string, topology?: string, ... }`
-- **Response:** `{ scenario: Scenario }`
+- **Body:** `{ title: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string }`
+- **Note:** a topology node may carry `data.config` overrides for the service's `deployment` spec — `config.env` (`{ name: string, value?: string, fromEdge?: "target" | "reaction" }[]`) and `config.args` (`string[]`). Invalid overrides are rejected with `400`.
+- **Response:** `{ scenario: Scenario }` (populated with infrastructure)
 
 ```bash
 curl -X POST http://localhost:3000/api/projects/proj123/scenarios \
  -H "Authorization: Bearer $TOKEN" \
  -H "Content-Type: application/json" \
  -d '{
- "name": "Scenario Name",
+ "title": "Scenario Name",
  "description": "Scenario description",
- "topology": "nodes:\n - id: node1\n label: Service 1"
+ "topology": {
+ "yaml": "nodes:\n - id: node1\n label: Service 1",
+ "nodes": [],
+ "edges": []
+ }
  }'
+```
+
+#### Get Scenario
+
+- **GET** `/api/scenarios/:id`
+- **Auth:** Required
+- **Response:** `{ scenario: Scenario }` (full detail — includes projectId, infrastructureId, executions)
+
+```bash
+curl -X GET http://localhost:3000/api/scenarios/scen123 \
+ -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Update Scenario
 
 - **PUT** `/api/scenarios/:id`
 - **Auth:** Required
-- **Body:** `{ name?: string, topology?: string, ... }`
+- **Body:** `{ title?: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string }`
+- **Note:** `data.config` node overrides (`env`, `args`) are validated as in Create Scenario.
 - **Response:** `{ scenario: Scenario }`
 
 ```bash
@@ -321,7 +509,7 @@ curl -X PUT http://localhost:3000/api/scenarios/scen123 \
  -H "Authorization: Bearer $TOKEN" \
  -H "Content-Type: application/json" \
  -d '{
- "topology": "nodes:\n - id: node1\n label: Updated Service"
+ "title": "Updated Scenario"
  }'
 ```
 
@@ -329,7 +517,7 @@ curl -X PUT http://localhost:3000/api/scenarios/scen123 \
 
 - **DELETE** `/api/scenarios/:id`
 - **Auth:** Required
-- **Response:** `{ message: "Scenario deleted" }`
+- **Response:** `{ message: "Scenario deleted successfully" }`
 
 ```bash
 curl -X DELETE http://localhost:3000/api/scenarios/scen123 \
@@ -338,65 +526,65 @@ curl -X DELETE http://localhost:3000/api/scenarios/scen123 \
 
 #### Execute Scenario
 
+Deploys the scenario's topology directly to the assigned infrastructure's
+Kubernetes cluster. See [Kubernetes Execution](integration/kubernetes-execution.md).
+
 - **POST** `/api/scenarios/:id/execute`
 - **Auth:** Required
-- **Body:** `{ infrastructureId: string, ... }`
-- **Response:** `{ executionId: string, status: string }`
+- **Body:** None (the target infrastructure comes from the scenario)
+- **Response:** `{ executionId: string, namespace: string, status: string, services: DeployedService[] }`
 
 ```bash
 curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
- -H "Authorization: Bearer $TOKEN" \
- -H "Content-Type: application/json" \
- -d '{"infrastructureId": "infra123"}'
+ -H "Authorization: Bearer $TOKEN"
 ```
 
-### Agent
+#### Stream Execution Events (SSE)
 
-#### Agent Health
-
-- **GET** `/api/agent/health`
+- **GET** `/api/scenarios/:id/executions/:executionId/events`
 - **Auth:** Required
-- **Response:**
-  ```json
-  {
-    "status": "healthy|degraded|offline",
-    "ollama": true,
-    "chatModel": { "name": "qwen3:14b", "available": true },
-    "embedModel": { "name": "nomic-embed-text", "available": true },
-    "availableModels": ["qwen3:14b", "nomic-embed-text:latest"]
-  }
-  ```
+- **Content-Type:** `text/event-stream`
+- **Events:** `progress`, `log`, `k8s-event`, `alert`, `end`, `error` — see
+  [SSE Events Protocol](integration/kubernetes-execution.md#sse-events-protocol)
 
-#### Stream Chat Response
+#### Tear Down Execution
 
-- **POST** `/api/agent/chat`
+- **DELETE** `/api/scenarios/:id/executions/:executionId`
 - **Auth:** Required
-- **Body:** `{ conversationId?: string, message: string }`
-- **Response:** `text/event-stream` SSE events (`metadata`, `token`, `sources`, `done`, `error`)
+- **Response:** `{ executionId, namespace, status: "completed", message }`
 
-#### List Conversations
+```bash
+curl -X DELETE http://localhost:3000/api/scenarios/scen123/executions/exec123 \
+ -H "Authorization: Bearer $TOKEN"
+```
 
-- **GET** `/api/agent/conversations`
+#### Update Execution Status
+
+- **PUT** `/api/scenarios/:id/executions/:executionId/status`
 - **Auth:** Required
-- **Response:** `[{ _id, title, lastMessage, updatedAt, messageCount }]`
+- **Body:** `{ status: string }`
+- **Response:** `{ execution: Execution }`
 
-#### Get Conversation
+```bash
+curl -X PUT http://localhost:3000/api/scenarios/scen123/executions/exec123/status \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"status":"completed"}'
+```
 
-- **GET** `/api/agent/conversations/:id`
+#### Add Execution Conclusion
+
+- **POST** `/api/scenarios/:id/executions/:executionId/conclusion`
 - **Auth:** Required
-- **Response:** `{ _id, title, messages: [{ role, content, timestamp, sources? }], updatedAt }`
+- **Body:** `{ text: string, author: string }`
+- **Response:** `{ execution: Execution }`
 
-#### Delete Conversation
-
-- **DELETE** `/api/agent/conversations/:id`
-- **Auth:** Required
-- **Response:** `{ message: "Conversation deleted" }`
-
-#### Reindex Service Embeddings
-
-- **POST** `/api/agent/rag/reindex`
-- **Auth:** Required (`admin`)
-- **Response:** `{ indexed: number, duration: number }`
+```bash
+curl -X POST http://localhost:3000/api/scenarios/scen123/executions/exec123/conclusion \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"text":"Deployment successful","author":"admin"}'
+```
 
 ### Infrastructures
 
@@ -483,83 +671,16 @@ curl -X POST http://localhost:3000/api/infrastructures/infra123/test \
  -H "Authorization: Bearer $TOKEN"
 ```
 
-### Categories
-
-#### List Categories
-
-- **GET** `/api/categories`
-- **Auth:** Required
-- **Response:** `{ categories: Category[] }`
-
-```bash
-curl -X GET http://localhost:3000/api/categories \
- -H "Authorization: Bearer $TOKEN"
-```
-
-#### Get Category
-
-- **GET** `/api/categories/:id`
-- **Auth:** Required
-- **Response:** `{ category: Category }`
-
-```bash
-curl -X GET http://localhost:3000/api/categories/cat1 \
- -H "Authorization: Bearer $TOKEN"
-```
-
-#### Create Category
-
-- **POST** `/api/categories`
-- **Auth:** Required (admin only)
-- **Body:** `{ name: string, description?: string }`
-- **Response:** `{ category: Category }`
-
-```bash
-curl -X POST http://localhost:3000/api/categories \
- -H "Authorization: Bearer $TOKEN" \
- -H "Content-Type: application/json" \
- -d '{
- "name": "Category Name",
- "description": "Category description"
- }'
-```
-
-#### Update Category
-
-- **PUT** `/api/categories/:id`
-- **Auth:** Required (admin only)
-- **Body:** `{ name?: string, description?: string }`
-- **Response:** `{ category: Category }`
-
-```bash
-curl -X PUT http://localhost:3000/api/categories/cat1 \
- -H "Authorization: Bearer $TOKEN" \
- -H "Content-Type: application/json" \
- -d '{"name": "Updated Category"}'
-```
-
-#### Delete Category
-
-- **DELETE** `/api/categories/:id`
-- **Auth:** Required (admin only)
-- **Response:** `{ message: "Category deleted" }`
-
-```bash
-curl -X DELETE http://localhost:3000/api/categories/cat1 \
- -H "Authorization: Bearer $TOKEN"
-```
-
 ## Data Models
 
 ### User
 
 ```typescript
 {
-  id: string;
+  _id: string;
   username: string;
-  email: string;
-  password: string; // hashed
   role: 'admin' | 'user';
+  passwordHash: string; // hashed, never returned by API
   createdAt: Date;
   updatedAt: Date;
 }
@@ -570,14 +691,63 @@ curl -X DELETE http://localhost:3000/api/categories/cat1 \
 ```typescript
 {
   id: string;
-  name: string;
-  description: string;
+  shortName: string; // uppercase, unique
+  title: string;
   categoryId: string; // Reference to Category
-  status: 'active' | 'inactive';
+  sectorId?: string; // Reference to Sector
+  provider: string;
+  description?: string;
+  currentVersion?: string;
+  versions: {
+    version: string;
+    dockerImage: string;
+    releaseNotes?: string;
+    releasedAt: Date;
+    releasedBy?: string;
+  }[];
+  type: 'Software' | 'Hardware' | 'Software/Hardware';
+  uiType: 'web' | 'terminal' | 'both';
+  trl: { current?: number; expected?: number }; // 1–9
+  license?: string;
+  standards: string[];
+  inputs: { name: string; description?: string; format?: string }[];
+  outputs: { name: string; description?: string; format?: string }[];
+  interactsWith: string[];
+  potentialUseCases: string[];
+  repositoryTable: 'INTACT_TOOLBOX' | 'OTHER_SERVICES';
+  deprecated: boolean;
+  deployment?: DeploymentSpec; // see below — optional Kubernetes deploy spec
   createdAt: Date;
   updatedAt: Date;
 }
 ```
+
+#### Service `deployment` spec
+
+Optional sub-document describing how the service's container is deployed on
+Kubernetes — consumed by the deploy engine
+(`docs/playbooks/montimage-attack-detect-respond-plan.md`). Services without
+a spec deploy with the engine defaults (Deployment, port 80, standalone).
+Validated on `POST`/`PUT /api/services`; invalid specs are rejected with
+`400`. Unknown fields are not allowed (the schema is strict).
+
+| Field             | Type                                                                    | Description                                                                      |
+| ----------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `kind`            | `'Deployment' \| 'Job'`                                                 | **Required.** `Job` for finite runs; MAG is a terminal `Deployment` (#233).      |
+| `role`            | `'attack' \| 'target' \| 'monitor' \| 'reaction' \| 'generic'`          | **Required.** Scenario role — drives node badges and edge validation.            |
+| `attachMode`      | `'standalone' \| 'sidecar'`                                             | `sidecar` injects the container into the target pod's network namespace.         |
+| `containerPort`   | number (int, 1–65535)                                                   | Container port — replaces the engine's default of 80.                            |
+| `exposePort`      | boolean                                                                 | Whether a Kubernetes Service exposes the port (`false` for sidecars and Jobs).   |
+| `command`         | string[]                                                                | Container ENTRYPOINT override, ahead of `args` — e.g. MAG's idle shell loop.     |
+| `args`            | string[]                                                                | Container arguments (e.g. `mag <attack> --target-ip …`).                         |
+| `env`             | `{ name: string; value?: string; fromEdge?: 'target' \| 'reaction' }[]` | Env vars — `fromEdge` marks a value the engine resolves from a topology edge.    |
+| `configFiles`     | `{ mountPath: string; content: string }[]`                              | Files rendered into a ConfigMap mounted at `mountPath`.                          |
+| `volumes`         | `{ name: string; mountPath: string; emptyDir: true }[]`                 | `emptyDir` volumes shared between the pod's containers.                          |
+| `securityContext` | `{ capabilities?: string[]; privileged?: boolean }`                     | Container security context (e.g. `capabilities: ['NET_ADMIN', 'NET_RAW']`).      |
+| `hostNetwork`     | boolean                                                                 | Run the pod on the host network (a sidecar `attachMode` is preferred).           |
+| `rbac`            | `{ apiGroups: string[]; resources: string[]; verbs: string[] }[]`       | Namespace-scoped Role rules bound to the pod's ServiceAccount (`''` = core API). |
+| `readinessPath`   | string                                                                  | HTTP readiness path — must start with `/` (e.g. `/health`).                      |
+| `startOrder`      | number (int, ≥ 0)                                                       | Startup ordering — lower starts first.                                           |
 
 ### Project
 
@@ -599,12 +769,32 @@ curl -X DELETE http://localhost:3000/api/categories/cat1 \
 {
   id: string;
   projectId: string; // Reference to Project
-  name: string;
-  description: string;
-  topology: string; // YAML format
+  title: string;
+  description?: string;
+  topology: {
+    yaml?: string;
+    nodes: object[];
+    edges: object[];
+  };
+  infrastructureId?: string; // Reference to Infrastructure
   status: 'draft' | 'ready' | 'executed';
+  executions: Execution[];
   createdAt: Date;
   updatedAt: Date;
+}
+```
+
+### Execution
+
+```typescript
+{
+  _id: string;
+  executedAt: Date;
+  executedBy: string;
+  status: 'pending' | 'deploying' | 'completed' | 'failed';
+  namespace?: string;
+  deployedServices: DeployedService[];
+  conclusion?: { text: string, author: string, createdAt: Date };
 }
 ```
 
@@ -615,7 +805,8 @@ curl -X DELETE http://localhost:3000/api/categories/cat1 \
   id: string;
   name: string;
   type: 'kubernetes' | 'docker' | 'vm';
-  credentials: object; // AES-256 encrypted
+  // `credentials` is stored AES-256-GCM encrypted and is NEVER returned by the
+  // API — list, detail, create and update responses project it out (issue #38).
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -631,6 +822,38 @@ curl -X DELETE http://localhost:3000/api/categories/cat1 \
  description?: string;
  createdAt: Date;
  updatedAt: Date;
+}
+```
+
+### Sector
+
+```typescript
+{
+  id: string;
+  name: string;
+  slug: string;
+  category: 'essential' | 'important';
+  description?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### Partner
+
+```typescript
+{
+  id: string;
+  shortName: string;
+  legalName: string;
+  role: 'COO' | 'BEN';
+  country: string;
+  pic: string;
+  maxGrantAmountEur: number;
+  deprecated: boolean;
+  seedManaged: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
@@ -681,13 +904,13 @@ curl -X GET "http://localhost:3000/api/services?page=2&limit=50" \
 
 Most endpoints support filters via query parameters:
 
-| Filter     | Example            | Behavior                             |
-| ---------- | ------------------ | ------------------------------------ |
-| `search`   | `?search=firewall` | Full-text search on name/description |
-| `category` | `?category=cat1`   | Exact match on category              |
-| `status`   | `?status=active`   | Exact match on status                |
-| `sector`   | `?sector=Telecom`  | Exact match on sector                |
-| `type`     | `?type=kubernetes` | Exact match on type                  |
+| Filter     | Example            | Behavior                                                                 |
+| ---------- | ------------------ | ------------------------------------------------------------------------ |
+| `search`   | `?search=firewall` | Case-insensitive literal substring match on short name/title/description |
+| `category` | `?category=cat1`   | Exact match on category                                                  |
+| `status`   | `?status=active`   | Exact match on status                                                    |
+| `sector`   | `?sector=Telecom`  | Exact match on sector                                                    |
+| `type`     | `?type=kubernetes` | Exact match on type                                                      |
 
 **Example:**
 
@@ -711,7 +934,7 @@ API rate limits (planned, not yet implemented):
 # Login
 TOKEN=$(curl -s -X POST http://localhost:3000/api/auth/login \
  -H "Content-Type: application/json" \
- -d '{"username":"admin","password":"intact2025"}' | jq -r '.token')
+ -d '{"username":"admin","password":"<ADMIN_PASSWORD>"}' | jq -r '.token')
 
 # Use token
 curl -X GET http://localhost:3000/api/services \
@@ -732,7 +955,7 @@ Content-Type: application/json
 
 {
  "username": "admin",
- "password": "intact2025"
+ "password": "<ADMIN_PASSWORD>"
 }
 
 ### Get Services

@@ -9,6 +9,7 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 1. **[Development Guide](DEVELOPMENT.md)** - Set up your local environment (5 min read)
 2. **[Deployment Guide](DEPLOYMENT.md)** - Deploy to production (10 min read)
 3. **[API Reference](API.md)** - All REST endpoints with examples (reference)
+4. **[Agent Environment Notes](AGENT_ENV.md)** - Toolchain, install, env vars, and recorded commands for AI agents
 
 ## Documentation by Role
 
@@ -35,9 +36,10 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 1. [Prerequisites](installation/prerequisites.md) - System requirements
 2. [Deployment Guide](DEPLOYMENT.md) - Production deployment checklist
 3. [Deployment Playbook](playbooks/deployment.md) - Step-by-step deployment
-4. [External Services](integration/external-services.md) - Third-party integrations
-5. [Troubleshooting](troubleshooting/common-issues.md) - Common issues and solutions
-6. [Database Configuration](database/schema.md) - MongoDB setup and optimization
+4. [Render Demo Playbook](playbooks/render-demo-deployment.md) - Free public demo deployment
+5. [External Services](integration/external-services.md) - Third-party integrations
+6. [Troubleshooting](troubleshooting/common-issues.md) - Common issues and solutions
+7. [Database Configuration](database/schema.md) - MongoDB setup and optimization
 
 ### For Contributors
 
@@ -72,19 +74,20 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 
 ### Deployment & Operations
 
-| Document                                       | Purpose                                 |
-| ---------------------------------------------- | --------------------------------------- |
-| [Deployment Guide](DEPLOYMENT.md)              | Production checklist and best practices |
-| [Deployment Playbook](playbooks/deployment.md) | Docker/Docker Compose deployment steps  |
-| [Prerequisites](installation/prerequisites.md) | System requirements and versions        |
-| [Configuration](installation/configuration.md) | Environment variables and setup         |
+| Document                                                    | Purpose                                 |
+| ----------------------------------------------------------- | --------------------------------------- |
+| [Deployment Guide](DEPLOYMENT.md)                           | Production checklist and best practices |
+| [Deployment Playbook](playbooks/deployment.md)              | Docker/Docker Compose deployment steps  |
+| [Render Demo Playbook](playbooks/render-demo-deployment.md) | Free public demo on Render + Atlas M0   |
+| [Prerequisites](installation/prerequisites.md)              | System requirements and versions        |
+| [Configuration](installation/configuration.md)              | Environment variables and setup         |
 
 ### Integration & Extensibility
 
-| Document                                                 | Purpose                       |
-| -------------------------------------------------------- | ----------------------------- |
-| [External Services](integration/external-services.md)    | Third-party services and APIs |
-| [Agent Architecture](architecture/agent-architecture.md) | Boss Agent and RAG design     |
+| Document                                                    | Purpose                                  |
+| ----------------------------------------------------------- | ---------------------------------------- |
+| [External Services](integration/external-services.md)       | Third-party services and APIs            |
+| [Kubernetes Execution](integration/kubernetes-execution.md) | Direct scenario deployment to Kubernetes |
 
 ### Reference
 
@@ -132,7 +135,6 @@ docs/
  backend.md # Backend structure
  frontend.md # Frontend structure
  data-flow.md # Request flow diagrams
- agent-architecture.md # Agent and RAG architecture
 
  database/ # Data layer documentation
  schema.md # MongoDB collections
@@ -144,6 +146,7 @@ docs/
 
  integration/ # External services
  external-services.md # Third-party integrations
+ kubernetes-execution.md # Direct scenario deployment to Kubernetes
 
  installation/ # Setup & configuration
  prerequisites.md # System requirements

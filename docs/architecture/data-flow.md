@@ -168,36 +168,30 @@ sequenceDiagram
  participant U as User
  participant C as Client
  participant S as Server
+ participant K as Kubernetes
 
  U->>C: Click "Execute"
  C->>S: POST /api/scenarios/:id/execute
- S->>S: Validate scenario
- S->>S: Create execution record
- S-->>C: { executionId, status }
- C->>S: PUT /api/scenarios/:id/executions/:executionId/status
- S-->>C: Updated execution status
+ S->>S: Validate scenario, resolve node images
+ S->>K: Create namespace + Deployment/Service per node
+ K-->>S: Created (nodePort assigned)
+ S-->>C: { executionId, namespace, status, services }
+
+ C->>S: GET .../executions/:id/events (SSE)
+ loop Poll until settled
+ S->>K: Read deployment status + pod logs
+ K-->>S: Replicas, log lines
+ S-->>C: event: progress / event: log
+ end
+ S-->>C: event: end
+
+ U->>C: Click "Tear Down"
+ C->>S: DELETE .../executions/:id
+ S->>K: Delete namespace (cascades)
 ```
 
-## Agent Chat Flow
-
-```mermaid
-sequenceDiagram
- participant U as User
- participant C as Client
- participant S as Server
- participant O as Ollama
- participant DB as MongoDB
-
- U->>C: Send chat message
- C->>S: POST /api/agent/chat (SSE)
- S-->>C: metadata event
- S->>DB: Store user message
- S->>O: Chat + embeddings
- O-->>S: token stream
- S-->>C: token events
- S->>DB: Store assistant message + sources
- S-->>C: sources + done events
-```
+See [Kubernetes Execution](../integration/kubernetes-execution.md) for the full
+resource model and SSE event payloads.
 
 ## Infrastructure Credential Flow
 

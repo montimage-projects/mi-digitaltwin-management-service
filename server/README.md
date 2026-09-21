@@ -8,7 +8,7 @@ The server provides a RESTful API for managing cybersecurity services, digital t
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) 1.0+ (or Node.js 18+)
+- [Node.js](https://nodejs.org/) 22+
 - Docker (for MongoDB)
 - MongoDB running on `localhost:27017`
 
@@ -19,16 +19,16 @@ The server provides a RESTful API for managing cybersecurity services, digital t
 docker-compose up -d mongodb
 
 # Install dependencies
-bun install
+npm install
 
 # Configure environment
 cp .env.example .env
 
 # Seed the database
-bun run seed
+npm run seed
 
 # Start development server
-bun run dev
+npm run dev
 ```
 
 The API will be available at `http://localhost:3000`.
@@ -37,12 +37,12 @@ The API will be available at `http://localhost:3000`.
 
 | Script               | Description                              |
 | -------------------- | ---------------------------------------- |
-| `bun run dev`        | Start development server with hot reload |
-| `bun run start`      | Start production server                  |
-| `bun run seed`       | Seed database with initial data          |
-| `bun run lint`       | Run ESLint                               |
-| `bun run lint --fix` | Fix auto-fixable lint issues             |
-| `bun run format`     | Format code with Prettier                |
+| `npm run dev`        | Start development server with hot reload |
+| `npm run start`      | Start production server                  |
+| `npm run seed`       | Seed database with initial data          |
+| `npm run lint`       | Run ESLint                               |
+| `npm run lint --fix` | Fix auto-fixable lint issues             |
+| `npm run format`     | Format code with Prettier                |
 
 ## Project Structure
 
@@ -84,7 +84,7 @@ src/
 | `JWT_SECRET`     | JWT signing secret             | (required)                         |
 | `JWT_EXPIRES_IN` | Token expiration               | `24h`                              |
 | `CORS_ORIGIN`    | Allowed CORS origin            | `http://localhost:5173`            |
-| `ENCRYPTION_KEY` | Credential encryption key      | (required, 32 chars)               |
+| `ENCRYPTION_KEY` | Credential encryption key      | (required, min 16 chars)           |
 | `SERVE_STATIC`   | Serve client build from server | `false`                            |
 
 ## API Endpoints
@@ -136,24 +136,24 @@ src/
 
 ## Technology Stack
 
-| Technology | Purpose            |
-| ---------- | ------------------ |
-| Bun        | JavaScript runtime |
-| Express    | HTTP framework     |
-| MongoDB    | Document database  |
-| Mongoose   | ODM for MongoDB    |
-| Zod        | Schema validation  |
-| JWT        | Authentication     |
-| bcrypt     | Password hashing   |
+| Technology | Purpose              |
+| ---------- | -------------------- |
+| Node.js    | JavaScript runtime   |
+| Express    | HTTP framework       |
+| MongoDB    | Document database    |
+| Mongoose   | ODM for MongoDB v9   |
+| Zod        | Schema validation v4 |
+| JWT        | Authentication       |
+| bcrypt     | Password hashing     |
 
 ## Testing
 
 ```bash
 # Run tests
-bun test
+npm test
 
 # Run specific test file
-bun test src/routes/services.test.ts
+npx vitest run src/routes/services.test.ts
 ```
 
 ## Database
@@ -182,7 +182,7 @@ db.services.find({ categoryId: ObjectId('...') });
 ```bash
 # Clear and reseed
 docker-compose exec mongodb mongosh intact --eval "db.dropDatabase()"
-bun run seed
+npm run seed
 ```
 
 ## Troubleshooting
@@ -202,7 +202,13 @@ Check JWT_SECRET is set in `.env`.
 
 ### Encryption Errors
 
-Ensure ENCRYPTION_KEY is exactly 32 characters.
+Ensure ENCRYPTION_KEY is set and at least 16 characters — there is no built-in
+default, so the server refuses to boot without it. The value is SHA-256 derived
+into the AES-256 key, so any length at or above the floor is valid.
+
+If decryption starts failing (`Unsupported state or unable to authenticate
+data`) the key changed: AES-256-GCM rejects the auth tag rather than returning
+garbage. Restore the previous key, or re-enter the stored credentials.
 
 ## Static File Serving
 
@@ -212,11 +218,11 @@ The server can serve the client's production build directly, enabling a single-p
 
 ```bash
 # Build the client
-cd client && bun run build
+cd client && npm run build
 
 # Start server with static serving
 cd server
-SERVE_STATIC=true bun run start
+SERVE_STATIC=true npm run start
 ```
 
 The full application will be available at `http://localhost:3000`.

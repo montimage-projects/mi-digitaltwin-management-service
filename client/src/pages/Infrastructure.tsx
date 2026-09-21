@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { InfrastructureTable } from '@/components/infrastructure/InfrastructureTable';
+import { InfrastructureTableWithState } from '@/components/infrastructure/InfrastructureTable';
 import { InfrastructureForm } from '@/components/infrastructure/InfrastructureForm';
 import { toast } from 'sonner';
 
@@ -106,7 +106,12 @@ export function Infrastructure() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <InfrastructureTable infrastructures={infrastructures} onEdit={handleEdit} />
+          <InfrastructureTableWithState
+            infrastructures={infrastructures}
+            onEdit={handleEdit}
+            error={null}
+            onRetry={() => window.location.reload()}
+          />
         )}
       </div>
 

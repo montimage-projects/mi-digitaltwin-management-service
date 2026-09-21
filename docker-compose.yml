@@ -1,39 +1,46 @@
 # Development Docker Compose - MongoDB and admin tools only
-# Application runs locally with: bun run dev
+# Application runs locally with: npm run dev
 
 services:
   mongodb:
-    image: mongo:7
-    container_name: intact-mongodb
+    image: mongo:8
+    container_name: montimage-mongodb
     ports:
-      - "27017:27017"
+      - '27017:27017'
     volumes:
       - mongodb_data:/data/db
+      - ./scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
     environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
       MONGO_INITDB_DATABASE: intact
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ['CMD', 'mongosh', '-u', 'admin', '-p', 'admin123', '--authenticationDatabase', 'admin', '--eval', "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     networks:
-      - intact-network
+      - montimage-network
 
   mongo-express:
-    image: mongo-express:latest
-    container_name: intact-mongo-express
+    image: mongo-express:1.0.2
+    container_name: montimage-mongo-express
     ports:
-      - "8081:8081"
+      - '127.0.0.1:8081:8081'
     environment:
       ME_CONFIG_MONGODB_SERVER: mongodb
-      ME_CONFIG_BASICAUTH_USERNAME: admin
-      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+      ME_CONFIG_MONGODB_PORT: '27017'
+      ME_CONFIG_MONGODB_AUTH_DATABASE: admin
+      ME_CONFIG_MONGODB_AUTH_USERNAME: admin
+      ME_CONFIG_MONGODB_AUTH_PASSWORD: admin123
+      ME_CONFIG_BASICAUTH_USERNAME: ${ME_BASICAUTH_USERNAME:-admin}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${ME_BASICAUTH_PASSWORD:-admin123}
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
-      - intact-network
+      - montimage-network
 
   # Optional local Ollama service for agent features.
   # Uncomment if you want Docker-managed Ollama instead of host Ollama.
@@ -49,10 +56,8 @@ services:
 
 volumes:
   mongodb_data:
-    name: intact-mongodb-data
-  # ollama_data:
-  #   name: intact-ollama-data
+    name: montimage-mongodb-data
 
 networks:
-  intact-network:
+  montimage-network:
     driver: bridge

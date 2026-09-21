@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 
 import { env } from './config/env.js';
-import { connectDatabase, disconnectDatabase, isDatabaseConnected } from './config/database.js';
+import { connectDatabase, disconnectDatabase } from './config/database.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { configureStaticServing } from './middleware/staticServe.js';
 import { runStartupChecks, printServerReady } from './utils/startup.js';
@@ -16,6 +16,7 @@ import usersRoutes from './routes/users.routes.js';
 import categoriesRoutes from './routes/categories.routes.js';
 import sectorsRoutes from './routes/sectors.routes.js';
 import servicesRoutes from './routes/services.routes.js';
+import partnersRoutes from './routes/partners.routes.js';
 import projectsRoutes from './routes/projects.routes.js';
 import scenariosRoutes from './routes/scenarios.routes.js';
 import infrastructuresRoutes from './routes/infrastructures.routes.js';
@@ -39,10 +40,12 @@ app.use(
 );
 app.use(
   helmet({
+    crossOriginOpenerPolicy: false,
     contentSecurityPolicy: {
+      useDefaults: false,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'cdn.jsdelivr.net'],
+        scriptSrc: ["'self'", 'cdn.jsdelivr.net'], // no unsafe-inline/eval; Monaco uses wasm-unsafe-eval via importmap
         styleSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'fonts.googleapis.com'],
         fontSrc: ["'self'", 'fonts.gstatic.com', 'cdn.jsdelivr.net'],
         imgSrc: ["'self'", 'data:', 'blob:'],
@@ -63,14 +66,9 @@ app.use(morgan(env.NODE_ENV === 'development' ? 'dev' : 'combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
+// Health check endpoint — public, minimal response (no env/DB disclosure).
 app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    database: isDatabaseConnected() ? 'connected' : 'disconnected',
-    environment: env.NODE_ENV,
-  });
+  res.json({ status: 'ok' });
 });
 
 // API Documentation (development only)
@@ -86,6 +84,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/sectors', sectorsRoutes);
 app.use('/api/services', servicesRoutes);
+app.use('/api/partners', partnersRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api', scenariosRoutes);
 app.use('/api/infrastructures', infrastructuresRoutes);

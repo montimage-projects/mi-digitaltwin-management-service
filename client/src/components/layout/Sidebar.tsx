@@ -10,6 +10,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { APP_NAME_SHORT, LOGO_SRC, LOGO_ALT, LOGO_BACKDROP } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 
 const navigation = [
@@ -24,9 +25,11 @@ const navigation = [
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  /** Invoked when a nav link is activated — lets the mobile drawer close itself. */
+  onNavigate?: () => void;
 }
 
-export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
   const location = useLocation();
 
   return (
@@ -39,7 +42,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Logo */}
       <div className="flex h-16 items-center justify-between border-b px-4">
         {!collapsed && (
-          <img src="/intact_logo.png" alt="INTACT" className="h-10 w-auto dark:invert" />
+          <img
+            src={LOGO_SRC}
+            alt={LOGO_ALT}
+            className={`h-10 w-auto max-w-[160px] object-contain${LOGO_BACKDROP ? ' bg-white rounded px-1.5 py-0.5' : ''}`}
+          />
         )}
         <Button
           variant="ghost"
@@ -59,11 +66,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Navigation */}
       <nav className={cn('flex-1 space-y-1 py-4', collapsed ? 'px-2' : 'px-3')}>
         {navigation.map((item) => {
-          const isActive = location.pathname === item.href;
+          // Prefix-based matching: /projects matches /projects, /projects/:id, /projects/add, etc.
+          const isActive =
+            location.pathname === item.href || location.pathname.startsWith(item.href + '/');
           return (
             <Link
               key={item.name}
               to={item.href}
+              onClick={onNavigate}
               title={collapsed ? item.name : undefined}
               className={cn(
                 'flex items-center rounded-md text-sm font-medium transition-colors',
@@ -84,7 +94,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       <div className={cn('border-t py-4', collapsed ? 'px-2' : 'px-6')}>
         {!collapsed && (
           <>
-            <p className="text-xs text-muted-foreground">Digital Twin Platform</p>
+            <p className="text-xs text-muted-foreground">{APP_NAME_SHORT}</p>
             <p className="text-xs text-muted-foreground">v1.0.0</p>
           </>
         )}

@@ -2,6 +2,14 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IDeployedService {
   serviceId: Types.ObjectId;
+  /** Topology node id this deployment was created from. */
+  nodeId?: string;
+  /** Kubernetes resource name (Deployment/Service) for this node. */
+  name?: string;
+  uiType?: 'web' | 'terminal' | 'both';
+  /** Coarse per-service deploy status derived from the cluster. */
+  status?: 'pending' | 'running' | 'completed' | 'failed';
+  /** Reachable NodePort URL for the deployed service. */
   dashboardUrl?: string;
 }
 
@@ -16,13 +24,40 @@ export interface IExecution {
   executedAt: Date;
   executedBy: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
+  /** Kubernetes namespace the topology was deployed into. */
+  namespace?: string;
   deployedServices: IDeployedService[];
   conclusion?: IConclusion;
 }
 
+/**
+ * Per-node config overrides — task 0.4 of the Montimage attack→detect→respond
+ * plan (docs/playbooks/montimage-attack-detect-respond-plan.md). Mirrors the
+ * `env`/`args` fields of `Service.deployment` (models/Service.ts) so a scenario
+ * can override catalog defaults (e.g. the MAG attack profile) without editing
+ * the catalog. Validated by the scenario routes on save; unknown keys are
+ * preserved for forward compatibility (e.g. `configFiles`, task 3.3).
+ */
+export interface INodeConfig {
+  env?: { name: string; value?: string; fromEdge?: 'target' | 'reaction' }[];
+  args?: string[];
+  [key: string]: unknown;
+}
+
+export interface ITopologyNode {
+  id?: string;
+  data?: {
+    serviceId?: string;
+    version?: string;
+    config?: INodeConfig;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 export interface ITopology {
   yaml: string;
-  nodes: object[];
+  nodes: ITopologyNode[];
   edges: object[];
 }
 
@@ -33,6 +68,14 @@ export interface IScenario extends Document {
   topology: ITopology;
   infrastructureId?: Types.ObjectId;
   executions: IExecution[];
+  /**
+   * Seed bookkeeping mirroring the catalog models — a seeded scenario (the
+   * demo, task 4.1) is stamped `seedManaged`/`deprecated` so re-running the
+   * seed can tell drift from an unchanged record; the demo seed never
+   * deprecates scenarios.
+   */
+  deprecated: boolean;
+  seedManaged: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +83,14 @@ export interface IScenario extends Document {
 const deployedServiceSchema = new Schema<IDeployedService>(
   {
     serviceId: { type: Schema.Types.ObjectId, ref: 'Service', required: true },
+    nodeId: { type: String },
+    name: { type: String },
+    uiType: { type: String, enum: ['web', 'terminal', 'both'] },
+    status: {
+      type: String,
+      enum: ['pending', 'running', 'completed', 'failed'],
+      default: 'pending',
+    },
     dashboardUrl: { type: String },
   },
   { _id: false }
@@ -63,6 +114,7 @@ const executionSchema = new Schema<IExecution>(
       enum: ['pending', 'running', 'completed', 'failed'],
       default: 'pending',
     },
+    namespace: { type: String },
     deployedServices: [deployedServiceSchema],
     conclusion: conclusionSchema,
   },
@@ -105,6 +157,14 @@ const scenarioSchema = new Schema<IScenario>(
       ref: 'Infrastructure',
     },
     executions: [executionSchema],
+    deprecated: {
+      type: Boolean,
+      default: false,
+    },
+    seedManaged: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

@@ -18,6 +18,7 @@ export const errorHandler = (
   err: Error,
   _req: Request,
   res: Response,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ): void => {
   if (err instanceof AppError) {
@@ -30,7 +31,7 @@ export const errorHandler = (
   if (err instanceof ZodError) {
     res.status(400).json({
       error: 'Validation error',
-      details: err.errors.map((e) => ({
+      details: err.issues.map((e) => ({
         path: e.path.join('.'),
         message: e.message,
       })),

@@ -120,8 +120,8 @@ app.use(morgan('dev'));
       "type": "node",
       "request": "launch",
       "name": "Debug Server",
-      "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "--inspect", "src/app.ts"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["tsx", "--inspect", "src/app.ts"],
       "cwd": "${workspaceFolder}/server",
       "restart": true,
       "console": "integratedTerminal"
@@ -172,7 +172,7 @@ db.services.find({ categoryId: ObjectId('...') }).explain()
 # Login
 curl -X POST http://localhost:3000/api/auth/login \
  -H "Content-Type: application/json" \
- -d '{"username":"admin","password":"intact2025"}'
+ -d '{"username":"admin","password":"'$ADMIN_PASSWORD'"}'
 
 # Get services (with auth)
 curl http://localhost:3000/api/services \
@@ -256,7 +256,7 @@ cd client
 npx vite-bundle-visualizer
 
 # Check bundle size
-bun run build
+npm run build
 ls -la dist/assets
 ```
 

@@ -3,7 +3,8 @@
  * Checks required services and prints helpful information on server start
  */
 
-import { env } from '../config/env.js';
+import { DEFAULT_ADMIN_PASSWORDS, env } from '../config/env.js';
+import { APP_NAME } from '../config/branding.js';
 
 // ANSI color codes for terminal output
 const colors = {
@@ -42,9 +43,11 @@ function isDefaultValue(value: string, patterns: string[]): boolean {
 }
 
 /**
- * Validate environment configuration
+ * Validate environment configuration.
+ *
+ * Exported for unit testing — `runStartupChecks` is the production entry point.
  */
-function validateEnvironment(): ValidationResult[] {
+export function validateEnvironment(): ValidationResult[] {
   const results: ValidationResult[] = [];
 
   // Check JWT_SECRET
@@ -64,12 +67,58 @@ function validateEnvironment(): ValidationResult[] {
     });
   }
 
-  // Check ENCRYPTION_KEY
-  const encryptionDefaults = ['your-32-character', 'default', 'example', 'test'];
+  // Check ADMIN_PASSWORD
+  const adminPasswordIsDefault = (DEFAULT_ADMIN_PASSWORDS as readonly string[]).includes(
+    env.ADMIN_PASSWORD.toLowerCase()
+  );
+  const adminPasswordPatterns = [
+    'change-me',
+    'changeme',
+    'your-',
+    'example',
+    'placeholder',
+    'replace-with',
+  ];
+  if (adminPasswordIsDefault || isDefaultValue(env.ADMIN_PASSWORD, adminPasswordPatterns)) {
+    results.push({
+      name: 'ADMIN_PASSWORD',
+      status: env.NODE_ENV === 'production' ? 'error' : 'warning',
+      message: 'Using default/example ADMIN_PASSWORD',
+      fix: 'Set a strong, unique ADMIN_PASSWORD before seeding the admin user',
+    });
+  } else {
+    results.push({
+      name: 'ADMIN_PASSWORD',
+      status: 'ok',
+      message: `Configured (${env.ADMIN_PASSWORD.length} chars)`,
+    });
+  }
+
+  // Check ENCRYPTION_KEY.
+  // A placeholder key is fatal in every NODE_ENV — development and staging
+  // encrypt the same stored cluster credentials production does (#37). Because
+  // the check now aborts the boot, the patterns must be placeholder-specific:
+  // bare words like 'default' or 'test' would reject legitimate CI and local
+  // keys such as ci-test-encryption-key-16chr.
+  //
+  // Covers every literal placeholder shipped in this repo: the hyphenated
+  // change-me-strong-encryption-key in .env.example and server/.env.example,
+  // and the underscored CHANGE_ME_min_16_chars_use_openssl_rand_hex_16 in
+  // k8s/base/secret.example.yaml (isDefaultValue lowercases both sides).
+  const encryptionDefaults = [
+    'your-',
+    'default-encryption-key',
+    'example-encryption-key',
+    'placeholder',
+    'replace-with',
+    'change-me',
+    'change_me',
+    'changeme',
+  ];
   if (isDefaultValue(env.ENCRYPTION_KEY, encryptionDefaults)) {
     results.push({
       name: 'ENCRYPTION_KEY',
-      status: env.NODE_ENV === 'production' ? 'error' : 'warning',
+      status: 'error',
       message: 'Using default/example ENCRYPTION_KEY',
       fix: 'Generate a secure key: openssl rand -hex 16',
     });
@@ -178,11 +227,11 @@ async function testMongoDBConnection(): Promise<ValidationResult> {
 /**
  * Print startup banner
  */
-export function printBanner(): void {
+function printBanner(): void {
   console.info(`
 ${colors.cyan}╔══════════════════════════════════════════════════════════════╗
 ║                                                                ║
-║   ${colors.bright}INTACT Digital Twin Management Platform${colors.reset}${colors.cyan}                   ║
+║   ${colors.bright}${APP_NAME}${colors.reset}${colors.cyan}                       ║
 ║                                                                ║
 ╚══════════════════════════════════════════════════════════════╝${colors.reset}
 `);
@@ -191,7 +240,7 @@ ${colors.cyan}╔═════════════════════
 /**
  * Print environment information
  */
-export function printEnvironmentInfo(): void {
+function printEnvironmentInfo(): void {
   log.header('Environment Configuration');
 
   const mongoDisplay = env.MONGODB_URI.includes('@')
@@ -265,9 +314,10 @@ export async function runStartupChecks(): Promise<boolean> {
 ${colors.dim}Common fixes:
   1. Copy .env.example to .env: cp .env.example .env
   2. Start MongoDB: docker-compose up -d mongodb
-  3. Generate secrets:
-     - JWT_SECRET: openssl rand -base64 48
-     - ENCRYPTION_KEY: openssl rand -hex 16
+   3. Generate secrets:
+      - JWT_SECRET: openssl rand -base64 48
+      - ENCRYPTION_KEY: openssl rand -hex 16
+      - ADMIN_PASSWORD: choose a strong, unique password
   4. For MongoDB Atlas: Whitelist your IP in Network Access${colors.reset}
 `);
     return false;

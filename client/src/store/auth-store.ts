@@ -17,6 +17,8 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>()(
+  // Token is persisted to localStorage so sessions survive page reloads.
+  // Trade-off: readable by any injected script; bounded by JWT expiry.
   persist(
     (set) => ({
       user: null,
@@ -46,7 +48,13 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({
-        token: state.token,
+        // The JWT persists to localStorage so sessions survive page reloads.
+        // Accepted risk: an XSS payload could read the stored value.
+        // Mitigations: strict CSP (script-src 'self' + cdn.jsdelivr.net only,
+        // no unsafe-inline/eval — see server/src/app.ts), npm audit in CI,
+        // short JWT expiry, and the 401 → logout interceptor that clears the
+        // persisted state.
+        token: state.token, // gitleaks:allow — field name, not a credential
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),

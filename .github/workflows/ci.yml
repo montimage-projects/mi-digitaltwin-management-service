@@ -5,6 +5,9 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  schedule:
+    # Full-history secret scan daily at 06:00 UTC.
+    - cron: '0 6 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,27 +17,38 @@ jobs:
   quality:
     name: Code Quality
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22, 24]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.6.0
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.3
         with:
-          bun-version: latest
+          node-version: ${{ matrix.node-version }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.2.0
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Install dependencies
-        run: bun install
+        run: npm ci
 
       - name: Check formatting
-        run: bun run format:check
+        run: npm run format:check
 
       - name: Lint client
-        run: bun run lint:client
+        run: npm run lint:client
 
       - name: Lint server
-        run: bun run lint:server
+        run: npm run lint:server
 
   typecheck:
     name: Type Check
@@ -42,44 +56,163 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.6.0
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.3
         with:
-          bun-version: latest
+          node-version: '22'
+
+      - name: Cache npm dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.2.0
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Install dependencies
-        run: bun install
+        run: npm ci
 
       - name: Type check client
-        run: bun run typecheck:client
+        run: npm run typecheck:client
 
       - name: Type check server
-        run: bun run typecheck:server
+        run: npm run typecheck:server
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22, 24]
+
+    services:
+      mongodb:
+        image: mongo:8
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh -u admin -p admin123 --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: admin123
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.3
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.2.0
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create MongoDB app user
+        run: |
+          docker exec "$(docker ps -q --filter ancestor=mongo:8)" \
+            mongosh -u admin -p admin123 --authenticationDatabase admin --eval '
+            db = db.getSiblingDB("intact");
+            db.createUser({
+              user: "intact_app",
+              pwd: "intact_pass",
+              roles: [{ role: "readWrite", db: "intact" }]
+            });
+          '
+
+      - name: Run server tests
+        run: npm run test:server
+        env:
+          JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
+          ADMIN_PASSWORD: ci-test-admin-secret-9f2K7x
+          ENCRYPTION_KEY: ci-test-encryption-key-16chr
+          MONGODB_URI: 'mongodb://intact_app:intact_pass@localhost:27017/intact?authSource=admin'
+          SEED_TEST_MONGODB_URI: 'mongodb://admin:admin123@localhost:27017/admin'
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    needs: [test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.3
+        with:
+          node-version: '22'
+
+      - name: Cache npm dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.2.0
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run server tests with coverage
+        run: cd server && npm run test:coverage
+        env:
+          JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
+          ADMIN_PASSWORD: ci-test-admin-secret-9f2K7x
+          ENCRYPTION_KEY: ci-test-encryption-key-16chr
+          # No MONGODB_URI/SEED_TEST_MONGODB_URI: this job has no mongo service,
+          # so tests must fall back to the hermetic in-memory server.
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.0
+        with:
+          name: coverage-report
+          path: server/coverage/
+          retention-days: 14
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [quality, typecheck]
+    needs: [quality, typecheck, test, coverage]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.6.0
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.3
         with:
-          bun-version: latest
+          node-version: '22'
+
+      - name: Cache npm dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.2.0
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Install dependencies
-        run: bun install
+        run: npm ci
 
       - name: Build client
-        run: bun run build:client
+        run: npm run build:client
 
       - name: Build server (type check)
-        run: bun run build:server
+        run: npm run build:server
 
   security:
     name: Security Scan
@@ -87,15 +220,57 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.6.0
         with:
-          bun-version: latest
+          fetch-depth: 0  # needed for full-history scheduled scan
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.3
+        with:
+          node-version: '22'
+
+      - name: Cache npm dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.2.0
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Install dependencies
-        run: bun install
+        run: npm ci
+
+      - name: Install gitleaks
+        run: curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz | tar xz -C /usr/local/bin
+
+      - name: Run gitleaks (diff-mode)
+        if: github.event_name != 'schedule'
+        run: gitleaks detect --no-banner --report-format json --report-path gitleaks-report.json --log-opts "HEAD~1..HEAD"
+
+      - name: Run gitleaks (full-history)
+        if: github.event_name == 'schedule'
+        run: gitleaks detect --no-banner --report-format json --report-path gitleaks-report.json --verbose
+
+      - name: Upload gitleaks report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.0
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          retention-days: 14
 
       - name: Audit dependencies
-        run: npm audit --audit-level=moderate || true
+        run: |
+          if ! npm audit --json > "$RUNNER_TEMP/npm-audit.json"; then
+            echo "npm audit reported vulnerabilities — evaluating severity gate"
+          fi
+          critical="$(jq -r '.metadata.vulnerabilities.critical // 0' "$RUNNER_TEMP/npm-audit.json")"
+          high="$(jq -r '.metadata.vulnerabilities.high // 0' "$RUNNER_TEMP/npm-audit.json")"
+          count=$((critical + high))
+          echo "npm audit summary: ${critical} critical, ${high} high"
+          if [ "${count}" -gt 0 ]; then
+            echo "::error::Dependency audit failed: ${count} high-or-critical vulnerability(ies) found"
+            jq -r '.vulnerabilities | to_entries[]
+                   | select(.value.severity == "critical" or .value.severity == "high")
+                   | "\(.value.severity)\t\(.key)"' "$RUNNER_TEMP/npm-audit.json"
+            exit 1
+          fi

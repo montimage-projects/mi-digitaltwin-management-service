@@ -1,61 +1,56 @@
 # Server Dockerfile - Multi-stage build for production
 
 # Build stage
-FROM oven/bun:1 AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
 # Copy package files
-COPY package.json bun.lockb* ./
+COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN npm ci
 
 # Copy source code
 COPY src ./src
 COPY tsconfig.json ./
 
+# Compile TypeScript
+RUN npm run build
+
+# Trim dev dependencies from the production image.
+RUN npm prune --omit=dev && npm cache clean --force
+
+# Pre-create the data dir here: the distroless runtime has no shell, so it
+# cannot mkdir. A named volume mounted at this path inherits the directory's
+# ownership from the image, which is what lets the seed marker be written.
+RUN mkdir -p /app/data
+
 # Production stage
-FROM oven/bun:1-slim AS production
+FROM gcr.io/distroless/nodejs22-debian13:nonroot AS production
 
 WORKDIR /app
 
-# Install curl for healthcheck (required in slim image)
-# Create non-root user for security (Debian-based image)
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd --system --gid 1001 nodejs \
-    && useradd --system --uid 1001 --gid nodejs intact
-
-# Copy dependencies and source from builder
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/package.json ./
-
-# Copy entrypoint script and set permissions
-COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-
-# Create data directory for persistent state (seed marker)
-RUN mkdir -p /app/data
-
-# Set ownership (excluding entrypoint which stays root-owned but executable)
-RUN chown -R intact:nodejs /app
-
-# Switch to non-root user
-USER intact
-
-# Environment defaults
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV SEED_ON_STARTUP=false
+
+# Copy dependencies and compiled output from builder
+COPY --from=builder --chown=nonroot:nonroot /app/node_modules ./node_modules
+COPY --from=builder --chown=nonroot:nonroot /app/dist ./dist
+COPY --from=builder --chown=nonroot:nonroot /app/package.json ./
+
+# Writable data dir for the seed marker (see the builder stage above).
+COPY --from=builder --chown=nonroot:nonroot /app/data ./data
+
+# Run as non-root user
+USER nonroot
 
 # Expose port
 EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+  CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 
-# Use entrypoint for startup logic
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["bun", "src/app.ts"]
+CMD ["dist/bootstrap.js"]

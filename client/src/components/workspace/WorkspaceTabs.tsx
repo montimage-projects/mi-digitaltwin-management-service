@@ -2,6 +2,7 @@ import { X, FileText } from 'lucide-react';
 import { useWorkspaceStore, WorkspaceTab } from '@/store/workspace-store';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface WorkspaceTabsProps {
   onTabClick?: (tab: WorkspaceTab) => void;
@@ -41,14 +42,24 @@ export function WorkspaceTabs({ onTabClick }: WorkspaceTabsProps) {
           <FileText className="h-4 w-4" />
           <span className="max-w-[150px] truncate">{tab.title}</span>
           {tab.isDirty && <span className="w-2 h-2 rounded-full bg-yellow-500" />}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-4 w-4 p-0 hover:bg-muted"
-            onClick={(e) => handleCloseTab(e, tab.id)}
-          >
-            <X className="h-3 w-3" />
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 p-1 hover:bg-muted"
+                  onClick={(e) => handleCloseTab(e, tab.id)}
+                  aria-label={`Close tab: ${tab.title}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Close tab</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       ))}
     </div>

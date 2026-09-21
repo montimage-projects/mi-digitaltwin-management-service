@@ -11,28 +11,37 @@ services:
     build:
       context: .
       dockerfile: server/Dockerfile.unified
-    container_name: intact-app
+    container_name: montimage-app
     restart: unless-stopped
     ports:
-      - "${PORT:-3000}:3000"
+      - '${PORT:-3000}:3000'
     volumes:
-      - app_data:/app/server/data  # Persist seed marker
+      - app_data:/app/server/data # Persist seed marker
     environment:
       - NODE_ENV=production
       - PORT=3000
       - MONGODB_URI=${MONGODB_URI:?MONGODB_URI is required - use MongoDB Atlas connection string}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      - MAESTRO_BASE_URL=${MAESTRO_BASE_URL:-https://maestro.intact-project.eu}
+      - BRANDING_PROFILE=${BRANDING_PROFILE:-secassured}
+      - APP_NAME=${APP_NAME:-}
+      - ORG_NAME=${ORG_NAME:-}
+      - ORG_URL=${ORG_URL:-}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3:14b}
       - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       - VECTOR_DB_TYPE=${VECTOR_DB_TYPE:-mongodb}
       - SERVE_STATIC=true
-      - SEED_ON_STARTUP=${SEED_ON_STARTUP:-true}
+      # Opt-in: seeding refuses known-default ADMIN_PASSWORDs. Set a strong
+      # ADMIN_PASSWORD (required above), then override SEED_ON_STARTUP=true
+      # for the first boot.
+      - SEED_ON_STARTUP=${SEED_ON_STARTUP:-false}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -40,4 +49,4 @@ services:
 
 volumes:
   app_data:
-    name: intact-app-data-atlas
+    name: montimage-app-data-atlas

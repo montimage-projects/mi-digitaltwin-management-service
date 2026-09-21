@@ -28,9 +28,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, Edit, Trash2, Play, FileText } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, Play, FileText, AlertCircle } from 'lucide-react';
 import { Scenario, scenariosApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { ErrorState } from '@/components/ui/error-state';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ScenarioTableProps {
   scenarios: Scenario[];
@@ -138,14 +140,17 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
               <TableCell>{new Date(scenario.updatedAt).toLocaleDateString()}</TableCell>
               <TableCell>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuTrigger
+                    asChild
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  >
                     <Button variant="ghost" className="h-8 w-8 p-0">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         navigate(`/scenarios/${scenario._id}`);
                       }}
@@ -156,7 +161,7 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
                       Open Editor
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         navigate(`/scenarios/${scenario._id}/edit`);
                       }}
@@ -166,23 +171,36 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
                       </span>
                       Edit Details
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/scenarios/${scenario._id}?deploy=true`);
-                      }}
-                      disabled={!scenario.infrastructureId}
-                      title="Deploy scenario to target infrastructure"
-                    >
-                      <span>
-                        <Play className="mr-2 h-4 w-4" />
-                      </span>
-                      Deploy
-                    </DropdownMenuItem>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DropdownMenuItem
+                            onClick={(e: React.MouseEvent) => {
+                              e.stopPropagation();
+                              navigate(`/scenarios/${scenario._id}?deploy=true`);
+                            }}
+                            disabled={!scenario.infrastructureId}
+                          >
+                            <span>
+                              <Play className="mr-2 h-4 w-4" />
+                            </span>
+                            Deploy
+                          </DropdownMenuItem>
+                        </TooltipTrigger>
+                        {!scenario.infrastructureId && (
+                          <TooltipContent className="max-w-[250px]">
+                            <p className="text-xs">
+                              <AlertCircle className="mr-1 inline h-3 w-3" />
+                              Select a target infrastructure before deploying a scenario.
+                            </p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={(e) => {
+                      onClick={(e: React.MouseEvent) => {
                         e.stopPropagation();
                         handleDelete(scenario);
                       }}
@@ -197,7 +215,6 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
               </TableCell>
             </TableRow>
           ))}
-          ```{' '}
         </TableBody>
       </Table>
 
@@ -223,4 +240,26 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
       </AlertDialog>
     </>
   );
+}
+
+export function ScenarioTableWithState({
+  scenarios,
+  projectId,
+  isLoading,
+  error,
+  onRetry,
+}: {
+  scenarios: Scenario[];
+  projectId: string;
+  isLoading: boolean;
+  error: Error | string | null;
+  onRetry?: () => void;
+}) {
+  if (isLoading) {
+    return <ScenarioTable scenarios={scenarios} projectId={projectId} />;
+  }
+  if (error) {
+    return <ErrorState error={error} onRetry={onRetry} />;
+  }
+  return <ScenarioTable scenarios={scenarios} projectId={projectId} />;
 }

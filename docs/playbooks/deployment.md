@@ -6,6 +6,12 @@ Complete guide for deploying the MI Digital Twin Management Service to productio
 
 This playbook covers Docker-based deployment of the full service stack. The production deployment uses a unified approach where the Express server serves both the API and the client static files, avoiding CORS issues.
 
+> **New deployments:** Consider the
+> [Kubernetes Deployment Playbook](kubernetes-deployment.md) instead — it's
+> now the recommended path for scalable, container-orchestrated deployments.
+> This Docker Compose playbook remains fully supported and is not going away;
+> use whichever fits your infrastructure.
+
 | Configuration     | Containers          | Description                          |
 | ----------------- | ------------------- | ------------------------------------ |
 | **Production**    | 2 (app + MongoDB)   | Server serves API + client (no CORS) |
@@ -109,7 +115,7 @@ The application will be available at `http://localhost:3000`.
 
 **Note:** Database seeding happens automatically on first startup. The seed includes:
 
-- Default admin user (admin / intact2025)
+- Admin user (`ADMIN_USERNAME` / `ADMIN_PASSWORD` from the environment — known defaults such as `intact2025` are refused by seeding)
 - Categories and NIS2 sectors
 - Sample services from INTACT Toolbox
 
@@ -157,7 +163,7 @@ docker compose -f docker-compose.prod.yml restart app
 Or manually run the seed:
 
 ```bash
-docker compose -f docker-compose.prod.yml exec app bun src/seed/index.ts
+docker compose -f docker-compose.prod.yml exec app npx tsx src/seed/index.ts
 ```
 
 ## Backup and Restore
@@ -251,13 +257,16 @@ docker compose -f docker-compose.prod.yml exec app \
 
 ```bash
 # Re-run seed script (resets to default credentials)
-docker compose -f docker-compose.prod.yml exec app bun src/seed/index.ts
+docker compose -f docker-compose.prod.yml exec app npx tsx src/seed/index.ts
 ```
 
 ## Security Recommendations
 
 1. **Use HTTPS**: Use a reverse proxy (nginx, Caddy) for SSL termination
-2. **Rotate Secrets**: Change JWT_SECRET and ENCRYPTION_KEY periodically
+2. **Rotate Secrets**: Rotate `JWT_SECRET` freely — it only invalidates live
+   sessions. Do **not** rotate `ENCRYPTION_KEY` on a schedule: credentials
+   already stored by the app become undecryptable. Change it only alongside a
+   plan to re-enter every stored infrastructure credential
 3. **Enable Auth**: Enable MongoDB authentication in production
 4. **Firewall**: Restrict access to MongoDB port (27017)
 5. **Updates**: Keep Docker images updated for security patches
@@ -302,10 +311,14 @@ MONGODB_URI=mongodb+srv://your-username:your-password@cluster0.xxxxx.mongodb.net
 JWT_SECRET=<generate-with-openssl-rand-base64-48>
 ENCRYPTION_KEY=<generate-with-openssl-rand-hex-16>
 
+# Required admin credential (server refuses to boot without it;
+# known defaults like intact2025 are refused by seeding)
+ADMIN_PASSWORD=<choose-a-strong-password>
+
 # Optional
 PORT=3000
 CORS_ORIGIN=https://your-domain.com
-SEED_ON_STARTUP=true
+SEED_ON_STARTUP=false
 ```
 
 ### Step 4: Deploy with Atlas

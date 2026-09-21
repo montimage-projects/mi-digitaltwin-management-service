@@ -1,0 +1,145 @@
+name: E2E — kind (Montimage scenario)
+
+# End-to-end CI for the Montimage attack → detect → respond scenario
+# (issue #206 / playbook task 4.3 in
+# docs/playbooks/montimage-attack-detect-respond-plan.md).
+#
+# A kind cluster is registered as an Infrastructure and the seeded demo
+# scenario is executed through the public REST API. The driver
+# (scripts/e2e-kind/run-e2e.js) drives the R1 two-attack script (issue #237):
+# `kubectl exec` attack #1 → the MMT-Probe sidecar alerts → CI-SIM logs
+# "service stopped" and is restarted by its Deployment → AI4SOAR's playbook
+# POSTs the attacker address to ci-sim /admin/block → `kubectl exec`
+# attack #2 is answered 403 while the probe alerts again and the target stays
+# healthy → namespace deletion leaves no resources behind.
+#
+# The four module images live in the private registry.montimage.eu, which does
+# not resolve on the public Internet (and the engine does not attach
+# imagePullSecrets), so the driver substitutes a locally-built stub image
+# (scripts/e2e-kind/stub/) loaded into kind — the scenario topology, specs and
+# every assertion are unchanged. Set SECSIM_E2E_REQUIRE_REAL_IMAGES=1 on the
+# job to fail clearly instead of falling back to the stub image.
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'server/src/services/**'
+      - 'server/src/seed/**'
+      - 'scripts/e2e-kind/**'
+      - 'sim/**'
+      - '.github/workflows/e2e-kind.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'server/src/services/**'
+      - 'server/src/seed/**'
+      - 'scripts/e2e-kind/**'
+      - 'sim/**'
+      - '.github/workflows/e2e-kind.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kind-e2e:
+    name: Kind E2E — Montimage demo scenario
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      # gitleaks:allow — CI-only test credentials (same values as ci.yml), never real secrets
+      JWT_SECRET: ci-test-jwt-secret-min-32-characters-long # gitleaks:allow
+      ADMIN_PASSWORD: ci-test-admin-secret-9f2K7x # gitleaks:allow
+      ENCRYPTION_KEY: ci-test-encryption-key-16chr # gitleaks:allow
+      MONGODB_URI: 'mongodb://admin:admin123@localhost:27017/intact?authSource=admin'
+      BASE_URL: 'http://127.0.0.1:3000'
+      STUB_IMAGE: 'secsim-e2e-stub:local'
+      KIND_CLUSTER_NAME: 'secsim-e2e'
+      KIND_VERSION: 'v0.30.0'
+      KUBECTL_VERSION: 'v1.34.0'
+
+    services:
+      mongodb:
+        image: mongo:8
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh -u admin -p admin123 --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          # gitleaks:allow — throwaway service-container credential, CI only
+          MONGO_INITDB_ROOT_PASSWORD: admin123 # gitleaks:allow
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.3
+        with:
+          node-version: '22'
+
+      - name: Cache npm dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.2.0
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install kind and kubectl
+        run: |
+          curl -fsSL -o kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
+          chmod +x kind && sudo mv kind /usr/local/bin/kind
+          curl -fsSL -o kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+          chmod +x kubectl && sudo mv kubectl /usr/local/bin/kubectl
+          kind version
+          kubectl version --client
+
+      - name: Create kind cluster
+        run: kind create cluster --name "${KIND_CLUSTER_NAME}" --wait 120s
+
+      - name: Build and load the stub image
+        run: |
+          docker build -t "${STUB_IMAGE}" scripts/e2e-kind/stub
+          kind load docker-image "${STUB_IMAGE}" --name "${KIND_CLUSTER_NAME}"
+
+      - name: Start the platform (auto-seeds catalog, demo scenario, admin)
+        run: |
+          cd server
+          nohup npx tsx src/app.ts > "${RUNNER_TEMP}/secsim-server.log" 2>&1 &
+
+      - name: Run the kind E2E scenario
+        run: node scripts/e2e-kind/run-e2e.js
+
+      - name: Dump diagnostics on failure
+        if: failure()
+        run: |
+          echo "===== server log ====="
+          tail -200 "${RUNNER_TEMP}/secsim-server.log" || true
+          echo "===== cluster state ====="
+          kubectl get all -A -o wide || true
+          kubectl get networkpolicies -A || true
+          for ns in $(kubectl get ns -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep '^secsim-'); do
+            echo "===== namespace ${ns} ====="
+            kubectl describe pods -n "${ns}" || true
+            for pod in $(kubectl get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}'); do
+              for c in $(kubectl get pod "${pod}" -n "${ns}" -o jsonpath='{.spec.containers[*].name}'); do
+                echo "--- logs ${ns}/${pod}/${c} ---"
+                kubectl logs "${pod}" -n "${ns}" -c "${c}" --tail=100 || true
+              done
+            done
+          done
+
+      - name: Delete kind cluster
+        if: always()
+        run: kind delete cluster --name "${KIND_CLUSTER_NAME}" || true
