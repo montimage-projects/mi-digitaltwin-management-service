@@ -1,4 +1,4 @@
-import api from './api';
+import { api } from './api';
 import { useAuthStore } from '@/store/auth-store';
 
 export interface AgentHealth {
