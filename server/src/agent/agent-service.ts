@@ -11,6 +11,21 @@ export interface ChatResult {
   sources: IConversationSource[];
 }
 
+export interface ChatOptions {
+  // When false, skip intent classification + retrieval entirely. Used by the
+  // evaluation harness to produce a Cold-LLM baseline (same model, same prompt
+  // scaffold, no retrieved context).
+  useRag?: boolean;
+  // Where to place the freshly retrieved RAG context in the prompt:
+  //   'pre-user' (default) — inject as a system message immediately before
+  //                          the most recent user turn so the LLM cannot
+  //                          anchor on earlier turns' (possibly stale) context.
+  //   'static'             — inject only as a top-level system message after
+  //                          the boss-agent prompt; reproduces the pre-fix
+  //                          behaviour used as the ablation baseline.
+  injectionScheme?: 'pre-user' | 'static';
+}
+
 export class AgentService {
   constructor(private readonly conversationManager: ConversationManager) {}
 
@@ -18,8 +33,11 @@ export class AgentService {
     userId: string,
     message: string,
     conversationId?: string,
-    onToken?: (token: string) => void
+    onToken?: (token: string) => void,
+    options: ChatOptions = {}
   ): Promise<ChatResult> {
+    const useRag = options.useRag !== false;
+    const injectionScheme = options.injectionScheme ?? 'pre-user';
     const trimmedMessage = message.trim();
     if (!trimmedMessage) {
       throw new AppError('Message cannot be empty', 400);
@@ -43,15 +61,17 @@ export class AgentService {
 
     const retriever = getRAGRetriever();
     let retrieved: Awaited<ReturnType<typeof retriever.retrieveSimilar>> = [];
-    try {
-      const isServiceQuery = await getIntentClassifier().isServiceQuery(trimmedMessage);
-      if (isServiceQuery) {
-        retrieved = await retriever.retrieveSimilar(trimmedMessage, 4);
+    if (useRag) {
+      try {
+        const isServiceQuery = await getIntentClassifier().isServiceQuery(trimmedMessage);
+        if (isServiceQuery) {
+          retrieved = await retriever.retrieveSimilar(trimmedMessage, 4);
+        }
+      } catch (error) {
+        logger.warn('RAG retrieval failed; continuing with chat-only mode', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
-    } catch (error) {
-      logger.warn('RAG retrieval failed; continuing with chat-only mode', {
-        error: error instanceof Error ? error.message : String(error),
-      });
     }
     const ragContext = retriever.formatContextForPrompt(retrieved);
 
@@ -81,22 +101,27 @@ export class AgentService {
       }
     }
 
-    if (lastUserIndex > 0) {
+    let llmMessages: ChatMessage[];
+    if (injectionScheme === 'static' || lastUserIndex <= 0) {
+      // Static placement: the freshly retrieved context is appended as a
+      // top-level system message after the boss-agent system prompt. This is
+      // also the only sensible placement when the conversation contains a
+      // single user turn (lastUserIndex <= 0).
+      llmMessages = [
+        { role: 'system', content: BOSS_AGENT_SYSTEM_PROMPT },
+        { role: 'system', content: buildRagContextPrompt(ragContext) },
+        ...historyMessages,
+      ];
+    } else {
+      // Pre-user placement (default): splice the context immediately before
+      // the most recent user message so the LLM cannot anchor on stale
+      // context from earlier turns.
       historyMessages.splice(lastUserIndex, 0, {
         role: 'system',
         content: buildRagContextPrompt(ragContext),
       });
+      llmMessages = [{ role: 'system', content: BOSS_AGENT_SYSTEM_PROMPT }, ...historyMessages];
     }
-
-    const llmMessages: ChatMessage[] = [
-      { role: 'system', content: BOSS_AGENT_SYSTEM_PROMPT },
-      ...(lastUserIndex <= 0
-        ? [
-            { role: 'system' as const, content: buildRagContextPrompt(ragContext) },
-            ...historyMessages,
-          ]
-        : historyMessages),
-    ];
 
     const response = await getLLMGateway().chat(llmMessages, onToken);
     const sources: IConversationSource[] = retrieved.map((item) => ({

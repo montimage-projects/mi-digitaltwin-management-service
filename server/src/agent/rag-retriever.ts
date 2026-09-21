@@ -269,6 +269,73 @@ export class RAGRetriever {
     return lines.join('\n');
   }
 
+  /**
+   * Build the text that will be embedded into the vector store. This is
+   * intentionally a different text from `buildServiceText` (which feeds the
+   * LLM as context). Two differences matter for retrieval quality:
+   *
+   *   1. The service's own identity (shortName, title, provider, category)
+   *      is front-loaded as a natural-language sentence, so the embedding
+   *      is heavily weighted toward "what is this service?".
+   *
+   *   2. Cross-reference fields are omitted — in particular `interactsWith`,
+   *      which lists *other* services' shortnames. Including them dilutes
+   *      the embedding by making every service that interacts with X look
+   *      like a partial match for queries about X. Cross-references remain
+   *      in `buildServiceText` so the LLM still sees them at answer time.
+   */
+  private buildEmbeddingText(service: ServiceDoc, context: BuildTextContext): string {
+    const categoryName = context.categoryMap.get(String(service.categoryId));
+    const sectorName = service.sectorId
+      ? context.sectorMap.get(String(service.sectorId))
+      : undefined;
+
+    const description = cleanText(service.description);
+    const license = cleanText(service.license);
+    const standards = nonEmpty(service.standards || []);
+    const inputs = (service.inputs || [])
+      .map((input) => nonEmpty([input.name, input.description]).join(' '))
+      .filter(Boolean);
+    const outputs = (service.outputs || [])
+      .map((output) => nonEmpty([output.name, output.description]).join(' '))
+      .filter(Boolean);
+    const useCases = nonEmpty(service.potentialUseCases || []);
+
+    // Front-load the identity. The opening sentence states what the service
+    // *is* — shortName, title, provider, category — using natural language.
+    const identityParts: string[] = [];
+    identityParts.push(`${service.shortName}, the ${service.title}`);
+    identityParts.push(`provided by ${service.provider}`);
+    if (categoryName) identityParts.push(`in the ${categoryName} category`);
+    if (sectorName) identityParts.push(`for the ${sectorName} sector`);
+    const identitySentence = `${identityParts.join(', ')}.`;
+
+    const sentences: string[] = [identitySentence];
+
+    if (description) {
+      sentences.push(description.endsWith('.') ? description : `${description}.`);
+    }
+
+    const typeParts = [`Type: ${service.type}.`];
+    if (license) typeParts.push(`License: ${license}.`);
+    sentences.push(typeParts.join(' '));
+
+    if (standards.length > 0) {
+      sentences.push(`Supports the ${standards.join(', ')} standards.`);
+    }
+    if (inputs.length > 0) {
+      sentences.push(`Inputs: ${inputs.join('; ')}.`);
+    }
+    if (outputs.length > 0) {
+      sentences.push(`Outputs: ${outputs.join('; ')}.`);
+    }
+    if (useCases.length > 0) {
+      sentences.push(`Used for ${useCases.join(', ')}.`);
+    }
+
+    return sentences.join(' ');
+  }
+
   async indexService(service: ServiceDoc): Promise<void> {
     const context = await this.getLookupMaps();
     const rawText = this.buildServiceText(service, context);
@@ -286,7 +353,14 @@ export class RAGRetriever {
       ? context.sectorMap.get(String(service.sectorId))
       : undefined;
 
-    const embedding = await this.gateway.embed(rawText);
+    // The text fed to the embedding model is intentionally different from the
+    // rawText shown to the LLM: it is a focused natural-language description
+    // optimised for retrieval discrimination (see `buildEmbeddingText`).
+    // 'search_document' is the asymmetric-retrieval task prefix expected by
+    // nomic-embed-text for indexed passages. Models that ignore the prefix
+    // are unaffected.
+    const embeddingText = this.buildEmbeddingText(service, context);
+    const embedding = await this.gateway.embed(embeddingText, 'search_document');
     await this.vectorStore.upsert(String(service._id), embedding, {
       serviceId: String(service._id),
       shortName: service.shortName,
@@ -346,7 +420,9 @@ export class RAGRetriever {
       return [];
     }
 
-    const queryVector = await this.gateway.embed(queryText);
+    // 'search_query' is the matching retrieval-time prefix for nomic-embed-text;
+    // it pairs with the 'search_document' prefix used at indexing time.
+    const queryVector = await this.gateway.embed(queryText, 'search_query');
     const results = await this.vectorStore.search(queryVector, topK);
     return results.map((result) => this.mapResult(result));
   }

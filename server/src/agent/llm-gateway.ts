@@ -80,16 +80,27 @@ export class LLMGateway {
     }
   }
 
-  async embed(text: string): Promise<number[]> {
+  /**
+   * Generate an embedding vector for the given text.
+   *
+   * For asymmetric embedding models such as nomic-embed-text v1.5, callers
+   * should pass an appropriate `task` so the model produces task-aligned
+   * embeddings. Recognised values include `search_document` (for indexed
+   * passages), `search_query` (for retrieval queries), `classification`,
+   * and `clustering`. Models that ignore the prefix are unaffected.
+   */
+  async embed(text: string, task?: string): Promise<number[]> {
     const trimmed = text.trim();
     if (!trimmed) {
       throw new Error('Cannot embed empty text');
     }
 
+    const input = task ? `${task}: ${trimmed}` : trimmed;
+
     try {
       const response = await this.client.embed({
         model: this.config.embedModel,
-        input: trimmed,
+        input,
       });
 
       const vector = response.embeddings[0];

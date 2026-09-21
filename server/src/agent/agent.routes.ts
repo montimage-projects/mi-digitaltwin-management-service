@@ -122,9 +122,11 @@ router.post('/chat', validateBody(chatRequestSchema), async (req, res, next) => 
       throw new AppError('Unauthorized', 401);
     }
 
-    const { message, conversationId } = req.body as {
+    const { message, conversationId, useRag, injectionScheme } = req.body as {
       message: string;
       conversationId?: string;
+      useRag?: boolean;
+      injectionScheme?: 'pre-user' | 'static';
     };
 
     let activeConversationId = conversationId;
@@ -154,9 +156,15 @@ router.post('/chat', validateBody(chatRequestSchema), async (req, res, next) => 
       messageId,
     });
 
-    const result = await agentService.chat(userId, message, activeConversationId, (token) => {
-      writeEvent('token', { content: token });
-    });
+    const result = await agentService.chat(
+      userId,
+      message,
+      activeConversationId,
+      (token) => {
+        writeEvent('token', { content: token });
+      },
+      { useRag, injectionScheme }
+    );
 
     writeEvent('sources', result.sources);
     writeEvent('done', { ok: true });

@@ -65,3 +65,12 @@ note.md
 .gemini/
 .windsurf/
 .github/prompts/
+
+
+# Thesis and articles related to the project
+article/
+literature/
+scripts/
+
+# No need to track testbed files.
+testbed/*
