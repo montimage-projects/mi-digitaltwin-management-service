@@ -229,7 +229,7 @@ export function Dashboard() {
               <div>
                 <p className="font-medium">Execute & Document</p>
                 <p className="text-sm text-muted-foreground">
-                  Deploy directly to Kubernetes, capture conclusions, and export reports
+                  Ask the AI Agent, deploy to Kubernetes, capture conclusions, and export reports
                 </p>
               </div>
             </li>

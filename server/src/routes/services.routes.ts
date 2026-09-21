@@ -31,6 +31,17 @@ function triggerAsyncIndex(serviceId: string): void {
     });
 }
 
+// Drop a service's embedding from the RAG vector store after it is deleted, so
+// the Boss Agent can no longer retrieve a service that no longer exists.
+// Best-effort, same as triggerAsyncIndex.
+function triggerAsyncDeindex(serviceId: string): void {
+  getRAGRetriever()
+    .removeServiceById(serviceId)
+    .catch((_error) => {
+      // Keep service APIs non-blocking even if de-indexing fails.
+    });
+}
+
 // Validation schemas
 const inputOutputSchema = z.object({
   name: z.string().min(1).max(100),
@@ -374,6 +385,9 @@ router.delete(
   validateObjectIdParam,
   asyncHandler(async (req, res) => {
     await findByIdAndDelete(Service, req.params.id);
+
+    triggerAsyncDeindex(req.params.id);
+
     res.json({ message: 'Service deleted successfully' });
   })
 );

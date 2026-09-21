@@ -472,4 +472,14 @@ export class RAGRetriever {
 
     await this.indexService(service);
   }
+
+  /**
+   * Drop a service's embedding from the vector store so a deleted service can
+   * no longer be retrieved by the Boss Agent. Called after the service is
+   * removed from the catalog (the service row is already gone at this point,
+   * so we key off the id rather than re-loading it).
+   */
+  async removeServiceById(serviceId: string): Promise<void> {
+    await this.vectorStore.delete(serviceId);
+  }
 }
