@@ -375,7 +375,11 @@ export class RAGRetriever {
 
   async reindexAll(): Promise<{ indexed: number; duration: number }> {
     const startedAt = Date.now();
-    const services = (await Service.find({}).lean()) as unknown as ServiceDoc[];
+    // Only index active services — deprecated ones (retired by a catalog
+    // refresh, e.g. old-version tools like MONT-MMT) must not be retrievable.
+    const services = (await Service.find({
+      deprecated: { $ne: true },
+    }).lean()) as unknown as ServiceDoc[];
 
     await this.vectorStore.deleteAll();
 
@@ -465,8 +469,17 @@ export class RAGRetriever {
   }
 
   async indexServiceById(serviceId: string): Promise<void> {
-    const service = (await Service.findById(serviceId).lean()) as unknown as ServiceDoc | null;
+    const service = (await Service.findById(serviceId).lean()) as unknown as
+      | (ServiceDoc & { deprecated?: boolean })
+      | null;
     if (!service) {
+      return;
+    }
+
+    // A deprecated service must not stay retrievable — drop any stale embedding
+    // instead of (re)indexing it.
+    if (service.deprecated) {
+      await this.removeServiceById(serviceId);
       return;
     }
 
