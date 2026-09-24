@@ -30,6 +30,8 @@ const NAV_TOUR_COPY: Record<string, string> = {
     'Digital twin projects group the scenarios you build for a sector such as Telecom or Healthcare.',
   '/infrastructure':
     'Connect and manage the Kubernetes clusters or Docker environments that scenarios are deployed to.',
+  '/monitoring':
+    'Live CPU and memory of every running service, with threshold alert rules and filters by service, time range and severity.',
   '/analytics':
     'Platform usage at a glance: projects by sector, services by category and infrastructure status.',
   '/settings': 'System information, service categories and other platform preferences.',
