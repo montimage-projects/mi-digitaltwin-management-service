@@ -21,6 +21,11 @@ server/public/
 .env.development.local
 .env.test.local
 .env.production.local
+*.env
+
+# Agent context files: keep only the root CLAUDE.md
+**/CLAUDE.md
+!/CLAUDE.md
 
 # Logs
 logs
