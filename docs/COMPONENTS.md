@@ -305,6 +305,27 @@ Navigation sidebar with menu items.
 - Icon + label navigation
 - Responsive mobile behavior
 
+### GuidedTour
+
+Step-by-step walkthrough of the application shell, in
+`client/src/components/tour/`. `MainLayout` mounts it once, and it renders
+nothing until a user starts it.
+
+**Features:**
+
+- Started from the header help button or the Dashboard "Getting Started" card;
+  it never starts on its own
+- Each step anchors a popover to an element marked with `data-tour="<id>"`,
+  falling back to `fallbackTarget` and then to a centered dialog when the
+  target is not visible (for example the desktop sidebar on small screens)
+- Back / Next / Finish, Skip tour, Esc, a "Step n of N" label and a progress bar
+- Menu steps are built from the exported Sidebar `navigation` array
+  (`buildTourSteps` in `tour-steps.ts`), so a new menu entry gets a step
+  automatically; add its copy to `NAV_TOUR_COPY`
+- State lives in `useTourStore` (`client/src/store/tour-store.ts`, persisted
+  under `tour-storage`); only the outcome is persisted, so a reload never
+  reopens the tour
+
 ### ProtectedRoute
 
 Wrapper ensuring only authenticated users can access routes.

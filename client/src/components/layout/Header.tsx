@@ -1,6 +1,7 @@
-import { LogOut, User, Sun, Moon, Menu } from 'lucide-react';
+import { LogOut, User, Sun, Moon, Menu, CircleHelp } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useThemeStore } from '@/store/theme-store';
+import { useTourStore } from '@/store/tour-store';
 import { APP_NAME, APP_NAME_SHORT, LOGO_SRC, LOGO_ALT, LOGO_BACKDROP } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +21,7 @@ interface HeaderProps {
 export function Header({ onMenuClick }: HeaderProps) {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
+  const startTour = useTourStore((state) => state.start);
 
   const handleLogout = () => {
     logout();
@@ -37,6 +39,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             onClick={onMenuClick}
             title="Open navigation"
             aria-label="Open navigation"
+            data-tour="nav-menu"
           >
             <Menu className="h-5 w-5" />
           </Button>
@@ -56,15 +59,27 @@ export function Header({ onMenuClick }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon"
+          onClick={startTour}
+          title="Start guided tour"
+          aria-label="Start guided tour"
+          data-tour="help"
+        >
+          <CircleHelp className="h-5 w-5" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={toggleTheme}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          data-tour="theme-toggle"
         >
           {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
+            <Button variant="ghost" size="sm" className="gap-2" data-tour="user-menu">
               <User className="h-4 w-4" />
               <span>{user?.username}</span>
             </Button>
