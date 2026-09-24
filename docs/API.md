@@ -698,6 +698,78 @@ curl -X POST http://localhost:3000/api/infrastructures/infra123/test \
  -H "Authorization: Bearer $TOKEN"
 ```
 
+### Monitoring
+
+Live CPU and memory of every running service, read on demand from the
+Kubernetes metrics-server (`metrics.k8s.io`) of the infrastructure each
+execution was deployed to, plus threshold alert rules evaluated against each
+snapshot.
+
+**Prerequisites:** metrics-server must be installed in the target cluster and
+the stored credentials need RBAC `get`/`list` on `pods.metrics.k8s.io`. Without
+them the infrastructure is reported as `available: false` with a `reason`
+(`metrics-server is not installed…`, `Missing RBAC permission…`, …) — the
+endpoint still answers `200` for the other infrastructures.
+
+**Not yet available:** request rate, error rate and latency need Prometheus or
+service instrumentation and are deferred; only CPU and memory are reported.
+
+#### Get Metrics Snapshot
+
+- **GET** `/api/monitoring/metrics`
+- **Auth:** Required
+- **Query Parameters:**
+- `infrastructureId` (ObjectId, optional) - Only executions deployed to this infrastructure
+- `serviceId` (ObjectId, optional) - Only workloads running this catalog service (host or sidecar)
+- `severity` (`info` | `warning` | `critical`, optional) - Only alerts of this severity
+- **Response:** `MonitoringSnapshot` — `{ collectedAt, infrastructures: [{ infrastructureId, name, available, reason?, namespaces }], services: [{ key, name, serviceIds, nodeIds, scenarioId, scenarioTitle, executionId, namespace, infrastructureId, infrastructureName, metricsAvailable, pods, cpuMillicores, memoryBytes, containers: [{ name, cpuMillicores, memoryBytes }] }], alerts: FiredAlert[] }`
+- **Errors:** `400` invalid filter
+
+One metrics call is made per active (`pending`/`running`) execution namespace.
+Sidecar containers are reported inside their host workload's `containers`.
+Credentials are never part of the response.
+
+```bash
+curl "http://localhost:3000/api/monitoring/metrics?severity=critical" \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+#### List Alert Rules
+
+- **GET** `/api/monitoring/alert-rules`
+- **Auth:** Required
+- **Response:** `AlertRule[]` (newest first)
+
+#### Create Alert Rule
+
+- **POST** `/api/monitoring/alert-rules`
+- **Auth:** Required — `admin` role
+- **Body:** `{ name: string, metric: "cpu_millicores"|"memory_mib", operator: "gt"|"gte"|"lt"|"lte", threshold: number (>= 0), severity: "info"|"warning"|"critical", scope?: { serviceId?: string, infrastructureId?: string }, enabled?: boolean }`
+- **Response:** `201` `AlertRule`
+- **Errors:** `400` validation error · `403` not an admin
+
+```bash
+curl -X POST http://localhost:3000/api/monitoring/alert-rules \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"name":"High CPU","metric":"cpu_millicores","operator":"gt","threshold":800,"severity":"critical"}'
+```
+
+#### Update Alert Rule
+
+- **PUT** `/api/monitoring/alert-rules/:id`
+- **Auth:** Required — `admin` role
+- **Body:** any subset of the create body (at least one field)
+- **Response:** `AlertRule`
+- **Errors:** `400` invalid id or body · `403` not an admin · `404` rule not found
+
+#### Delete Alert Rule
+
+- **DELETE** `/api/monitoring/alert-rules/:id`
+- **Auth:** Required — `admin` role
+- **Response:** `{ message: "Alert rule deleted successfully" }`
+- **Errors:** `400` invalid id · `403` not an admin · `404` rule not found
+
 ## Data Models
 
 ### User
@@ -842,6 +914,28 @@ Validated on `POST`/`PUT /api/services`; invalid specs are rejected with
   updatedAt: Date;
 }
 ```
+
+### AlertRule
+
+```typescript
+{
+  _id: string;
+  name: string;
+  metric: 'cpu_millicores' | 'memory_mib';
+  operator: 'gt' | 'gte' | 'lt' | 'lte';
+  threshold: number; // >= 0, in millicores or MiB
+  severity: 'info' | 'warning' | 'critical';
+  scope: { serviceId?: string; infrastructureId?: string }; // empty = all services
+  enabled: boolean;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+A fired alert (`FiredAlert`, in the metrics snapshot) carries `ruleId`,
+`ruleName`, `serviceKey`, `serviceName`, `executionId`, `infrastructureId`,
+`metric`, `operator`, `value`, `threshold` and `severity`.
 
 ### Category
 
