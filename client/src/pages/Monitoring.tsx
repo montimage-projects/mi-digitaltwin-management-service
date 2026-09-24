@@ -113,6 +113,8 @@ export function Monitoring() {
         <p>
           CPU and memory come from the Kubernetes metrics-server of each infrastructure. Request
           rate, error rate and latency are not yet available: they need Prometheus integration.
+          Sparkline history is collected in this tab since the page was opened (up to 1 hour) and
+          resets on reload.
         </p>
       </div>
 

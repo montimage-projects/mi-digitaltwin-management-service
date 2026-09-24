@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -176,6 +176,36 @@ describe('Monitoring', () => {
     vi.mocked(monitoringApi.getMetrics).mockRejectedValue(new Error('Network down'));
     renderPage();
     expect(await screen.findByText('Network down')).toBeInTheDocument();
+  });
+
+  it('shows an error state when the alert rules cannot be loaded', async () => {
+    vi.mocked(monitoringApi.listRules).mockRejectedValue(new Error('Rules unavailable'));
+    renderPage();
+    expect(await screen.findByText('Rules unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('No alert rules defined')).not.toBeInTheDocument();
+  });
+
+  it('explains that sparkline history is session-only', async () => {
+    renderPage();
+    expect(
+      await screen.findByText(/history is collected in this tab since the page was opened/)
+    ).toBeInTheDocument();
+  });
+
+  it('flags a negative threshold inline and blocks saving', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /New rule/ }));
+    await user.type(screen.getByLabelText('Name'), 'CPU');
+    const threshold = screen.getByLabelText('Threshold');
+    expect(threshold).toBeRequired();
+    fireEvent.change(threshold, { target: { value: '-5' } });
+
+    const message = screen.getByText('Threshold must be 0 or greater');
+    expect(threshold).toHaveAttribute('aria-invalid', 'true');
+    expect(threshold).toHaveAttribute('aria-describedby', message.id);
+    expect(screen.getByRole('button', { name: 'Create rule' })).toBeDisabled();
   });
 
   it('lets an admin create an alert rule', async () => {

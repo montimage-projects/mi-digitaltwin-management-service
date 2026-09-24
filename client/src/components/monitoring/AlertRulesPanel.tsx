@@ -15,6 +15,7 @@ import { useAuthStore } from '@/store/auth-store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ErrorState } from '@/components/ui/error-state';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
@@ -110,7 +111,12 @@ export function AlertRulesPanel({ serviceOptions }: AlertRulesPanelProps) {
   const [form, setForm] = useState<RuleForm>(EMPTY_FORM);
   const [deleting, setDeleting] = useState<AlertRule | null>(null);
 
-  const { data: rules = [], isLoading } = useQuery({
+  const {
+    data: rules = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ['alert-rules'],
     queryFn: monitoringApi.listRules,
   });
@@ -150,6 +156,7 @@ export function AlertRulesPanel({ serviceOptions }: AlertRulesPanelProps) {
   };
 
   const threshold = Number(form.threshold);
+  const thresholdNegative = form.threshold !== '' && threshold < 0;
   const formValid = form.name.trim() !== '' && form.threshold !== '' && threshold >= 0;
 
   const handleSubmit = (event: FormEvent) => {
@@ -206,6 +213,8 @@ export function AlertRulesPanel({ serviceOptions }: AlertRulesPanelProps) {
 
       {isLoading ? (
         <p className="py-6 text-center text-sm text-muted-foreground">Loading alert rules…</p>
+      ) : error ? (
+        <ErrorState error={error as Error} onRetry={() => refetch()} />
       ) : rules.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">No alert rules defined</p>
       ) : (
@@ -275,10 +284,12 @@ export function AlertRulesPanel({ serviceOptions }: AlertRulesPanelProps) {
                 id="alert-rule-name"
                 value={form.name}
                 maxLength={100}
+                required
+                aria-required="true"
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label>Metric</Label>
                 <Select
@@ -323,11 +334,20 @@ export function AlertRulesPanel({ serviceOptions }: AlertRulesPanelProps) {
                   min={0}
                   step="any"
                   value={form.threshold}
+                  required
+                  aria-required="true"
+                  aria-invalid={thresholdNegative || undefined}
+                  aria-describedby={thresholdNegative ? 'alert-rule-threshold-error' : undefined}
                   onChange={(e) => setForm({ ...form, threshold: e.target.value })}
                 />
+                {thresholdNegative && (
+                  <p id="alert-rule-threshold-error" className="text-xs text-destructive">
+                    Threshold must be 0 or greater
+                  </p>
+                )}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Severity</Label>
                 <Select
