@@ -20,6 +20,7 @@ import partnersRoutes from './routes/partners.routes.js';
 import projectsRoutes from './routes/projects.routes.js';
 import scenariosRoutes from './routes/scenarios.routes.js';
 import infrastructuresRoutes from './routes/infrastructures.routes.js';
+import monitoringRoutes from './routes/monitoring.routes.js';
 import { openApiSpec } from './docs/openapi.js';
 
 const app = express();
@@ -76,6 +77,7 @@ app.use('/api/partners', partnersRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api', scenariosRoutes);
 app.use('/api/infrastructures', infrastructuresRoutes);
+app.use('/api/monitoring', monitoringRoutes);
 
 // Static file serving - always enabled to serve client build
 const staticServingEnabled = configureStaticServing(app);
