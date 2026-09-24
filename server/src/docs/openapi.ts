@@ -327,6 +327,73 @@ export const openApiSpec = {
         },
       },
     },
+    '/scenarios/{id}/executions/{executionId}/report': {
+      get: {
+        tags: ['Scenarios'],
+        summary: 'Get an execution report',
+        description:
+          'Report of one scenario run: outcome (`passed` | `failed` | `partial`), timings, final ' +
+          'per-service/container status, key metrics (service/container counts by status, ' +
+          'container restarts, log and error-line counts, namespace events by reason, security ' +
+          'alerts by verdict) and the capped tail of the logs, error lines, events and alerts. ' +
+          'Generated automatically when the run is torn down or its deploy fails. When no ' +
+          'report was stored yet, a provisional report (`provisional: true`) is built from the ' +
+          'execution record alone — the cluster is never read. `md` and `html` responses are ' +
+          'served as attachments named `execution-<executionId>-report.<format>`.',
+        parameters: [
+          { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'executionId', in: 'path', required: true, schema: { type: 'string' } },
+          {
+            name: 'format',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['json', 'md', 'html'], default: 'json' },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Execution report in the requested format',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    scenarioId: { type: 'string' },
+                    executionId: { type: 'string' },
+                    scenarioTitle: { type: 'string' },
+                    executedBy: { type: 'string' },
+                    namespace: { type: 'string' },
+                    status: { type: 'string', enum: ['pending', 'running', 'completed', 'failed'] },
+                    outcome: { type: 'string', enum: ['passed', 'failed', 'partial'] },
+                    startedAt: { type: 'string', format: 'date-time' },
+                    completedAt: { type: 'string', format: 'date-time' },
+                    durationMs: { type: 'integer' },
+                    services: { type: 'array', items: { type: 'object' } },
+                    metrics: { type: 'object' },
+                    logs: { type: 'array', items: { type: 'object' } },
+                    errorLogs: { type: 'array', items: { type: 'object' } },
+                    events: { type: 'array', items: { type: 'object' } },
+                    alerts: { type: 'array', items: { type: 'object' } },
+                    omitted: { type: 'object' },
+                    partial: { type: 'boolean' },
+                    captureErrors: { type: 'array', items: { type: 'string' } },
+                    error: { type: 'string' },
+                    conclusion: { type: 'string' },
+                    provisional: { type: 'boolean' },
+                    generatedAt: { type: 'string', format: 'date-time' },
+                  },
+                },
+              },
+              'text/markdown': { schema: { type: 'string' } },
+              'text/html': { schema: { type: 'string' } },
+            },
+          },
+          400: { description: 'Invalid scenario/execution id or unsupported format' },
+          401: { description: 'Authentication required' },
+          404: { description: 'Scenario or execution not found' },
+        },
+      },
+    },
     '/scenarios/{id}/executions/{executionId}/events': {
       get: {
         tags: ['Scenarios'],
