@@ -58,6 +58,9 @@ const {
           createNamespacedServiceAccount: async () => ({}),
           deleteNamespace: clusterCalls.deleteNamespace,
           listNamespacedPod: async () => ({ items: [] }),
+          // Read by the execution report captured at teardown (issue #26).
+          readNamespacedPodLog: async () => '',
+          listNamespacedEvent: async () => ({ items: [] }),
         };
       }
       if (ctor === AppsV1Api) {
@@ -110,6 +113,7 @@ const { Project } = await import('../../models/Project.js');
 const { Infrastructure } = await import('../../models/Infrastructure.js');
 const { Service } = await import('../../models/Service.js');
 const { Scenario } = await import('../../models/Scenario.js');
+const { ExecutionReport } = await import('../../models/ExecutionReport.js');
 const { errorHandler } = await import('../../middleware/errorHandler.js');
 const scenariosRoutes = (await import('../scenarios.routes.js')).default;
 
@@ -262,6 +266,15 @@ describe('POST /api/scenarios/:id/execute (Kubernetes deploy)', () => {
     const scenario = await Scenario.findById(scenarioId).lean();
     const execution = scenario?.executions.find((e) => e._id?.toString() === executionId);
     expect(execution?.status).toBe('completed');
+
+    // The run is closed with run-end stamps and a stored report (issue #26).
+    // The mocked deployment never becomes available, so the verdict is partial.
+    expect(execution?.completedAt).toBeInstanceOf(Date);
+    expect(typeof execution?.durationMs).toBe('number');
+    expect(execution?.outcome).toBe('partial');
+    const report = await ExecutionReport.findOne({ scenarioId, executionId }).lean();
+    expect(report?.outcome).toBe('partial');
+    expect(report?.namespace).toBe(namespace);
   });
 });
 
