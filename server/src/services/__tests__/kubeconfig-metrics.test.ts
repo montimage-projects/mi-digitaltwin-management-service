@@ -3,6 +3,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { ApiException, Metrics } from '@kubernetes/client-node';
 import { buildKubeConfig } from '../kubernetesDeploy.js';
+import { classifyMetricsError } from '../monitoring.js';
 import { encrypt } from '../../utils/encryption.js';
 import type { IInfrastructure } from '../../models/Infrastructure.js';
 
@@ -144,5 +145,19 @@ describe('buildKubeConfig (real @kubernetes/client-node)', () => {
 
     expect(err).toBeInstanceOf(ApiException);
     expect((err as ApiException<unknown>).code).toBe(404);
+    // The dashboard's classifier recognises the error the real client throws.
+    expect(classifyMetricsError(err)).toMatch(/metrics-server is not installed/);
+  });
+
+  test('an RBAC denial (403) is classified as a missing pods.metrics.k8s.io permission', async () => {
+    respond = (res) =>
+      sendJson(res, 403, { kind: 'Status', status: 'Failure', reason: 'Forbidden', code: 403 });
+
+    const metrics = new Metrics(
+      buildKubeConfig(infra('a-bearer-token-value', { skipTLSVerify: true }))
+    );
+    const err = await metrics.getPodMetrics('ns-1').catch((e: unknown) => e);
+
+    expect(classifyMetricsError(err)).toMatch(/pods\.metrics\.k8s\.io/);
   });
 });
