@@ -426,6 +426,22 @@ describe('execution reports', () => {
     expect(htmlText).not.toMatch(/<script/i);
     expect(htmlText).toContain('Report &lt;b&gt;Scenario&lt;/b&gt;');
     expect(htmlText).toContain('HTTP flood &lt;script&gt;x&lt;/script&gt;');
+
+    // A conclusion written after the run closed shows up in the report.
+    const concluded = await fetch(
+      `${baseUrl}/api/scenarios/${scenarioId}/executions/${executionId}/conclusion`,
+      {
+        method: 'POST',
+        headers: { ...authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'Flood detected | mitigated', author: 'analyst' }),
+      }
+    );
+    expect(concluded.status).toBe(200);
+    const withConclusion = await (
+      await fetch(reportUrl(executionId, '?format=md'), { headers: authHeader })
+    ).text();
+    expect(withConclusion).toContain('## Conclusion');
+    expect(withConclusion).toContain('Flood detected | mitigated');
   });
 
   test('a second teardown keeps the stored report and stamps', async () => {

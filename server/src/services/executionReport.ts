@@ -75,6 +75,13 @@ const ERROR_LINE_RE =
 
 const TRUNCATION_MARK = '… [truncated]';
 
+/** Why a provisional report carries no captured artifacts. */
+function provisionalNotice(status: string): string {
+  return status === 'completed' || status === 'failed'
+    ? 'no report was captured when this run closed; it is built from the execution record only'
+    : 'this run has not been closed yet; no logs, events or alerts were captured';
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -490,15 +497,23 @@ type StoredReport = Omit<
   updatedAt?: Date;
 };
 
-/** Project a stored report onto the API shape (field whitelist). */
-export function toReportData(stored: StoredReport, status: string): ExecutionReportData {
+/**
+ * Project a stored report onto the API shape (field whitelist). The live
+ * execution supplies what can change after the run closed: its status and
+ * the conclusion an analyst writes after reviewing the run.
+ */
+export function toReportData(
+  stored: StoredReport,
+  execution: { status: string; conclusion?: { text?: string } | null }
+): ExecutionReportData {
+  const conclusion = execution.conclusion?.text ?? stored.conclusion;
   return {
     scenarioId: String(stored.scenarioId),
     executionId: String(stored.executionId),
     scenarioTitle: stored.scenarioTitle ?? '',
     executedBy: stored.executedBy ?? '',
     ...(stored.namespace ? { namespace: stored.namespace } : {}),
-    status,
+    status: execution.status,
     outcome: stored.outcome,
     startedAt: stored.startedAt,
     completedAt: stored.completedAt,
@@ -518,7 +533,7 @@ export function toReportData(stored: StoredReport, status: string): ExecutionRep
     partial: Boolean(stored.partial),
     captureErrors: stored.captureErrors ?? [],
     ...(stored.error ? { error: stored.error } : {}),
-    ...(stored.conclusion ? { conclusion: stored.conclusion } : {}),
+    ...(conclusion ? { conclusion: truncateBytes(conclusion, MAX_TEXT_BYTES) } : {}),
     provisional: false,
     generatedAt: stored.updatedAt ?? stored.completedAt ?? stored.startedAt,
   };
@@ -868,9 +883,7 @@ export function renderMarkdown(report: ExecutionReportData): string {
   out.push(`# Execution report: ${escapeMarkdown(report.scenarioTitle)}`);
   out.push('');
   if (report.provisional) {
-    out.push(
-      '> **Provisional report** — this run has not been closed yet; no logs, events or alerts were captured.'
-    );
+    out.push(`> **Provisional report** — ${provisionalNotice(report.status)}.`);
     out.push('');
   }
   if (report.partial) {
@@ -1074,7 +1087,7 @@ export function renderHtml(report: ExecutionReportData): string {
   parts.push(`<h1>Execution report: ${escapeHtml(report.scenarioTitle)}</h1>`);
   if (report.provisional) {
     parts.push(
-      '<p class="note"><strong>Provisional report</strong> — this run has not been closed yet; no logs, events or alerts were captured.</p>'
+      `<p class="note"><strong>Provisional report</strong> — ${escapeHtml(provisionalNotice(report.status))}.</p>`
     );
   }
   if (report.partial) {

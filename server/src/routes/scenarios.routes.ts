@@ -352,7 +352,7 @@ router.get(
 
     const stored = await ExecutionReport.findOne({ scenarioId: id, executionId }).lean();
     const report = stored
-      ? toReportData(stored, execution.status)
+      ? toReportData(stored, execution)
       : buildProvisionalReport(scenario, execution);
 
     if (format === 'json') {

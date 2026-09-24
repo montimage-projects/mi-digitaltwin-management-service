@@ -349,6 +349,14 @@ describe('buildProvisionalReport', () => {
     expect(report.logs).toEqual([]);
   });
 
+  test('says whether the run is still open or closed without a report', () => {
+    const open = buildProvisionalReport(scenario, makeExecution());
+    expect(renderMarkdown(open)).toContain('has not been closed yet');
+    const closed = buildProvisionalReport(scenario, makeExecution({ status: 'completed' }));
+    expect(renderMarkdown(closed)).toContain('no report was captured when this run closed');
+    expect(renderHtml(closed)).toContain('no report was captured when this run closed');
+  });
+
   test('keeps the outcome and close time stamped on the execution', () => {
     const report = buildProvisionalReport(
       scenario,
