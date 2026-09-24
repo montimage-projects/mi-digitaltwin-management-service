@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Copy, Globe, Terminal, Monitor } from 'lucide-react';
 import type { Service } from '@/lib/api';
+import { getServiceConfigStatus } from '@/lib/service-config-status';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ConfigStatusBadge } from '@/components/services/ConfigStatusBadge';
 import { Separator } from '@/components/ui/separator';
 import {
   Sheet,
@@ -52,6 +54,7 @@ export function ServiceDrawer({ service, open, onClose }: ServiceDrawerProps) {
     service.versions?.find((v) => v.version === activeVersionString) || service.versions?.[0];
 
   const UiTypeIcon = UI_TYPE_ICONS[service.uiType || 'web'];
+  const configStatus = getServiceConfigStatus(service);
 
   return (
     <Sheet open={open} onOpenChange={(isOpen: boolean) => !isOpen && onClose()}>
@@ -60,11 +63,28 @@ export function ServiceDrawer({ service, open, onClose }: ServiceDrawerProps) {
           <SheetTitle className="flex items-center gap-2">
             {service.shortName}
             <Badge variant="secondary">{service.currentVersion}</Badge>
+            <ConfigStatusBadge service={service} />
           </SheetTitle>
           <SheetDescription>{service.title}</SheetDescription>
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
+          {configStatus.state === 'incomplete' && (
+            <div
+              className="rounded-md border border-amber-500/60 bg-amber-500/10 p-3 text-sm"
+              data-testid="missing-configuration"
+            >
+              <p className="font-medium text-amber-700 dark:text-amber-400">
+                Missing configuration
+              </p>
+              <ul className="mt-1 list-inside list-disc text-muted-foreground">
+                {configStatus.missing.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Basic Info */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
