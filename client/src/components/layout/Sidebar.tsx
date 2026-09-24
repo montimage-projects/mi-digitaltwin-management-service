@@ -8,12 +8,23 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { APP_NAME_SHORT, LOGO_SRC, LOGO_ALT, LOGO_BACKDROP } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 
-const navigation = [
+export interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+/**
+ * Primary sidebar navigation. Exported so the guided tour can derive one step
+ * per entry — a page added here automatically gets a tour step.
+ */
+export const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Services', href: '/services', icon: Server },
   { name: 'Projects', href: '/projects', icon: FolderKanban },
@@ -21,6 +32,12 @@ const navigation = [
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
+
+/** Stable `data-tour` id for a nav entry: '/' -> 'nav-dashboard', '/services' -> 'nav-services'. */
+export function navTourId(href: string): string {
+  const slug = href.replace(/^\/+|\/+$/g, '').replace(/\//g, '-');
+  return `nav-${slug || 'dashboard'}`;
+}
 
 interface SidebarProps {
   collapsed: boolean;
@@ -54,6 +71,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
           onClick={onToggle}
           className={cn('h-8 w-8', collapsed && 'mx-auto')}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          data-tour="sidebar-toggle"
         >
           {collapsed ? (
             <PanelLeftOpen className="h-4 w-4" />
@@ -75,6 +93,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
               to={item.href}
               onClick={onNavigate}
               title={collapsed ? item.name : undefined}
+              data-tour={navTourId(item.href)}
               className={cn(
                 'flex items-center rounded-md text-sm font-medium transition-colors',
                 collapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2',
