@@ -30,6 +30,15 @@ describe('Header', () => {
     expect(useTourStore.getState()).toMatchObject({ status: 'active', stepIndex: 0 });
   });
 
+  it('marks the mobile navigation button as a tour target', () => {
+    render(<Header onMenuClick={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Open navigation' })).toHaveAttribute(
+      'data-tour',
+      'nav-menu'
+    );
+  });
+
   it('restarts the tour from the first step after it was completed', async () => {
     const user = userEvent.setup();
     useTourStore.setState({ status: 'completed', stepIndex: 0 });

@@ -53,6 +53,17 @@ describe('buildTourSteps', () => {
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
   });
 
+  it('falls back to the header menu button for sidebar-anchored steps', () => {
+    const steps = buildTourSteps(navigation);
+    const sidebarAnchored = steps.filter(
+      (s) => s.target === 'sidebar-toggle' || s.target?.startsWith('nav-')
+    );
+    expect(sidebarAnchored.length).toBeGreaterThan(navigation.length);
+    for (const step of sidebarAnchored) {
+      expect(step.fallbackTarget, step.id).toBe('nav-menu');
+    }
+  });
+
   it('uses unique step ids', () => {
     const ids = buildTourSteps(navigation).map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);

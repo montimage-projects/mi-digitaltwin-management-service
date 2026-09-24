@@ -175,8 +175,10 @@ export function Dashboard() {
         </div>
 
         {/* Getting Started */}
-        <div className="rounded-lg border bg-background p-6" data-tour="getting-started">
-          <h2 className="mb-4 text-lg font-semibold">Getting Started</h2>
+        <div className="rounded-lg border bg-background p-6">
+          <h2 className="mb-4 text-lg font-semibold" data-tour="getting-started">
+            Getting Started
+          </h2>
           <ul className="space-y-3">
             <li className="flex items-start gap-3">
               <div className="rounded-full bg-primary/10 p-1 mt-0.5">

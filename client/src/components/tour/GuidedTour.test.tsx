@@ -11,7 +11,17 @@ const STEPS: TourStep[] = [
   { id: 'last', title: 'Last step', description: 'Goodbye' },
 ];
 
-function renderTour() {
+const FALLBACK_STEPS: TourStep[] = [
+  {
+    id: 'hidden',
+    title: 'Hidden target',
+    description: 'Points at the demo button instead',
+    target: 'missing',
+    fallbackTarget: 'demo',
+  },
+];
+
+function renderTour(steps: TourStep[] = STEPS) {
   return render(
     <>
       <main>
@@ -19,11 +29,11 @@ function renderTour() {
         <button type="button" onClick={() => useTourStore.getState().start()}>
           Launch tour
         </button>
-        <button type="button" data-tour="demo">
+        <button type="button" data-tour="demo" className="ring-offset-background">
           Demo button
         </button>
       </main>
-      <GuidedTour steps={STEPS} />
+      <GuidedTour steps={steps} />
     </>
   );
 }
@@ -115,6 +125,20 @@ describe('GuidedTour', () => {
     await user.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByRole('dialog', { name: 'Last step' })).toBeInTheDocument();
     expect(target).not.toHaveClass('ring-2');
+    // Classes the target already had are not stripped by the highlight cleanup.
+    expect(target).toHaveClass('ring-offset-background');
+  });
+
+  it('anchors to the fallback target when the primary target is not visible', () => {
+    makeDemoTargetVisible();
+    useTourStore.getState().start();
+    renderTour(FALLBACK_STEPS);
+
+    expect(screen.getByRole('dialog', { name: 'Hidden target' })).toHaveAttribute(
+      'data-tour-placement',
+      'anchored'
+    );
+    expect(screen.getByRole('button', { name: 'Demo button' })).toHaveClass('ring-2');
   });
 
   it('keeps the tour running and the page usable when switching dialog to popover', async () => {
@@ -160,6 +184,41 @@ describe('GuidedTour', () => {
     expect(screen.getByRole('dialog', { name: 'Intro' })).toContainElement(
       document.activeElement as HTMLElement
     );
+  });
+
+  it('focuses the primary action when each step opens', async () => {
+    const user = userEvent.setup();
+    makeDemoTargetVisible();
+    useTourStore.getState().start();
+    renderTour();
+
+    expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByRole('dialog', { name: 'Demo target' })).toHaveAttribute(
+      'data-tour-placement',
+      'anchored'
+    );
+    expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByRole('button', { name: 'Finish' })).toHaveFocus();
+  });
+
+  it('returns focus to the launcher when the tour finishes after several steps', async () => {
+    const user = userEvent.setup();
+    makeDemoTargetVisible();
+    renderTour();
+    const launch = screen.getByRole('button', { name: 'Launch tour' });
+
+    await user.click(launch);
+    await user.click(await screen.findByRole('button', { name: 'Next' }));
+    await screen.findByRole('dialog', { name: 'Demo target' });
+    await user.click(screen.getByRole('button', { name: 'Next' }));
+    await user.click(await screen.findByRole('button', { name: 'Finish' }));
+
+    expect(useTourStore.getState().status).toBe('completed');
+    await waitFor(() => expect(launch).toHaveFocus());
   });
 
   it('completes the tour from the last step', async () => {

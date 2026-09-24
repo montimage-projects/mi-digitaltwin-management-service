@@ -12,6 +12,11 @@ export interface TourStep {
    * small screen) — are shown as a centered dialog instead.
    */
   target?: string;
+  /**
+   * `data-tour` value to point at instead when `target` is not visible, e.g.
+   * the header menu button while the desktop sidebar is hidden.
+   */
+  fallbackTarget?: string;
   /** Preferred side of the target to place the step on. */
   side?: TourSide;
 }
@@ -30,12 +35,16 @@ const NAV_TOUR_COPY: Record<string, string> = {
   '/settings': 'System information, service categories and other platform preferences.',
 };
 
+/** Header button that opens the navigation drawer below the `lg` breakpoint. */
+const NAV_MENU_TARGET = 'nav-menu';
+
 function navStep(item: Pick<NavItem, 'name' | 'href'>): TourStep {
   return {
     id: `menu-${navTourId(item.href)}`,
     title: item.name,
     description: NAV_TOUR_COPY[item.href] ?? `Open ${item.name} from the sidebar.`,
     target: navTourId(item.href),
+    fallbackTarget: NAV_MENU_TARGET,
     side: 'right',
   };
 }
@@ -65,9 +74,11 @@ export function buildTourSteps(
     ...navigation.map(navStep),
     {
       id: 'sidebar-toggle',
-      title: 'Collapse the sidebar',
-      description: 'Shrink the sidebar to icons to give the workspace more room.',
+      title: 'Show or hide the menu',
+      description:
+        'Collapse the sidebar to icons to give the workspace more room. On smaller screens, the same menu opens from the menu button in the header.',
       target: 'sidebar-toggle',
+      fallbackTarget: NAV_MENU_TARGET,
       side: 'right',
     },
     {
@@ -87,9 +98,7 @@ export function buildTourSteps(
     {
       id: 'main-content',
       title: 'Your workspace',
-      description: 'The page you open from the sidebar is shown here.',
-      target: 'main-content',
-      side: 'top',
+      description: 'The page you pick from the menu opens in the main area, below the header.',
     },
     {
       id: 'getting-started',
@@ -97,7 +106,7 @@ export function buildTourSteps(
       description:
         'The Getting Started checklist on the Dashboard summarises the typical workflow. The next steps walk through it.',
       target: 'getting-started',
-      side: 'top',
+      side: 'bottom',
     },
     {
       id: 'flow-services',
@@ -105,6 +114,7 @@ export function buildTourSteps(
       description:
         'Start in Services to explore the available cybersecurity tools and check that the ones you need are fully configured.',
       target: navTourId('/services'),
+      fallbackTarget: NAV_MENU_TARGET,
       side: 'right',
     },
     {
@@ -112,6 +122,7 @@ export function buildTourSteps(
       title: '2. Create a Digital Twin Project',
       description: 'In Projects, create a project for your sector (Telecom, Healthcare, etc.).',
       target: navTourId('/projects'),
+      fallbackTarget: NAV_MENU_TARGET,
       side: 'right',
     },
     {
@@ -126,6 +137,7 @@ export function buildTourSteps(
       description:
         'In Infrastructure, connect the Kubernetes cluster or Docker environment your scenarios will run on.',
       target: navTourId('/infrastructure'),
+      fallbackTarget: NAV_MENU_TARGET,
       side: 'right',
     },
     {

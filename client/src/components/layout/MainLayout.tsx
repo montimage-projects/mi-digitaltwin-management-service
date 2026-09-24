@@ -44,12 +44,7 @@ export function MainLayout() {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onMenuClick={() => setMobileNavOpen(true)} />
-        <main
-          id="main-content"
-          className="flex-1 overflow-auto bg-muted/30 p-6"
-          tabIndex={-1}
-          data-tour="main-content"
-        >
+        <main id="main-content" className="flex-1 overflow-auto bg-muted/30 p-6" tabIndex={-1}>
           <Breadcrumb />
           <Outlet />
         </main>

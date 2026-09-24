@@ -39,6 +39,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             onClick={onMenuClick}
             title="Open navigation"
             aria-label="Open navigation"
+            data-tour="nav-menu"
           >
             <Menu className="h-5 w-5" />
           </Button>

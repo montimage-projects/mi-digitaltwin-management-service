@@ -33,13 +33,12 @@ function findVisibleTarget(id: string): HTMLElement | null {
   return null;
 }
 
-/**
- * Radix returns focus to the previously focused element when a step's
- * popover/dialog unmounts. While the tour is still running the next step has
- * already taken focus, so only let focus return once the tour has closed.
- */
-function keepFocusWhileActive(event: Event) {
-  if (useTourStore.getState().status === 'active') event.preventDefault();
+/** Visible target for a step, falling back to its alternate target (e.g. on small screens). */
+function resolveTarget(step: TourStep): HTMLElement | null {
+  if (!step.target) return null;
+  const target = findVisibleTarget(step.target);
+  if (target || !step.fallbackTarget) return target;
+  return findVisibleTarget(step.fallbackTarget);
 }
 
 interface GuidedTourProps {
@@ -73,6 +72,11 @@ function ActiveTour({ steps }: { steps: TourStep[] }) {
   const titleId = useId();
   const descriptionId = useId();
   const anchorRef = useRef<HTMLElement | null>(null);
+  const primaryRef = useRef<HTMLButtonElement>(null);
+  // Element that launched the tour, captured before any step takes focus.
+  const [launcher] = useState(() =>
+    document.activeElement instanceof HTMLElement ? document.activeElement : null
+  );
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [resolved, setResolved] = useState<{ stepId: string; target: HTMLElement | null } | null>(
     null
@@ -86,14 +90,42 @@ function ActiveTour({ steps }: { steps: TourStep[] }) {
 
   // Resolve (and highlight) the current step's target before paint.
   useLayoutEffect(() => {
-    const target = step.target ? findVisibleTarget(step.target) : null;
+    const target = resolveTarget(step);
     anchorRef.current = target;
     setResolved({ stepId: step.id, target });
     if (!target) return;
     target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
-    target.classList.add(...HIGHLIGHT_CLASSES);
-    return () => target.classList.remove(...HIGHLIGHT_CLASSES);
+    // Only add (and later remove) the classes the target lacks, so classes it
+    // already carries (e.g. a button's ring-offset-background) survive.
+    const added = HIGHLIGHT_CLASSES.filter((name) => !target.classList.contains(name));
+    target.classList.add(...added);
+    return () => target.classList.remove(...added);
   }, [step, layoutVersion]);
+
+  // Each step opens with focus on its primary action (Next / Finish).
+  const focusPrimary = (event: Event) => {
+    event.preventDefault();
+    primaryRef.current?.focus();
+  };
+
+  /**
+   * Radix returns focus to the previously focused element when a step's
+   * popover/dialog unmounts. While the tour is running the next step has
+   * already taken focus, so keep it there. Once the tour closes, return focus
+   * to the launcher (or the header help button) unless the user already moved
+   * it elsewhere, e.g. by clicking outside.
+   */
+  const restoreFocus = (event: Event) => {
+    event.preventDefault();
+    if (useTourStore.getState().status === 'active') return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    const fallback =
+      launcher && launcher.isConnected && launcher !== document.body
+        ? launcher
+        : findVisibleTarget('help');
+    fallback?.focus();
+  };
 
   if (!resolved || resolved.stepId !== step.id) return null;
 
@@ -119,7 +151,7 @@ function ActiveTour({ steps }: { steps: TourStep[] }) {
         <Button variant="outline" size="sm" onClick={prev} disabled={isFirst}>
           Back
         </Button>
-        <Button size="sm" onClick={isLast ? complete : () => next(steps.length)}>
+        <Button ref={primaryRef} size="sm" onClick={isLast ? complete : () => next(steps.length)}>
           {isLast ? 'Finish' : 'Next'}
         </Button>
       </div>
@@ -147,7 +179,8 @@ function ActiveTour({ steps }: { steps: TourStep[] }) {
           // Tabbing back into the page should not end the tour; Esc, an outside
           // click or Skip still do.
           onFocusOutside={(event) => event.preventDefault()}
-          onCloseAutoFocus={keepFocusWhileActive}
+          onOpenAutoFocus={focusPrimary}
+          onCloseAutoFocus={restoreFocus}
         >
           <div className="space-y-1.5">
             <h2 id={titleId} className="font-semibold leading-none tracking-tight">
@@ -175,7 +208,8 @@ function ActiveTour({ steps }: { steps: TourStep[] }) {
       <DialogContent
         className="max-w-md"
         data-tour-placement="centered"
-        onCloseAutoFocus={keepFocusWhileActive}
+        onOpenAutoFocus={focusPrimary}
+        onCloseAutoFocus={restoreFocus}
       >
         <DialogHeader>
           <DialogTitle>{step.title}</DialogTitle>
