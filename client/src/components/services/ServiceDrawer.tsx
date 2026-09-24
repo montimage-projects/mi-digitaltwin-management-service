@@ -60,10 +60,10 @@ export function ServiceDrawer({ service, open, onClose }: ServiceDrawerProps) {
     <Sheet open={open} onOpenChange={(isOpen: boolean) => !isOpen && onClose()}>
       <SheetContent className="overflow-y-auto sm:max-w-xl">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
+          <SheetTitle className="flex flex-wrap items-center gap-2 pr-8">
             {service.shortName}
             <Badge variant="secondary">{service.currentVersion}</Badge>
-            <ConfigStatusBadge service={service} />
+            <ConfigStatusBadge service={service} withTooltip={false} />
           </SheetTitle>
           <SheetDescription>{service.title}</SheetDescription>
         </SheetHeader>

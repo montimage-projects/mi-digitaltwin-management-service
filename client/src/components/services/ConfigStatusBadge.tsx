@@ -22,35 +22,41 @@ const STATE_LABELS: Record<ServiceConfigState, string> = {
 interface ConfigStatusBadgeProps {
   service: ServiceConfigInput;
   className?: string;
+  /**
+   * Wrap the incomplete badge in a focusable tooltip trigger listing the
+   * missing items. Disable where the missing items are already shown nearby
+   * (e.g. the service drawer) so the badge is not a tab stop.
+   */
+  withTooltip?: boolean;
 }
 
 /**
  * Configuration-completeness badge for a service (issue #245). Icon + text
  * convey the state without relying on color; when incomplete, a tooltip and
- * the accessible label list the missing requirements.
+ * visually hidden text list the missing requirements.
  */
-export function ConfigStatusBadge({ service, className }: ConfigStatusBadgeProps) {
+export function ConfigStatusBadge({
+  service,
+  className,
+  withTooltip = true,
+}: ConfigStatusBadgeProps) {
   const { state, missing } = getServiceConfigStatus(service);
   const label = STATE_LABELS[state];
   const Icon = state === 'complete' ? CheckCircle2 : AlertTriangle;
-  const ariaLabel =
-    state === 'complete'
-      ? 'Configuration complete'
-      : `Needs configuration: missing ${missing.join(', ')}`;
 
   const badge = (
     <Badge
       variant="outline"
       data-testid={`config-status-badge-${state}`}
-      aria-label={ariaLabel}
       className={cn('gap-1 whitespace-nowrap font-medium', STATE_STYLES[state], className)}
     >
       <Icon className="h-3 w-3" aria-hidden="true" />
       {label}
+      {state === 'incomplete' && <span className="sr-only">: missing {missing.join(', ')}</span>}
     </Badge>
   );
 
-  if (state === 'complete') return badge;
+  if (state === 'complete' || !withTooltip) return badge;
 
   return (
     <TooltipProvider>

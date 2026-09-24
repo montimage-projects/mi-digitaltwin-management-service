@@ -17,21 +17,32 @@ describe('ConfigStatusBadge', () => {
     render(<ConfigStatusBadge service={configured} />);
     const badge = screen.getByTestId('config-status-badge-complete');
     expect(badge).toHaveTextContent('Configured');
-    expect(badge).toHaveAttribute('aria-label', 'Configuration complete');
+    expect(badge).not.toHaveAttribute('aria-label');
     expect(screen.queryByTestId('config-status-badge-incomplete')).not.toBeInTheDocument();
   });
 
-  it('renders the incomplete state with the missing items in its accessible label', () => {
+  it('renders the incomplete state with the missing items in its accessible text', () => {
     render(<ConfigStatusBadge service={{ ...configured, versions: [] }} />);
     const badge = screen.getByTestId('config-status-badge-incomplete');
-    expect(badge).toHaveTextContent('Needs configuration');
-    expect(badge).toHaveAttribute('aria-label', 'Needs configuration: missing Container image');
+    expect(badge).toHaveTextContent('Needs configuration: missing Container image');
+    expect(badge).not.toHaveAttribute('aria-label');
+    expect(screen.getByText(': missing Container image')).toHaveClass('sr-only');
   });
 
   it('makes the incomplete badge keyboard-focusable for its tooltip', () => {
     render(<ConfigStatusBadge service={{ ...configured, description: '' }} />);
     const trigger = screen.getByTestId('config-status-badge-incomplete').parentElement;
     expect(trigger).toHaveAttribute('tabindex', '0');
+  });
+
+  it('renders a plain, non-focusable badge when the tooltip is disabled', () => {
+    const { container } = render(
+      <ConfigStatusBadge service={{ ...configured, description: '' }} withTooltip={false} />
+    );
+    const badge = screen.getByTestId('config-status-badge-incomplete');
+    expect(badge).toHaveTextContent('Needs configuration');
+    expect(container.querySelector('[tabindex]')).toBeNull();
+    expect(container.firstChild).toBe(badge);
   });
 
   it('updates when the service configuration changes', () => {
