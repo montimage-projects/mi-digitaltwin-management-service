@@ -33,12 +33,18 @@ function findVisibleTarget(id: string): HTMLElement | null {
   return null;
 }
 
+interface ResolvedTarget {
+  element: HTMLElement | null;
+  /** True when the step points at its `fallbackTarget` instead of `target`. */
+  isFallback: boolean;
+}
+
 /** Visible target for a step, falling back to its alternate target (e.g. on small screens). */
-function resolveTarget(step: TourStep): HTMLElement | null {
-  if (!step.target) return null;
+function resolveTarget(step: TourStep): ResolvedTarget {
+  if (!step.target) return { element: null, isFallback: false };
   const target = findVisibleTarget(step.target);
-  if (target || !step.fallbackTarget) return target;
-  return findVisibleTarget(step.fallbackTarget);
+  if (target || !step.fallbackTarget) return { element: target, isFallback: false };
+  return { element: findVisibleTarget(step.fallbackTarget), isFallback: true };
 }
 
 interface GuidedTourProps {
@@ -78,9 +84,7 @@ function ActiveTour({ steps }: { steps: TourStep[] }) {
     document.activeElement instanceof HTMLElement ? document.activeElement : null
   );
   const [layoutVersion, setLayoutVersion] = useState(0);
-  const [resolved, setResolved] = useState<{ stepId: string; target: HTMLElement | null } | null>(
-    null
-  );
+  const [resolved, setResolved] = useState<({ stepId: string } & ResolvedTarget) | null>(null);
 
   useEffect(() => {
     const onResize = () => setLayoutVersion((version) => version + 1);
@@ -90,9 +94,9 @@ function ActiveTour({ steps }: { steps: TourStep[] }) {
 
   // Resolve (and highlight) the current step's target before paint.
   useLayoutEffect(() => {
-    const target = resolveTarget(step);
+    const { element: target, isFallback } = resolveTarget(step);
     anchorRef.current = target;
-    setResolved({ stepId: step.id, target });
+    setResolved({ stepId: step.id, element: target, isFallback });
     if (!target) return;
     target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
     // Only add (and later remove) the classes the target lacks, so classes it
@@ -158,7 +162,7 @@ function ActiveTour({ steps }: { steps: TourStep[] }) {
     </div>
   );
 
-  if (resolved.target) {
+  if (resolved.element) {
     return (
       <Popover
         key={step.id}
@@ -169,10 +173,13 @@ function ActiveTour({ steps }: { steps: TourStep[] }) {
       >
         <PopoverAnchor virtualRef={anchorRef} />
         <PopoverContent
-          side={step.side ?? 'bottom'}
+          // A fallback target (the small-screen header menu button) sits at the
+          // screen edge, where a side placement would push the popover
+          // off-screen; below it, collision handling keeps it in view.
+          side={resolved.isFallback ? 'bottom' : (step.side ?? 'bottom')}
           sideOffset={10}
           collisionPadding={16}
-          className="w-80 space-y-4"
+          className="w-80 max-w-[calc(100vw-2rem)] space-y-4"
           aria-labelledby={titleId}
           aria-describedby={descriptionId}
           data-tour-placement="anchored"

@@ -18,6 +18,7 @@ const FALLBACK_STEPS: TourStep[] = [
     description: 'Points at the demo button instead',
     target: 'missing',
     fallbackTarget: 'demo',
+    side: 'right',
   },
 ];
 
@@ -139,6 +140,29 @@ describe('GuidedTour', () => {
       'anchored'
     );
     expect(screen.getByRole('button', { name: 'Demo button' })).toHaveClass('ring-2');
+  });
+
+  it('places a fallback-anchored step below its target so it stays on screen', () => {
+    makeDemoTargetVisible();
+    useTourStore.getState().start();
+    renderTour(FALLBACK_STEPS);
+
+    // The step prefers 'right', but the fallback (header menu button) sits at the
+    // screen edge, so the popover opens below it instead.
+    const popover = screen.getByRole('dialog', { name: 'Hidden target' });
+    expect(popover).toHaveAttribute('data-side', 'bottom');
+    expect(popover).toHaveClass('max-w-[calc(100vw-2rem)]');
+  });
+
+  it('keeps the preferred side when the primary target is visible', () => {
+    makeDemoTargetVisible();
+    useTourStore.getState().start();
+    renderTour([{ ...FALLBACK_STEPS[0], target: 'demo', fallbackTarget: 'missing' }]);
+
+    expect(screen.getByRole('dialog', { name: 'Hidden target' })).toHaveAttribute(
+      'data-side',
+      'right'
+    );
   });
 
   it('keeps the tour running and the page usable when switching dialog to popover', async () => {
