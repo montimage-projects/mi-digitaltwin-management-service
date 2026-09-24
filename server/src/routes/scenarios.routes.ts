@@ -1,5 +1,6 @@
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
+import mongoose from 'mongoose';
 import { Scenario } from '../models/Scenario.js';
 import { Project } from '../models/Project.js';
 import { Infrastructure } from '../models/Infrastructure.js';
@@ -11,6 +12,14 @@ import { asyncHandler, findById, validateObjectIdParam } from '../middleware/ent
 import { AppError } from '../middleware/errorHandler.js';
 import { executeScenario } from '../services/scenarioExecution.js';
 import { runSSEStream } from '../services/scenarioSSE.js';
+import { ExecutionReport } from '../models/ExecutionReport.js';
+import {
+  buildProvisionalReport,
+  captureReport,
+  renderHtml,
+  renderMarkdown,
+  toReportData,
+} from '../services/executionReport.js';
 
 /** Extract unique service IDs from a scenario's topology nodes. */
 function resolveServiceIds(scenario: { topology?: { nodes?: unknown[] } }): string[] {
@@ -264,21 +273,106 @@ router.delete(
     if (!execution) throw new AppError('Execution not found', 404);
 
     // Only reach the cluster when something was actually deployed.
-    if (execution.namespace && scenario.infrastructureId) {
-      const infra = await findById(Infrastructure, scenario.infrastructureId.toString());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await teardownDeployment(buildClientFromInfrastructure(infra as any), execution.namespace);
+    const clients =
+      execution.namespace && scenario.infrastructureId
+        ? buildClientFromInfrastructure(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (await findById(Infrastructure, scenario.infrastructureId.toString())) as any
+          )
+        : null;
+
+    // Close the run with a report (issue #26) *before* the namespace — and
+    // with it every pod log and event — is deleted. The outcome is computed
+    // from the status the run had before teardown; capture is bounded by a
+    // timeout and never throws, so a slow or failing cluster read yields a
+    // partial report rather than blocking the teardown.
+    const closed = await captureReport({ clients, scenario, execution });
+
+    if (clients && execution.namespace) {
+      await teardownDeployment(clients, execution.namespace);
     }
 
-    execution.status = 'completed';
-    await scenario.save();
+    // Positional atomic update so a concurrent write to another execution of
+    // this scenario is not overwritten by a whole-document save().
+    await Scenario.findOneAndUpdate(
+      { _id: id, 'executions._id': new mongoose.Types.ObjectId(executionId) },
+      {
+        $set: {
+          'executions.$.status': 'completed',
+          'executions.$.completedAt': closed.completedAt,
+          'executions.$.durationMs': closed.durationMs,
+          'executions.$.outcome': closed.outcome,
+        },
+      }
+    );
 
     res.json({
       executionId,
       namespace: execution.namespace,
-      status: execution.status,
+      status: 'completed',
+      outcome: closed.outcome,
+      durationMs: closed.durationMs,
       message: 'Deployment torn down',
     });
+  })
+);
+
+const REPORT_FORMATS = ['json', 'md', 'html'] as const;
+type ReportFormat = (typeof REPORT_FORMATS)[number];
+
+// GET /api/scenarios/:id/executions/:executionId/report - Execution report (issue #26)
+// `?format=json|md|html` (default json). Serves the report stored when the run
+// closed; a run with no stored report gets a provisional one built from the
+// embedded execution fields only — this endpoint never reads the cluster.
+router.get(
+  '/scenarios/:id/executions/:executionId/report',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
+    const { id, executionId } = req.params;
+
+    if (!/^[0-9a-fA-F]{24}$/.test(executionId)) {
+      throw new AppError('Invalid ID format', 400);
+    }
+
+    const rawFormat = req.query.format ?? 'json';
+    if (typeof rawFormat !== 'string' || !REPORT_FORMATS.includes(rawFormat as ReportFormat)) {
+      throw new AppError(
+        `Invalid report format; expected one of ${REPORT_FORMATS.join(', ')}`,
+        400
+      );
+    }
+    const format = rawFormat as ReportFormat;
+
+    const scenario = await Scenario.findById(id).lean();
+    if (!scenario) throw new AppError('Scenario not found', 404);
+
+    const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
+    if (!execution) throw new AppError('Execution not found', 404);
+
+    const stored = await ExecutionReport.findOne({ scenarioId: id, executionId }).lean();
+    const report = stored
+      ? toReportData(stored, execution.status)
+      : buildProvisionalReport(scenario, execution);
+
+    if (format === 'json') {
+      res.json(report);
+      return;
+    }
+
+    // The filename is built only from the validated hex execution id — never
+    // from user-controlled text such as the scenario title.
+    const filename = `execution-${executionId}-report.${format}`;
+    res.set('Content-Disposition', `attachment; filename="${filename}"`);
+
+    if (format === 'md') {
+      res.type('text/markdown; charset=utf-8').send(renderMarkdown(report));
+      return;
+    }
+
+    // Script-free page: lock it down even if opened in place of downloading.
+    res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'");
+    res.type('text/html; charset=utf-8').send(renderHtml(report));
   })
 );
 
