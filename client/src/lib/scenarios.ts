@@ -58,7 +58,19 @@ export interface Execution {
   namespace?: string;
   deployedServices: DeployedService[];
   conclusion?: Conclusion;
+  /** When the run closed — teardown or deploy failure. */
+  completedAt?: string;
+  /** Run time from `executedAt` to `completedAt`, in ms. */
+  durationMs?: number;
+  /** Overall verdict recorded when the run closed. */
+  outcome?: ExecutionOutcome;
 }
+
+/** Overall verdict of a closed run. */
+export type ExecutionOutcome = 'passed' | 'failed' | 'partial';
+
+/** Export formats served by the execution report endpoint. */
+export type ReportFormat = 'json' | 'md' | 'html';
 
 export interface Scenario {
   _id: string;
@@ -118,8 +130,27 @@ export const scenariosApi = {
   teardown: async (
     scenarioId: string,
     executionId: string
-  ): Promise<{ executionId: string; namespace?: string; status: string; message: string }> => {
+  ): Promise<{
+    executionId: string;
+    namespace?: string;
+    status: string;
+    outcome?: ExecutionOutcome;
+    durationMs?: number;
+    message: string;
+  }> => {
     const { data } = await api.delete(`/scenarios/${scenarioId}/executions/${executionId}`);
+    return data;
+  },
+  /** Download an execution report as a Blob (JSON, Markdown or HTML). */
+  getReport: async (
+    scenarioId: string,
+    executionId: string,
+    format: ReportFormat
+  ): Promise<Blob> => {
+    const { data } = await api.get(`/scenarios/${scenarioId}/executions/${executionId}/report`, {
+      params: { format },
+      responseType: 'blob',
+    });
     return data;
   },
   addConclusion: async (

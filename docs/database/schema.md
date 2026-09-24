@@ -278,6 +278,60 @@ edges:
  target: node-2
 ```
 
+Each entry of `executions[]` also carries run-close stamps (issue #26):
+`completedAt: Date`, `durationMs: number` and
+`outcome: 'passed' | 'failed' | 'partial'`, written when the run is torn down
+or its deploy fails.
+
+### execution_reports
+
+Snapshot report of one scenario execution (Mongoose model `ExecutionReport`),
+captured when the run closes — before the Kubernetes namespace is deleted at
+teardown, or when the deploy fails. Kept out of the scenario document so it
+stays small. Never contains infrastructure credentials.
+
+```typescript
+{
+ _id: ObjectId,
+ scenarioId: ObjectId, // Reference to scenarios
+ executionId: ObjectId, // _id of the embedded execution
+ scenarioTitle: string,
+ executedBy: string,
+ namespace?: string,
+ outcome: 'passed' | 'failed' | 'partial',
+ startedAt: Date,
+ completedAt: Date,
+ durationMs: number,
+ services: [{ name, status, containers: [{ name, status }] }],
+ metrics: { // derived from the full, uncapped artifacts
+ services: { total, byStatus },
+ containers: { total, byStatus, restarts },
+ logs: { lines, errorLines },
+ events: { total, warnings, byReason: [{ name, count }] },
+ alerts: { total, uniqueAttackers, byVerdict: [{ name, count }] }
+ },
+ logs: [{ service, pod, container?, line }], // most recent ≤2000
+ errorLogs: [{ service, pod, container?, line }], // most recent ≤200
+ events: [{ reason, message, objectKind, objectName, type, count, timestamp }], // ≤500
+ alerts: [{ service, pod, container?, timestamp, verdict, attacker, line }], // ≤200
+ omitted: { logs, errorLogs, events, alerts }, // entries dropped by the caps
+ partial: boolean, // part of the capture failed
+ captureErrors: string[],
+ error?: string, // deploy error (truncated)
+ conclusion?: string,
+ createdAt: Date,
+ updatedAt: Date
+}
+```
+
+Each line/message is capped at 4 KB and each artifact list has an aggregate
+byte budget (~8 MB in total), keeping the document well under MongoDB's 16 MB
+limit.
+
+**Indexes:**
+
+- `{ scenarioId, executionId }`: unique
+
 ### infrastructures
 
 Target deployment infrastructure.
@@ -318,13 +372,14 @@ Target deployment infrastructure.
 
 ## Relationships
 
-| Relationship              | Type        | Description                          |
-| ------------------------- | ----------- | ------------------------------------ |
-| Service → Category        | Many-to-One | Each service belongs to one category |
-| Service → Sector          | Many-to-One | Services may belong to a sector      |
-| Project → User            | Many-to-One | Projects are created by users        |
-| Scenario → Project        | Many-to-One | Scenarios belong to projects         |
-| Scenario → Infrastructure | Many-to-One | Scenarios target an infrastructure   |
+| Relationship               | Type        | Description                          |
+| -------------------------- | ----------- | ------------------------------------ |
+| Service → Category         | Many-to-One | Each service belongs to one category |
+| Service → Sector           | Many-to-One | Services may belong to a sector      |
+| Project → User             | Many-to-One | Projects are created by users        |
+| Scenario → Project         | Many-to-One | Scenarios belong to projects         |
+| Scenario → Infrastructure  | Many-to-One | Scenarios target an infrastructure   |
+| ExecutionReport → Scenario | Many-to-One | One report per scenario execution    |
 
 ## Population Patterns
 

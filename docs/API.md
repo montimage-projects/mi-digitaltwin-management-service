@@ -549,13 +549,40 @@ curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
 
 #### Tear Down Execution
 
+Captures the execution report (see below) before deleting the namespace, then
+stamps `completedAt`, `durationMs` and `outcome` on the execution.
+
 - **DELETE** `/api/scenarios/:id/executions/:executionId`
 - **Auth:** Required
-- **Response:** `{ executionId, namespace, status: "completed", message }`
+- **Response:** `{ executionId, namespace, status: "completed", outcome, durationMs, message }`
 
 ```bash
 curl -X DELETE http://localhost:3000/api/scenarios/scen123/executions/exec123 \
  -H "Authorization: Bearer $TOKEN"
+```
+
+#### Get Execution Report
+
+Report of one run — outcome (`passed` | `failed` | `partial`), start/end time
+and duration, final per-service and per-container status, key metrics
+(service/container counts by status, container restarts, log and error-line
+counts, namespace events by reason, security alerts by verdict) and the capped
+tail of the logs (≤2000 lines), error lines (≤200), events (≤500) and alerts
+(≤200). The report is generated automatically when the run is torn down or its
+deploy fails. Before that, a provisional report (`provisional: true`) built
+from the execution record alone is returned — this endpoint never reads the
+cluster.
+
+- **GET** `/api/scenarios/:id/executions/:executionId/report?format=json|md|html`
+- **Auth:** Required
+- **Query:** `format` — `json` (default), `md` (Markdown) or `html` (standalone page, no scripts)
+- **Response:** `json` → the report object; `md` / `html` → a file download
+  (`Content-Disposition: attachment; filename="execution-<executionId>-report.<format>"`)
+- **Errors:** `400` invalid id or format · `404` scenario or execution not found
+
+```bash
+curl http://localhost:3000/api/scenarios/scen123/executions/exec123/report?format=md \
+ -H "Authorization: Bearer $TOKEN" -o report.md
 ```
 
 #### Update Execution Status
@@ -795,6 +822,9 @@ Validated on `POST`/`PUT /api/services`; invalid specs are rejected with
   namespace?: string;
   deployedServices: DeployedService[];
   conclusion?: { text: string, author: string, createdAt: Date };
+  completedAt?: Date; // set when the run closes (teardown or deploy failure)
+  durationMs?: number; // executedAt → completedAt
+  outcome?: 'passed' | 'failed' | 'partial';
 }
 ```
 

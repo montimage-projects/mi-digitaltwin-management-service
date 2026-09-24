@@ -17,6 +17,7 @@ import {
 } from './kubernetesDeploy.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { Scenario } from '../models/Scenario.js';
+import { recordDeployFailure } from './executionReport.js';
 
 /** Minimal view of an Infrastructure document. */
 interface InfrastructureView {
@@ -48,6 +49,7 @@ export interface ExecutionResult {
 export async function executeScenario(
   scenario: {
     _id: Types.ObjectId;
+    title?: string;
     topology?: { nodes?: unknown[]; edges?: unknown[] };
     infrastructureId?: Types.ObjectId;
     executions: unknown[];
@@ -126,7 +128,13 @@ export async function executeScenario(
       services: result.services,
     };
   } catch (deployError) {
-    // Surface the deploy failure but leave a durable, failed execution record.
+    // Surface the deploy failure but leave a durable, failed execution record
+    // closed with its run-end stamps (issue #26).
+    const completedAt = new Date();
+    const executedAt = new Date(execItem.executedAt as Date | string);
+    const durationMs = Number.isNaN(executedAt.getTime())
+      ? 0
+      : Math.max(0, completedAt.getTime() - executedAt.getTime());
     execItem.namespace = namespace;
     execItem.status = 'failed';
     await Scenario.findOneAndUpdate(
@@ -135,9 +143,26 @@ export async function executeScenario(
         $set: {
           'executions.$.namespace': namespace,
           'executions.$.status': 'failed',
+          'executions.$.completedAt': completedAt,
+          'executions.$.durationMs': durationMs,
+          'executions.$.outcome': 'failed',
         },
       }
     );
+    // Best-effort failure report; never throws, so it cannot mask deployError.
+    await recordDeployFailure({
+      scenario: { _id: scenario._id, title: scenario.title },
+      execution: {
+        _id: executionId,
+        executedAt: execItem.executedAt as Date | string,
+        executedBy: execItem.executedBy as string | undefined,
+        status: 'failed',
+        namespace,
+        deployedServices: [],
+      },
+      completedAt,
+      error: deployError,
+    });
     throw deployError;
   }
 }

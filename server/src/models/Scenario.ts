@@ -28,6 +28,12 @@ export interface IExecution {
   namespace?: string;
   deployedServices: IDeployedService[];
   conclusion?: IConclusion;
+  /** When the run closed — teardown or deploy failure (issue #26). */
+  completedAt?: Date;
+  /** Wall-clock run time from `executedAt` to `completedAt`, in ms. */
+  durationMs?: number;
+  /** Overall verdict recorded when the run closed (issue #26). */
+  outcome?: 'passed' | 'failed' | 'partial';
 }
 
 /**
@@ -117,6 +123,9 @@ const executionSchema = new Schema<IExecution>(
     namespace: { type: String },
     deployedServices: [deployedServiceSchema],
     conclusion: conclusionSchema,
+    completedAt: { type: Date },
+    durationMs: { type: Number, min: 0 },
+    outcome: { type: String, enum: ['passed', 'failed', 'partial'] },
   },
   { _id: true }
 );
