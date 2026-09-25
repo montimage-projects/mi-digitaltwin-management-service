@@ -95,6 +95,10 @@ const TIMING = {
   alertMs: 180_000,
   reactionMs: 180_000, // blocklist entry — alert → ai4soar → /admin/block
   recoverMs: 300_000, // ci-sim container restart + Ready again
+  // "service stopped" log read after the restart: kubelet may still be
+  // swapping incarnations (a double stop deletes the first one's log while
+  // restartCount still reads 1), so the read is retried until this deadline.
+  stopEvidenceMs: 45_000,
   teardownMs: 120_000,
   pollMs: 4_000,
 };
@@ -147,6 +151,16 @@ function kubectl(args, { allowFail = false, timeoutMs } = {}) {
     if (allowFail) return '';
     const stderr = err.stderr?.toString().trim();
     throw new Error(`kubectl ${args.join(' ')} failed: ${stderr || err.message}`);
+  }
+}
+
+/** Like kubectl() with allowFail, but opt-in keeps the failure reason:
+ * never throws, returns `{ out, err }` (err is '' on success). */
+function kubectlCapture(args) {
+  try {
+    return { out: kubectl(args), err: '' };
+  } catch (err) {
+    return { out: '', err: err.message };
   }
 }
 
@@ -582,13 +596,93 @@ function targetContainerStatus() {
   return { restarts: Number(restarts) || 0, ready: ready === 'True' };
 }
 
-function targetStoppedEvidence() {
-  // The crashed container's log — `kubectl logs -p` is only valid once a
-  // restart happened, so this is best-effort detail, not the assertion.
+function targetPodName() {
   return kubectl(
-    ['-n', namespace, 'logs', '-l', `app=${HOST_APP}`, '-c', HOST_APP, '-p', '--tail=60'],
+    [
+      '-n',
+      namespace,
+      'get',
+      'pods',
+      '-l',
+      `app=${HOST_APP}`,
+      '-o',
+      'jsonpath={.items[0].metadata.name}',
+    ],
     { allowFail: true }
   );
+}
+
+/** One-line container status for failure detail: restart count, current
+ * state, and why the previous incarnation terminated. */
+function targetContainerSummary(pod) {
+  if (!pod) return 'pod=(none)';
+  const { out, err } = kubectlCapture(['-n', namespace, 'get', 'pod', pod, '-o', 'json']);
+  if (err) return `pod=${pod} status unavailable (${err.slice(0, 160)})`;
+  try {
+    const statuses = JSON.parse(out).status?.containerStatuses ?? [];
+    const cs = statuses.find((c) => c.name === HOST_APP);
+    if (!cs) return `pod=${pod} no ${HOST_APP} container status`;
+    const state = Object.keys(cs.state ?? {})[0] ?? 'unknown';
+    const last = cs.lastState?.terminated;
+    const lastText = last ? `${last.reason ?? '?'}/exit ${last.exitCode ?? '?'}` : 'none';
+    return `pod=${pod} restartCount=${cs.restartCount} state=${state} lastState.terminated=${lastText}`;
+  } catch {
+    return `pod=${pod} status unparseable`;
+  }
+}
+
+/** Read the "service stopped" line from the target pod — the previous
+ * incarnation's log first, then the current one's — retrying until
+ * TIMING.stopEvidenceMs. A double stop makes the kubelet drop the first
+ * incarnation's log while restartCount still reads 1, so a one-shot `-p`
+ * read can fail spuriously; the second stop's line lands in `-p` (or the
+ * current log) shortly after. Keeps the last kubectl error and lines seen
+ * so a real miss explains itself. */
+async function targetStoppedEvidence() {
+  const deadline = Date.now() + TIMING.stopEvidenceMs;
+  let pod = '';
+  let lastError = '';
+  const lastLines = { previous: [], current: [] };
+  for (;;) {
+    pod = targetPodName() || pod;
+    if (!pod) lastError = `no pod with label app=${HOST_APP}`;
+    for (const source of pod ? ['previous', 'current'] : []) {
+      const { out, err } = kubectlCapture([
+        '-n',
+        namespace,
+        'logs',
+        pod,
+        '-c',
+        HOST_APP,
+        ...(source === 'previous' ? ['-p'] : []),
+        '--tail=60',
+      ]);
+      if (err) {
+        lastError = err;
+        continue;
+      }
+      const lines = out.split('\n').filter(Boolean);
+      const line = lines.find((l) => /service stopped/.test(l));
+      if (line) return { ok: true, pod, line };
+      if (lines.length) lastLines[source] = lines.slice(-5);
+    }
+    if (Date.now() >= deadline) return { ok: false, pod, lastError, lastLines };
+    await sleep(TIMING.pollMs);
+  }
+}
+
+/** Evidence for a failed stop check, printed before teardown deletes the
+ * namespace (the finally-block diagnostics() runs too late for ci-sim). */
+function printTargetSnapshot(pod) {
+  if (!pod) return;
+  for (const args of [
+    ['-n', namespace, 'describe', 'pod', pod],
+    ['-n', namespace, 'logs', pod, '-c', HOST_APP, '-p', '--tail=40'],
+    ['-n', namespace, 'logs', pod, '-c', HOST_APP, '--tail=40'],
+  ]) {
+    const { out, err } = kubectlCapture(args);
+    note(`$ kubectl ${args.join(' ')}\n${out || err || '(empty)'}`);
+  }
 }
 
 /** Attack #1's win condition (#231): the flood pushes CI-SIM over its rate
@@ -602,15 +696,28 @@ async function assertTargetStoppedAndRecovered() {
       TIMING.recoverMs,
       'the ci-sim container restart after "service stopped"'
     );
-    const stoppedLog = targetStoppedEvidence();
-    record(
-      'attack #1 stops the CI-SIM service (container restarted)',
-      /service stopped/.test(stoppedLog),
-      stoppedLog
-        .split('\n')
-        .find((l) => /service stopped/.test(l))
-        ?.slice(0, 140) || 'restartCount>=1 but no "service stopped" in previous logs'
-    );
+    const evidence = await targetStoppedEvidence();
+    if (evidence.ok) {
+      record(
+        'attack #1 stops the CI-SIM service (container restarted)',
+        true,
+        evidence.line.slice(0, 140)
+      );
+    } else {
+      const seen = [
+        ...evidence.lastLines.previous.map((l) => `[previous] ${l.slice(0, 140)}`),
+        ...evidence.lastLines.current.map((l) => `[current] ${l.slice(0, 140)}`),
+      ];
+      record(
+        'attack #1 stops the CI-SIM service (container restarted)',
+        false,
+        `restartCount>=1 but no "service stopped" in previous or current logs within ` +
+          `${Math.round(TIMING.stopEvidenceMs / 1000)}s — ${targetContainerSummary(evidence.pod)}` +
+          `${evidence.lastError ? `; last kubectl error: ${evidence.lastError.slice(0, 240)}` : ''}` +
+          `; last lines seen: ${seen.length ? `\n  ${seen.join('\n  ')}` : '(none)'}`
+      );
+      printTargetSnapshot(evidence.pod);
+    }
     const recovered = await poll(
       async () => (targetContainerStatus().ready ? true : null),
       TIMING.recoverMs,
