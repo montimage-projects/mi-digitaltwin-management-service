@@ -77,6 +77,13 @@ describe('configs', () => {
     expect(config.exporters.prometheus.metric_expiration).toBe('25s');
   });
 
+  test('flushes span metrics faster than stale series expire', () => {
+    const config = yamlLoad(collectorConfig([])) as {
+      connectors: { spanmetrics: { metrics_flush_interval: string } };
+    };
+    expect(config.connectors.spanmetrics.metrics_flush_interval).toBe('10s');
+  });
+
   test('Prometheus scrapes the collector and labels each service target', () => {
     const config = yamlLoad(prometheusConfig(scrapeTargets(NODES))) as {
       scrape_configs: { job_name: string; metrics_path?: string; static_configs: unknown[] }[];

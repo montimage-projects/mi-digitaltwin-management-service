@@ -138,7 +138,9 @@ export function collectorConfig(probes: ProbeTarget[]): string {
       memory_limiter: { check_interval: '5s', limit_percentage: 80, spike_limit_percentage: 20 },
       batch: {},
     },
-    connectors: { spanmetrics: {} },
+    // Flush span metrics every probe interval: the 60 s default would let
+    // them expire (SERIES_EXPIRATION) between flushes.
+    connectors: { spanmetrics: { metrics_flush_interval: PROBE_INTERVAL } },
     exporters: {
       prometheus: {
         endpoint: `0.0.0.0:${COLLECTOR_METRICS_PORT}`,
