@@ -5,6 +5,108 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-09-25
+
+> **Upgrade note (#253).** `POST /api/scenarios/:id/execute` now returns
+> **202** with `status: 'pending'` and the planned services (no
+> `dashboardUrl` yet) instead of 200 after the rollout; the deploy continues
+> in the background. Clients should follow the execution over SSE
+> (`GET /api/scenarios/:id/executions/:executionId/events`) or poll the
+> scenario record. The bundled client and `scripts/e2e-kind/run-e2e.js` are
+> already updated.
+>
+> **Upgrade note (#250).** The server now serves Prometheus metrics at
+> `GET /metrics` by default (`METRICS_ENABLED`, default `true`). The endpoint
+> is unauthenticated unless `METRICS_TOKEN` (16+ characters) is set, which
+> then requires `Authorization: Bearer <token>`. Where the server is reachable
+> from outside the cluster (for example the Render blueprint), set
+> `METRICS_TOKEN` or `METRICS_ENABLED=false`; with a token, the bundled
+> Prometheus scrape config needs it too (see
+> `docs/integration/observability.md`). OpenTelemetry tracing starts only when
+> `OTEL_EXPORTER_OTLP_ENDPOINT` is set (`OTEL_SERVICE_NAME` is optional);
+> `docker-compose.prod.yml` and the k8s `dev`/`prod` overlays set it to their
+> bundled collector. No new environment variables are required.
+>
+> Scenario executions now also deploy a best-effort OTel Collector and
+> Prometheus into their namespace (scenario `observability` option, on by
+> default, existing scenarios included). Air-gapped clusters must mirror
+> `otel/opentelemetry-collector-contrib:0.161.0` and `prom/prometheus:v3.14.0`,
+> or clear the scenario's **Collect observability data** option.
+>
+> Executions torn down before execution reports (#249) have no `completedAt`
+> and count as live on the Monitoring page. Run the idempotent migration once
+> after upgrading: `npm run migrate:close-legacy-executions -w server` (see
+> `docs/DEPLOYMENT.md` for the Docker Compose variant).
+
+### Features
+
+- Add service monitoring dashboard at `/monitoring`: live CPU/memory, health, traffic and threshold alerts (#25, #250)
+- Add Prometheus `GET /metrics`, OpenTelemetry tracing and a per-execution OTel Collector + Prometheus stack (#25, #250)
+- Replace MMT-Probe with secAnoD as the demo monitor and add a Kafka catalog service as the alert bus (#253)
+- Add execution-console attack buttons, proxied "Open interface" links (signed, 12-hour) and a live runbook view (#253)
+- Deploy scenarios in the background: `POST .../execute` returns 202 and the SSE stream follows the rollout (#253)
+- Add execution reporting service: snapshot each run when it closes; export as JSON, Markdown or HTML (#26, #249)
+- Add guided step-by-step walkthrough tour of the header, sidebar menus and core workflow (#181, #248)
+- Show a configuration-completeness badge for each service, listing any missing fields (#245, #247)
+- Add a login password visibility toggle and a `docker-compose.deploy.yml` override for a local kind API (#23, #230)
+- Re-seed the demo scenario for the R1 flow: CI-SIM target and two default MAG attack profiles (#236, #242)
+- Add topology Auto-wire action that generates role-derived typed edges and a role-column layout (#232, #241)
+- Run MAG as a long-running terminal Deployment driven via `kubectl exec` (`deployment.command`) (#233, #240)
+- Add typed probe `alert` SSE events and an AI4SOAR playbook that blocks the attacker on CI-SIM (#234, #235, #240)
+- Add the CI-SIM critical-infrastructure HTTP simulation image and seed it into the catalog (#231, #239)
+- Seed the Montimage attack-detect-respond demo project and scenario; add a root `npm run seed` script (#204, #226)
+- Add container log tabs, per-container status chips and a namespace events pane to the execution view (#203, #225)
+- Add a per-node topology config panel for env, args and config-file overrides over catalog defaults (#202, #224)
+- Type topology edges from node roles, reject illegal role pairs, and sync edge types to YAML (#201, #223)
+- Render role badges on topology nodes and dock sidecar nodes inside their host (#200, #222)
+- Stream the execution namespace's Kubernetes events over SSE as deduplicated `k8s-event` records (#198, #220)
+- Report per-container status and Job completion, and collect container-tagged pod logs (#196, #197, #219)
+- Roll out workloads in `startOrder` tiers and hold attack workloads until deployed pods are Ready (#195, #218)
+- Apply the PodSecurity `enforce=privileged` namespace label only when a node needs elevated privileges (#194, #217)
+- Add k8s manifest layer: sidecar pods, Jobs, ConfigMaps, namespaced RBAC, edge-resolved env (#191, #192, #193, #216)
+- Resolve each node's merged deployment spec and typed-edge context at deploy time (#190, #215)
+- Validate node-level `env`/`args` config overrides on scenario topology nodes (#189, #214)
+- Add an optional `deployment` spec to the Service model, validated on `POST`/`PUT /api/services` (#188, #213)
+- Seed attack, target, monitor and reaction role categories for the Montimage modules (#187, #212)
+- Seed the four Montimage scenario services (MAG, HTTP-SIM, MMT-PROBE, AI4SOAR) with confirmed images (#186, #211)
+
+### Bug Fixes
+
+- Fix the flaky kind e2e first-attack check by polling both previous and current CI-SIM container logs (#254, #255)
+- Fix the prod deploy stack: root-lockfile image build, `authSource=intact`, distroless-safe healthcheck (#23, #230)
+- Wire `@tailwindcss/postcss` so utility styles are emitted, and fix `useBlocker` with `createBrowserRouter` (#23, #230)
+- Persist the auth token in localStorage so sessions survive a page reload (#23, #230)
+- Accept `projectId` in `validateObjectIdParam` so project-scoped scenario routes stop returning 400 (#189, #214)
+- Repair CI checks: link-check timeout crash, missing `mongosh` on the runner, and non-hermetic coverage runs (#208)
+
+### Security
+
+- Ignore `*.env` files in git so local credential files can't be committed; also ignore nested `CLAUDE.md` stubs (#252)
+- Store the auth token in localStorage, not memory only; mitigated by strict CSP, JWT expiry and 401 logout (#23, #230)
+- Confine each attack pod with an egress NetworkPolicy that allows only its declared targets and DNS (#194, #217)
+- Repair the unparseable gitleaks config and allowlist `<placeholder>`-style credential values in docs (#208)
+
+### Documentation
+
+- Add a scripted kind + stub R1 demo setup, from cluster creation to teardown, to the Montimage playbook (#23, #230)
+- Document the R1 attack-detect-respond flow in the playbook, API reference and k8s execution guide (#238, #244)
+- Update Kubernetes integration docs and add a run-it-yourself section to the Montimage playbook (#207, #229)
+- Record AI4SOAR's in-cluster ServiceAccount auth mode and the required PodSecurity level (#185, #210)
+- Record runtime contracts (port, config, env, capabilities, health) for the Montimage modules (#184, #209)
+- Record Montimage module images and registry access (#183, #208)
+
+### Dependencies
+
+- Add `prom-client` and `@opentelemetry/*` SDK, exporter and instrumentation packages (server) (#25, #250)
+- Pin observability images `otel/opentelemetry-collector-contrib:0.161.0` and `prom/prometheus:v3.14.0` (#25, #250)
+
+### Testing
+
+- Assert the two-attack R1 flow end-to-end in the kind e2e (#237, #243)
+- Add kind-based e2e CI that runs the seeded Montimage scenario through the platform API with stub images (#206, #228)
+- Backfill unit tests for k8s manifest builders, rollout ordering and status (#205, #227)
+- Assert teardown leaves no orphaned resources and creates no cluster-scoped ones (#199, #221)
+
 ## [1.0.0] - 2026-08-28
 
 ### Breaking Changes

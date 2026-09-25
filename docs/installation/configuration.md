@@ -31,20 +31,26 @@ These variables have no default and must be set — the server refuses to boot w
 
 ### Optional Variables
 
-| Variable           | Description                                                      | Default                             |
-| ------------------ | ---------------------------------------------------------------- | ----------------------------------- |
-| `NODE_ENV`         | Environment mode                                                 | `development`                       |
-| `PORT`             | Server port                                                      | `3000`                              |
-| `SERVE_STATIC`     | Serve built client from the same origin (`true`/`false`/`1`/`0`) | unset (false)                       |
-| `MONGODB_URI`      | MongoDB connection string                                        | `mongodb://localhost:27017/intact`  |
-| `JWT_EXPIRES_IN`   | JWT token expiration                                             | `24h`                               |
-| `CORS_ORIGIN`      | Allowed CORS origin                                              | `http://localhost:5173`             |
-| `ADMIN_USERNAME`   | Username for the seeded admin user                               | `admin`                             |
-| `MAESTRO_BASE_URL` | External Maestro API base URL                                    | `https://maestro.intact-project.eu` |
-| `BRANDING_PROFILE` | Branding profile: `default` / `intact` / `secassured`            | `default`                           |
-| `APP_NAME`         | Override application display name                                | (uses profile default)              |
-| `ORG_NAME`         | Override organization name                                       | (uses profile default)              |
-| `ORG_URL`          | Override organization URL                                        | (uses profile default)              |
+| Variable                      | Description                                                         | Default                             |
+| ----------------------------- | ------------------------------------------------------------------- | ----------------------------------- |
+| `NODE_ENV`                    | Environment mode                                                    | `development`                       |
+| `PORT`                        | Server port                                                         | `3000`                              |
+| `SERVE_STATIC`                | Serve built client from the same origin (`true`/`false`/`1`/`0`)    | unset (false)                       |
+| `MONGODB_URI`                 | MongoDB connection string                                           | `mongodb://localhost:27017/intact`  |
+| `JWT_EXPIRES_IN`              | JWT token expiration                                                | `24h`                               |
+| `CORS_ORIGIN`                 | Allowed CORS origin                                                 | `http://localhost:5173`             |
+| `ADMIN_USERNAME`              | Username for the seeded admin user                                  | `admin`                             |
+| `MAESTRO_BASE_URL`            | External Maestro API base URL                                       | `https://maestro.intact-project.eu` |
+| `BRANDING_PROFILE`            | Branding profile: `default` / `intact` / `secassured`               | `default`                           |
+| `APP_NAME`                    | Override application display name                                   | (uses profile default)              |
+| `ORG_NAME`                    | Override organization name                                          | (uses profile default)              |
+| `ORG_URL`                     | Override organization URL                                           | (uses profile default)              |
+| `METRICS_ENABLED`             | Serve Prometheus metrics at `GET /metrics` (`true`/`false`/`1`/`0`) | `true`                              |
+| `METRICS_TOKEN`               | Bearer token `GET /metrics` requires when set (min 16 chars)        | unset (no auth)                     |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP/HTTP collector URL; setting it turns on server tracing         | unset (tracing off)                 |
+| `OTEL_SERVICE_NAME`           | Service name on the server's trace spans                            | `secsim-server`                     |
+
+Metrics and tracing are covered in [Observability](../integration/observability.md).
 
 ### Example Server .env
 

@@ -7,7 +7,7 @@ export const openApiSpec = {
   openapi: '3.0.0',
   info: {
     title: `${APP_NAME} API`,
-    version: '1.0.0',
+    version: '1.1.0',
     description:
       'API for managing cybersecurity services, digital twin projects, scenarios, and infrastructure.',
     contact: {
@@ -433,12 +433,13 @@ export const openApiSpec = {
         tags: ['Scenarios'],
         summary: 'Execute a scenario',
         description:
-          'Deploys the scenario topology directly to the assigned Kubernetes infrastructure ' +
-          '(one Deployment + NodePort Service per node) and records a new execution.',
+          'Records a new execution and answers with its rollout plan; the topology is then ' +
+          'deployed to the assigned Kubernetes infrastructure in the background. Follow the ' +
+          'execution over its SSE events stream or by polling the scenario.',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: {
-          200: {
-            description: 'Execution started',
+          202: {
+            description: 'Rollout planned; the deploy continues in the background',
             content: {
               'application/json': {
                 schema: {
@@ -446,7 +447,7 @@ export const openApiSpec = {
                   properties: {
                     executionId: { type: 'string' },
                     namespace: { type: 'string' },
-                    status: { type: 'string', enum: ['pending', 'running', 'completed', 'failed'] },
+                    status: { type: 'string', enum: ['pending'] },
                     services: {
                       type: 'array',
                       items: {
@@ -456,9 +457,8 @@ export const openApiSpec = {
                           serviceId: { type: 'string' },
                           name: { type: 'string' },
                           uiType: { type: 'string', enum: ['web', 'terminal', 'both'] },
-                          status: { type: 'string', enum: ['pending', 'running', 'failed'] },
-                          dashboardUrl: { type: 'string' },
-                          nodePort: { type: 'integer' },
+                          status: { type: 'string', enum: ['pending'] },
+                          webInterface: { type: 'boolean' },
                         },
                       },
                     },

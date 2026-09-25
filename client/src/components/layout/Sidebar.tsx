@@ -116,7 +116,7 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
         {!collapsed && (
           <>
             <p className="text-xs text-muted-foreground">{APP_NAME_SHORT}</p>
-            <p className="text-xs text-muted-foreground">v1.0.0</p>
+            <p className="text-xs text-muted-foreground">v1.1.0</p>
           </>
         )}
       </div>

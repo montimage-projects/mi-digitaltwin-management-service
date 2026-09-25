@@ -497,14 +497,20 @@ sequenceDiagram
  participant SSE as SSE Stream
  participant C as Client
 
- S->>E: executeScenario(scenario, infra, services)
+ S->>E: planExecution(scenario, services)
+ E->>K: planDeployedServices(topology)
+ K-->>E: pending service rows
+ E-->>S: { executionId, namespace, status: "pending", services }
+ S-->>C: 202 rollout plan
+
+ S->>E: executeScenario(scenario, infra, services), in the background
  E->>K: buildClientFromInfrastructure(infra)
  K-->>E: k8s client
- E->>K: deployToCluster(client, topology)
- K-->>E: namespace + status
- E-->>S: { executionId, namespace, status }
+ E->>K: deployTopology(clients, topology)
+ K-->>E: namespace + services
+ E->>E: execution → running (failed on error)
 
- S->>SSE: runSSEStream(res, scenario, execution, infra)
+ S->>SSE: runSSEStream(res, scenario, execution, infra, readState)
  SSE->>C: text/event-stream
  C->>SSE: [progress, log, end, error events]
  SSE->>SSE: cleanup on close

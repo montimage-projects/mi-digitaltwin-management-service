@@ -172,11 +172,14 @@ sequenceDiagram
 
  U->>C: Click "Execute"
  C->>S: POST /api/scenarios/:id/execute
- S->>S: Validate scenario, resolve node images
+ S->>S: Validate scenario, resolve node images, record plan
+ S-->>C: 202 { executionId, namespace, status: "pending", services }
+
+ par Background rollout
  S->>K: Create namespace + Deployment/Service per node
  K-->>S: Created (nodePort assigned)
- S-->>C: { executionId, namespace, status, services }
-
+ S->>S: Execution → running (failed on error)
+ and Client follows over SSE
  C->>S: GET .../executions/:id/events (SSE)
  loop Poll until settled
  S->>K: Read deployment status + pod logs
@@ -184,6 +187,7 @@ sequenceDiagram
  S-->>C: event: progress / event: log
  end
  S-->>C: event: end
+ end
 
  U->>C: Click "Tear Down"
  C->>S: DELETE .../executions/:id

@@ -49,7 +49,7 @@ export function Settings() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Version</p>
-                <p className="font-medium">1.0.0 (MVP)</p>
+                <p className="font-medium">1.1.0</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Environment</p>

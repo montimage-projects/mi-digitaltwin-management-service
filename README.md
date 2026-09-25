@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/montimage-projects/mi-digitaltwin-management-service/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/montimage-projects/mi-digitaltwin-management-service/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/montimage-projects/mi-digitaltwin-management-service/releases/tag/v1.0.0)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue)](https://github.com/montimage-projects/mi-digitaltwin-management-service/releases/tag/v1.1.0)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.0-brightgreen)](<>)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 

@@ -31,19 +31,23 @@ sequenceDiagram
 
   U->>C: Click "Execute"
   C->>S: POST /api/scenarios/:id/execute
-  S->>S: Resolve topology nodes to images
-  S->>K: Create namespace
-  S->>K: Roll out workloads in startOrder tiers (Deployment/Job + Service/ConfigMap/RBAC as needed)
-  K-->>S: Created (nodePort assigned)
-  S-->>C: { executionId, namespace, status, services }
+  S->>S: Resolve topology nodes to images, record the plan (pending)
+  S-->>C: 202 { executionId, namespace, status: "pending", services }
 
-  C->>S: GET .../executions/:executionId/events (SSE)
-  loop Poll until settled
-    S->>K: Read deployment status + pod logs
-    K-->>S: Replica counts, log lines
-    S-->>C: event: progress / event: log
+  par Background rollout
+    S->>K: Create namespace
+    S->>K: Roll out workloads in startOrder tiers (Deployment/Job + Service/ConfigMap/RBAC as needed)
+    K-->>S: Created (nodePort assigned)
+    S->>S: Execution → running (failed on error)
+  and Console follows the execution
+    C->>S: GET .../executions/:executionId/events (SSE)
+    loop Poll until settled
+      S->>K: Read deployment status + pod logs
+      K-->>S: Replica counts, log lines
+      S-->>C: event: progress / event: log
+    end
+    S-->>C: event: end
   end
-  S-->>C: event: end
 
   U->>C: Click "Tear Down"
   C->>S: DELETE .../executions/:executionId
@@ -62,22 +66,28 @@ When a user clicks **Execute** on a scenario:
    version). A node with no service or no deployable image is rejected (`400`).
 3. An execution record is appended to the scenario (`status: pending`) so it has
    an `_id` before anything reaches the cluster. The namespace name is derived
-   from the scenario and execution ids.
-4. The topology is deployed (see below). On success the execution flips to
-   `running` and stores the namespace and per-service records; on failure it is
-   persisted as `failed` and the error is surfaced.
+   from the scenario and execution ids, and the rollout plan — one `pending` row
+   per topology node — is stored on the record. If the topology is rejected
+   (step 2), the record is removed again, so a `400` leaves no execution behind.
+4. The server answers `202` with that plan (see [Endpoint](#endpoint)) and
+   deploys the topology in the background (see below). On success the execution
+   flips to `running` and each exposed service's record gains its
+   `dashboardUrl`; on failure it is persisted as `failed`, closed with a failure
+   report, and the SSE stream reports it as an `error` event.
 
 ### Endpoint
 
 - **POST** `/api/scenarios/:id/execute`
 - **Auth:** Required
-- **Response:**
+- **Response:** `202 Accepted` with the rollout plan — every service `pending`,
+  no `nodePort` or `dashboardUrl` yet (`webInterface` marks a node that gets a
+  web-reachable Service):
 
   ```json
   {
     "executionId": "665f…",
     "namespace": "secsim-<scenario>-<execution>",
-    "status": "running",
+    "status": "pending",
     "services": [
       {
         "nodeId": "mmt-probe",
@@ -85,12 +95,16 @@ When a user clicks **Execute** on a scenario:
         "name": "mmt-probe",
         "uiType": "web",
         "status": "pending",
-        "nodePort": 31840,
-        "dashboardUrl": "http://cluster-host:31840"
+        "webInterface": true
       }
     ]
   }
   ```
+
+- **Progress:** follow the execution on the [SSE stream](#sse-events-protocol),
+  or poll `GET /api/scenarios/:id` for its `status` (`pending` → `running`, or
+  `failed`) and its `deployedServices`, whose `dashboardUrl`s appear once the
+  rollout has created the Services.
 
 ## Kubernetes Resource Model
 
@@ -172,7 +186,14 @@ client disconnects or the execution is torn down (issue #233).
 - **Auth:** Required
 - **Content-Type:** `text/event-stream`
 
-If nothing was deployed, or the execution already reached a terminal state, the
+The console opens the stream as soon as `POST /execute` answers, while the
+rollout still runs in the background. As long as the execution is `pending`,
+cluster reads that fail because the namespace or workloads do not exist yet are
+skipped and polling continues; if the rollout fails, the stream sends an
+`error` event (`Deployment failed — see the execution report for details`) and
+closes.
+
+If nothing was deployed, or the execution was already torn down or failed, the
 stream emits a single `progress` snapshot followed by `end` and closes. Bad
 credentials fail as a normal JSON error _before_ the stream opens, rather than as
 a half-open connection.
@@ -186,7 +207,7 @@ a half-open connection.
 | `k8s-event` | Per new Kubernetes Event in the execution namespace | `{ uid?: string, reason?: string, message?: string, objectKind?: string, objectName?: string, type?: string, count?: number, timestamp?: string }` — `reason`/`message`/`objectKind`/`objectName` distil the Event's involved object (e.g. `Pod`/`svc-a-pod`), `type` is `Normal` or `Warning`, and `timestamp` is the ISO time of the most recent occurrence. Events are deduplicated across polls on `<uid>:<count>`; a recurring event re-emits when its `count` grows.                                                  |
 | `alert`     | A pod log line parses as a security report          | `{ service: string, pod: string, container?: string, timestamp?: string, verdict?: string, attacker?: string, line: string }` — a typed detection distilled from a monitor's stdout security report (issue #234): `attacker` is the report's `ip.src` (the address the AI4SOAR playbook blocks, issue #235), `verdict` the detection summary, `line` the original log line. JSON reports (the seeded `output.format = "JSON"`) and plain-text `ALERT …` lines both qualify; every alert also flows as a normal `log` event. |
 | `end`       | Deploy settled                                      | `{ status: "completed" \| "failed", services: [{ name, status, containers }] }` — with a terminal-typed workload in the execution the stream stays open after `end` (see above); a `failed` settle always closes it.                                                                                                                                                                                                                                                                                                        |
-| `error`     | Cluster read failed mid-stream                      | `{ message: string }` (the stream then closes)                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `error`     | Cluster read or background rollout failed           | `{ message: string }` (the stream then closes)                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 ```text
 event: progress
@@ -225,14 +246,21 @@ by `k8s-event`.
 
 ## Per-Service URLs
 
-There are no embedded dashboards or simulated terminals — services expose real,
-clickable URLs backed by their NodePort.
+There are no embedded dashboards or simulated terminals — services expose their
+real web interfaces, opened through the platform.
 
-- On deploy, each service's `dashboardUrl` is built from the cluster endpoint
-  host and the assigned NodePort: `http://<cluster-host>:<nodePort>`.
+- Once the background rollout has created the Services, each exposed service's
+  `dashboardUrl` — `http://<cluster-host>:<nodePort>`, built from the cluster
+  endpoint host and the assigned NodePort — is stored on the execution's
+  `deployedServices` (the `202` plan carries none yet).
 - **Web-facing services** (`uiType: "web"` or `"both"`) render an **Open
-  interface** link to that URL once the service is running.
-- **Terminal-only services** (`uiType: "terminal"`) show a status badge plus a
+  interface** button. It requests a signed link valid for 12 hours
+  (`POST .../executions/:executionId/services/:name/link`) and opens the
+  service through the Kubernetes API server's service proxy, so it also works
+  where NodePorts are unreachable from the browser (kind, Docker Desktop).
+- **Terminal-only services** (`uiType: "terminal"`) show a status badge, a
+  **Run** button per attack profile stored on the node (`data.config.profiles`
+  — only the stored argv runs, and its output streams into the logs) and a
   copyable `kubectl exec -it deploy/<name> -n <exec-ns> -- …` hint — the shell
   access contract for long-running interactive workloads like MAG (issue
   #233). No link, no fake terminal.
@@ -254,11 +282,13 @@ partially-created namespace before surfacing the error — so a failed execution
 leaves no half-deployed resources behind either.
 
 Deleting an already-gone namespace is treated as success (idempotent). The
-execution record is marked `completed`.
+execution record is marked `completed`. Tearing down while the background
+rollout is still running is safe too: the run stays closed as `completed`, and
+the interrupted rollout does not overwrite its status or report.
 
 - **DELETE** `/api/scenarios/:id/executions/:executionId`
 - **Auth:** Required
-- **Response:** `{ executionId, namespace, status: "completed", message }`
+- **Response:** `{ executionId, namespace, status: "completed", outcome, durationMs, message }`
 
 The cluster is only contacted when the execution actually has a namespace; a
 never-deployed or already-torn-down execution short-circuits.
@@ -280,11 +310,15 @@ real cluster liveness probe used by `POST /api/infrastructures/:id/test`.
 ## Error Handling
 
 Kubernetes API failures surface as `502 Bad Gateway` (the cluster is an upstream
-dependency); other unexpected errors become `500`. Common deploy failure causes:
+dependency); other unexpected errors become `500`. `POST /execute` answers
+before the rollout reaches the cluster, so a deploy failure lands on the
+execution record rather than in that response. Common deploy failure causes:
 
 - Topology node without a `serviceId` or without a deployable docker image
-  (`400`, before any cluster call).
-- Cluster unreachable, bad credentials, or TLS error (`502`).
+  (`400` from `POST /execute`, before any cluster call; no execution is kept).
+- Cluster unreachable, credentials rejected by the cluster, or TLS error — the
+  background rollout marks the execution `failed` and the SSE stream sends an
+  `error` event.
 - Per-pod failure reasons detected during status polling —
   `CrashLoopBackOff`, `ImagePullBackOff`, `ErrImagePull`,
   `CreateContainerError`, `CreateContainerConfigError`, `RunContainerError`,

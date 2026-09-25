@@ -537,13 +537,27 @@ curl -X DELETE http://localhost:3000/api/scenarios/scen123 \
 
 #### Execute Scenario
 
-Deploys the scenario's topology directly to the assigned infrastructure's
-Kubernetes cluster. See [Kubernetes Execution](integration/kubernetes-execution.md).
+Records a new execution and answers with its rollout plan right away; the topology is
+then deployed to the assigned infrastructure's Kubernetes cluster in the background. See
+[Kubernetes Execution](integration/kubernetes-execution.md).
 
 - **POST** `/api/scenarios/:id/execute`
 - **Auth:** Required
 - **Body:** None (the target infrastructure comes from the scenario)
-- **Response:** `{ executionId: string, namespace: string, status: string, services: DeployedService[] }`
+- **Response:** `202` —
+  `{ executionId: string, namespace: string, status: "pending", services: PlannedService[] }`,
+  where each planned service is
+  `{ nodeId, serviceId, name, uiType, status: "pending", webInterface: boolean }` — no
+  `nodePort` or `dashboardUrl` yet (`webInterface` marks a node that gets a web-reachable
+  Service)
+- **Progress:** follow the execution on
+  [Stream Execution Events (SSE)](#stream-execution-events-sse), or poll
+  [Get Scenario](#get-scenario): it stays `pending` while the rollout runs, then turns
+  `running` (with `dashboardUrl` set on each exposed entry of `deployedServices`) or
+  `failed` — the SSE stream then sends an `error` event
+- **Errors:** `400` no infrastructure assigned, or a topology that cannot be deployed (a
+  node without a service or deployable image, a sidecar without a monitor edge, …) — no
+  execution is kept and nothing reaches the cluster
 
 ```bash
 curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
@@ -557,6 +571,36 @@ curl -X POST http://localhost:3000/api/scenarios/scen123/execute \
 - **Content-Type:** `text/event-stream`
 - **Events:** `progress`, `log`, `k8s-event`, `alert`, `end`, `error` — see
   [SSE Events Protocol](integration/kubernetes-execution.md#sse-events-protocol)
+
+#### List Attack Profiles
+
+Attack profiles stored on the scenario's topology nodes (`data.config.profiles`, e.g. MAG's
+R1 attacks) that the execution console can run.
+
+- **GET** `/api/scenarios/:id/executions/:executionId/profiles`
+- **Auth:** Required
+- **Response:** `{ profiles: { nodeId, name, description?, args: string[] }[] }`
+- **Errors:** `400` invalid id · `404` scenario or execution not found
+
+#### Run Attack Profile
+
+Starts one stored profile in its node's running pod. Only the stored `args` run
+(shell-quoted; the request carries no command text), and the output is teed into the
+container log, so it reaches the console as SSE `log` events.
+
+- **POST** `/api/scenarios/:id/executions/:executionId/profiles/run`
+- **Auth:** Required
+- **Body:** `{ nodeId: string, name: string }`
+- **Response:** `202` — `{ nodeId, name, pod, container, message: "Profile started" }`
+- **Errors:** `400` invalid id or body · `404` scenario, execution or profile not found ·
+  `409` execution not deployed (torn down or failed) or no running pod for the node
+
+```bash
+curl -X POST http://localhost:3000/api/scenarios/scen123/executions/exec123/profiles/run \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"nodeId":"mag","name":"attack-1-stop-the-server"}'
+```
 
 #### Tear Down Execution
 
@@ -916,7 +960,7 @@ Validated on `POST`/`PUT /api/services`; invalid specs are rejected with
   _id: string;
   executedAt: Date;
   executedBy: string;
-  status: 'pending' | 'deploying' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed'; // pending while the rollout runs
   namespace?: string;
   deployedServices: DeployedService[];
   conclusion?: { text: string, author: string, createdAt: Date };

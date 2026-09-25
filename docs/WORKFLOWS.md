@@ -191,20 +191,22 @@ runs end-to-end on a real Kubernetes cluster (issue #206 / playbook task 4.3)
 **Steps:**
 
 1. **Provision** — installs `kind` + `kubectl` and creates a throwaway cluster
-2. **Stub image** — builds `scripts/e2e-kind/stub/` and loads it into kind. The
-   four module images live in the private `registry.montimage.eu` (not
-   resolvable on the public Internet), so the stub stands in for them while the
-   real scenario topology, deployment specs, RBAC and ordering are exercised.
-   Setting `SECSIM_E2E_REQUIRE_REAL_IMAGES=1` makes the job fail clearly when
-   the registry is unreachable instead of using the stub
+2. **Images** — builds `scripts/e2e-kind/stub/` and loads it into kind. The
+   MAG, CI-SIM and AI4SOAR images live in the private `registry.montimage.eu`
+   (not resolvable on the public Internet), so the stub stands in for them
+   while the real scenario topology, deployment specs, RBAC and ordering are
+   exercised. The secAnoD sidecar image is built from `scripts/secanod-kafka`
+   and kind-loaded along with `apache/kafka:3.9.1`, so detection and the Kafka
+   alert bus run for real. Setting `SECSIM_E2E_REQUIRE_REAL_IMAGES=1` makes the
+   job fail clearly when the registry is unreachable instead of using the stub
 3. **Execute** — `scripts/e2e-kind/run-e2e.js` registers the kind cluster as an
    Infrastructure over the REST API and executes the seeded demo scenario
 4. **Assert** — the R1 two-attack script (issue #237): `kubectl exec` attack
-   #1 trips an MMT-Probe alert, stops CI-SIM (rate threshold → "service
-   stopped" → Deployment restart) and lands the attacker on the ci-sim
-   blocklist via AI4SOAR's `/admin/block` playbook; `kubectl exec` attack #2
-   is answered 403 while the probe alerts again and the target stays
-   healthy; namespace deletion leaves no resources behind
+   #1 trips a secAnoD alert that AI4SOAR consumes from Kafka, stops CI-SIM
+   (rate threshold → "service stopped" → Deployment restart) and lands the
+   attacker on the ci-sim blocklist via AI4SOAR's `/admin/block` playbook;
+   `kubectl exec` attack #2 is answered 403 while secAnoD alerts again and the
+   target stays healthy; namespace deletion leaves no resources behind
 5. **Teardown** — diagnostics are dumped on failure and the cluster is always
    deleted
 
