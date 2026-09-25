@@ -223,9 +223,11 @@ beforeAll(async () => {
   const execution = (
     status: 'running' | 'completed',
     namespace: string,
-    services: { id: mongoose.Types.ObjectId; name: string }[]
+    services: { id: mongoose.Types.ObjectId; name: string }[],
+    completedAt?: Date
   ) => ({
     executedAt: new Date(),
+    ...(completedAt ? { completedAt } : {}),
     executedBy: 'tester',
     status,
     namespace,
@@ -246,8 +248,8 @@ beforeAll(async () => {
       topology: { yaml: '', nodes: [], edges: [] },
       executions: [
         execution('running', 'ns-a', [{ id: web._id, name: 'web' }]),
-        // A closed run must not be polled.
-        execution('completed', 'ns-a-old', [{ id: web._id, name: 'web' }]),
+        // A torn-down run (completedAt stamped) must not be polled.
+        execution('completed', 'ns-a-old', [{ id: web._id, name: 'web' }], new Date()),
       ],
     },
     {
@@ -255,7 +257,9 @@ beforeAll(async () => {
       title: 'Db scenario',
       infrastructureId: infraB._id,
       topology: { yaml: '', nodes: [], edges: [] },
-      executions: [execution('running', 'ns-b', [{ id: db._id, name: 'db' }])],
+      // Settled but still deployed: the console saves `completed` once the
+      // rollout settles, and the namespace stays up until teardown.
+      executions: [execution('completed', 'ns-b', [{ id: db._id, name: 'db' }])],
     },
   ]);
 

@@ -725,7 +725,7 @@ service instrumentation and are deferred; only CPU and memory are reported.
 - **Response:** `MonitoringSnapshot` — `{ collectedAt, infrastructures: [{ infrastructureId, name, available, reason?, namespaces }], services: [{ key, name, serviceIds, nodeIds, scenarioId, scenarioTitle, executionId, namespace, infrastructureId, infrastructureName, metricsAvailable, pods, cpuMillicores, memoryBytes, containers: [{ name, cpuMillicores, memoryBytes }] }], alerts: FiredAlert[] }`
 - **Errors:** `400` invalid filter
 
-One metrics call is made per active (`pending`/`running`) execution namespace.
+One metrics call is made per live execution namespace: one that has not been torn down (no `completedAt`) and has not failed. A run whose rollout settled as `completed` stays live until teardown.
 Sidecar containers are reported inside their host workload's `containers`.
 Credentials are never part of the response.
 

@@ -33,7 +33,18 @@ export const METRICS_TIMEOUT_MS = 8000;
 
 const MIB = 1024 * 1024;
 
-const ACTIVE_STATUSES = ['pending', 'running'];
+/**
+ * An execution is live while its namespace exists: the console saves
+ * `completed` as soon as the rollout settles, but only teardown stamps
+ * `completedAt` (same rule as `isLive` in scenarios.routes.ts).
+ */
+function isLiveExecution(execution: {
+  status: string;
+  namespace?: string | null;
+  completedAt?: Date | null;
+}): boolean {
+  return !!execution.namespace && !execution.completedAt && execution.status !== 'failed';
+}
 
 // ---------------------------------------------------------------------------
 // Quantity parsing
@@ -441,7 +452,11 @@ export async function collectMonitoringSnapshot(
       ? new Types.ObjectId(filters.infrastructureId)
       : { $ne: null },
     executions: {
-      $elemMatch: { status: { $in: ACTIVE_STATUSES }, namespace: { $nin: [null, ''] } },
+      $elemMatch: {
+        status: { $ne: 'failed' },
+        completedAt: null,
+        namespace: { $nin: [null, ''] },
+      },
     },
   })
     .select('title infrastructureId executions')
@@ -451,7 +466,7 @@ export async function collectMonitoringSnapshot(
   for (const scenario of scenarios) {
     const infrastructureId = String(scenario.infrastructureId);
     for (const execution of scenario.executions) {
-      if (!ACTIVE_STATUSES.includes(execution.status) || !execution.namespace) continue;
+      if (!isLiveExecution(execution) || !execution.namespace) continue;
       if (
         filters.serviceId &&
         !execution.deployedServices.some((s) => String(s.serviceId) === filters.serviceId)
