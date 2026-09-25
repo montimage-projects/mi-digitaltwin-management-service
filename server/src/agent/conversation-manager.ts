@@ -1,3 +1,4 @@
+import { env } from '../config/env.js';
 import { Conversation } from '../models/Conversation.js';
 import type { IConversationSource } from '../models/Conversation.js';
 import { getLLMGateway } from './index.js';
@@ -85,6 +86,9 @@ export class ConversationManager {
 
   async generateTitle(firstMessage: string): Promise<string> {
     const fallback = normalizeTitle(firstMessage);
+    if (!env.AGENT_LLM_TITLES) {
+      return fallback;
+    }
 
     try {
       const response = await getLLMGateway().chat([

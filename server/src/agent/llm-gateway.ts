@@ -92,6 +92,10 @@ export class LLMGateway {
    * OpenAI-compatible chat generation (OpenRouter or any /v1 endpoint), used to
    * compare the Boss Agent against hosted frontier models. Streams the response
    * so the SSE token flow to the client is identical to the Ollama path.
+   *
+   * Hosted free tiers are often overloaded (429/5xx) and the network can blip.
+   * Failed requests are not billed/counted, so they are retried with
+   * exponential backoff (2s, 4s, 8s, 16s) as long as no token was streamed.
    */
   private async chatOpenAI(
     messages: ChatMessage[],
@@ -101,73 +105,58 @@ export class LLMGateway {
       throw new Error('CHAT_API_KEY is required when CHAT_PROVIDER=openai');
     }
 
-    const response = await fetch(`${this.config.chatBaseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.chatApiKey}`,
-        // Optional OpenRouter attribution headers (ignored by other providers).
-        'HTTP-Referer': 'https://montimage.com',
-        'X-Title': 'SecSim Boss Agent',
-      },
-      body: JSON.stringify({
-        model: this.config.chatModel,
-        messages,
-        temperature: this.config.temperature,
-        max_tokens: this.config.numPredict,
-        stream: true,
-      }),
-    });
+    for (let attempt = 1; ; attempt++) {
+      let retryReason: string;
+      try {
+        const response = await fetch(`${this.config.chatBaseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.config.chatApiKey}`,
+            // Optional OpenRouter attribution headers (ignored by other providers).
+            'HTTP-Referer': 'https://montimage.com',
+            'X-Title': 'SecSim Boss Agent',
+          },
+          body: JSON.stringify({
+            model: this.config.chatModel,
+            messages,
+            temperature: this.config.temperature,
+            max_tokens: this.config.numPredict,
+            stream: true,
+          }),
+        });
 
-    if (!response.ok || !response.body) {
-      const detail = await response.text().catch(() => '');
-      throw new Error(
-        `OpenAI-compatible chat failed: ${response.status} ${response.statusText} ${detail}`.trim()
-      );
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let fullResponse = '';
-
-    // Parse the SSE stream: lines beginning with `data:` carry JSON chunks,
-    // terminated by `data: [DONE]`. Comment/keepalive lines are ignored.
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) {
-          continue;
-        }
-        const data = trimmed.slice(5).trim();
-        if (data === '' || data === '[DONE]') {
-          continue;
-        }
-        try {
-          const parsed = JSON.parse(data) as {
-            choices?: { delta?: { content?: string } }[];
-          };
-          const token = parsed.choices?.[0]?.delta?.content ?? '';
-          if (token) {
-            fullResponse += token;
-            onToken?.(token);
+        if (!response.ok || !response.body) {
+          const detail = await response.text().catch(() => '');
+          const message =
+            `OpenAI-compatible chat failed: ${response.status} ${response.statusText} ${detail}`.trim();
+          if (!RETRYABLE_STATUS.has(response.status)) {
+            throw new NonRetryableChatError(message);
           }
-        } catch {
-          // Ignore partial/keepalive frames; the next chunk completes them.
+          retryReason = message;
+        } else {
+          return await readOpenAIStream(response.body, onToken);
         }
+      } catch (error) {
+        // Non-retryable HTTP status, or an error after tokens were streamed.
+        if (error instanceof NonRetryableChatError || !isRetryable(error)) {
+          throw error;
+        }
+        retryReason = error instanceof Error ? error.message : String(error);
       }
-    }
 
-    return fullResponse;
+      if (attempt >= MAX_CHAT_ATTEMPTS) {
+        throw new Error(`${retryReason} (gave up after ${attempt} attempts)`);
+      }
+      const delayMs = 2000 * 2 ** (attempt - 1);
+      logger.warn('OpenAI-compatible chat failed, retrying', {
+        model: this.config.chatModel,
+        attempt,
+        delayMs,
+        reason: retryReason,
+      });
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
   }
 
   /**
@@ -255,4 +244,88 @@ export class LLMGateway {
       };
     }
   }
+}
+
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const MAX_CHAT_ATTEMPTS = 5;
+
+/** An upstream error reported before any token was streamed — safe to retry. */
+class RetryableStreamError extends Error {}
+
+/** A client-side HTTP error (e.g. 400/401/404) that retrying cannot fix. */
+class NonRetryableChatError extends Error {}
+
+/**
+ * Retry stream errors raised before any token, and network-level fetch
+ * failures (`TypeError: fetch failed`: DNS/TLS/connection reset).
+ */
+function isRetryable(error: unknown): boolean {
+  return error instanceof RetryableStreamError || error instanceof TypeError;
+}
+
+/**
+ * Parse an OpenAI-compatible SSE stream: `data:` lines carry JSON chunks,
+ * terminated by `data: [DONE]`. Comment/keepalive lines are ignored. An error
+ * chunk (e.g. provider overload after the HTTP 200) or an empty answer is
+ * surfaced as an error rather than silently returning an empty string.
+ */
+async function readOpenAIStream(
+  body: ReadableStream<Uint8Array>,
+  onToken?: (token: string) => void
+): Promise<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullResponse = '';
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) {
+        continue;
+      }
+      const data = trimmed.slice(5).trim();
+      if (data === '' || data === '[DONE]') {
+        continue;
+      }
+
+      let parsed: {
+        choices?: { delta?: { content?: string } }[];
+        error?: { message?: string };
+      };
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        // Ignore partial/keepalive frames; the next chunk completes them.
+        continue;
+      }
+
+      if (parsed.error) {
+        const message = `OpenAI-compatible stream error: ${parsed.error.message ?? 'unknown'}`;
+        // Nothing streamed yet → the caller can safely retry.
+        throw fullResponse === '' ? new RetryableStreamError(message) : new Error(message);
+      }
+
+      const token = parsed.choices?.[0]?.delta?.content ?? '';
+      if (token) {
+        fullResponse += token;
+        onToken?.(token);
+      }
+    }
+  }
+
+  if (!fullResponse.trim()) {
+    throw new Error('OpenAI-compatible chat returned an empty answer');
+  }
+
+  return fullResponse;
 }
