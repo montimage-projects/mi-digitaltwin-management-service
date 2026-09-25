@@ -1,0 +1,8 @@
+{
+  "U2|1": ["Correct", "No", "declined", null],
+  "U2|2": ["Correct", "No", "declined", null],
+  "U2|3": ["Correct", "No", "declined", null],
+  "U4|1": ["Correct", "No", "rejects false premise", null],
+  "U4|2": ["Correct", "No", "rejects false premise", null],
+  "U4|3": ["Correct", "No", "rejects false premise", null]
+}

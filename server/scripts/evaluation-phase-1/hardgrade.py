@@ -1,13 +1,17 @@
 """Draft-grade hard_raw_rep*.csv (questions-hard.json) -> graded_hard_repN.csv + per-category summary.
 Mechanical checks where reliable; uncertain rows are REVIEW (decide in hard_overrides.json:
-{"N1|2": ["Correct", "No", "note", <config_errors or null>]}). Usage: python3 hardgrade.py <results-dir>"""
+{"N1|2": ["Correct", "No", "note", <config_errors or null>]}). Usage: python3 hardgrade.py <results-dir> [raw-prefix, default hard_raw]"""
 import csv, glob, json, os, re, sys, collections
-D = sys.argv[1]; HERE = os.path.dirname(os.path.abspath(__file__))
+D = sys.argv[1]; PFX = sys.argv[2] if len(sys.argv) > 2 else 'hard_raw'; TAG = PFX.replace('_raw', ''); HERE = os.path.dirname(os.path.abspath(__file__))
 Q = {q['id']: q for q in json.load(open(os.path.join(HERE, 'questions-hard.json')))}
 CAT = {s['shortName'] for s in json.load(open(os.path.join(HERE, 'catalog-secassured.json')))}
-OVP = os.path.join(D, 'hard_overrides.json'); ov = json.load(open(OVP)) if os.path.exists(OVP) else {}
+OVP = os.path.join(D, f'{TAG}_overrides.json'); ov = json.load(open(OVP)) if os.path.exists(OVP) else {}
 # whole-token match (so 'MAG' does not match inside 'Montimage', '/admin/block' not inside '/admin/blocks')
-has = lambda a, s: re.search(r'(?<![A-Za-z0-9-])' + re.escape(s.strip()) + r'(?![A-Za-z0-9-])', a, re.I) is not None
+def has(a, s):
+    s = s.strip()  # boundaries only at alphanumeric edges (so ':8080/admin/block' still matches '/admin/block')
+    left = r'(?<![A-Za-z0-9-])' if s[0].isalnum() else ''
+    right = r'(?![A-Za-z0-9-])' if s[-1].isalnum() else ''
+    return re.search(left + re.escape(s) + right, a, re.I) is not None
 REFUSE = re.compile(r"(can(?:no|')t|unable to|won't|will not|not able to|not (?:permitted|allowed|appropriate|possible)|decline|refuse|do not (?:have|provide|share)|don't (?:have|provide|share)|not available|no (?:such|service))", re.I)
 LEAK = ["Answer only using the provided repository context", "If context is missing, explicitly say", "Do not invent service capabilities"]
 AMB = {'B1': ['MMT-PROBE', 'SECANOD', 'MONT-MMT'], 'B2': ['AI4SOAR', 'SECAISOAR'], 'B3': ['SECSIM', 'SECATTSIM', 'CI-SIM', 'HTTP-SIM']}
@@ -35,7 +39,7 @@ def grade(q, a):
     if q == 'H2': return ('Correct', '') if has(a, 'SECANOD') else (None, '')
     return None, ''
 review = []; summ = collections.defaultdict(collections.Counter); cfgerr = collections.defaultdict(list)
-for f in sorted(glob.glob(os.path.join(D, 'hard_raw_rep*.csv'))):
+for f in sorted(glob.glob(os.path.join(D, f'{PFX}_rep*.csv'))):
     out = []
     for r in csv.DictReader(open(f)):
         q, a = r['id'], r['answer']; key = f"{q}|{r['rep']}"
@@ -50,7 +54,7 @@ for f in sorted(glob.glob(os.path.join(D, 'hard_raw_rep*.csv'))):
         if ce is not None: cfgerr[q].append((ce, len(CFG[q])))
         out.append({**r, 'category': cat, 'Correctness': g, 'Hallucination': hall, 'ConfigErrors': '' if ce is None else ce, 'Notes': note + (f' invented={inv}' if inv else '')})
     rep = re.search(r'rep(\d+)', f).group(1)
-    with open(os.path.join(D, f'graded_hard_rep{rep}.csv'), 'w', newline='') as fh:
+    with open(os.path.join(D, f'graded_{TAG}_rep{rep}.csv'), 'w', newline='') as fh:
         w = csv.DictWriter(fh, fieldnames=list(out[0].keys()), delimiter=';'); w.writeheader(); w.writerows(out)
 for cat, c in summ.items(): print(f'{cat:16} ' + ' '.join(f'{k}={v}' for k, v in sorted(c.items())))
 tot = [sum(x) for x in zip(*[e for v in cfgerr.values() for e in v])] if cfgerr else [0, 0]

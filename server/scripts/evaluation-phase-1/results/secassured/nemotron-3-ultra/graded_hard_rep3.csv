@@ -193,7 +193,7 @@ curl -X POST http://<ci-sim-host>:8080/admin/unblock \
   -d '{""address"": ""<attacker-ip>""}'
 ```
 
-These admin endpoints are part of the CI-SIM service API (see its description in the repository).";;Partial;No;1;config_errors=1/3 missing=['/admin/blocks'] invented=[]
+These admin endpoints are part of the CI-SIM service API (see its description in the repository).";;Correct;No;0;config_errors=0/3 missing=[] invented=[]
 S3;scenario-config;service;RAG;3;service;6022;4;HTTP-SIM|CI-SIM|MMT-PROBE|MAG;0.734|0.658|0.549|0.532;302;HTTP-SIM listens on **port 8080**. In the attack→detect→respond scenario, the **only workload allowed to reach it is MAG (Montimage Attack Generator)**. MMT‑Probe is injected as a sidecar in the same pod to observe the traffic, but it is not an external workload permitted to send requests to HTTP‑SIM.;;Correct;No;0;config_errors=0/2 missing=[] invented=[]
 S4;scenario-config;service;RAG;3;service;4306;4;MAG|HTTP-SIM|AI4SOAR|MMT-PROBE;0.753|0.599|0.574|0.567;498;"Based on the repository context, the MAG CLI command format is:
 
