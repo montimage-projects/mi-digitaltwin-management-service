@@ -3,8 +3,23 @@ import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 
-vi.mock('../../models/Scenario.js', () => ({
-  Scenario: { aggregate: vi.fn().mockResolvedValue([{ count: 2 }]) },
+const { aggregate, db } = vi.hoisted(() => {
+  const db = { readyState: 1 };
+  const aggregate = vi.fn(() => ({
+    option: vi.fn(async () => [{ count: 2 }]),
+  }));
+  return { aggregate, db };
+});
+
+vi.mock('../../models/Scenario.js', () => ({ Scenario: { aggregate } }));
+vi.mock('mongoose', () => ({
+  default: {
+    connection: {
+      get readyState() {
+        return db.readyState;
+      },
+    },
+  },
 }));
 
 const { metricsHandler, metricsMiddleware, registry } = await import('../metrics.js');
@@ -52,6 +67,24 @@ describe('server metrics', () => {
     expect(text).toContain('http_request_duration_seconds_bucket');
     expect(text).toMatch(/secsim_live_executions\{service="secsim-server"\} 2/);
     expect(text).toContain('process_cpu_user_seconds_total');
+  });
+
+  test('bounds the live-executions query and skips it while the database is down', async () => {
+    aggregate.mockClear();
+    await fetch(`${base}/metrics`);
+    expect(aggregate).toHaveBeenCalledTimes(1);
+    const option = aggregate.mock.results[0].value.option;
+    expect(option).toHaveBeenCalledWith({ maxTimeMS: 2000 });
+
+    aggregate.mockClear();
+    db.readyState = 0;
+    try {
+      const text = await (await fetch(`${base}/metrics`)).text();
+      expect(aggregate).not.toHaveBeenCalled();
+      expect(text).toMatch(/secsim_live_executions\{service="secsim-server"\} 2/);
+    } finally {
+      db.readyState = 1;
+    }
   });
 
   test('does not count its own scrapes', async () => {

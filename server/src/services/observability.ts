@@ -604,8 +604,10 @@ export async function collectTraffic(
       const entry = out.get(service) ?? {};
       if (sample.metric.http_url) entry.probe = 'http';
       else if (sample.metric.tcpcheck_endpoint) entry.probe = 'tcp';
-      if (field === 'up') entry.up = sample.value >= 1;
-      else entry[field] = sample.value;
+      // First answer wins: the scraped /metrics query precedes the
+      // spanmetrics one for each field, so scraped values take precedence.
+      if (field === 'up') entry.up ??= sample.value >= 1;
+      else entry[field] ??= sample.value;
       out.set(service, entry);
     }
   });

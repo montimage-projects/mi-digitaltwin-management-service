@@ -539,7 +539,7 @@ export function toReportData(
     errorLogs: stored.errorLogs ?? [],
     events: stored.events ?? [],
     alerts: stored.alerts ?? [],
-    ...(stored.traffic?.length ? { traffic: stored.traffic } : {}),
+    ...(Array.isArray(stored.traffic) ? { traffic: stored.traffic } : {}),
     omitted: {
       logs: stored.omitted?.logs ?? 0,
       errorLogs: stored.omitted?.errorLogs ?? 0,

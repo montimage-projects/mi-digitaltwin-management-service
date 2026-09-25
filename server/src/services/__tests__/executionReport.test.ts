@@ -52,6 +52,7 @@ const {
   summarizeReport,
   renderMarkdown,
   takeTail,
+  toReportData,
   truncateBytes,
   MAX_LOG_LINES,
   MAX_TEXT_BYTES,
@@ -622,6 +623,20 @@ describe('observability section (issue #25)', () => {
     expect(html).toContain('Component health');
     expect(html).not.toContain(hostile);
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+  });
+
+  test('keeps an empty stored traffic section (stack ran, no readings)', () => {
+    const report = buildReport({
+      scenario,
+      execution: makeExecution(),
+      completedAt,
+      artifacts: makeArtifacts({ traffic: [] }),
+    });
+    // A stored document carries the report fields; toReportData ignores the rest.
+    expect(toReportData(report, { status: 'completed' }).traffic).toEqual([]);
+    expect(
+      toReportData({ ...report, traffic: undefined }, { status: 'completed' })
+    ).not.toHaveProperty('traffic');
   });
 
   test('omits the section for runs without the stack', () => {

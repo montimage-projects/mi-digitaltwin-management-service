@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import mongoose from 'mongoose';
 import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
 import { Scenario } from '../models/Scenario.js';
 
@@ -34,6 +35,9 @@ new Gauge({
   help: 'Scenario executions whose namespace is still deployed',
   registers: [registry],
   async collect() {
+    // Mongoose buffers commands while disconnected, so querying during an
+    // outage would stall the scrape: skip it and keep the last value.
+    if (mongoose.connection.readyState !== 1) return;
     try {
       const [row] = await Scenario.aggregate<{ count: number }>([
         { $unwind: '$executions' },
@@ -45,7 +49,7 @@ new Gauge({
           },
         },
         { $count: 'count' },
-      ]);
+      ]).option({ maxTimeMS: 2000 });
       this.set(row?.count ?? 0);
     } catch {
       // Database unavailable: keep the last value rather than failing the scrape.

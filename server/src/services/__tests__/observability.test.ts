@@ -244,6 +244,21 @@ describe('collectTraffic', () => {
     expect(traffic.get('kafka')).toEqual({ probe: 'tcp', up: true, requestRate: 2 });
   });
 
+  test('prefers the scraped /metrics value when spanmetrics also answers', async () => {
+    const both: ApiGet = async (path) => {
+      const query = decodeURIComponent(path.split('query=')[1]);
+      if (/^sum by \(service\) \(rate\(http_requests_total\[/.test(query)) {
+        return { status: 200, body: vector([{ metric: { service: 'api' }, value: 7 }]) };
+      }
+      if (/^sum by \(service_name\) \(rate\(traces[^/]*$/.test(query)) {
+        return { status: 200, body: vector([{ metric: { service_name: 'api' }, value: 3 }]) };
+      }
+      return { status: 200, body: vector([]) };
+    };
+    const traffic = await collectTraffic(both, 'ns');
+    expect(traffic.get('api')).toEqual({ requestRate: 7 });
+  });
+
   test('throws only when the stack answered no query at all', async () => {
     const down: ApiGet = async () => ({ status: 503, body: '' });
     await expect(collectTraffic(down, 'ns')).rejects.toBeInstanceOf(ObservabilityError);
