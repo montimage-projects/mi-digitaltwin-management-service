@@ -21,6 +21,7 @@ import type { IncomingHttpHeaders } from 'node:http';
 import type { Request, Response } from 'express';
 import type { KubeConfig } from '@kubernetes/client-node';
 import { env } from '../config/env.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 /** How long a minted proxy link stays valid. */
 export const PROXY_LINK_TTL_S = 12 * 60 * 60;
@@ -106,6 +107,27 @@ export function proxiedResponseHeaders(
  * proxy, streaming the response back. `path` is the part after the signed
  * prefix (no leading slash) plus the original query string.
  */
+/**
+ * Trailing upstream path taken from the raw, still-encoded request URL
+ * (relative to the router, e.g. `/proxy/<exp>/<sig>/<id>/<exec>/<name>/rest`),
+ * so legitimate percent-encoding is preserved. Rejects any segment that
+ * decodes to `.` or `..`, which could escape the service proxy prefix.
+ */
+export function rawProxyRest(url: string, prefixSegments = 7): string {
+  const pathname = url.split('?')[0];
+  const rest = pathname.split('/').slice(prefixSegments);
+  for (const segment of rest) {
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      throw new AppError('Invalid proxy path', 400);
+    }
+    if (decoded === '.' || decoded === '..') throw new AppError('Invalid proxy path', 400);
+  }
+  return rest.join('/');
+}
+
 export async function proxyToService(
   kc: KubeConfig,
   namespace: string,
@@ -121,6 +143,11 @@ export async function proxyToService(
   const upstreamPath =
     `${base.pathname.replace(/\/$/, '')}/api/v1/namespaces/${encodeURIComponent(namespace)}` +
     `/services/${encodeURIComponent(service)}:${port}/proxy/${path}`;
+  // Defense in depth: the normalized path must stay under this service's proxy.
+  const prefix = upstreamPath.slice(0, upstreamPath.length - path.length);
+  if (!new URL(upstreamPath, base).pathname.startsWith(prefix)) {
+    throw new AppError('Invalid proxy path', 400);
+  }
 
   const headers: Record<string, string> = {};
   for (const [key, value] of Object.entries(req.headers)) {

@@ -14,7 +14,12 @@ import {
 } from '../services/kubernetesDeploy.js';
 import { listAttackProfiles, runAttackProfile } from '../services/attackProfiles.js';
 import { collectRunbookContext, renderRunbook } from '../services/runbook.js';
-import { proxyToService, signProxyPath, verifyProxySignature } from '../services/serviceProxy.js';
+import {
+  proxyToService,
+  rawProxyRest,
+  signProxyPath,
+  verifyProxySignature,
+} from '../services/serviceProxy.js';
 import { CoreV1Api } from '@kubernetes/client-node';
 import { asyncHandler, findById, validateObjectIdParam } from '../middleware/entityLoader.js';
 import { AppError } from '../middleware/errorHandler.js';
@@ -400,9 +405,11 @@ router.post(
 router.all(
   /^\/proxy\/(\d+)\/([A-Za-z0-9_-]+)\/([0-9a-fA-F]{24})\/([0-9a-fA-F]{24})\/([a-z0-9-]+)(?:\/(.*))?$/,
   asyncHandler(async (req, res) => {
-    const [expires, sig, id, executionId, name, rest = ''] = [0, 1, 2, 3, 4, 5].map(
+    const [expires, sig, id, executionId, name] = [0, 1, 2, 3, 4].map(
       (i) => (req.params as Record<string, string | undefined>)[i]
     ) as string[];
+    // Raw (undecoded) trailing path; rejects dot segments before any lookup.
+    const rest = rawProxyRest(req.url);
     const target = { scenarioId: id, executionId, service: name };
     if (!verifyProxySignature(target, Number(expires), sig)) {
       throw new AppError('Invalid or expired link', 403);

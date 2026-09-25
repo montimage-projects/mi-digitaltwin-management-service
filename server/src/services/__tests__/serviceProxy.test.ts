@@ -2,12 +2,14 @@ import { describe, test, expect } from 'vitest';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import express from 'express';
+import type { Request, Response } from 'express';
 import type { KubeConfig } from '@kubernetes/client-node';
 import {
   PROXIED_CSP,
   PROXY_LINK_TTL_S,
   proxiedResponseHeaders,
   proxyToService,
+  rawProxyRest,
   signProxyPath,
   verifyProxySignature,
 } from '../serviceProxy.js';
@@ -106,5 +108,29 @@ describe('proxied response headers', () => {
       upstream.closeAllConnections();
       upstream.close();
     }
+  });
+});
+
+describe('proxy path traversal', () => {
+  const base = `/proxy/1/s/${'a'.repeat(24)}/${'b'.repeat(24)}/ci-sim`;
+
+  test('keeps a normal path with its percent-encoding intact', () => {
+    expect(rawProxyRest(`${base}/static/a%20b.js?x=1`)).toBe('static/a%20b.js');
+    expect(rawProxyRest(`${base}/`)).toBe('');
+  });
+
+  test.each(['..', '%2e%2e', '%2E.', '.', '%2e'])('rejects the dot segment %s', (seg) => {
+    expect(() => rawProxyRest(`${base}/${seg}/api/v1/secrets`)).toThrow(/Invalid proxy path/);
+  });
+
+  test('proxyToService refuses a path escaping the service proxy prefix', async () => {
+    const kc = {
+      getCurrentCluster: () => ({ server: 'http://127.0.0.1:1' }),
+      applyToHTTPSOptions: async () => {},
+    } as unknown as KubeConfig;
+    const req = { headers: {}, method: 'GET' } as unknown as Request;
+    await expect(
+      proxyToService(kc, 'ns', 'svc', 80, '../../../secrets', req, {} as Response)
+    ).rejects.toThrow(/Invalid proxy path/);
   });
 });
