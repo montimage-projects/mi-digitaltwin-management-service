@@ -111,13 +111,16 @@ const RULE: AlertRule = {
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <Monitoring />
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
+  return {
+    queryClient,
+    ...render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <Monitoring />
+        </MemoryRouter>
+      </QueryClientProvider>
+    ),
+  };
 }
 
 function loginAs(role: string) {
@@ -176,6 +179,22 @@ describe('Monitoring', () => {
     vi.mocked(monitoringApi.getMetrics).mockRejectedValue(new Error('Network down'));
     renderPage();
     expect(await screen.findByText('Network down')).toBeInTheDocument();
+  });
+
+  it('keeps the last snapshot on screen when a background refresh fails', async () => {
+    vi.mocked(monitoringApi.getMetrics)
+      .mockResolvedValueOnce(SNAPSHOT)
+      .mockRejectedValue(new Error('Network down'));
+    const { queryClient } = renderPage();
+    await screen.findByText('Web scenario');
+
+    await queryClient.refetchQueries({ queryKey: ['monitoring-metrics'] });
+
+    const banner = await screen.findByText(/Last refresh failed \(Network down\)/);
+    expect(
+      within(banner.closest('[role="alert"]')!).getByRole('button', { name: 'Retry' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Web scenario')).toBeInTheDocument();
   });
 
   it('shows an error state when the alert rules cannot be loaded', async () => {

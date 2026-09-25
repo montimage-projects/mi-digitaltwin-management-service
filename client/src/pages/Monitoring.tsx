@@ -22,6 +22,7 @@ import {
 import { AlertRulesPanel, SEVERITY_BADGE } from '@/components/monitoring/AlertRulesPanel';
 import { MetricSparkline } from '@/components/monitoring/MetricSparkline';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/error-state';
 import {
   Select,
@@ -118,10 +119,26 @@ export function Monitoring() {
         </p>
       </div>
 
-      {error ? (
+      {error && !snapshot ? (
         <ErrorState error={error as Error} onRetry={() => refetch()} />
       ) : (
         <>
+          {/* A failed background refresh keeps the last snapshot on screen. */}
+          {error && (
+            <div
+              role="alert"
+              className="flex flex-wrap items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
+            >
+              <AlertTriangle className="h-4 w-4 flex-shrink-0 text-destructive" />
+              <p className="flex-1">
+                Last refresh failed ({(error as Error).message}). Showing data from the previous
+                refresh.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          )}
           {unavailable.map((infra) => (
             <div
               key={infra.infrastructureId}
