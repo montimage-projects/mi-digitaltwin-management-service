@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { ExecutionConsole } from './ExecutionConsole';
 import * as sseModule from '@/lib/sse';
-import type { ExecutionEventHandlers } from '@/lib/api';
+import { scenariosApi, type ExecutionEventHandlers } from '@/lib/api';
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -339,5 +339,96 @@ describe('ExecutionConsole', () => {
     await vi.waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(expected);
     });
+  });
+
+  it('runs a seeded attack profile from its button', async () => {
+    const profile = {
+      nodeId: 'mag',
+      name: 'attack-1-stop-the-server',
+      description: 'Attack #1',
+      args: ['mag', 'http-flood'],
+    };
+    vi.spyOn(scenariosApi, 'listProfiles').mockResolvedValue([profile]);
+    const run = vi
+      .spyOn(scenariosApi, 'runProfile')
+      .mockResolvedValue({ pod: 'mag-pod', container: 'mag', message: 'Profile started' });
+
+    await renderWithMockedStream({
+      ...defaultProps,
+      services: [
+        { nodeId: 'n1', serviceId: 's1', name: 'mag', uiType: 'terminal', status: 'running' },
+      ],
+    });
+
+    fireEvent.click(await screen.findByTestId('run-profile-attack-1-stop-the-server'));
+    await vi.waitFor(() => {
+      expect(run).toHaveBeenCalledWith('scenario-1', 'exec-1', profile);
+    });
+  });
+
+  it('opens a web interface in a tab severed from window.opener', async () => {
+    const tab = { opener: window, location: { href: '' }, close: vi.fn() };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    vi.spyOn(scenariosApi, 'getServiceLink').mockResolvedValue({
+      url: '/api/proxy/1/sig/scenario-1/exec-1/ci-sim/',
+    });
+
+    await renderWithMockedStream({
+      ...defaultProps,
+      services: [
+        {
+          nodeId: 'n1',
+          serviceId: 's1',
+          name: 'ci-sim',
+          uiType: 'web',
+          status: 'running',
+          webInterface: 'http://node:30080',
+        },
+      ],
+    });
+
+    fireEvent.click(await screen.findByTestId('open-interface-ci-sim'));
+    await vi.waitFor(() => {
+      expect(tab.location.href).toBe('/api/proxy/1/sig/scenario-1/exec-1/ci-sim/');
+    });
+    expect(open).toHaveBeenCalledWith('about:blank', '_blank');
+    expect(tab.opener).toBeNull();
+    open.mockRestore();
+  });
+  it('keeps runbook progress across console/runbook view switches', async () => {
+    vi.spyOn(scenariosApi, 'getRunbook').mockResolvedValue({
+      steps: [
+        {
+          id: 'flood',
+          title: 'Flood the server',
+          profile: { nodeId: 'mag', name: 'attack-1' },
+          expect: [{ label: 'Attack started', source: 'log', pattern: 'attack started' }],
+        },
+      ],
+    } as never);
+    vi.spyOn(scenariosApi, 'runProfile').mockResolvedValue({
+      pod: 'mag-pod',
+      container: 'mag',
+      message: 'Profile started',
+    });
+    const handlers = await renderWithMockedStream();
+
+    fireEvent.click(screen.getByTestId('view-runbook'));
+    fireEvent.click(await screen.findByTestId('runbook-run-flood'));
+    act(() => {
+      handlers.onLog?.({
+        service: 'mag',
+        pod: 'mag-pod',
+        container: 'mag',
+        line: 'attack started',
+      });
+    });
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('runbook-expect-flood-0')).toHaveAttribute('data-met', 'true');
+    });
+
+    fireEvent.click(screen.getByTestId('view-console'));
+    fireEvent.click(screen.getByTestId('view-runbook'));
+    expect(screen.getByTestId('runbook-expect-flood-0')).toHaveAttribute('data-met', 'true');
   });
 });

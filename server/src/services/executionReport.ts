@@ -875,6 +875,87 @@ function mdTable(headers: string[], rows: string[][]): string {
   ].join('\n');
 }
 
+/** Auto-generated run conclusion: a one-line verdict plus supporting findings. */
+export interface ReportConclusion {
+  verdict: string;
+  findings: string[];
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+/**
+ * Derive the report's conclusion from its outcome and metrics, so every
+ * report ends with an assessment even when no analyst wrote one. Built from
+ * counts and capped identifiers only; renderers escape it like any other text.
+ */
+export function summarizeReport(report: ExecutionReportData): ReportConclusion {
+  const m = report.metrics;
+  const failedServices = report.services.filter(
+    (s) => s.status === 'failed' || s.containers.some((c) => c.status === 'failed')
+  );
+
+  let verdict: string;
+  if (report.outcome === 'failed') {
+    verdict = report.error
+      ? 'The run failed during deployment; the scenario did not execute.'
+      : `The run failed: ${plural(failedServices.length, 'service')} ended in a failed state.`;
+  } else if (report.outcome === 'partial') {
+    verdict = report.provisional
+      ? 'The run has no captured artifacts yet; this assessment is based on the execution record only.'
+      : 'The run finished, but its final state could not be fully observed.';
+  } else {
+    verdict =
+      m.services.total === 1
+        ? 'The run passed: the deployed service reached a healthy state.'
+        : `The run passed: all ${m.services.total} services reached a healthy state.`;
+  }
+
+  const findings: string[] = [];
+  if (m.alerts.total) {
+    const top = m.alerts.byVerdict[0];
+    findings.push(
+      `Detection: the monitor raised ${plural(m.alerts.total, 'security alert')} from ${plural(
+        m.alerts.uniqueAttackers,
+        'distinct attacker'
+      )}${top ? `; most frequent verdict "${top.name}" (${top.count})` : ''}.`
+    );
+  } else if (!report.provisional) {
+    findings.push(
+      'Detection: no security alerts were raised. If an attack was run, the monitor did not detect it.'
+    );
+  }
+  if (failedServices.length && report.outcome !== 'failed') {
+    findings.push(`Services: ${failedServices.map((s) => s.name).join(', ')} failed.`);
+  } else if (failedServices.length) {
+    findings.push(`Failed services: ${failedServices.map((s) => s.name).join(', ')}.`);
+  }
+  if (m.containers.restarts) {
+    findings.push(
+      `Resilience: containers restarted ${plural(m.containers.restarts, 'time')} during the run${
+        report.outcome === 'passed' ? ' and every service recovered' : ''
+      }.`
+    );
+  }
+  if (m.events.warnings) {
+    findings.push(`Cluster: ${plural(m.events.warnings, 'Kubernetes warning event')} recorded.`);
+  }
+  if (m.logs.errorLines) {
+    findings.push(
+      `Logs: ${plural(m.logs.errorLines, 'error-looking line')} out of ${m.logs.lines}.`
+    );
+  }
+  if (report.partial) {
+    findings.push(
+      `Capture: ${plural(report.captureErrors.length, 'capture step')} failed; figures may be incomplete.`
+    );
+  }
+  if (!findings.length)
+    findings.push('No alerts, restarts, warnings or error lines were recorded.');
+  return { verdict, findings };
+}
+
 /** Render the report as GitHub-flavored Markdown; all untrusted text escaped. */
 export function renderMarkdown(report: ExecutionReportData): string {
   const m = report.metrics;
@@ -913,6 +994,14 @@ export function renderMarkdown(report: ExecutionReportData): string {
 
   if (report.error) {
     out.push('## Error', '', markdownCodeBlock(report.error), '');
+  }
+
+  const conclusion = summarizeReport(report);
+  out.push('## Conclusion', '', `**${escapeMarkdown(conclusion.verdict)}**`, '');
+  for (const finding of conclusion.findings) out.push(`- ${escapeMarkdown(finding)}`);
+  out.push('');
+  if (report.conclusion) {
+    out.push('### Analyst note', '', markdownCodeBlock(report.conclusion), '');
   }
 
   out.push('## Key metrics', '');
@@ -1034,42 +1123,198 @@ export function renderMarkdown(report: ExecutionReportData): string {
     out.push('');
   }
 
-  if (report.conclusion) {
-    out.push('## Conclusion', '', markdownCodeBlock(report.conclusion), '');
-  }
-
   return out.join('\n');
 }
 
+/**
+ * Dark "SOC console" theme for the standalone HTML report. System font
+ * stacks only (the page must render offline and carries no script); a
+ * light, ink-friendly variant takes over for print.
+ */
 const HTML_STYLE = `
-body { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; margin: 2rem auto; max-width: 1100px; padding: 0 1rem; color: #1f2937; }
-h1 { font-size: 1.5rem; } h2 { font-size: 1.2rem; margin-top: 2rem; border-bottom: 1px solid #e5e7eb; padding-bottom: .25rem; }
-table { border-collapse: collapse; width: 100%; font-size: .875rem; margin: .5rem 0; }
-th, td { border: 1px solid #e5e7eb; padding: .35rem .5rem; text-align: left; vertical-align: top; word-break: break-word; }
-th { background: #f9fafb; }
-pre { background: #0f172a; color: #e2e8f0; padding: .75rem; border-radius: 6px; font-size: .75rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
-.note { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: .5rem .75rem; }
-.muted { color: #6b7280; }
-.outcome { display: inline-block; padding: .1rem .5rem; border-radius: 9999px; font-weight: 600; font-size: .8rem; }
-.outcome-passed { background: #dcfce7; color: #166534; }
-.outcome-failed { background: #fee2e2; color: #991b1b; }
-.outcome-partial { background: #fef3c7; color: #92400e; }
-`;
+:root {
+  --bg: #07090b; --panel: #0c1013; --panel-2: #10161a; --line: #1b2329; --line-2: #26313a;
+  --text: #e4ebef; --muted: #8a979f; --faint: #5b6770;
+  --green: #22c55e; --red: #ef4444; --amber: #f59e0b; --blue: #3b82f6;
+  --mono: 'JetBrains Mono', 'IBM Plex Mono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+  --sans: 'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', Helvetica, sans-serif;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body {
+  margin: 0; color: var(--text); font: 14px/1.55 var(--sans);
+  background:
+    linear-gradient(rgba(34,197,94,.035) 1px, transparent 1px) 0 0 / 100% 28px,
+    radial-gradient(1200px 500px at 85% -10%, rgba(34,197,94,.07), transparent 60%),
+    var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+.sheet { max-width: 1120px; margin: 0 auto; padding: 40px 32px 64px; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
 
-function htmlTable(headers: string[], rows: (string | number | undefined)[][]): string {
-  const head = headers.map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join('');
-  const body = rows
-    .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell ?? '—')}</td>`).join('')}</tr>`)
-    .join('\n');
-  return `<table><thead><tr>${head}</tr></thead><tbody>\n${body}\n</tbody></table>`;
+/* Masthead */
+.bar { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  font: 600 11px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--muted);
+  border-left: 3px solid var(--green); padding: 6px 0 6px 12px; }
+.bar b { color: var(--green); font-weight: 600; }
+.masthead { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end;
+  margin: 28px 0 24px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+.eyebrow { font: 500 12px/1 var(--mono); color: var(--faint); letter-spacing: .12em; text-transform: uppercase; }
+h1 { margin: 10px 0 0; font: 600 34px/1.15 var(--sans); letter-spacing: -.02em; word-break: break-word; }
+.verdict { text-align: right; }
+.verdict .label { font: 500 11px/1 var(--mono); letter-spacing: .16em; color: var(--faint); text-transform: uppercase; }
+.outcome { display: inline-flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 16px;
+  border: 1px solid currentColor; border-radius: 4px; font: 700 18px/1 var(--mono); letter-spacing: .14em; }
+.outcome::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: currentColor;
+  box-shadow: 0 0 12px currentColor; }
+.outcome-passed { color: var(--green); }
+.outcome-failed { color: var(--red); }
+.outcome-partial { color: var(--amber); }
+
+/* Metadata */
+.meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-bottom: 28px; }
+.meta div { background: var(--panel); padding: 12px 14px; min-width: 0; }
+.meta dt { font: 500 10px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.meta dd { margin: 6px 0 0; font: 13px/1.35 var(--mono); word-break: break-all; }
+
+/* Notices */
+.note { border: 1px solid var(--line-2); border-left: 3px solid var(--amber); background: var(--panel);
+  padding: 10px 14px; border-radius: 4px; margin: 0 0 16px; color: var(--text); }
+.note strong { color: var(--amber); }
+
+/* Conclusion */
+.conclusion { position: relative; background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line-2); border-left: 3px solid var(--green); border-radius: 6px;
+  padding: 22px 24px; margin-bottom: 28px; box-shadow: 0 20px 40px -24px rgba(0,0,0,.8); }
+.tag { font: 600 11px/1 var(--mono); letter-spacing: .2em; color: var(--green); text-transform: uppercase; }
+.conclusion .lead { margin: 12px 0 14px; font-size: 17px; line-height: 1.5; font-weight: 500; }
+.conclusion ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.conclusion li { padding-left: 22px; position: relative; color: #c7d1d6; }
+.conclusion li::before { content: '›'; position: absolute; left: 4px; color: var(--green); font-family: var(--mono); font-weight: 700; }
+.analyst { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line-2); }
+.analyst p { margin: 8px 0 0; white-space: pre-wrap; word-break: break-word; }
+
+/* KPI strip */
+.kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 36px; }
+.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; }
+.kpi .v { font: 600 28px/1 var(--mono); letter-spacing: -.02em; }
+.kpi .k { margin-top: 8px; font: 500 10px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.kpi .s { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.kpi.hot .v { color: var(--red); } .kpi.warm .v { color: var(--amber); } .kpi.ok .v { color: var(--green); }
+
+/* Sections */
+section { margin-top: 36px; }
+h2 { display: flex; align-items: baseline; gap: 14px; margin: 0 0 14px; padding-bottom: 10px;
+  border-bottom: 1px solid var(--line); font: 600 13px/1 var(--mono); letter-spacing: .16em; text-transform: uppercase; }
+h2 .n { color: var(--green); }
+h2 .c { margin-left: auto; color: var(--faint); font-weight: 500; letter-spacing: .08em; }
+h3 { margin: 20px 0 8px; font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+
+/* Tables */
+.tw { border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th { text-align: left; font: 500 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--faint); background: var(--panel-2); padding: 10px 12px; border-bottom: 1px solid var(--line); }
+td { padding: 9px 12px; border-top: 1px solid var(--line); vertical-align: top; word-break: break-word; font-family: var(--mono); }
+tbody tr:first-child td { border-top: 0; }
+tbody tr:nth-child(even) td { background: rgba(255,255,255,.015); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.st { font-weight: 600; white-space: nowrap; }
+.st::before { content: '●'; margin-right: 6px; font-size: 9px; vertical-align: 1px; }
+.st-completed, .st-running, .st-Normal { color: var(--green); }
+.st-failed { color: var(--red); } .st-pending, .st-Warning { color: var(--amber); }
+.atk { color: var(--red); }
+
+/* Logs */
+pre { margin: 0; background: #050607; color: #b9c6cc; border: 1px solid var(--line); border-radius: 6px;
+  padding: 14px 16px; font: 11.5px/1.6 var(--mono); overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 560px; }
+pre.err { color: #f3b3b3; border-left: 3px solid var(--red); }
+.empty { color: var(--faint); font: 12px var(--mono); padding: 14px 0; }
+.empty::before { content: '— '; }
+ul.errs { margin: 0; padding-left: 18px; color: var(--amber); font: 12px/1.6 var(--mono); }
+
+footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); display: flex;
+  justify-content: space-between; gap: 16px; flex-wrap: wrap; font: 11px/1.4 var(--mono); color: var(--faint); letter-spacing: .06em; }
+
+@media (max-width: 640px) {
+  .sheet { padding: 24px 16px 48px; }
+  .masthead { grid-template-columns: 1fr; }
+  .verdict { text-align: left; }
+  .meta, .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  h1 { overflow-wrap: anywhere; }
+  h1 { font-size: 26px; }
 }
 
-function htmlLogBlock(lines: IReportLogLine[]): string {
-  return `<pre>${escapeHtml(lines.map((l) => `${logPrefix(l)} ${l.line}`).join('\n'))}</pre>`;
+/* Print: ink-friendly light variant of the same layout. */
+@media print {
+  :root { --bg: #fff; --panel: #fff; --panel-2: #f5f7f8; --line: #d9dee2; --line-2: #c6cdd2;
+    --text: #0b0f12; --muted: #4b5563; --faint: #6b7280; --green: #15803d; --red: #b91c1c; --amber: #b45309; }
+  html, body { background: #fff; }
+  .sheet { max-width: none; padding: 0; }
+  .conclusion, .kpi, .tw, pre { box-shadow: none; break-inside: avoid; }
+  .outcome::before { box-shadow: none; }
+  pre { background: #f7f8f9; color: #111; max-height: none; }
+  pre.err { color: #7f1d1d; }
+  .conclusion li { color: var(--text); }
+  tbody tr:nth-child(even) td { background: #fafbfb; }
+  section { break-inside: auto; } h2 { break-after: avoid; }
+  @page { size: A4; margin: 16mm 14mm; }
+}
+`;
+
+/** A table cell: plain (escaped) text, or pre-escaped markup. */
+type HtmlCell = string | number | undefined | { html: string };
+
+function cellHtml(cell: HtmlCell): string {
+  if (cell !== null && typeof cell === 'object') return cell.html;
+  return escapeHtml(cell === undefined || cell === '' ? '—' : cell);
+}
+
+function htmlTable(headers: string[], rows: HtmlCell[][], numeric: number[] = []): string {
+  const head = headers
+    .map(
+      (h, i) =>
+        `<th scope="col"${numeric.includes(i) ? ' style="text-align:right"' : ''}>${escapeHtml(h)}</th>`
+    )
+    .join('');
+  const body = rows
+    .map(
+      (row) =>
+        `<tr>${row
+          .map(
+            (cell, i) => `<td${numeric.includes(i) ? ' class="num"' : ''}>${cellHtml(cell)}</td>`
+          )
+          .join('')}</tr>`
+    )
+    .join('\n');
+  return `<div class="tw"><table><thead><tr>${head}</tr></thead><tbody>\n${body}\n</tbody></table></div>`;
+}
+
+/** Status text with a colored marker; the class is derived from a fixed allowlist. */
+function htmlStatus(status: string | undefined): { html: string } {
+  const known = ['completed', 'running', 'pending', 'failed', 'Normal', 'Warning'];
+  const cls = status && known.includes(status) ? ` st-${status}` : '';
+  return { html: `<span class="st${cls}">${escapeHtml(status || '—')}</span>` };
+}
+
+function htmlLogBlock(lines: IReportLogLine[], cls = ''): string {
+  return `<pre${cls ? ` class="${cls}"` : ''}>${escapeHtml(
+    lines.map((l) => `${logPrefix(l)} ${l.line}`).join('\n')
+  )}</pre>`;
 }
 
 function htmlOmitted(count: number, what: string): string {
-  return count ? `<p class="muted">${count} earlier ${escapeHtml(what)} omitted.</p>` : '';
+  return count ? `<p class="muted mono">${count} earlier ${escapeHtml(what)} omitted.</p>` : '';
+}
+
+function htmlEmpty(text: string): string {
+  return `<p class="empty">${escapeHtml(text)}</p>`;
+}
+
+function htmlKpi(value: number | string, label: string, sub: string, tone = ''): string {
+  return `<div class="kpi${tone ? ` ${tone}` : ''}"><div class="v">${escapeHtml(value)}</div><div class="k">${escapeHtml(label)}</div><div class="s">${escapeHtml(sub)}</div></div>`;
 }
 
 /**
@@ -1082,9 +1327,32 @@ export function renderHtml(report: ExecutionReportData): string {
   const outcome = ['passed', 'failed', 'partial'].includes(report.outcome)
     ? report.outcome
     : 'partial';
+  const conclusion = summarizeReport(report);
   const parts: string[] = [];
+  let sectionNo = 0;
+  const section = (title: string, body: string, count?: number | string): void => {
+    sectionNo += 1;
+    parts.push(
+      `<section><h2><span class="n">${String(sectionNo).padStart(2, '0')}</span>${escapeHtml(title)}${
+        count === undefined ? '' : `<span class="c">${escapeHtml(count)}</span>`
+      }</h2>${body}</section>`
+    );
+  };
 
-  parts.push(`<h1>Execution report: ${escapeHtml(report.scenarioTitle)}</h1>`);
+  parts.push(
+    `<div class="bar"><span><b>▌ SecSim</b> // Execution report</span><span>${escapeHtml(
+      `Exec ${report.executionId || '—'}`
+    )}</span></div>`
+  );
+  parts.push(
+    `<header class="masthead"><div><div class="eyebrow">Scenario run · ${escapeHtml(
+      iso(report.startedAt)
+    )}</div><h1>${escapeHtml(report.scenarioTitle || 'Untitled scenario')}</h1></div>` +
+      `<div class="verdict"><div class="label">Outcome</div><div class="outcome outcome-${outcome}">${escapeHtml(
+        outcome.toUpperCase()
+      )}</div></div></header>`
+  );
+
   if (report.provisional) {
     parts.push(
       `<p class="note"><strong>Provisional report</strong> — ${escapeHtml(provisionalNotice(report.status))}.</p>`
@@ -1096,132 +1364,172 @@ export function renderHtml(report: ExecutionReportData): string {
     );
   }
 
-  parts.push('<h2>Summary</h2>');
+  const meta: [string, string | undefined][] = [
+    ['Status', report.status],
+    ['Executed by', report.executedBy],
+    ['Namespace', report.namespace],
+    ['Duration', formatDuration(report.durationMs)],
+    ['Started', iso(report.startedAt)],
+    ['Completed', iso(report.completedAt)],
+    ['Scenario ID', report.scenarioId],
+    ['Generated', iso(report.generatedAt)],
+  ];
   parts.push(
-    `<p>Outcome: <span class="outcome outcome-${outcome}">${escapeHtml(outcome.toUpperCase())}</span></p>`
+    `<dl class="meta">${meta
+      .map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v || '—')}</dd></div>`)
+      .join('')}</dl>`
   );
+
   parts.push(
-    htmlTable(
-      ['Field', 'Value'],
-      [
-        ['Status', report.status],
-        ['Scenario', report.scenarioTitle],
-        ['Execution', report.executionId],
-        ['Executed by', report.executedBy],
-        ['Namespace', report.namespace],
-        ['Started', iso(report.startedAt)],
-        ['Completed', iso(report.completedAt)],
-        ['Duration', formatDuration(report.durationMs)],
-        ['Generated', iso(report.generatedAt)],
-      ]
-    )
+    `<section class="conclusion" aria-labelledby="concl"><div class="tag" id="concl">[ Conclusion ]</div>` +
+      `<p class="lead">${escapeHtml(conclusion.verdict)}</p>` +
+      `<ul>${conclusion.findings.map((f) => `<li>${escapeHtml(f)}</li>`).join('')}</ul>` +
+      (report.conclusion
+        ? `<div class="analyst"><div class="tag">Analyst note</div><p>${escapeHtml(report.conclusion)}</p></div>`
+        : '') +
+      '</section>'
+  );
+
+  const failedServices = m.services.byStatus.failed;
+  parts.push(
+    `<div class="kpis">${[
+      htmlKpi(
+        m.services.total,
+        'Services',
+        `${m.services.byStatus.completed + m.services.byStatus.running} healthy · ${failedServices} failed`,
+        failedServices ? 'hot' : ''
+      ),
+      htmlKpi(
+        m.alerts.total,
+        'Security alerts',
+        `${m.alerts.uniqueAttackers} unique attacker(s)`,
+        m.alerts.total ? 'hot' : ''
+      ),
+      htmlKpi(
+        m.containers.restarts,
+        'Restarts',
+        `${m.containers.total} container(s)`,
+        m.containers.restarts ? 'warm' : ''
+      ),
+      htmlKpi(
+        m.events.total,
+        'K8s events',
+        `${m.events.warnings} warning(s)`,
+        m.events.warnings ? 'warm' : ''
+      ),
+      htmlKpi(
+        m.logs.errorLines,
+        'Error lines',
+        `of ${m.logs.lines} log lines`,
+        m.logs.errorLines ? 'warm' : ''
+      ),
+    ].join('')}</div>`
   );
 
   if (report.error) {
-    parts.push('<h2>Error</h2>', `<pre>${escapeHtml(report.error)}</pre>`);
+    section('Deploy error', `<pre class="err">${escapeHtml(report.error)}</pre>`);
   }
 
-  parts.push('<h2>Key metrics</h2>');
-  parts.push(
-    htmlTable(
-      ['Metric', 'Value'],
-      [
-        ['Services', `${m.services.total} (${statusSummary(m.services.byStatus)})`],
-        [
-          'Containers',
-          `${m.containers.total} (${statusSummary(m.containers.byStatus)}); restarts ${m.containers.restarts}`,
-        ],
-        ['Log lines', `${m.logs.lines} (${m.logs.errorLines} error lines)`],
-        ['Kubernetes events', `${m.events.total} (${m.events.warnings} warnings)`],
-        ['Security alerts', `${m.alerts.total} (${m.alerts.uniqueAttackers} unique attackers)`],
-      ]
-    )
+  section(
+    'Security alerts',
+    report.alerts.length
+      ? (m.alerts.byVerdict.length
+          ? `<h3>By verdict</h3>${htmlTable(
+              ['Verdict', 'Count'],
+              m.alerts.byVerdict.map((c) => [c.name, c.count]),
+              [1]
+            )}<h3>Timeline</h3>`
+          : '') +
+          htmlOmitted(report.omitted.alerts, 'alerts') +
+          htmlTable(
+            ['Time', 'Service', 'Container', 'Verdict', 'Attacker'],
+            report.alerts.map((a) => [
+              a.timestamp,
+              a.service,
+              a.container,
+              a.verdict,
+              { html: `<span class="atk">${escapeHtml(a.attacker || '—')}</span>` },
+            ])
+          )
+      : htmlEmpty('No security alerts.'),
+    m.alerts.total
   );
-  if (m.alerts.byVerdict.length) {
-    parts.push(
-      '<h3>Alerts by verdict</h3>',
-      htmlTable(
-        ['Verdict', 'Count'],
-        m.alerts.byVerdict.map((c) => [c.name, c.count])
-      )
-    );
-  }
-  if (m.events.byReason.length) {
-    parts.push(
-      '<h3>Events by reason</h3>',
-      htmlTable(
-        ['Reason', 'Count'],
-        m.events.byReason.map((c) => [c.name, c.count])
-      )
-    );
-  }
 
-  parts.push('<h2>Services</h2>');
-  parts.push(
+  section(
+    'Services',
     report.services.length
       ? htmlTable(
           ['Service', 'Status', 'Containers'],
           report.services.map((s) => [
             s.name,
-            s.status,
-            s.containers.map((c) => `${c.name}: ${c.status}`).join(', ') || '—',
+            htmlStatus(s.status),
+            s.containers.length
+              ? {
+                  html: s.containers
+                    .map((c) => `${escapeHtml(c.name)} ${htmlStatus(c.status).html}`)
+                    .join('<br>'),
+                }
+              : undefined,
           ])
         )
-      : '<p class="muted">No services were deployed.</p>'
+      : htmlEmpty('No services were deployed.'),
+    m.services.total
   );
 
-  parts.push('<h2>Security alerts</h2>');
-  parts.push(
-    report.alerts.length
-      ? htmlOmitted(report.omitted.alerts, 'alerts') +
-          htmlTable(
-            ['Time', 'Service', 'Container', 'Verdict', 'Attacker'],
-            report.alerts.map((a) => [a.timestamp, a.service, a.container, a.verdict, a.attacker])
-          )
-      : '<p class="muted">No security alerts.</p>'
-  );
-
-  parts.push('<h2>Kubernetes events</h2>');
-  parts.push(
+  section(
+    'Kubernetes events',
     report.events.length
-      ? htmlOmitted(report.omitted.events, 'events') +
+      ? (m.events.byReason.length
+          ? `<h3>By reason</h3>${htmlTable(
+              ['Reason', 'Count'],
+              m.events.byReason.map((c) => [c.name, c.count]),
+              [1]
+            )}<h3>Timeline</h3>`
+          : '') +
+          htmlOmitted(report.omitted.events, 'events') +
           htmlTable(
             ['Time', 'Type', 'Reason', 'Object', 'Message'],
             report.events.map((e) => [
               e.timestamp,
-              e.type,
+              htmlStatus(e.type),
               e.reason,
               [e.objectKind, e.objectName].filter(Boolean).join('/') || undefined,
               e.message,
             ])
           )
-      : '<p class="muted">No events captured.</p>'
+      : htmlEmpty('No events captured.'),
+    m.events.total
   );
 
-  parts.push('<h2>Error log lines</h2>');
-  parts.push(
+  section(
+    'Error log lines',
     report.errorLogs.length
-      ? htmlOmitted(report.omitted.errorLogs, 'error lines') + htmlLogBlock(report.errorLogs)
-      : '<p class="muted">No error lines.</p>'
+      ? htmlOmitted(report.omitted.errorLogs, 'error lines') + htmlLogBlock(report.errorLogs, 'err')
+      : htmlEmpty('No error lines.'),
+    m.logs.errorLines
   );
 
-  parts.push('<h2>Logs</h2>');
-  parts.push(
+  section(
+    'Logs',
     report.logs.length
       ? htmlOmitted(report.omitted.logs, 'log lines') + htmlLogBlock(report.logs)
-      : '<p class="muted">No logs captured.</p>'
+      : htmlEmpty('No logs captured.'),
+    m.logs.lines
   );
 
   if (report.captureErrors.length) {
-    parts.push(
-      '<h2>Capture errors</h2>',
-      `<ul>${report.captureErrors.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`
+    section(
+      'Capture errors',
+      `<ul class="errs">${report.captureErrors.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}</ul>`,
+      report.captureErrors.length
     );
   }
 
-  if (report.conclusion) {
-    parts.push('<h2>Conclusion</h2>', `<pre>${escapeHtml(report.conclusion)}</pre>`);
-  }
+  parts.push(
+    `<footer><span>SecSim · MI Digital Twin Management Platform</span><span>${escapeHtml(
+      `Generated ${iso(report.generatedAt)}`
+    )}</span></footer>`
+  );
 
   return [
     '<!DOCTYPE html>',
@@ -1229,11 +1537,14 @@ export function renderHtml(report: ExecutionReportData): string {
     '<head>',
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<meta name="color-scheme" content="dark light">',
     `<title>Execution report: ${escapeHtml(report.scenarioTitle)}</title>`,
     `<style>${HTML_STYLE}</style>`,
     '</head>',
     '<body>',
+    '<main class="sheet">',
     ...parts,
+    '</main>',
     '</body>',
     '</html>',
     '',

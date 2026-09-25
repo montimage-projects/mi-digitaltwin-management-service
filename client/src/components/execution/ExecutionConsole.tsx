@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Rocket,
   Loader2,
@@ -14,6 +14,8 @@ import {
   Activity,
   ShieldAlert,
   Copy,
+  Play,
+  ListChecks,
 } from 'lucide-react';
 import {
   scenariosApi,
@@ -24,6 +26,7 @@ import {
   type ExecutionAlertEvent,
   type ExecutionK8sEvent,
   type ExecutionServiceStatus,
+  type AttackProfile,
 } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +43,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { RunbookPanel } from './RunbookPanel';
 
 interface LogLine {
   id: number;
@@ -47,6 +51,8 @@ interface LogLine {
   pod: string;
   container?: string;
   line: string;
+  /** Arrival time (ms) — the runbook counts beats from a step's start. */
+  at: number;
 }
 
 interface K8sEventLine extends ExecutionK8sEvent {
@@ -55,6 +61,7 @@ interface K8sEventLine extends ExecutionK8sEvent {
 
 interface AlertLine extends ExecutionAlertEvent {
   id: number;
+  at: number;
 }
 
 /** Maximum number of log lines to retain in the ring buffer. */
@@ -158,6 +165,51 @@ export function ExecutionConsole({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const logIdRef = useRef(0);
   const eventIdRef = useRef(0);
+
+  // Seeded attack profiles (e.g. MAG's two R1 attacks) runnable from the
+  // console — the server execs only the stored argv in the node's pod.
+  const { data: profiles = [] } = useQuery({
+    queryKey: ['execution-profiles', scenarioId, executionId],
+    queryFn: () => scenariosApi.listProfiles(scenarioId, executionId),
+  });
+  // Web interfaces open through the server's signed proxy link: the raw
+  // NodePort URL is unreachable when the cluster nodes are not (kind).
+  const openInterface = async (serviceName: string) => {
+    // Open synchronously so the popup blocker treats it as user-initiated.
+    // 'noopener' would make window.open return null, so sever the proxied
+    // page's handle on this window by hand before navigating it.
+    const tab = window.open('about:blank', '_blank');
+    if (tab) tab.opener = null;
+    try {
+      const { url } = await scenariosApi.getServiceLink(scenarioId, executionId, serviceName);
+      if (tab) tab.location.href = url;
+      else window.location.assign(url);
+    } catch (err) {
+      tab?.close();
+      toast.error(`Could not open ${serviceName}: ${(err as Error).message}`);
+    }
+  };
+  // Console ↔ Runbook view; the runbook is resolved against this run
+  // (namespace, pod names/IPs) and refetched once the rollout settles.
+  const [view, setView] = useState<'console' | 'runbook'>('console');
+  const {
+    data: runbook,
+    isLoading: runbookLoading,
+    isError: runbookError,
+    refetch: refetchRunbook,
+  } = useQuery({
+    queryKey: ['execution-runbook', scenarioId, executionId, phase],
+    queryFn: () => scenariosApi.getRunbook(scenarioId, executionId),
+    enabled: view === 'runbook',
+  });
+  const runProfile = useMutation({
+    mutationFn: (profile: Pick<AttackProfile, 'nodeId' | 'name'>) =>
+      scenariosApi.runProfile(scenarioId, executionId, profile),
+    onSuccess: (_data, profile) =>
+      toast.success(`Started ${profile.name} — output streams into the logs below`),
+    onError: (err: Error, profile) =>
+      toast.error(`Could not start ${profile.name}: ${err.message}`),
+  });
   const alertIdRef = useRef(0);
   const viewportRef = useRef<HTMLDivElement>(null);
   const eventsViewportRef = useRef<HTMLDivElement>(null);
@@ -216,6 +268,7 @@ export function ExecutionConsole({
               pod: event.pod,
               container: event.container,
               line: event.line,
+              at: Date.now(),
             },
           ];
           // Ring-buffer cap: drop oldest lines when over the limit.
@@ -236,7 +289,7 @@ export function ExecutionConsole({
       },
       onAlert: (event) => {
         setAlerts((prev) => {
-          const next = [...prev, { ...event, id: alertIdRef.current++ }];
+          const next = [...prev, { ...event, id: alertIdRef.current++, at: Date.now() }];
           if (next.length > MAX_ALERTS) {
             return next.slice(next.length - MAX_ALERTS);
           }
@@ -354,6 +407,30 @@ export function ExecutionConsole({
           </Badge>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex rounded-md border p-0.5" role="tablist">
+            {(['console', 'runbook'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                aria-selected={view === v}
+                data-testid={`view-${v}`}
+                onClick={() => setView(v)}
+                className={`flex items-center gap-1 rounded px-2 py-0.5 text-xs capitalize ${
+                  view === v
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {v === 'console' ? (
+                  <Terminal className="h-3 w-3" />
+                ) : (
+                  <ListChecks className="h-3 w-3" />
+                )}
+                {v}
+              </button>
+            ))}
+          </div>
           {!isSettled && (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -434,7 +511,11 @@ export function ExecutionConsole({
                 const meta = statusMeta[service.status] ?? statusMeta.pending;
                 const StatusIcon = !isSettled && service.status === 'pending' ? Loader2 : meta.icon;
                 const isWeb = service.uiType === 'web' || service.uiType === 'both';
-                const canLink = isWeb && !!service.dashboardUrl && !tornDown && phase !== 'failed';
+                const canLink =
+                  isWeb &&
+                  !!(service.webInterface ?? service.dashboardUrl) &&
+                  !tornDown &&
+                  phase !== 'failed';
 
                 return (
                   <li key={service.nodeId} className="rounded-lg border p-3">
@@ -480,21 +561,43 @@ export function ExecutionConsole({
 
                     <div className="mt-2">
                       {canLink ? (
-                        <a
-                          href={service.dashboardUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          data-testid={`open-interface-${service.name}`}
+                          title={`Open ${service.name} through the platform proxy`}
+                          onClick={() => void openInterface(service.name)}
                           className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                           Open interface
-                        </a>
+                        </button>
                       ) : service.uiType === 'terminal' ? (
                         <div className="space-y-1.5">
                           <Badge variant="outline" className="gap-1 text-xs">
                             <Terminal className="h-3 w-3" />
                             Terminal service
                           </Badge>
+                          {/* One button per seeded attack profile — runs it in
+                              the pod without a terminal; the output lands in
+                              the container log streamed below. */}
+                          {!tornDown &&
+                            profiles
+                              .filter((p) => p.nodeId === service.name)
+                              .map((profile) => (
+                                <Button
+                                  key={profile.name}
+                                  size="sm"
+                                  variant="secondary"
+                                  className="h-7 w-full justify-start gap-1.5 text-xs"
+                                  data-testid={`run-profile-${profile.name}`}
+                                  title={profile.description ?? profile.args.join(' ')}
+                                  disabled={phase === 'failed' || runProfile.isPending}
+                                  onClick={() => runProfile.mutate(profile)}
+                                >
+                                  <Play className="h-3 w-3" />
+                                  Run {profile.name}
+                                </Button>
+                              ))}
                           {/* Copyable `kubectl exec` hint (issue #233) — the
                               terminal workload idles between shell-driven
                               runs, so access is one paste away. */}
@@ -530,186 +633,208 @@ export function ExecutionConsole({
           </ScrollArea>
         </div>
 
-        {/* Log console */}
-        <div className="flex min-h-0 flex-col bg-zinc-950">
-          <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
-            <div className="flex items-center gap-2 text-zinc-300">
-              <Terminal className="h-4 w-4" />
-              <span className="text-sm font-medium">Logs</span>
+        {/* Kept mounted while hidden so runbook progress survives view switches. */}
+        <div
+          hidden={view !== 'runbook'}
+          data-testid="runbook-view"
+          className={view === 'runbook' ? 'flex min-h-0 flex-col' : 'hidden'}
+        >
+          <RunbookPanel
+            steps={runbook?.steps ?? []}
+            isLoading={runbookLoading}
+            isError={runbookError}
+            onRetry={() => void refetchRunbook()}
+            logs={logs}
+            alerts={alerts}
+            live={!tornDown && phase !== 'failed'}
+            runProfile={(profile) => runProfile.mutate(profile)}
+            isRunning={runProfile.isPending}
+            openInterface={(name) => void openInterface(name)}
+            copy={(text) => void copyToClipboard(text).then(() => toast.success('Copied'))}
+          />
+        </div>
+        {view === 'console' && (
+          /* Log console */
+          <div className="flex min-h-0 flex-col bg-zinc-950">
+            <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
+              <div className="flex items-center gap-2 text-zinc-300">
+                <Terminal className="h-4 w-4" />
+                <span className="text-sm font-medium">Logs</span>
+              </div>
+              <span className="text-xs text-zinc-400">{visibleLogs.length} lines</span>
             </div>
-            <span className="text-xs text-zinc-400">{visibleLogs.length} lines</span>
-          </div>
-          {/* One tab per container; "All" restores the combined stream. */}
-          {containerKeys.length > 0 && (
-            <div
-              data-testid="log-tabs"
-              className="flex flex-wrap items-center gap-1 border-b border-zinc-800 px-3 py-1.5"
-            >
-              <button
-                type="button"
-                data-testid="log-tab-all"
-                aria-pressed={activeContainer === null}
-                onClick={() => setActiveContainer(null)}
-                className={`rounded px-2 py-0.5 text-xs ${
-                  activeContainer === null
-                    ? 'bg-zinc-800 text-zinc-100'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
+            {/* One tab per container; "All" restores the combined stream. */}
+            {containerKeys.length > 0 && (
+              <div
+                data-testid="log-tabs"
+                className="flex flex-wrap items-center gap-1 border-b border-zinc-800 px-3 py-1.5"
               >
-                All
-              </button>
-              {containerKeys.map((key) => (
                 <button
-                  key={key}
                   type="button"
-                  data-testid={`log-tab-${key}`}
-                  aria-pressed={activeContainer === key}
-                  onClick={() => setActiveContainer(key)}
-                  className={`rounded px-2 py-0.5 font-mono text-xs ${
-                    activeContainer === key
+                  data-testid="log-tab-all"
+                  aria-pressed={activeContainer === null}
+                  onClick={() => setActiveContainer(null)}
+                  className={`rounded px-2 py-0.5 text-xs ${
+                    activeContainer === null
                       ? 'bg-zinc-800 text-zinc-100'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
-                  {key}
+                  All
                 </button>
-              ))}
-            </div>
-          )}
-          <ScrollArea ref={viewportRef} className="min-h-0 flex-1">
-            <div className="p-3 font-mono text-xs leading-relaxed">
-              {visibleLogs.length === 0 ? (
-                <p className="text-zinc-400">
-                  {logs.length === 0
-                    ? isSettled
-                      ? 'No logs were captured.'
-                      : 'Waiting for logs…'
-                    : 'No logs for this container.'}
-                </p>
-              ) : (
-                visibleLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    data-testid="log-line"
-                    className="whitespace-pre-wrap break-all text-zinc-300"
+                {containerKeys.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    data-testid={`log-tab-${key}`}
+                    aria-pressed={activeContainer === key}
+                    onClick={() => setActiveContainer(key)}
+                    className={`rounded px-2 py-0.5 font-mono text-xs ${
+                      activeContainer === key
+                        ? 'bg-zinc-800 text-zinc-100'
+                        : 'text-zinc-400 hover:text-zinc-200'
+                    }`}
                   >
-                    <span className="mr-2 text-emerald-400">
-                      [{log.service}
-                      {log.container ? `:${log.container}` : ''}]
-                    </span>
-                    {log.line}
-                  </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
+                    {key}
+                  </button>
+                ))}
+              </div>
+            )}
+            <ScrollArea ref={viewportRef} className="min-h-0 flex-1">
+              <div className="p-3 font-mono text-xs leading-relaxed">
+                {visibleLogs.length === 0 ? (
+                  <p className="text-zinc-400">
+                    {logs.length === 0
+                      ? isSettled
+                        ? 'No logs were captured.'
+                        : 'Waiting for logs…'
+                      : 'No logs for this container.'}
+                  </p>
+                ) : (
+                  visibleLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      data-testid="log-line"
+                      className="whitespace-pre-wrap break-all text-zinc-300"
+                    >
+                      <span className="mr-2 text-emerald-400">
+                        [{log.service}
+                        {log.container ? `:${log.container}` : ''}]
+                      </span>
+                      {log.line}
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
 
-          {/* Security alerts pane — `alert` SSE records distilled from probe
+            {/* Security alerts pane — `alert` SSE records distilled from probe
               security reports (issue #234): timestamp, verdict and the
               attacker address the reaction playbook consumes. */}
-          <div
-            data-testid="alerts-pane"
-            className="flex h-36 shrink-0 flex-col border-t border-zinc-800"
-          >
-            <div className="flex items-center justify-between px-4 py-1.5">
-              <div className="flex items-center gap-2 text-zinc-300">
-                <ShieldAlert className="h-4 w-4" />
-                <span className="text-sm font-medium">Security alerts</span>
+            <div
+              data-testid="alerts-pane"
+              className="flex h-36 shrink-0 flex-col border-t border-zinc-800"
+            >
+              <div className="flex items-center justify-between px-4 py-1.5">
+                <div className="flex items-center gap-2 text-zinc-300">
+                  <ShieldAlert className="h-4 w-4" />
+                  <span className="text-sm font-medium">Security alerts</span>
+                </div>
+                <span className="text-xs text-zinc-400">{alerts.length} alerts</span>
               </div>
-              <span className="text-xs text-zinc-400">{alerts.length} alerts</span>
-            </div>
-            <ScrollArea className="min-h-0 flex-1">
-              <div className="space-y-1 px-3 pb-3 font-mono text-xs leading-relaxed">
-                {alerts.length === 0 ? (
-                  <p className="text-zinc-500">
-                    {isSettled ? 'No security alerts were detected.' : 'Waiting for alerts…'}
-                  </p>
-                ) : (
-                  alerts.map((alert) => {
-                    const time = alert.timestamp ? new Date(alert.timestamp) : null;
-                    const timeLabel =
-                      time && !Number.isNaN(time.getTime()) ? time.toLocaleTimeString() : null;
-                    return (
-                      <div
-                        key={alert.id}
-                        data-testid="alert-row"
-                        className="flex flex-wrap items-baseline gap-x-2"
-                      >
-                        {timeLabel && (
-                          <span className="tabular-nums text-zinc-500">{timeLabel}</span>
-                        )}
-                        <span className="text-red-400">{alert.verdict ?? 'Alert'}</span>
-                        {alert.attacker && (
-                          <span className="text-amber-300">src={alert.attacker}</span>
-                        )}
-                        <span className="text-zinc-500">
-                          [{alert.service}
-                          {alert.container ? `:${alert.container}` : ''}]
-                        </span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-
-          {/* Namespace events pane — `k8s-event` SSE records (scheduling,
-              image pulls, probe failures, reaction activity…). */}
-          <div
-            data-testid="events-pane"
-            className="flex h-44 shrink-0 flex-col border-t border-zinc-800"
-          >
-            <div className="flex items-center justify-between px-4 py-1.5">
-              <div className="flex items-center gap-2 text-zinc-300">
-                <Activity className="h-4 w-4" />
-                <span className="text-sm font-medium">Namespace events</span>
-              </div>
-              <span className="text-xs text-zinc-400">{events.length} events</span>
-            </div>
-            <ScrollArea ref={eventsViewportRef} className="min-h-0 flex-1">
-              <div className="space-y-1 px-3 pb-3 font-mono text-xs leading-relaxed">
-                {events.length === 0 ? (
-                  <p className="text-zinc-500">
-                    {isSettled ? 'No namespace events were captured.' : 'Waiting for events…'}
-                  </p>
-                ) : (
-                  events.map((ev) => {
-                    const time = ev.timestamp ? new Date(ev.timestamp) : null;
-                    const timeLabel =
-                      time && !Number.isNaN(time.getTime()) ? time.toLocaleTimeString() : null;
-                    const warning = ev.type === 'Warning';
-                    return (
-                      <div
-                        key={ev.id}
-                        data-testid="k8s-event"
-                        className="flex flex-wrap items-baseline gap-x-2"
-                      >
-                        {timeLabel && (
-                          <span className="tabular-nums text-zinc-500">{timeLabel}</span>
-                        )}
-                        <span className={warning ? 'text-amber-400' : 'text-sky-400'}>
-                          {ev.reason ?? 'Event'}
-                        </span>
-                        {(ev.objectKind || ev.objectName) && (
+              <ScrollArea className="min-h-0 flex-1">
+                <div className="space-y-1 px-3 pb-3 font-mono text-xs leading-relaxed">
+                  {alerts.length === 0 ? (
+                    <p className="text-zinc-500">
+                      {isSettled ? 'No security alerts were detected.' : 'Waiting for alerts…'}
+                    </p>
+                  ) : (
+                    alerts.map((alert) => {
+                      const time = alert.timestamp ? new Date(alert.timestamp) : null;
+                      const timeLabel =
+                        time && !Number.isNaN(time.getTime()) ? time.toLocaleTimeString() : null;
+                      return (
+                        <div
+                          key={alert.id}
+                          data-testid="alert-row"
+                          className="flex flex-wrap items-baseline gap-x-2"
+                        >
+                          {timeLabel && (
+                            <span className="tabular-nums text-zinc-500">{timeLabel}</span>
+                          )}
+                          <span className="text-red-400">{alert.verdict ?? 'Alert'}</span>
+                          {alert.attacker && (
+                            <span className="text-amber-300">src={alert.attacker}</span>
+                          )}
                           <span className="text-zinc-500">
-                            {[ev.objectKind, ev.objectName].filter(Boolean).join('/')}
+                            [{alert.service}
+                            {alert.container ? `:${alert.container}` : ''}]
                           </span>
-                        )}
-                        {ev.message && (
-                          <span className="whitespace-pre-wrap break-all text-zinc-300">
-                            {ev.message}
-                            {ev.count !== undefined && ev.count > 1 ? ` (×${ev.count})` : ''}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Namespace events pane — `k8s-event` SSE records (scheduling,
+              image pulls, probe failures, reaction activity…). */}
+            <div
+              data-testid="events-pane"
+              className="flex h-44 shrink-0 flex-col border-t border-zinc-800"
+            >
+              <div className="flex items-center justify-between px-4 py-1.5">
+                <div className="flex items-center gap-2 text-zinc-300">
+                  <Activity className="h-4 w-4" />
+                  <span className="text-sm font-medium">Namespace events</span>
+                </div>
+                <span className="text-xs text-zinc-400">{events.length} events</span>
               </div>
-            </ScrollArea>
+              <ScrollArea ref={eventsViewportRef} className="min-h-0 flex-1">
+                <div className="space-y-1 px-3 pb-3 font-mono text-xs leading-relaxed">
+                  {events.length === 0 ? (
+                    <p className="text-zinc-500">
+                      {isSettled ? 'No namespace events were captured.' : 'Waiting for events…'}
+                    </p>
+                  ) : (
+                    events.map((ev) => {
+                      const time = ev.timestamp ? new Date(ev.timestamp) : null;
+                      const timeLabel =
+                        time && !Number.isNaN(time.getTime()) ? time.toLocaleTimeString() : null;
+                      const warning = ev.type === 'Warning';
+                      return (
+                        <div
+                          key={ev.id}
+                          data-testid="k8s-event"
+                          className="flex flex-wrap items-baseline gap-x-2"
+                        >
+                          {timeLabel && (
+                            <span className="tabular-nums text-zinc-500">{timeLabel}</span>
+                          )}
+                          <span className={warning ? 'text-amber-400' : 'text-sky-400'}>
+                            {ev.reason ?? 'Event'}
+                          </span>
+                          {(ev.objectKind || ev.objectName) && (
+                            <span className="text-zinc-500">
+                              {[ev.objectKind, ev.objectName].filter(Boolean).join('/')}
+                            </span>
+                          )}
+                          {ev.message && (
+                            <span className="whitespace-pre-wrap break-all text-zinc-300">
+                              {ev.message}
+                              {ev.count !== undefined && ev.count > 1 ? ` (×${ev.count})` : ''}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Footer */}

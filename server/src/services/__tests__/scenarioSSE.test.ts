@@ -51,6 +51,8 @@ vi.mock('../kubernetesDeploy.js', () => ({
 }));
 
 const { runSSEStream: stream } = await import('../scenarioSSE.js');
+const kube = await import('../kubernetesDeploy.js');
+const getDeploymentStatusCalls = () => vi.mocked(kube.getDeploymentStatus).mock.calls.length;
 
 /** Minimal express Response double — the service only writes events + ends. */
 function makeResponse() {
@@ -90,6 +92,52 @@ afterEach(() => {
 });
 
 describe('runSSEStream', () => {
+  test('a failed background deploy surfaces as an error event', async () => {
+    const res = makeResponse();
+    const cleanup = stream(
+      res as unknown as Response,
+      { infrastructureId: 'infra' },
+      { ...runningExecution, status: 'pending' },
+      infra,
+      async () => ({ status: 'failed' })
+    );
+    await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
+    cleanup();
+    expect(textOf(res)).toContain('event: error');
+    expect(textOf(res)).toContain('Deployment failed');
+  });
+
+  test('cluster read errors are ignored while the rollout is still pending', async () => {
+    vi.useFakeTimers();
+    deploy.statusError = new Error('namespaces "secsim-scn-exec" not found');
+    deploy.settled = false;
+    const res = makeResponse();
+    const cleanup = stream(
+      res as unknown as Response,
+      { infrastructureId: 'infra' },
+      { ...runningExecution, status: 'pending' },
+      infra,
+      async () => ({ status: 'pending' })
+    );
+    await vi.advanceTimersByTimeAsync(10);
+    expect(textOf(res)).not.toContain('event: error');
+    expect(res.end).not.toHaveBeenCalled();
+    cleanup();
+  });
+
+  test('a settled (completed) execution still deployed keeps streaming', async () => {
+    const res = makeResponse();
+    const cleanup = stream(
+      res as unknown as Response,
+      { infrastructureId: 'infra' },
+      { ...runningExecution, status: 'completed' },
+      infra
+    );
+    await vi.waitFor(() => expect(textOf(res)).toContain('event: progress'));
+    expect(getDeploymentStatusCalls()).toBeGreaterThan(0);
+    cleanup();
+  });
+
   test('a terminal execution emits one snapshot then closes', async () => {
     const res = makeResponse();
     const cleanup = stream(res as unknown as Response, {}, { status: 'failed' }, infra);
@@ -316,6 +364,51 @@ describe('runSSEStream', () => {
     const text = textOf(res);
     expect(text).toContain('"attacker":"192.168.10.20"');
     expect(text).toContain('"verdict":"syn-flood"');
+  });
+
+  test('secAnoD mmt-security array reports become throttled alert events', async () => {
+    const report = (ts: number) =>
+      JSON.stringify([
+        10,
+        3,
+        'eth0',
+        ts,
+        56,
+        'detected',
+        'attack',
+        'Probable SYN flooding attack',
+        {
+          event_1: {
+            attributes: [
+              ['ip.src', '10.244.0.7'],
+              ['ip.dst', '10.244.0.5'],
+            ],
+          },
+        },
+      ]);
+    deploy.logs = [1, 2, 3].map((i) => ({
+      name: 'ci-sim',
+      pod: 'ci-sim-pod',
+      container: 'secanod',
+      line: report(1790284285 + i),
+    }));
+
+    const res = makeResponse();
+    const cleanup = stream(
+      res as unknown as Response,
+      { infrastructureId: 'infra' },
+      runningExecution,
+      infra
+    );
+
+    await vi.waitFor(() => expect(res.end).toHaveBeenCalled());
+    cleanup();
+
+    const text = textOf(res);
+    expect(text).toContain('"attacker":"10.244.0.7"');
+    expect(text).toContain('"verdict":"rule 56: Probable SYN flooding attack"');
+    // Three identical detections in one poll collapse into one alert event.
+    expect(text.match(/event: alert/g)).toHaveLength(1);
   });
 
   test('a plain-text ALERT line emits an alert event with the text as verdict', async () => {

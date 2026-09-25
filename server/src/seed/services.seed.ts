@@ -316,35 +316,6 @@ const intactToolboxServices: ServiceSeed[] = [
     repositoryTable: 'INTACT_TOOLBOX',
   },
   {
-    shortName: 'SECANOD',
-    title: 'AI-based Attack/Anomaly Detection (secAnoD)',
-    categorySlug: 'ops-services',
-    provider: 'Montimage (MTI)',
-    description:
-      'Develops explainable LLM-based models for anomaly detection and prediction, extending MMT (Multi-modal Model) with LLMs to automatically generate new detection mechanisms and facilitate operator reporting via an adaptive GUI. Learns from up-to-date threat intelligence (e.g. through RAG), recommends security solutions and autonomously mitigates vulnerabilities identified by security experts.',
-    type: 'Software',
-    trl: { current: 3, expected: 7 },
-    license: 'TBD',
-    standards: [],
-    inputs: [
-      {
-        name: 'Threat Intelligence & Telemetry',
-        description: 'Up-to-date threat intelligence feeds and monitoring data',
-      },
-    ],
-    outputs: [
-      {
-        name: 'Anomaly Predictions',
-        description: 'Explainable attack/anomaly detections and mitigation recommendations',
-      },
-    ],
-    interactsWith: [],
-    potentialUseCases: [
-      '>=80% accuracy of incident prediction; >=70% of studied attacks where the SOAR learns the response solution',
-    ],
-    repositoryTable: 'INTACT_TOOLBOX',
-  },
-  {
     shortName: 'SECAISOAR',
     title: 'AI-driven Security Control Orchestration (secAISOAR)',
     categorySlug: 'ops-services',
@@ -552,12 +523,127 @@ const montimageScenarioServices: ServiceSeed[] = [
     },
   },
   {
+    shortName: 'SECANOD',
+    title: 'AI-based Attack/Anomaly Detection (secAnoD)',
+    categorySlug: 'monitor',
+    provider: 'Montimage (MTI)',
+    description:
+      'SECASSURED secAnoD capture & detection service (`mmt-image`: mmt-probe + mmt-dpi + mmt-security) from github.com/montimage-projects/secanod, rebuilt with the mmt-probe Kafka output channel (scripts/secanod-kafka). Injected as a sidecar sharing the target pod network namespace — requires NET_ADMIN and NET_RAW — it runs live DPI and LTL rule-based detection on eth0 with only the rules for the demo MAG attacks enabled (56 SYN/HTTP flood, 20 ICMP flood, 51 ping of death) and publishes JSON security reports to the Kafka topic AI4SOAR consumes. Roadmap: explainable LLM/SLM-based detection extending MMT.',
+    type: 'Software',
+    trl: { current: 6, expected: 8 },
+    license: 'TBD',
+    standards: [],
+    inputs: [
+      {
+        name: 'Pod Network Traffic',
+        description: 'Packets on the target pod interface (eth0)',
+      },
+    ],
+    outputs: [
+      {
+        name: 'Security Reports',
+        description: 'mmt-security JSON reports on Kafka topic mmt-security-alerts (and stdout)',
+      },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Monitor module in the Montimage attack→detect→respond scenario'],
+    repositoryTable: 'INTACT_TOOLBOX',
+    // Local build of scripts/secanod-kafka — the published mmt-image has no
+    // Kafka module; load it into the cluster (`kind load docker-image`).
+    dockerImage: 'secanod-mmt-image:kafka',
+    deployment: {
+      // The image entrypoint only drives offline PCAP analysis, so the
+      // command runs mmt-probe live on the stock config with -X overrides.
+      // exclude-rules keeps only the rules matching the MAG attacks the demo
+      // performs: 56 (SYN flooding — mag http-flood / synflood), 20 (ICMP
+      // flood) and 51 (ping of death). Reports go to Kafka for AI4SOAR and
+      // to stdout for the console's Security alerts pane.
+      kind: 'Deployment',
+      role: 'monitor',
+      attachMode: 'sidecar',
+      exposePort: false,
+      // stdbuf: mmt-probe's stdout is block-buffered when piped, which would
+      // hold detections back from the pod log the console streams.
+      command: [
+        'stdbuf',
+        '-oL',
+        'mmt-probe',
+        '-c',
+        '/opt/mmt/probe/mmt-probe.conf',
+        ...[
+          'input.source=eth0',
+          'output.format=JSON',
+          'output.cache-period=1',
+          'file-output.enable=false',
+          'session-report.enable=false',
+          'security.enable=true',
+          'security.output-channel=kafka,stdout',
+          'security.exclude-rules=1-19,21-50,52-55,57-1000',
+          'kafka-output.enable=true',
+          'kafka-output.hostname=kafka',
+          'kafka-output.port=9092',
+          'kafka-output.topic=mmt-security-alerts',
+        ].flatMap((override) => ['-X', override]),
+      ],
+      securityContext: { capabilities: ['NET_ADMIN', 'NET_RAW'] },
+      startOrder: 10,
+    },
+  },
+  {
+    shortName: 'KAFKA',
+    title: 'Apache Kafka Alert Bus (KAFKA)',
+    categorySlug: 'ops-services',
+    provider: 'Apache Software Foundation',
+    description:
+      'Single-node Apache Kafka broker (KRaft mode, public apache/kafka image) carrying security alerts between the monitor and the reaction module: secAnoD publishes its mmt-security reports to the `mmt-security-alerts` topic, AI4SOAR consumes them. Reachable in the execution namespace as kafka:9092.',
+    type: 'Software',
+    trl: { current: 9, expected: 9 },
+    license: 'Apache-2.0',
+    standards: [],
+    inputs: [{ name: 'Security Reports', description: 'Produced by the monitor (secAnoD)' }],
+    outputs: [
+      { name: 'Security Alerts', description: 'Consumed by the reaction module (AI4SOAR)' },
+    ],
+    interactsWith: [],
+    potentialUseCases: ['Alert bus in the Montimage attack→detect→respond scenario'],
+    repositoryTable: 'OTHER_SERVICES',
+    dockerImage: 'apache/kafka:3.9.1',
+    // Kafka speaks its own protocol, not HTTP — no web interface to open;
+    // its CLI tools are reached with `kubectl exec` (the terminal hint).
+    uiType: 'terminal',
+    deployment: {
+      // Generic infrastructure: no role badge, rolls out before the
+      // monitor/reaction tier. Advertised as kafka:9092 — the Service name
+      // the engine derives from the `kafka` node id.
+      kind: 'Deployment',
+      role: 'generic',
+      containerPort: 9092,
+      exposePort: true,
+      env: [
+        { name: 'KAFKA_NODE_ID', value: '1' },
+        { name: 'KAFKA_PROCESS_ROLES', value: 'broker,controller' },
+        { name: 'KAFKA_LISTENERS', value: 'PLAINTEXT://:9092,CONTROLLER://:9093' },
+        { name: 'KAFKA_ADVERTISED_LISTENERS', value: 'PLAINTEXT://kafka:9092' },
+        { name: 'KAFKA_CONTROLLER_LISTENER_NAMES', value: 'CONTROLLER' },
+        {
+          name: 'KAFKA_LISTENER_SECURITY_PROTOCOL_MAP',
+          value: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT',
+        },
+        { name: 'KAFKA_CONTROLLER_QUORUM_VOTERS', value: '1@localhost:9093' },
+        { name: 'KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR', value: '1' },
+        { name: 'KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR', value: '1' },
+        { name: 'KAFKA_TRANSACTION_STATE_LOG_MIN_ISR', value: '1' },
+      ],
+      startOrder: 0,
+    },
+  },
+  {
     shortName: 'AI4SOAR',
     title: 'AI-driven Security Orchestration and Response (AI4SOAR)',
     categorySlug: 'reaction',
     provider: 'Montimage (MTI)',
     description:
-      'Shuffle-based SOAR stack packaged from the Montimage/ai4soar repository, exposing its API/UI on :5000. Ingests MMT-Probe alerts and applies namespace-scoped Kubernetes playbook responses (NetworkPolicy creation, pod deletion, Job scale-down) through its ServiceAccount.',
+      'Shuffle-based SOAR stack packaged from the Montimage/ai4soar repository, exposing its API/UI on :5000. Ingests MMT-Probe / secAnoD alerts and applies namespace-scoped Kubernetes playbook responses (NetworkPolicy creation, pod deletion, Job scale-down) through its ServiceAccount.',
     type: 'Software',
     trl: { current: 5, expected: 8 },
     license: 'TBD',
@@ -588,6 +674,12 @@ const montimageScenarioServices: ServiceSeed[] = [
       containerPort: 5000,
       exposePort: true,
       readinessPath: '/health',
+      // Security reports arrive on the scenario's Kafka broker (the `kafka`
+      // node), published there by secAnoD.
+      env: [
+        { name: 'KAFKA_BOOTSTRAP_SERVERS', value: 'kafka:9092' },
+        { name: 'KAFKA_TOPIC', value: 'mmt-security-alerts' },
+      ],
       // The ai4soar-playbook document (issue #235) — mounted into the pod
       // via the node's `<node>-config` ConfigMap. The default reaction is
       // an application-level block: parse the attacker source address
@@ -612,7 +704,8 @@ const montimageScenarioServices: ServiceSeed[] = [
             '  remains observable by MMT-Probe for the second detection.',
             'trigger:',
             '  on: mmt-security-alert',
-            '  # Alerts arrive over the Kafka channel enabled in mmt-probe.conf',
+            '  # Alerts arrive on the scenario Kafka broker (kafka:9092), published',
+            '  # by the secAnoD kafka output channel',
             '  # (topic mmt-security-alerts); the report format is JSON.',
             '  source: kafka:mmt-security-alerts',
             'steps:',

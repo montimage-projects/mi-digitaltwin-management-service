@@ -27,6 +27,7 @@ on:
       - 'server/src/services/**'
       - 'server/src/seed/**'
       - 'scripts/e2e-kind/**'
+      - 'scripts/secanod-kafka/**'
       - 'sim/**'
       - '.github/workflows/e2e-kind.yml'
   push:
@@ -35,6 +36,7 @@ on:
       - 'server/src/services/**'
       - 'server/src/seed/**'
       - 'scripts/e2e-kind/**'
+      - 'scripts/secanod-kafka/**'
       - 'sim/**'
       - '.github/workflows/e2e-kind.yml'
   workflow_dispatch:
@@ -57,6 +59,8 @@ jobs:
       MONGODB_URI: 'mongodb://admin:admin123@localhost:27017/intact?authSource=admin'
       BASE_URL: 'http://127.0.0.1:3000'
       STUB_IMAGE: 'secsim-e2e-stub:local'
+      SECANOD_IMAGE: 'secanod-mmt-image:kafka'
+      KAFKA_IMAGE: 'apache/kafka:3.9.1'
       KIND_CLUSTER_NAME: 'secsim-e2e'
       KIND_VERSION: 'v0.30.0'
       KUBECTL_VERSION: 'v1.34.0'
@@ -112,6 +116,33 @@ jobs:
         run: |
           docker build -t "${STUB_IMAGE}" scripts/e2e-kind/stub
           kind load docker-image "${STUB_IMAGE}" --name "${KIND_CLUSTER_NAME}"
+
+      # The seeded secAnoD sidecar (secanod-mmt-image:kafka) is a local build
+      # of scripts/secanod-kafka — it is not published to any registry, so it
+      # must be built and kind-loaded or the ci-sim pod hits ErrImagePull. It
+      # compiles mmt-probe, hence the GHA layer cache. No imagePullPolicy is
+      # set on the pods and neither tag is `latest`, so Kubernetes defaults to
+      # IfNotPresent and uses the kind-loaded images.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build the secAnoD Kafka image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: scripts/secanod-kafka
+          tags: ${{ env.SECANOD_IMAGE }}
+          load: true
+          push: false
+          cache-from: type=gha,scope=secanod-kafka
+          cache-to: type=gha,scope=secanod-kafka,mode=max
+
+      - name: Load the secAnoD and Kafka images into kind
+        run: |
+          kind load docker-image "${SECANOD_IMAGE}" --name "${KIND_CLUSTER_NAME}"
+          # Pre-load the broker image so pods do not pull from Docker Hub
+          # (anonymous pull throttling).
+          docker pull "${KAFKA_IMAGE}"
+          kind load docker-image "${KAFKA_IMAGE}" --name "${KIND_CLUSTER_NAME}"
 
       - name: Start the platform (auto-seeds catalog, demo scenario, admin)
         run: |

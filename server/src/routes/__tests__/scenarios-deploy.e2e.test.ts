@@ -201,31 +201,52 @@ afterAll(async () => {
   await mongoose.disconnect();
 });
 
+/** Poll the execution until the background rollout reaches `status`. */
+async function waitForExecutionStatus(executionId: string, status: string) {
+  await vi.waitFor(
+    async () => {
+      const scenario = await Scenario.findById(scenarioId).lean();
+      const execution = scenario?.executions.find((e) => e._id?.toString() === executionId);
+      expect(execution?.status).toBe(status);
+    },
+    { timeout: 5000, interval: 50 }
+  );
+}
+
 describe('POST /api/scenarios/:id/execute (Kubernetes deploy)', () => {
   let executionId: string;
   let namespace: string;
 
-  test('deploys the topology and returns namespace + services (no maestroUrl)', async () => {
+  test('answers at once with the rollout plan, then deploys in the background', async () => {
     if (!mongoAvailable) return;
 
     const res = await fetch(`${baseUrl}/api/scenarios/${scenarioId}/execute`, {
       method: 'POST',
       headers: authHeader,
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const body = (await res.json()) as {
       executionId: string;
       namespace: string;
       status: string;
       maestroUrl?: string;
-      services: { serviceId: string; status: string; dashboardUrl?: string }[];
+      services: {
+        serviceId: string;
+        status: string;
+        dashboardUrl?: string;
+        webInterface?: boolean;
+      }[];
     };
 
     expect(body.maestroUrl).toBeUndefined();
     expect(body.namespace).toMatch(/^secsim-/);
-    expect(body.status).toBe('running');
+    // The plan: pending rows, no NodePort yet — the console follows via SSE.
+    expect(body.status).toBe('pending');
     expect(body.services).toHaveLength(1);
-    expect(body.services[0].dashboardUrl).toBe('http://10.0.0.1:30080');
+    expect(body.services[0]).toMatchObject({ status: 'pending', webInterface: true });
+    expect(body.services[0].dashboardUrl).toBeUndefined();
+
+    await waitForExecutionStatus(body.executionId, 'running');
 
     expect(clusterCalls.createNamespace).toHaveBeenCalled();
     expect(clusterCalls.createNamespacedDeployment).toHaveBeenCalled();
@@ -245,6 +266,7 @@ describe('POST /api/scenarios/:id/execute (Kubernetes deploy)', () => {
     expect(execution?.deployedServices).toHaveLength(1);
     expect(execution?.deployedServices[0].status).toBe('pending');
     expect(execution?.deployedServices[0].nodeId).toBe('n1');
+    expect(execution?.deployedServices[0].dashboardUrl).toBe('http://10.0.0.1:30080');
   });
 
   test('DELETE tears down the deployment and marks the execution completed', async () => {
@@ -279,7 +301,7 @@ describe('POST /api/scenarios/:id/execute (Kubernetes deploy)', () => {
 });
 
 describe('POST /api/scenarios/:id/execute deploy failure', () => {
-  test('marks the execution failed and surfaces 502 when the cluster rejects the deploy', async () => {
+  test('marks the execution failed when the cluster rejects the background deploy', async () => {
     if (!mongoAvailable) return;
 
     const original = clusterCalls.createNamespace;
@@ -292,17 +314,64 @@ describe('POST /api/scenarios/:id/execute deploy failure', () => {
         method: 'POST',
         headers: authHeader,
       });
-      expect(res.status).toBe(502);
+      expect(res.status).toBe(202);
+      const { executionId } = (await res.json()) as { executionId: string };
 
       // A durable, failed execution record is left behind with its namespace.
+      await waitForExecutionStatus(executionId, 'failed');
       const scenario = await Scenario.findById(scenarioId).lean();
-      const failed = scenario?.executions.filter((e) => e.status === 'failed') ?? [];
-      expect(failed.length).toBeGreaterThan(0);
-      const latestFailed = failed[failed.length - 1];
-      expect(latestFailed.namespace).toMatch(/^secsim-/);
-      expect(latestFailed.deployedServices).toHaveLength(0);
+      const failed = scenario?.executions.find((e) => e._id?.toString() === executionId);
+      expect(failed?.namespace).toMatch(/^secsim-/);
+      expect(failed?.completedAt).toBeInstanceOf(Date);
     } finally {
       clusterCalls.createNamespace = original;
+    }
+  });
+});
+
+describe('POST /api/scenarios/:id/execute torn down mid-rollout', () => {
+  test('a teardown during the background rollout keeps the run closed as completed', async () => {
+    if (!mongoAvailable) return;
+
+    // Hold the rollout inside namespace creation until the teardown lands,
+    // then fail it the way a deleted namespace does.
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const original = clusterCalls.createNamespace;
+    clusterCalls.createNamespace = vi.fn(async () => {
+      await gate;
+      throw new ApiException(409, 'conflict', { message: 'namespace is being terminated' });
+    });
+
+    try {
+      const res = await fetch(`${baseUrl}/api/scenarios/${scenarioId}/execute`, {
+        method: 'POST',
+        headers: authHeader,
+      });
+      expect(res.status).toBe(202);
+      const { executionId } = (await res.json()) as { executionId: string };
+
+      const down = await fetch(`${baseUrl}/api/scenarios/${scenarioId}/executions/${executionId}`, {
+        method: 'DELETE',
+        headers: authHeader,
+      });
+      expect(down.status).toBe(200);
+      release();
+
+      // Give the background deploy time to fail, then check nothing moved.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const scenario = await Scenario.findById(scenarioId).lean();
+      const execution = scenario?.executions.find((e) => e._id?.toString() === executionId);
+      expect(execution?.status).toBe('completed');
+      expect(execution?.outcome).not.toBe('failed');
+      expect(execution?.completedAt).toBeInstanceOf(Date);
+      // …and the teardown's report is not overwritten by a deploy-failure one.
+      const report = await ExecutionReport.findOne({ scenarioId, executionId }).lean();
+      expect(report?.outcome).not.toBe('failed');
+      expect(report?.error).toBeUndefined();
+    } finally {
+      clusterCalls.createNamespace = original;
+      release();
     }
   });
 });

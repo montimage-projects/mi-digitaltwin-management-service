@@ -49,6 +49,7 @@ const {
   formatDuration,
   markdownCodeBlock,
   renderHtml,
+  summarizeReport,
   renderMarkdown,
   takeTail,
   truncateBytes,
@@ -494,6 +495,38 @@ describe('renderers', () => {
     // The log fence outlasts the 4-backtick run inside the log.
     expect(md).toContain('`````\n');
     expect(md).toContain('**PASSED**');
+  });
+
+  test('every report carries a generated conclusion, even without an analyst note', () => {
+    const report = buildReport({
+      scenario,
+      execution: makeExecution(),
+      completedAt,
+      artifacts: makeArtifacts({
+        logs: [
+          {
+            name: 'svc-a',
+            pod: 'svc-a-pod',
+            line: JSON.stringify({ 'ip.src': '10.0.0.66', verdict: 'SYN flood' }),
+          },
+        ],
+      }),
+    });
+    expect(report.conclusion).toBeUndefined();
+    const { verdict, findings } = summarizeReport(report);
+    expect(verdict).toMatch(/^The run passed/);
+    expect(findings.join(' ')).toContain('1 security alert from 1 distinct attacker');
+    expect(renderMarkdown(report)).toContain('## Conclusion');
+    expect(renderMarkdown(report)).not.toContain('### Analyst note');
+    const html = renderHtml(report);
+    expect(html).toContain('[ Conclusion ]');
+    expect(html).toContain(escapeHtml(verdict));
+  });
+
+  test('the analyst note is rendered under the generated conclusion', () => {
+    const report = hostileReport();
+    expect(renderMarkdown(report)).toContain('### Analyst note');
+    expect(renderHtml(report)).toContain('Analyst note');
   });
 
   test('formatDuration renders compact durations', () => {

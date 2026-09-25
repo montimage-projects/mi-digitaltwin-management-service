@@ -1,9 +1,12 @@
 # E2E stub image for the kind-based CI test (issue #206).
 #
-# One image substitutes for the four private registry.montimage.eu modules;
+# One image substitutes for the private registry.montimage.eu modules;
 # run-e2e.js repoints the seeded services at it and selects each module's
 # behaviour through the STUB_ROLE env var. See stub.py for the role table.
 FROM python:3.13-alpine
+
+# kafka-python: the reaction role consumes secAnoD reports from Kafka.
+RUN pip install --no-cache-dir kafka-python==2.2.15
 
 COPY stub.py /app/stub.py
 

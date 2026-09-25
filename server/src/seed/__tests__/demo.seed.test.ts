@@ -51,7 +51,7 @@ afterAll(async () => {
 });
 
 describe('demo scenario seed (issue #204)', () => {
-  test('creates the demo project and scenario with the four wired nodes', async () => {
+  test('creates the demo project and scenario with the five wired nodes', async () => {
     if (!mongoAvailable) {
       console.warn('Skipping: no MongoDB reachable at', TEST_MONGODB_URI);
       return;
@@ -72,15 +72,16 @@ describe('demo scenario seed (issue #204)', () => {
 
     const nodes = scenario?.topology.nodes ?? [];
     const edges = scenario?.topology.edges ?? [];
-    expect(nodes, 'four topology nodes').toHaveLength(4);
-    expect(edges, 'four typed edges').toHaveLength(4);
+    expect(nodes, 'five topology nodes').toHaveLength(5);
+    expect(edges, 'five typed edges').toHaveLength(5);
 
     // Each node references its catalog service by id and carries the role the
     // badge/edge-validation layer resolves.
     const serviceByNode = new Map([
       ['mag', 'MAG'],
       ['ci-sim', 'CI-SIM'],
-      ['mmt-probe', 'MMT-PROBE'],
+      ['secanod', 'SECANOD'],
+      ['kafka', 'KAFKA'],
       ['ai4soar', 'AI4SOAR'],
     ] as const);
     for (const [nodeId, shortName] of serviceByNode) {
@@ -101,15 +102,15 @@ describe('demo scenario seed (issue #204)', () => {
     expect(edgeTriples).toEqual(
       expect.arrayContaining([
         ['mag', 'attacks', 'ci-sim'],
-        ['mmt-probe', 'monitors', 'ci-sim'],
-        ['mmt-probe', 'notifies', 'ai4soar'],
+        ['secanod', 'monitors', 'ci-sim'],
+        ['secanod', 'publishes', 'kafka'],
+        ['kafka', 'consumes', 'ai4soar'],
         ['ai4soar', 'acts-on', 'ci-sim'],
       ])
     );
 
     // The monitor node is the sidecar the engine injects into the target pod.
-    const probe = nodes.find((n) => n.id === 'mmt-probe');
-    expect(probe?.data?.attachMode).toBe('sidecar');
+    expect(nodes.find((n) => n.id === 'secanod')?.data?.attachMode).toBe('sidecar');
 
     // MAG is a terminal Deployment driven via `kubectl exec` (issue #233);
     // `uiType` mirrors the catalog and `config.profiles` carries the R1
@@ -124,16 +125,10 @@ describe('demo scenario seed (issue #204)', () => {
       'attack-1-stop-the-server',
       'attack-2-already-blocked',
     ]);
-    for (const profile of profiles ?? []) {
-      expect(profile.args).toEqual([
-        'mag',
-        'http-flood',
-        '--target-ip',
-        'ci-sim',
-        '--target-port',
-        '8080',
-      ]);
-    }
+    const flood = ['mag', 'http-flood', '--target-ip', 'ci-sim', '--target-port', '8080'];
+    expect(profiles?.[0].args).toEqual(flood);
+    // Attack #2 is capped so it trips detection without re-stopping CI-SIM.
+    expect(profiles?.[1].args).toEqual([...flood, '--count', '25']);
 
     // The YAML mirror lists the same services and typed connections.
     expect(scenario?.topology.yaml).toContain('ci-sim');
@@ -148,7 +143,7 @@ describe('demo scenario seed (issue #204)', () => {
     expect(scenario).not.toBeNull();
 
     const services = await Service.find({
-      shortName: { $in: ['MAG', 'CI-SIM', 'MMT-PROBE', 'AI4SOAR'] },
+      shortName: { $in: ['MAG', 'CI-SIM', 'SECANOD', 'KAFKA', 'AI4SOAR'] },
     }).lean();
     const resolved = resolveTopologyNodes(
       scenario!.topology.nodes,
@@ -156,7 +151,7 @@ describe('demo scenario seed (issue #204)', () => {
       scenario!.topology.edges
     );
 
-    expect(resolved).toHaveLength(4);
+    expect(resolved).toHaveLength(5);
     const byId = new Map(resolved.map((n) => [n.nodeId, n]));
     // Issue #233: MAG resolves to a long-running terminal Deployment whose
     // container idles on the seeded shell command — attacks come via exec.
@@ -170,13 +165,27 @@ describe('demo scenario seed (issue #204)', () => {
     // No fixed attack args — Mongoose defaults the array field to []; the
     // `config.profiles` runbook data is not a deployment merge key.
     expect(byId.get('mag')?.deployment.args ?? []).toEqual([]);
-    expect(byId.get('mmt-probe')?.edgeContext.monitors).toEqual(['ci-sim']);
-    expect(byId.get('mmt-probe')?.edgeContext.notifies).toEqual(['ai4soar']);
+    expect(byId.get('secanod')?.edgeContext.monitors).toEqual(['ci-sim']);
+    // secAnoD publishes to the Kafka bus AI4SOAR consumes; the rule filter
+    // keeps only the demo MAG attacks' rules (56, 20, 51).
+    expect(byId.get('secanod')?.deployment.command).toEqual(
+      expect.arrayContaining([
+        'security.output-channel=kafka,stdout',
+        'security.exclude-rules=1-19,21-50,52-55,57-1000',
+        'kafka-output.hostname=kafka',
+      ])
+    );
+    expect(byId.get('kafka')?.deployment.containerPort).toBe(9092);
     expect(byId.get('ai4soar')?.edgeContext.actsOn).toEqual(['ci-sim']);
     expect(byId.get('mag')?.edgeContext.targets).toEqual(['ci-sim']);
-    // Every node resolves to its seeded docker image.
-    for (const n of resolved) {
-      expect(n.image, `${n.nodeId} image`).toMatch(/^registry\.montimage\.eu\//);
+    // Every node resolves to its seeded docker image — secAnoD the local
+    // Kafka-enabled build, the broker the public apache/kafka image, the
+    // other modules the private registry.
+    const images = new Map(resolved.map((n) => [n.nodeId, n.image]));
+    expect(images.get('secanod')).toBe('secanod-mmt-image:kafka');
+    expect(images.get('kafka')).toBe('apache/kafka:3.9.1');
+    for (const id of ['mag', 'ci-sim', 'ai4soar']) {
+      expect(images.get(id), `${id} image`).toMatch(/^registry\.montimage\.eu\//);
     }
   });
 
@@ -212,7 +221,7 @@ describe('demo scenario seed (issue #204)', () => {
     expect(await Scenario.countDocuments({ title: LEGACY_SCENARIO_TITLE })).toBe(0);
     const scenarios = await Scenario.find({ title: DEMO_SCENARIO_TITLE });
     expect(scenarios, 'one R1 demo scenario').toHaveLength(1);
-    expect(scenarios[0].topology.nodes, 'topology refreshed by the upsert').toHaveLength(4);
+    expect(scenarios[0].topology.nodes, 'topology refreshed by the upsert').toHaveLength(5);
   });
 
   test('skips cleanly when a catalog module is missing', async () => {
