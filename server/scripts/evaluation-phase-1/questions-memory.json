@@ -1,0 +1,34 @@
+[
+  {
+    "id": "M1",
+    "category": "memory",
+    "expectedIntent": "service",
+    "setup": "What is the provider of MAG?",
+    "question": "Which service did I just ask you about, and what was its provider?",
+    "groundTruth": "MAG (Montimage Attack Generator); provider Montimage (MTI)."
+  },
+  {
+    "id": "M2",
+    "category": "memory",
+    "expectedIntent": "service",
+    "setup": "Tell me about MMT-PROBE.",
+    "question": "And what is its current TRL?",
+    "groundTruth": "MMT-PROBE current TRL 7 (expected 8) - must resolve 'its' from the previous turn."
+  },
+  {
+    "id": "M3",
+    "category": "memory",
+    "expectedIntent": "service",
+    "setup": "Which services are provided by Tecnalia?",
+    "question": "Of those, which one uses the OSCAL standard?",
+    "groundTruth": "secSAC (Security Assurance Case Tool)."
+  },
+  {
+    "id": "M4",
+    "category": "memory",
+    "expectedIntent": "casual",
+    "setup": "Tell me about the MMT-PROBE and MAG services.",
+    "question": "Do you have with you the message that we just chatted?",
+    "groundTruth": "Yes - should recall the previous turn about MMT-PROBE (monitoring/DPI probe) and MAG (attack generator). 'I don't have access to chat history' = Incorrect (observed with qwen3:14b)."
+  }
+]

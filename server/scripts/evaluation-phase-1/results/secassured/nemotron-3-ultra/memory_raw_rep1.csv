@@ -1,0 +1,23 @@
+id,category,expected_intent,config,rep,predicted_intent,latency_ms,sources_count,top_source_ids,top_source_scores,answer_length,answer,error
+M1,memory,service,RAG,1,service,32657,4,SAVVY-DEVSRV|AST-DEDISRV|PPC-EMOB|MMT-PROBE,0.483|0.454|0.444|0.435,164,"You asked about **MAG**, and I answered that its provider is **Montimage (MTI)**.  
+
+(Note: MAG does not appear in the current repository context snippet provided.)",
+M1,memory,service,COLD,1,rag-off,3934,0,,,127,"You asked about **MAG**.  
+
+There is no service with that shortName in the repository, so no provider information is available.",
+M2,memory,service,RAG,1,service,10359,4,SECVDR|AST-DEDISRV|SECNCD|SECOPSTWIN,0.444|0.421|0.417|0.403,47,**MMT-PROBE** current TRL: **7** (expected: 8).,
+M2,memory,service,COLD,1,rag-off,16144,0,,,235,"There is no information about **MMT-PROBE** in the repository — no service with that name was retrieved, so its TRL (or any other details) cannot be provided. If you have an alternative name, shortName, or provider, I can search again.",
+M3,memory,service,RAG,1,service,20263,4,SECSAC|ORO-5GLAB|SECASSURE4AI|ITPAERO-CFAA,0.621|0.518|0.511|0.509,165,**SECSAC** (Security Assurance Case Tool) uses the OSCAL standard — it explicitly lists `standards: OSCAL` for representing security controls and assessment results.,
+M3,memory,service,COLD,1,rag-off,12403,0,,,129,"Since no services from Tecnalia were found in the repository catalog, there are no services to evaluate for OSCAL standard usage.",
+M4,memory,casual,RAG,1,casual,3221,0,,,427,"Yes, I can see our conversation history. In the previous message, you asked about **MMT-PROBE** and **MAG** services, and I provided detailed information about both based on the repository context that was available at that time.
+
+The current repository context for this new query shows ""No relevant services were retrieved from the catalog,"" but I still have access to our chat history and the information I shared previously.",
+M4,memory,casual,COLD,1,rag-off,19077,0,,,527,"Yes, I have access to our conversation history. 
+
+**Previous exchange:**
+- **You asked:** ""Tell me about the MMT-PROBE and MAG services.""
+- **I replied:** I couldn't find any services named **MMT-PROBE** or **MAG** in the current repository catalog, and suggested providing alternative names or details if available.
+
+The system then refreshed the repository context, which confirmed: *""No relevant services were retrieved from the catalog.""*
+
+Let me know if you'd like to search with different terms or explore other services.",

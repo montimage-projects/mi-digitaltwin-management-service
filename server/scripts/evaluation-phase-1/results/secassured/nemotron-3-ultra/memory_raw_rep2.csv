@@ -1,0 +1,13 @@
+id,category,expected_intent,config,rep,predicted_intent,latency_ms,sources_count,top_source_ids,top_source_scores,answer_length,answer,error
+M1,memory,service,RAG,2,service,42596,4,SAVVY-DEVSRV|AST-DEDISRV|PPC-EMOB|MMT-PROBE,0.483|0.454|0.444|0.435,225,"You asked about **MAG** (Montimage Attack Generator), and I answered that its provider is **Montimage (MTI)**.
+
+*Note: MAG does not appear in the current repository context snippet, but it was referenced in our chat history.*",
+M1,memory,service,COLD,2,rag-off,12841,0,,,152,"You asked about **MAG**. According to the repository catalog, no service with the shortName ""MAG"" exists, so there is no provider information available.",
+M2,memory,service,RAG,2,service,1673,4,SECVDR|AST-DEDISRV|SECNCD|SECOPSTWIN,0.444|0.421|0.417|0.403,48,**MMT-PROBE** — Current TRL: **7** (expected 8).,
+M2,memory,service,COLD,2,rag-off,13503,0,,,186,"There is no information about **MMT-PROBE** in the current repository — no service with that name was retrieved, so its TRL (Technology Readiness Level) is not available in this catalog.",
+M3,memory,service,RAG,2,service,2810,4,SECSAC|ORO-5GLAB|SECASSURE4AI|ITPAERO-CFAA,0.621|0.518|0.511|0.509,171,**SECSAC** (Security Assurance Case Tool) uses the OSCAL standard. Its entry explicitly lists `standards: OSCAL` for representing security controls and assessment results.,
+M3,memory,service,COLD,2,rag-off,12709,0,,,109,"Since no Tecnalia services were found in the repository, there are none to evaluate for OSCAL standard usage.",
+M4,memory,casual,RAG,2,casual,19455,0,,,439,"Yes — I can see our conversation history. In the previous turn you asked about **MMT-PROBE** and **MAG**, and I replied with details for both services (provider, category, description, inputs/outputs, Docker images, etc.) based on the repository context that was available at that time.
+
+The current repository context now shows “No relevant services were retrieved from the catalog,” but the chat history itself is still accessible to me.",
+M4,memory,casual,COLD,2,rag-off,5228,0,,,174,"Yes, I have our conversation history. You previously asked about **MMT-PROBE** and **MAG** services, and I responded that neither service was found in the repository catalog.",

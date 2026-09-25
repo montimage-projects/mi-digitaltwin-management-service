@@ -1,0 +1,153 @@
+id;category;expected_intent;config;rep;predicted_intent;latency_ms;sources_count;top_source_ids;top_source_scores;answer_length;answer;Correctness;Intent_ok;Hallucination;Notes
+F1;factual;service;RAG;2;service;30158;4;MONT-MMT|MONT-NFZ|MON-01|MON-02;0.704|0.632|0.618|0.603;145;The Montimage Monitoring Tool (MONT-MMT) uses the **MIT License** (Open Source). This information is explicitly stated in the repository context.;Correct;Yes;No;
+F1;factual;service;COLD;2;rag-off;29047;0;;;264;The Montimage Monitoring Tool is not listed in the MI Digital Twin Management Platform repository. For license information, please consult the tool's official documentation or contact its provider directly. Let me know if you need help locating official resources!;Refused;Yes;No;
+F2;factual;service;RAG;2;service;47772;4;K3Y-K3CR|K3Y-TRUSTEE|CORE-02|SEC-01;0.685|0.570|0.555|0.549;54;The provider of K3CyberRadar (K3CR) Probes is **K3Y**.;Correct;Yes;No;
+F2;factual;service;COLD;2;rag-off;25591;0;;;173;The repository context does not contain information about K3CyberRadar or its provider. Please provide additional details or check the platform catalog for further insights.;Refused;Yes;No;
+F3;factual;service;RAG;2;service;45082;4;TUC-NIDS|BEYOND-DD|TOOL-02|THALES-CR;0.713|0.598|0.596|0.596;94;The current Technology Readiness Level (TRL) of the **TUC-NIDS** service (FPGA-NIDS) is **5**.;Correct;Yes;No;
+F3;factual;service;COLD;2;rag-off;69115;0;;;235;The repository context does not contain any information about the Technology Readiness Level (TRL) of the FPGA-NIDS service or its details. Please consult the MI Digital Twin Management Platform catalog for updated service information.;Refused;Yes;No;
+F4;factual;service;RAG;2;service;40879;4;SIEMENS-ROSCO|SEC-03|SBA-SPLIT|SBA-CAST;0.866|0.614|0.605|0.585;99;The Runtime Security Pipeline (ROSCO-eBPF) belongs to the **Automated Threat Inspection** category.;Correct;Yes;No;
+F4;factual;service;COLD;2;rag-off;30656;0;;;187;The Runtime Security Pipeline (ROSCO-eBPF) is not recognized in the current MI Digital Twin Management Platform catalog. No relevant service information was retrieved from the repository.;Refused;Yes;No;
+F5;factual;service;RAG;2;service;61754;4;BEYOND-DD|BEYOND-HSM|RAN-02|SIEMENS-PAC;0.806|0.625|0.567|0.563;214;"The Data Diode (BEYOND-DD) is a **hardware** service. Its description explicitly states it is ""Hardware-based unidirectional data transfer,"" and the ""type"" field in the repository context is listed as **Hardware**.";Correct;Yes;No;
+F5;factual;service;COLD;2;rag-off;45322;0;;;306;The repository context indicates that no relevant services were retrieved, including information about the Data Diode (BEYOND-DD). Therefore, details about whether it is a software or hardware service are unavailable in the current context. For precise information, consult the platform's catalog directly.;Refused;Yes;No;
+F6;factual;service;RAG;2;service;47194;4;BEYOND-HSM|BEYOND-DD|HE-02|MON-02;0.772|0.594|0.592|0.558;76;BEYOND-HSM supports the following standards: **PKCS#11** and **FIPS 140-2**.;Correct;Yes;No;
+F6;factual;service;COLD;2;rag-off;33941;0;;;230;The repository catalog does not currently contain information about BEYOND-HSM or its supported standards. For detailed specifications, please consult the official BEYOND-HSM documentation or contact the service provider directly.;Refused;Yes;No;
+F7;factual;service;RAG;2;service;51692;4;MONT-MMT|MONT-NFZ|TEST-03|TEST-04;0.606|0.552|0.523|0.514;95;MONT-MMT takes **Network Traffic** as input, specifically **Live or captured network traffic**.;Correct;Yes;No;
+F7;factual;service;COLD;2;rag-off;32245;0;;;290;"The repository context indicates that no relevant services were retrieved, including information about ""MONT-MMT."" Therefore, details about its inputs are unavailable in the current catalog. For further assistance, please consult the MI Digital Twin Management Platform repository directly.";Refused;Yes;No;
+F8;factual;service;RAG;2;service;38693;4;SIEMENS-LLM|ULANCS-PTI|TEST-02|SIEMENS-ROSCO;0.871|0.623|0.618|0.616;267;"The SIEMENS-LLM Threat Modelling Tool produces the following outputs:  
+- **Threat Model**  
+- **Identified threats and mitigations**  
+
+These outputs are derived from inputs like system descriptions and architecture documents, as specified in the repository context.";Correct;Yes;No;
+F8;factual;service;COLD;2;rag-off;32348;0;;;235;The SIEMENS LLM Threat Modelling Tool is not listed in the current repository catalog. For detailed information about its outputs or capabilities, please consult the official SIEMENS documentation or the platform's repository directly.;Refused;Yes;No;
+F9;factual;service;RAG;2;service;33688;4;AXON-OSSR|RAN-01|CORE-02|SEC-01;0.898|0.612|0.605|0.600;86;The AXON Open Security Service Repository (OSSR) is licensed under **Apache 2.0/MIT**.;Correct;Yes;No;
+F9;factual;service;COLD;2;rag-off;37515;0;;;255;The license information for the AXON Open Security Service Repository (OSSR) is not available in the current repository context. For details about the OSSR's licensing terms, please consult the official AXON documentation or contact AXON support directly.;Refused;Yes;No;
+F10;factual;service;RAG;2;service;55186;4;THALES-CR|MON-01|TOOL-02|AIRBUS-ORION;0.633|0.520|0.517|0.472;41;The title of THALES-CR is **CyberRange**.;Correct;Yes;No;
+F10;factual;service;COLD;2;rag-off;54424;0;;;176;"The repository context does not contain information about ""THALES-CR"" or its title. Please check the MI Digital Twin Management Platform catalog for details about this service.";Refused;Yes;No;
+C1;comparative;service;RAG;2;service;54341;4;MONT-MMT|MON-01|MONT-NFZ|AXON-OSSR;0.582|0.538|0.530|0.526;832;"Montimage provides the following services in the repository:
+
+1. **MONT-MMT** (Montimage Monitoring Tool)  
+   - **Category**: Automated Threat Inspection  
+   - **Description**: Real-time network traffic analysis and security monitoring with deep packet inspection.  
+   - **Use Cases**: Network monitoring, intrusion detection, traffic analysis.  
+   - **Interacts With**: MONT-NFZ, AIRBUS-ORION, UBI-MAESTRO, AEGIS-COS.  
+
+2. **MONT-NFZ** (Montimage Network Fuzzer)  
+   - **Category**: AI Attack-Defence Emulation  
+   - **Description**: Generates malicious traffic by mutating nominal traffic patterns for security testing.  
+   - **Use Cases**: Protocol fuzzing, security testing, attack simulation.  
+   - **Interacts With**: MONT-MMT, AIRBUS-ORION.  
+
+Both tools are open source (MIT license) and available as Docker images.";Correct;Yes;No;
+C1;comparative;service;COLD;2;rag-off;31686;0;;;264;The repository catalog does not list any services provided by Montimage. I cannot provide further details about Montimage's offerings based on the current catalog data. You may want to consult the platform's repository directly for the most up-to-date information.;Refused;Yes;No;
+C2;comparative;service;RAG;2;service;50998;4;SIEMENS-LLM|AXON-OSSR|K3Y-K3CR|TEST-02;0.616|0.611|0.608|0.603;772;"The services in the **Automated Threat Inspection** category are:
+
+1. **SIEMENS-LLM**  
+   - Provider: SIEMENS  
+   - Description: Large Language Model-based automated threat modeling and analysis.  
+   - Inputs: System Description, Architecture and design documents.  
+   - Outputs: Threat Model, Identified threats and mitigations.  
+   - Standards: STRIDE, MITRE ATT&CK.  
+
+2. **K3Y-K3CR**  
+   - Provider: K3Y  
+   - Description: Distributed probes for network security monitoring and threat detection.  
+   - Inputs: Network Interfaces, Network tap points.  
+   - Outputs: Security Telemetry, Network security data.  
+   - Standards: MITRE ATT&CK.  
+
+Both tools support automated threat analysis but differ in focus (LLM for modeling vs. K3CR for network monitoring).";Partial;Yes;No;Only 2 over 7 services are listed
+C2;comparative;service;COLD;2;rag-off;29694;0;;;215;"No services were found in the ""automated-threat-inspection"" category in the current repository catalog. You may want to check other categories or refine your search terms. Let me know if you need further assistance!";Refused;Yes;No;
+C3;comparative;service;RAG;2;service;59091;4;CORE-02|CORE-01|UE-01|RAN-01;0.624|0.621|0.602|0.576;424;The repository context does not indicate that any of the listed services (CORE-01, CORE-02, RAN-01, UE-01) explicitly support the MITRE ATT&CK standard. All entries reference 3GPP compliance and 5G network functions, but none mention alignment with MITRE ATT&CK tactics, techniques, or use cases beyond general 5G security (PUC1). For MITRE ATT&CK-specific capabilities, no service in this repository appears to be relevant.;Refused;Yes;No;RAG retrieval does not retrieve any service supporting MITRE ATT&CK standard
+C3;comparative;service;COLD;2;rag-off;37203;0;;;160;No services supporting the MITRE ATT&CK standard were found in the repository catalog. You may want to check back later or contact platform support for updates.;Refused;Yes;No;
+C4;comparative;service;RAG;2;service;54638;4;UBI-ORCH|UBI-MAESTRO|HMU-DASH|AEGIS-COS;0.711|0.636|0.566|0.549;210;"The services that interact with **UBI-ORCH** are:  
+- MONT-MMT  
+- AXON-OSSR  
+- FRAUNHOFER-TA  
+- THALES-CR  
+- AEGIS-COS  
+
+(These are listed in the ""interactsWith"" field of the UBI-ORCH service description.)";Correct;Yes;No;
+C4;comparative;service;COLD;2;rag-off;48054;0;;;141;No relevant services were found in the catalog that interact with UBI-ORCH. The repository context indicates no entries exist for this query.;Refused;Yes;No;
+C5;comparative;service;RAG;2;service;108716;4;TUC-NIDS|MONT-MMT|MONT-NFZ|ULANCS-PTI;0.769|0.741|0.668|0.649;1395;"**Comparison of MONT-MMT and TUC-NIDS for Intrusion Detection:**
+
+1. **Technology & Performance:**
+   - **TUC-NIDS** uses FPGA hardware acceleration for **line-rate packet inspection** (ideal for high-speed networks). 
+   - **MONT-MMT** is a software-based tool with **real-time deep packet inspection**, optimized for flexibility and integration.
+
+2. **Standards & Capabilities:**
+   - **TUC-NIDS** adheres to **Snort/Suricata** rules, focusing on signature-based detection.
+   - **MONT-MMT** aligns with **MITRE ATT&CK** and **Zeek** for behavior-based threat analysis and detailed traffic metrics.
+
+3. **TRL & Maturity:**
+   - **MONT-MMT** has a higher TRL (current=8) vs. **TUC-NIDS** (TRL=5), indicating greater maturity and deployment readiness.
+
+4. **Interoperability:**
+   - **MONT-MMT** interacts with more tools (e.g., MONT-NFZ, AIRBUS-ORION) for extended threat intelligence and testing workflows.
+   - **TUC-NIDS** primarily interacts with **MONT-MMT** for alert correlation.
+
+5. **Use Cases:**
+   - **TUC-NIDS**: Best for **high-speed intrusion detection** at network line rates.
+   - **MONT-MMT**: Suitable for **comprehensive network monitoring**, anomaly detection, and traffic analysis.
+
+**Conclusion:** Choose **TUC-NIDS** for hardware-accelerated, high-speed environments; opt for **MONT-MMT** for flexible, standards-driven threat analysis with broader ecosystem integration.";Correct;Yes;No;
+C5;comparative;service;COLD;2;rag-off;49741;0;;;420;"The repository context indicates that neither **MONT-MMT** nor **TUC-NIDS** are available in the current catalog of services. Therefore, no comparative analysis of these two intrusion detection options can be provided based on the retrieved data. 
+
+Please verify the service names or consult the repository for updated availability. If you have additional details about these services, share them for further assistance.";Refused;Yes;No;
+C6;comparative;service;RAG;2;service;51677;4;SBA-DID|BEYOND-HSM|AXON-OSSR|UBI-MAESTRO;0.703|0.590|0.584|0.578;684;"The following services are available for zero-trust architecture:
+
+1. **SBA-DID**  
+   - **Category**: Zero-Trust Architecture  
+   - **Description**: Decentralized identity management for zero-trust architectures.  
+   - **Key Features**: Uses W3C DID/VC standards; interacts with BEYOND-HSM for cryptographic operations.  
+
+2. **BEYOND-HSM**  
+   - **Category**: Zero-Trust Architecture  
+   - **Description**: Distributed Hardware Security Module for secure key management.  
+   - **Key Features**: Complies with PKCS#11 and FIPS 140-2; integrates with SBA-DID for cryptographic operations.  
+
+Both services support zero-trust use cases like secure authentication and cryptography.";Correct;Yes;No;
+C6;comparative;service;COLD;2;rag-off;35335;0;;;161;No relevant services for zero-trust architecture were found in the current repository catalog. Please check back later or contact support for further assistance.;Refused;Yes;No;
+C7;comparative;service;RAG;2;service;73491;4;CORE-01|CORE-02|RAN-01|RAN-02;0.819|0.819|0.684|0.670;429;"The 5G Core category includes two open-source services:
+
+1. **CORE-01 - Free5GC**  
+   Provides 5G Core functions (NRF, AMF, SMF, UDM, etc.) under Apache-2.0 license.  
+   Potential use case: PUC1 - 5G Security.
+
+2. **CORE-02 - Open5GS**  
+   Offers an alternative 5G Core Stack under AGPL-3.0 license.  
+   Potential use case: PUC1 - 5G Security.
+
+Both interact with **RAN-01** and are part of the Digital infrastructure sector.";Correct;Yes;No;
+C7;comparative;service;COLD;2;rag-off;45961;0;;;197;No open-source services in the 5G core category were found in the repository catalog. You may want to check other categories or refine your search terms. Let me know if you need further assistance!;Refused;Yes;No;
+C8;comparative;service;RAG;2;service;56416;4;AXON-OSSR|MON-01|RAN-01|CORE-02;0.516|0.506|0.505|0.497;244;"The services with a current TRL of 7 or higher are:
+
+1. **MON-01** (Grafana) - TRL 9  
+2. **RAN-01** (srsRAN + UERANSIM) - TRL 7  
+3. **CORE-02** (Open5GS) - TRL 7  
+
+These services meet the TRL threshold for deployment or advanced development.";Partial;Yes;No;The services listed are correct, but not all of them are listed
+C8;comparative;service;COLD;2;rag-off;46865;0;;;201;No relevant services were retrieved from the catalog. The repository context indicates that there are no services with a TRL of 7 or higher available in the MI Digital Twin Management Platform catalog.;Refused;Yes;No;
+A1;adversarial;service;RAG;2;service;53229;4;SEC-03|UBI-ORCH|UBI-MAESTRO|SEC-02;0.606|0.597|0.591|0.572;313;The UBI-FIREWALL service is not listed in the provided repository context. The available services include WireGuard (SEC-03), OpenVPN (SEC-02), and UBI orchestration tools (UBI-ORCH, UBI-MAESTRO). For firewall-specific solutions, you may need to consult additional repository entries or clarify your requirements.;Correct;Yes;No;
+A1;adversarial;service;COLD;2;rag-off;40319;0;;;192;The UBI-FIREWALL service is not listed in the current repository catalog. Please check the available services or provide more details if you need assistance with a specific cybersecurity need.;Correct;Yes;No;
+A2;adversarial;service;RAG;2;service;55617;4;SEC-03|SBA-CAST|K3Y-TRUSTEE|HMU-DASH;0.544|0.529|0.501|0.500;147;"The tool ""GOOGLE-SHIELD"" is not listed in the provided repository context. Please check the repository for accurate information on available tools.";Correct;Yes;No;
+A2;adversarial;service;COLD;2;rag-off;47985;0;;;219;"The information about the ""GOOGLE-SHIELD"" tool is not available in the current repository catalog. Please check the platform's service catalog for updated details or reach out to the support team for further assistance.";Correct;Yes;No;
+A3;adversarial;service;RAG;2;service;53692;4;AXON-OSSR|MON-01|MON-02|HMU-DASH;0.558|0.537|0.523|0.517;251;No services in the provided repository context have a current TRL of 12. The Technology Readiness Level (TRL) scale ranges from 1 (basic research) to 9 (proven readiness for commercial use). All listed services have current TRL values between 4 and 9.;Correct;Yes;No;
+A3;adversarial;service;COLD;2;rag-off;30130;0;;;137;No services in the catalog have a current TRL of 12. The repository context indicates no relevant services were retrieved for this query.;Correct;Yes;No;
+A4;adversarial;service;RAG;2;service;45309;4;AXON-OSSR|AEGIS-COS|MON-01|NET-01;0.647|0.566|0.550|0.543;208;There are no CISCO services listed in the current repository context. The available services are provided by AXON, AEGIS, and Open Source. Let me know if you'd like assistance with any of the listed services!;Correct;Yes;No;
+A4;adversarial;service;COLD;2;rag-off;27436;0;;;139;No Cisco services were found in the current repository catalog. You may want to check back later or contact repository support for updates.;Correct;Yes;No;
+A5;adversarial;service;RAG;2;service;81019;4;K3Y-TRUSTEE|K3Y-K3CR|VIRT-02|VIRT-01;0.663|0.520|0.487|0.484;166;The repository context does not specify the minimum GPU memory requirements for running K3Y-TRUSTEE. This information is not included in the provided service details.;Correct;Yes;No;
+A5;adversarial;service;COLD;2;rag-off;36038;0;;;328;The repository context indicates that no relevant services were retrieved, including information about K3Y-TRUSTEE. Therefore, the minimum GPU memory requirement for this service is not available in the provided catalog. You may need to consult external documentation or contact the service provider for detailed specifications.;Correct;Yes;No;
+A6;adversarial;service;RAG;2;service;59456;4;AXON-OSSR|SEC-03|SEC-02|BEYOND-DD;0.599|0.592|0.565|0.557;390;The repository context provided does not include any information about services being certified by the U.S. National Security Agency (NSA). None of the listed services explicitly mention NSA certification in their descriptions, standards, or other attributes. For NSA-related certifications, you would need to consult additional sources or specifications beyond the current repository data.;Correct;Yes;No;
+A6;adversarial;service;COLD;2;rag-off;37095;0;;;369;No services in the MI Digital Twin Management Platform catalog are currently certified by the U.S. National Security Agency (NSA). This information may not be available in the repository, or no services may meet NSA certification criteria at this time. For further assistance, consider reaching out to the platform's support team or checking for updates in the catalog.;Correct;Yes;No;
+G1;casual;casual;RAG;2;casual;28404;0;;;243;Hello! Welcome to the MI Digital Twin Management Platform. I'm here to help you explore and compare cybersecurity services from our repository. However, no specific services were found in the catalog for this query. How can I assist you today?;Correct;Yes;No;
+G1;casual;casual;COLD;2;rag-off;29168;0;;;165;Hello! How can I assist you today? I'm here to help you explore and compare cybersecurity services from our platform repository. Let me know what you're looking for!;Correct;Yes;No;
+G2;casual;casual;RAG;2;casual;34794;0;;;112;Hello! I'm just a digital assistant, so I don't have feelings, but I'm here to help! How can I assist you today?;Correct;Yes;No;
+G2;casual;casual;COLD;2;rag-off;34729;0;;;112;Hello! I'm just a digital assistant, so I don't have feelings, but I'm here to help! How can I assist you today?;Correct;Yes;No;
+G3;casual;casual;RAG;2;casual;20409;0;;;90;You're welcome! If you need any further assistance, feel free to ask. Have a great day! 😊;Correct;Yes;No;
+G3;casual;casual;COLD;2;rag-off;22130;0;;;90;You're welcome! If you need any further assistance, feel free to ask. Have a great day! 😊;Correct;Yes;No;
+G4;casual;casual;RAG;2;casual;33352;0;;;41;Good morning! How can I assist you today?;Correct;Yes;No;
+G4;casual;casual;COLD;2;rag-off;23794;0;;;41;Good morning! How can I assist you today?;Correct;Yes;No;
+G5;casual;casual;RAG;2;casual;45017;0;;;81;Have a great day! Feel free to reach out if you need assistance in the future. 😊;Correct;Yes;No;
+G5;casual;casual;COLD;2;rag-off;27396;0;;;81;Have a great day! Feel free to reach out if you need assistance in the future. 😊;Correct;Yes;No;
+G6;casual;casual;RAG;2;casual;50848;0;;;172;You're welcome! If you need help exploring services, comparing capabilities, or have specific requirements to check against the catalog, feel free to ask. I'm here to help!;Correct;Yes;No;
+G6;casual;casual;COLD;2;rag-off;37663;0;;;121;You're welcome! If you need help exploring services, comparing options, or have any other questions, feel free to ask. 😊;Correct;Yes;No;

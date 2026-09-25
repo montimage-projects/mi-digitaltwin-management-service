@@ -1,0 +1,14 @@
+id,category,expected_intent,config,rep,predicted_intent,latency_ms,sources_count,top_source_ids,top_source_scores,answer_length,answer,error
+M1,memory,service,RAG,3,service,46904,4,SAVVY-DEVSRV|AST-DEDISRV|PPC-EMOB|MMT-PROBE,0.483|0.454|0.444|0.435,309,"The service you previously asked about was **MAG (Montimage Attack Generator)**. However, **MAG is not listed in the current repository context**, so its provider cannot be confirmed based on the available information. Please verify if MAG is part of the platform's repository or consult additional resources.",
+M1,memory,service,COLD,3,rag-off,18501,0,,,233,"The service you asked about was MAG, but its provider is not available in the current repository context. No relevant services were retrieved from the catalog. Please verify the service name or check the platform catalog for details.",
+M2,memory,service,RAG,3,service,21171,4,SECVDR|AST-DEDISRV|SECNCD|SECOPSTWIN,0.444|0.421|0.417|0.403,205,The repository context provided does not include information about **MMT-PROBE** or its TRL (Technology Readiness Level). Please consult the platform’s documentation or repository for details on MMT-PROBE.,
+M2,memory,service,COLD,3,rag-off,19251,0,,,346,"The service ""MMT-PROBE"" is not listed in the current repository catalog, and no information about its Technology Readiness Level (TRL) is available. If you have additional details (e.g., provider, use case, or shortName), I can attempt to search again. Otherwise, I recommend consulting external resources or clarifying the scope of your inquiry.",
+M3,memory,service,RAG,3,service,16654,4,SECSAC|ORO-5GLAB|SECASSURE4AI|ITPAERO-CFAA,0.621|0.518|0.511|0.509,281,"The service provided by Tecnalia that uses the **OSCAL standard** is:  
+
+- **SECSAC** (Security Assurance Case Tool)  
+  - Described as using **OSCAL for representing security controls and assessment results**.  
+
+No other Tecnalia services in the repository context mention OSCAL.",
+M3,memory,service,COLD,3,rag-off,15198,0,,,245,"No services provided by Tecnalia were found in the platform's repository. Therefore, there are no services from Tecnalia to evaluate for OSCAL standard usage. You may want to check back later or contact repository support for further assistance.",
+M4,memory,casual,RAG,3,casual,25300,0,,,310,"Yes, I can reference our previous chat within this session. However, I do not retain messages beyond the current conversation. For persistent records, you’d need to save the information yourself or use the platform’s repository for formal service documentation. Let me know if you need help with anything else!",
+M4,memory,casual,COLD,3,rag-off,18662,0,,,274,"Yes, our previous interaction is available in the chat history. You asked about the **MMT-PROBE** and **MAG** services, and I informed you that they were not found in the current repository catalog. Let me know if you'd like to refine your search or need further assistance!",

@@ -1,0 +1,160 @@
+id;category;expected_intent;config;rep;predicted_intent;latency_ms;sources_count;top_source_ids;top_source_scores;answer_length;answer;error;Correctness;Intent_ok;Hallucination;Notes
+F1;factual;service;RAG;3;service;18743;4;SECVDR|SECDEVTWIN|SECAISOAR|SECOPSTWIN;0.835|0.684|0.663|0.647;85;The provider of the Vulnerability Discovery and Repair service (SECVDR) is **CERTH**.;;Correct;Yes;No;auto
+F1;factual;service;COLD;3;rag-off;13992;0;;;223;The provider of the Vulnerability Discovery and Repair service (secVDR) is not listed in the retrieved repository context. This information may not be available in the current catalog or could require further clarification.;;Refused;Yes;No;auto
+F2;factual;service;RAG;3;service;20402;4;MMT-PROBE|HTTP-SIM|ORO-3GPP16|AI4SOAR;0.735|0.667|0.592|0.579;100;The current Technology Readiness Level (TRL) of the MMT Traffic Analysis Probe (MMT-PROBE) is **7**.;;Correct;Yes;No;auto
+F2;factual;service;COLD;3;rag-off;20943;0;;;329;The repository context retrieved does not contain information about the Technology Readiness Level (TRL) of the MMT Traffic Analysis Probe (MMT-PROBE) or any related services. This detail is currently unavailable in the platform's catalog. For further assistance, consider consulting the platform's documentation or support team.;;Refused;Yes;No;auto
+F3;factual;service;RAG;3;service;11103;4;MAG|HTTP-SIM|MMT-PROBE|SECANOD;0.804|0.639|0.636|0.617;72;The Montimage Attack Generator (MAG) belongs to the **Attack** category.;;Correct;Yes;No;auto
+F3;factual;service;COLD;3;rag-off;15608;0;;;325;The Montimage Attack Generator (MAG) is not listed in the repository context provided, so its categorization cannot be determined from the available information. For details about MAG's category or functionality, consult the MI Digital Twin Management Platform's official documentation or contact the platform's support team.;;Refused;Yes;No;auto
+F4;factual;service;RAG;3;service;18372;4;AALTO-LUMI|AALTO-EDGE5G|ITPAERO-CLUSTER|SECSIM;0.796|0.659|0.582|0.567;187;"The LUMI Supercomputer (AALTO-LUMI) is a **hardware** service. Its type is explicitly listed as ""Hardware"" in the repository context, and it is categorized under ""HPC & Compute Clusters.""";;Correct;Yes;No;auto
+F4;factual;service;COLD;3;rag-off;14125;0;;;290;The repository context does not contain information about the LUMI Supercomputer (AALTO-LUMI). Therefore, I cannot confirm whether it is classified as a software or hardware service based on the available data. For precise details, consult external sources or the service provider directly.;;Refused;Yes;No;auto
+F5;factual;service;RAG;3;service;26030;4;CSAM|SECSAC|SECINTERP|SECSIM;0.847|0.666|0.647|0.643;385;"The Compliance and Security Assurance Model (CSAM) supports the following standards:  
+- **ISO/IEC 15408**  
+- **EUCC**  
+- **EN 17927**  
+- **EN 17640**  
+- **Cyber Security Act**  
+- **Cyber Resilience Act**  
+- **AI Act**  
+
+It also aligns with regulatory frameworks like the **GDPR** and **ISO 8000** (for data quality), though these are noted as regulations rather than standards.";;Correct;Yes;No;auto
+F5;factual;service;COLD;3;rag-off;15213;0;;;248;The repository context does not provide specific information about the Compliance and Security Assurance Model (CSAM) or the standards it supports. For detailed insights, please consult official documentation or contact the platform's support team.;;Refused;Yes;No;no context (cold)
+F6;factual;service;RAG;3;service;13600;4;AI4SOAR|SECASSURE4AI|AALTO-LUMI|SECAISOAR;0.645|0.579|0.548|0.522;99;AI4SOAR takes **Security Alerts** as input, specifically **Detection alerts emitted by MMT-Probe**.;;Correct;Yes;No;auto
+F6;factual;service;COLD;3;rag-off;13253;0;;;213;The repository context does not contain information about AI4SOAR's inputs. For details on this service, please consult the MI Digital Twin Management Platform's official documentation or contact platform support.;;Refused;Yes;No;auto
+F7;factual;service;RAG;3;service;16270;4;SECSAC|SECSIM|SECOPSTWIN|SECINTERP;0.798|0.706|0.665|0.657;326;The Security Assurance Case Tool (SECSAC) produces a **Security Assurance Case** as its primary output, structured as an **OSCAL-based assurance case document**. This document synthesizes input data (requirements, system information, and assurance patterns) into a cohesive, standardized format to guide the assurance process.;;Correct;Yes;No;auto
+F7;factual;service;COLD;3;rag-off;14596;0;;;211;The Security Assurance Case Tool (secSAC) is not listed in the current repository context. Please provide additional details or check the catalog for specific information about secSAC's capabilities and outputs.;;Refused;Yes;No;auto
+F8;factual;service;RAG;3;service;20100;4;ORO-5GLAB|ORO-3GPP16|AALTO-EDGE5G|PPC-EMOB;0.874|0.784|0.680|0.593;195;The license for the Orange 5G Lab (ORO-5GLAB) is **N/A (Partner Infrastructure)**. This indicates that the service is provided through partner infrastructure, and no separate license is required.;;Correct;Yes;No;auto
+F8;factual;service;COLD;3;rag-off;15936;0;;;256;The repository context does not include information about the license of the Orange 5G Lab (ORO-5GLAB). For details on licensing, you may need to consult the platform's official documentation or contact MI Digital Twin Management Platform support directly.;;Refused;Yes;No;no context (cold)
+F9;factual;service;RAG;3;service;12415;4;SECOPSTWIN|SECDEVTWIN|SECANOD|SECAISOAR;0.696|0.656|0.566|0.562;87;"The title of SECOPSTWIN is **""Assurance-driven Security Operation Twin (SecOpsTwin)""**.";;Correct;Yes;No;auto
+F9;factual;service;COLD;3;rag-off;10188;0;;;250;"The repository context retrieved does not contain information about ""SECOPSTWIN."" Please verify the service name or consult the MI Digital Twin Management Platform catalog for details. If you have additional context, share it so I can assist further.";;Refused;Yes;No;auto
+F10;factual;service;RAG;3;service;18328;4;MAG|HTTP-SIM|MMT-PROBE|AI4SOAR;0.605|0.533|0.532|0.490;301;"MAG provides a **terminal-based command-line interface (CLI)**. It is driven via shell commands like `mag <attack> --target-ip <ip> --target-port <port>`, as described in the repository context under MAG's ""description"" and ""uiType"" fields. No web or graphical interface is mentioned for this service.";;Correct;Yes;No;auto
+F10;factual;service;COLD;3;rag-off;12192;0;;;188;The repository context does not provide information about MAG's user interface. Please check the platform's documentation or contact support for details about MAG's interface capabilities.;;Refused;Yes;No;no context (cold)
+C1;comparative;service;RAG;3;service;40595;4;MMT-PROBE|MAG|AI4SOAR|SECANOD;0.571|0.556|0.541|0.502;948;"Montimage (MTI) provides the following services through the MI Digital Twin Management Platform:
+
+1. **MMT-PROBE** (Monitor)  
+   - *ShortName*: MMT-PROBE  
+   - A traffic analysis probe that injects as a sidecar to monitor pod network traffic, emitting security alerts/reports.  
+
+2. **MAG** (Attack)  
+   - *ShortName*: MAG  
+   - A containerized attack-traffic generator for simulating HTTP attacks in attack→detect→respond scenarios.  
+
+3. **AI4SOAR** (Reaction)  
+   - *ShortName*: AI4SOAR  
+   - An AI-driven SOAR stack that orchestrates Kubernetes remediation actions (e.g., NetworkPolicy creation) based on MMT-PROBE alerts.  
+
+4. **SECANOD** (Ops Services)  
+   - *ShortName*: SECANOD  
+   - AI-based anomaly detection using LLMs for explainable attack predictions and mitigation recommendations.  
+
+All services are software-based, with web or terminal interfaces, and are part of Montimage’s attack→detect→respond cybersecurity workflow.";;Partial;Yes;No;auto: 4/8 listed
+C1;comparative;service;COLD;3;rag-off;17621;0;;;166;No services provided by Montimage were found in the repository catalog. Would you like assistance with anything else related to the platform's cybersecurity services?;;Refused;Yes;No;no context (cold)
+C2;comparative;service;RAG;3;service;42515;4;ORO-5GLAB|AALTO-EDGE5G|ORO-3GPP16|PPC-EMOB;0.687|0.668|0.649|0.572;755;"The services in the **5G Testbeds** category are:
+
+1. **ORO-5GLAB**  
+   - Provider: ORO (Orange Romania)  
+   - Sector: Digital infrastructure  
+   - Description: 5G Full-Stack Development, Testing, And Validation Laboratory with state-of-the-art equipment and access to current 3GPP technologies.  
+
+2. **AALTO-EDGE5G**  
+   - Provider: AALTO  
+   - Sector: Research  
+   - Description: Edge Devices & 5G Testbed for IIoT and edge computing workloads.  
+
+3. **ORO-3GPP16**  
+   - Provider: ORO (Orange Romania)  
+   - Sector: Digital infrastructure  
+   - Description: 3GPP Rel 16 Commercial Facility with 5G infrastructure deployed in 45 cities, supporting customised network slices (e.g., MEC capabilities).  
+
+Let me know if you need further details!";;Correct;Yes;No;auto
+C2;comparative;service;COLD;3;rag-off;15478;0;;;264;"No services were found in the ""5G Testbeds"" category in the current repository catalog. This may indicate that no relevant services are available or that the category is not yet populated. For further assistance, consider reaching out to the platform support team.";;Refused;Yes;No;auto
+C3;comparative;service;RAG;3;service;36983;4;TELLU-CARE|SECSAC|SECINTERP|SECASSURE4AI;0.550|0.548|0.545|0.538;844;"Tecnalia (TEC) provides the following services in the repository:
+
+1. **SECSAC** (Security Assurance Case Tool)  
+   - Automates creation of structured OSCAL-based security assurance cases from requirements and system data.  
+   - Reduces time to create assurance cases for regulations/standards.  
+
+2. **SECINTERP** (Assurance-driven Standard Interpretation Service)  
+   - Interprets cybersecurity standards (e.g., IEC 62443, IEEE 1686) for non-experts and developers.  
+   - Maps regulatory requirements to role-specific technical specifications.  
+
+3. **SECASSURE4AI** (Security Assurance Service for AI Components)  
+   - Assesses AI/ML components for security, explainability, fairness, and robustness.  
+   - Integrates with AML tools and tests for LLM-based services.  
+
+All are software tools with web-based UIs, developed by Tecnalia.";;Partial;Yes;No;auto: 3/4 listed
+C3;comparative;service;COLD;3;rag-off;10294;0;;;160;No services provided by Tecnalia were found in the platform's repository. You may want to check back later or contact repository support for further assistance.;;Refused;Yes;No;no context (cold)
+C4;comparative;service;RAG;3;service;40840;4;MAG|AI4SOAR|MMT-PROBE|SECANOD;0.738|0.733|0.707|0.703;667;"The Montimage attack→detect→respond scenario comprises three services:  
+1. **MAG (Montimage Attack Generator)**: Acts as the **attack** module, generating HTTP attack traffic using CLI commands or as a long-running deployment.  
+2. **MMT-PROBE**: Serves as the **detect** module, analyzing pod network traffic via DPI to emit security alerts consumed by AI4SOAR.  
+3. **AI4SOAR**: Functions as the **respond** module, orchestrating Kubernetes-based remediation actions (e.g., NetworkPolicy creation) in response to MMT-PROBE alerts.  
+
+**SECANOD** (Ops Services) is not explicitly part of this scenario but supports broader threat intelligence and anomaly detection.";;Partial;Yes;No;auto: 3/4 listed
+C4;comparative;service;COLD;3;rag-off;16639;0;;;286;"No relevant services were found in the repository related to the ""Montimage attack-detect-respond"" scenario. This information may not be available in the current catalog. For further assistance, please consult the MI Digital Twin Management Platform documentation or repository updates.";;Refused;Yes;No;auto
+C5;comparative;service;RAG;3;service;43403;4;MMT-PROBE|SECANOD|HTTP-SIM|SECOPSTWIN;0.746|0.736|0.656|0.641;866;"MMT-PROBE and SECANOD serve different roles in attack detection:  
+
+- **MMT-PROBE** (Monitor category) focuses on **real-time traffic analysis** via DPI (Deep Packet Inspection), emitting **security alerts/reports** by inspecting pod network traffic. It is a mature tool (TRL 7) with direct integration into the attack→detect→respond workflow.  
+
+- **SECANOD** (Ops Services category) uses **AI/LLM-based anomaly detection** for **predictive threat analysis**, leveraging threat intelligence and telemetry to generate **explainable attack predictions** and mitigation recommendations. It is less mature (TRL 3) but aims for higher accuracy in incident prediction (≥80%).  
+
+**Key difference**: MMT-PROBE is a reactive, traffic-centric monitor, while SECANOD is a proactive, AI-driven predictive system. They could complement each other in a layered defense strategy.";;Correct;Yes;No;accurate comparison
+C5;comparative;service;COLD;3;rag-off;18253;0;;;375;"The repository context indicates that neither **MMT-PROBE** nor **secAnoD** are available in the current catalog of cybersecurity services. Therefore, no direct comparison between these two attack detection options can be provided based on the retrieved data. 
+
+For further assistance, please consult the MI Digital Twin Management Platform repository for available services.";;Refused;Yes;No;no context (cold)
+C6;comparative;service;RAG;3;service;25861;4;SECDEVTWIN|SECOPSTWIN|AST-DEDISRV|PPC-EMOB;0.559|0.534|0.504|0.487;463;"The services in the catalog that are digital twins are:
+
+1. **SECDEVTWIN** (category: Dev Services)  
+   - Assurance-driven Security Development Twin for software development phase support.
+
+2. **SECOPSTWIN** (category: Ops Services)  
+   - Assurance-driven Security Operation Twin for continuous security monitoring and risk mitigation during operations.
+
+The other services (AST-DEDISRV, PPC-EMOB) are hardware-based infrastructure solutions, not digital twins.";;Correct;Yes;No;auto
+C6;comparative;service;COLD;3;rag-off;15478;0;;;142;No relevant services were retrieved from the catalog. The repository context indicates that no services are currently listed as digital twins.;;Refused;Yes;No;auto
+C7;comparative;service;RAG;3;service;22973;4;PPC-EMOB|SPS-DEVSECOPS|UIH-PROSUMER|PPC-IIOT;0.569|0.561|0.524|0.522;585;"All listed services belong to the Energy sector:
+
+1. **PPC-EMOB** (E-mobility Testing Facilities)  
+   *Category*: E-Mobility & IIoT  
+   *Provider*: PPC  
+
+2. **SPS-DEVSECOPS** (DevSecOps Architecture)  
+   *Category*: DevSecOps Platforms  
+   *Provider*: SPS (Safepay Systems)  
+
+3. **UIH-PROSUMER** (Prosumer Cell)  
+   *Category*: Energy Grid Infrastructure  
+   *Provider*: UIH (Urban Institute Magyarorszag)  
+
+4. **PPC-IIOT** (PPC IIoT Lab)  
+   *Category*: E-Mobility & IIoT  
+   *Provider*: PPC  
+
+All are explicitly marked under the *Energy* sector in the repository context.";;Correct;Yes;No;auto
+C7;comparative;service;COLD;3;rag-off;12407;0;;;59;No services in the Energy sector were found in the catalog.;;Refused;Yes;No;auto
+C8;comparative;service;RAG;3;service;23214;4;AST-DEDISRV|ORO-3GPP16|SAVVY-DEVSRV|PPC-EMOB;0.514|0.510|0.509|0.478;175;None of the services in the provided repository context have a current TRL of 3. All listed services (AST-DEDISRV, ORO-3GPP16, SAVVY-DEVSRV, PPC-EMOB) have a current TRL of 9.;;Incorrect;Yes;No;retrieval miss: says none have TRL 3 (faithful to retrieved context)
+C8;comparative;service;COLD;3;rag-off;17735;0;;;143;"No services in the repository have a current TRL of 3. The catalog检索 returned ""no relevant services,"" indicating no matches for this criterion.";;Refused;Yes;No;auto
+A1;adversarial;service;RAG;3;service;24303;4;MMT-PROBE|HTTP-SIM|MAG|AI4SOAR;0.591|0.564|0.515|0.512;557;"The service ""MONT-MMT"" is not explicitly listed in the provided repository context. However, the **MMT-PROBE** (shortName: `MMT-PROBE`) is a related tool developed by Montimage (MTI) for traffic analysis and threat detection. It is part of the Montimage attack→detect→respond scenario, monitoring pod network traffic and emitting security alerts. 
+
+If you meant a different service, please clarify, or check the repository for other Montimage tools like **MAG** (attack generation), **HTTP-SIM** (target simulation), or **AI4SOAR** (response orchestration).";;Correct;Yes;No;"declined; points to MMT-PROBE"
+A1;adversarial;service;COLD;3;rag-off;14646;0;;;191;The MONT-MMT service is not listed in the current repository catalog. Please verify the service name or consult additional resources for details. If you have more context, feel free to share!;;Correct;Yes;No;declined
+A2;adversarial;service;RAG;3;service;19724;4;SECVDR|MMT-PROBE|SECASSURE4AI|AI4SOAR;0.536|0.511|0.509|0.502;326;"The tool ""GOOGLE-SHIELD"" is not listed in the provided repository context. I cannot confirm its capabilities or existence within the MI Digital Twin Management Platform's repository. For assistance with tools in the repository, feel free to ask about the services listed above (e.g., SECVDR, MMT-PROBE, SECASSURE4AI, AI4SOAR).";;Correct;Yes;No;declined
+A2;adversarial;service;COLD;3;rag-off;14882;0;;;252;The GOOGLE-SHIELD tool is not listed in the current MI Digital Twin Management Platform repository. For detailed information about this tool, please consult the official repository or provide additional context if you need help with a specific service.;;Correct;Yes;No;declined
+A3;adversarial;service;RAG;3;service;20391;4;AST-DEDISRV|SAVVY-DEVSRV|SECNCD|SECVDR;0.513|0.498|0.491|0.480;327;No services in the provided repository context have a current TRL (Technology Readiness Level) of 12. The TRL values listed for all services are either 5 or 9. Note that TRL is typically measured on a scale from 1 (basic principles) to 9 (system proven in operational environment), so a TRL of 12 is outside the standard range.;;Correct;Yes;No;declined
+A3;adversarial;service;COLD;3;rag-off;12856;0;;;215;No services in the catalog have a current TRL of 12. The repository context indicates no relevant services were retrieved, meaning there is no available information about services with TRL 12 in the current catalog.;;Correct;Yes;No;auto
+A4;adversarial;service;RAG;3;service;17636;4;AST-DEDISRV|SAVVY-DEVSRV|SECINTERP|CI-SIM;0.574|0.565|0.551|0.527;229;There are no CISCO services listed in the current repository context. The available services are provided by AST, SAVVY, Tecnalia, and Montimage. Let me know if you'd like to explore these or need help with repository navigation!;;Correct;Yes;No;declined
+A4;adversarial;service;COLD;3;rag-off;12594;0;;;144;No Cisco services were found in the repository catalog at this time. You may want to check back later or contact repository support for updates.;;Correct;Yes;No;declined
+A5;adversarial;service;RAG;3;service;18604;4;MMT-PROBE|HTTP-SIM|AI4SOAR|MAG;0.727|0.660|0.557|0.538;273;The repository context does not specify the minimum RAM requirements for running MMT-PROBE. This information is not included in the provided technical details. For precise hardware requirements, consult the official Montimage documentation or contact the provider directly.;;Correct;Yes;No;declined
+A5;adversarial;service;COLD;3;rag-off;16473;0;;;284;The repository context does not contain information about the minimum RAM requirements for running MMT-PROBE. This detail is not available in the current catalog data. For precise technical specifications, consult the service's official documentation or contact its provider directly.;;Correct;Yes;No;auto
+A6;adversarial;service;RAG;3;service;25876;4;SECINTERP|SECSAC|SECNCD|SECOPSTWIN;0.598|0.580|0.565|0.564;453;The repository context provided does not mention any U.S. National Security Agency (NSA) certifications for the listed services (SECINTERP, SECSAC, SECNCD, or SECOPSTWIN). Certification details are not included in the descriptions, standards, or other metadata for these tools. For NSA certification information, you would need to consult direct documentation from the service providers (Tecnalia, CERTH, SINTEF) or official NSA certification databases.;;Correct;Yes;No;declined
+A6;adversarial;service;COLD;3;rag-off;14312;0;;;299;No services in the MI Digital Twin Management Platform repository are currently certified by the U.S. National Security Agency (NSA). This information is not available in the catalog at this time. For updates or further assistance, please check the platform's catalog again later or contact support.;;Correct;Yes;No;auto
+G1;casual;casual;RAG;3;casual;12634;0;;;165;Hello! How can I assist you today? I'm here to help you explore and compare cybersecurity services from our platform repository. Let me know what you're looking for!;;Correct;Yes;No;auto
+G1;casual;casual;COLD;3;rag-off;12537;0;;;192;Hello! How can I assist you today? I'm here to help you explore and compare cybersecurity services from the MI Digital Twin Management Platform repository. Let me know what you're looking for!;;Correct;Yes;No;auto
+G2;casual;casual;RAG;3;casual;13668;0;;;115;I'm just a digital assistant, so I don't have feelings, but I'm here and ready to help! How can I assist you today?;;Correct;Yes;No;auto
+G2;casual;casual;COLD;3;rag-off;12709;0;;;125;Hello! I'm just a digital assistant, so I don't have feelings, but I'm here and ready to help! How can I assist you today? 😊;;Correct;Yes;No;auto
+G3;casual;casual;RAG;3;casual;9140;0;;;90;You're welcome! If you need any further assistance, feel free to ask. Have a great day! 😊;;Correct;Yes;No;auto
+G3;casual;casual;COLD;3;rag-off;9157;0;;;90;You're welcome! If you need any further assistance, feel free to ask. Have a great day! 😊;;Correct;Yes;No;auto
+G4;casual;casual;RAG;3;casual;13737;0;;;202;Good morning! How can I assist you today? If you have any questions about cybersecurity services or need help exploring options from the MI Digital Twin Management Platform repository, feel free to ask!;;Correct;Yes;No;auto
+G4;casual;casual;COLD;3;rag-off;13310;0;;;189;Good morning! How can I assist you today? If you have any questions about cybersecurity services or need help exploring the MI Digital Twin Management Platform repository, feel free to ask!;;Correct;Yes;No;auto
+G5;casual;casual;RAG;3;casual;8517;0;;;81;Have a great day! Feel free to reach out if you need assistance in the future. 😊;;Correct;Yes;No;auto
+G5;casual;casual;COLD;3;rag-off;8554;0;;;81;Have a great day! Feel free to reach out if you need assistance in the future. 😊;;Correct;Yes;No;auto
+G6;casual;casual;RAG;3;casual;14541;0;;;119;You're welcome! If you need further assistance exploring the platform or have any other questions, feel free to ask. 😊;;Correct;Yes;No;auto
+G6;casual;casual;COLD;3;rag-off;12087;0;;;187;You're welcome! If you need help exploring services, comparing capabilities, or have any other questions, feel free to ask. Always refer to the repository context for specific details. 😊;;Correct;Yes;No;auto

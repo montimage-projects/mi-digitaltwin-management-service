@@ -1,0 +1,60 @@
+{
+  "F6|COLD|1": ["Refused", "No", "no context (cold)"],
+  "C2|COLD|1": ["Refused", "No", "no context (cold)"],
+  "C6|COLD|1": ["Refused", "No", "no context (cold)"],
+  "C7|COLD|1": ["Refused", "No", "no context (cold)"],
+  "F9|COLD|2": ["Refused", "No", "no context (cold)"],
+  "C2|COLD|2": ["Refused", "No", "no context (cold)"],
+  "C6|COLD|2": ["Refused", "No", "no context (cold)"],
+  "C7|COLD|2": ["Refused", "No", "no context (cold)"],
+  "C1|COLD|3": ["Refused", "No", "no context (cold)"],
+  "A1|COLD|1": ["Correct", "No", "declined"],
+  "A2|COLD|1": ["Correct", "No", "declined"],
+  "A1|COLD|2": ["Correct", "No", "declined"],
+  "A2|COLD|2": ["Correct", "No", "declined"],
+  "A3|COLD|2": ["Correct", "No", "declined"],
+  "A1|COLD|3": ["Correct", "No", "declined"],
+  "A2|COLD|3": ["Correct", "No", "declined"],
+  "A3|COLD|3": ["Correct", "No", "declined"],
+  "A1|RAG|1": ["Correct", "No", "says not in catalog, points to MMT-PROBE"],
+  "A1|RAG|2": ["Correct", "No", "says not in catalog, points to MMT-PROBE"],
+  "A1|RAG|3": ["Correct", "No", "says not in catalog, points to MMT-PROBE"],
+  "A2|RAG|1": ["Correct", "No", "declined"],
+  "A2|RAG|2": ["Correct", "No", "declined"],
+  "A2|RAG|3": ["Correct", "No", "declined"],
+  "A3|RAG|2": ["Correct", "No", "declined"],
+  "A4|RAG|1": ["Correct", "No", "declined"],
+  "A5|RAG|1": ["Correct", "No", "declined"],
+  "A6|RAG|1": ["Correct", "No", "declined"],
+  "A6|RAG|3": ["Correct", "No", "declined"],
+  "A3|RAG|1": [
+    "Correct",
+    "No",
+    "declined; overgeneralises TRL range (5-9) from 4 retrieved services"
+  ],
+  "C5|RAG|1": ["Correct", "No", "accurate comparison"],
+  "C5|RAG|2": ["Correct", "No", "accurate comparison"],
+  "C8|RAG|1": [
+    "Incorrect",
+    "No",
+    "retrieval miss: says none have TRL 3 (faithful to retrieved context)"
+  ],
+  "C8|RAG|2": [
+    "Incorrect",
+    "No",
+    "retrieval miss: says none have TRL 3 (faithful to retrieved context)"
+  ],
+  "A4|RAG|2": ["Correct", "No", "declined"],
+  "A4|COLD|2": ["Correct", "No", "declined"],
+  "A5|RAG|2": ["Correct", "No", "declined"],
+  "A6|RAG|2": ["Correct", "No", "declined"],
+  "A3|RAG|3": ["Correct", "No", "declined"],
+  "A4|RAG|3": ["Correct", "No", "declined"],
+  "A5|RAG|3": ["Correct", "No", "declined"],
+  "C5|RAG|3": ["Correct", "No", "accurate comparison"],
+  "C8|RAG|3": [
+    "Incorrect",
+    "No",
+    "retrieval miss: says none have TRL 3 (faithful to retrieved context)"
+  ]
+}

@@ -1,0 +1,83 @@
+[
+  {
+    "id": "FT1",
+    "turns": [
+      { "user": "Hello, how are you today?", "graded": false },
+      {
+        "user": "What license does SIEMENS-ROSCO use?",
+        "graded": true,
+        "groundTruthAny": ["Apache 2.0", "Apache-2.0", "Apache", "MIT"]
+      }
+    ]
+  },
+  {
+    "id": "FT2",
+    "turns": [
+      { "user": "Good morning.", "graded": false },
+      {
+        "user": "Who is the provider of K3CyberRadar?",
+        "graded": true,
+        "groundTruthAny": ["K3Y"]
+      }
+    ]
+  },
+  {
+    "id": "FT3",
+    "turns": [
+      { "user": "Thanks for the help!", "graded": false },
+      {
+        "user": "Hello, is the Data Diode (BEYOND-DD) software or hardware?",
+        "graded": true,
+        "groundTruthAny": ["Hardware", "hardware"]
+      }
+    ]
+  },
+  {
+    "id": "FT4",
+    "turns": [
+      { "user": "Tell me about UBI-FIREWALL.", "graded": false },
+      {
+        "user": "Thank you, now I want to know what inputs does MONT-MMT take?",
+        "graded": true,
+        "groundTruthAny": ["network traffic", "Network Traffic", "Network traffic"]
+      }
+    ]
+  },
+  {
+    "id": "FT5",
+    "turns": [
+      { "user": "Goodbye.", "graded": false },
+      {
+        "user": "What is the TRL of TUC-NIDS?",
+        "graded": true,
+        "groundTruthAny": [
+          "TRL 5",
+          "TRL: 5",
+          "TRL of 5",
+          "current TRL is 5",
+          "TRL is 5",
+          "current TRL of 5"
+        ]
+      },
+      { "user": "Thank you!", "graded": false }
+    ]
+  },
+  {
+    "id": "FT6",
+    "turns": [
+      { "user": "Are you there?", "graded": false },
+      {
+        "user": "What is the title of THALES-CR?",
+        "graded": true,
+        "groundTruthAny": ["CyberRange"]
+      },
+      { "user": "Thanks for the information!", "graded": false },
+      {
+        "user": "Tell me which open-source services are available in the 5G core category?",
+        "graded": true,
+        "groundTruthAny": ["CORE-01", "Free5GC", "CORE-02", "Open5GS"]
+      },
+      { "user": "Thanks, goodbye.", "graded": false }
+    ]
+  }
+]

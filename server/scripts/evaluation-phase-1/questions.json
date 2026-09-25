@@ -1,0 +1,182 @@
+[
+  {
+    "id": "F1",
+    "category": "factual",
+    "question": "What license does the Montimage Monitoring Tool use?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "F2",
+    "category": "factual",
+    "question": "Who is the provider of K3CyberRadar?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "F3",
+    "category": "factual",
+    "question": "What is the current Technology Readiness Level (TRL) of the FPGA-NIDS service?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "F4",
+    "category": "factual",
+    "question": "Which category does the Runtime Security Pipeline (ROSCO-eBPF) belong to?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "F5",
+    "category": "factual",
+    "question": "Is the Data Diode (BEYOND-DD) a software or a hardware service?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "F6",
+    "category": "factual",
+    "question": "What standards does BEYOND-HSM support?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "F7",
+    "category": "factual",
+    "question": "What inputs does MONT-MMT take?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "F8",
+    "category": "factual",
+    "question": "What does the SIEMENS LLM Threat Modelling Tool produce as output?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "F9",
+    "category": "factual",
+    "question": "What is the license of the AXON Open Security Service Repository (OSSR)?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "F10",
+    "category": "factual",
+    "question": "What is the title of THALES-CR?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "C1",
+    "category": "comparative",
+    "question": "Which services are provided by Montimage?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "C2",
+    "category": "comparative",
+    "question": "List the services in the automated-threat-inspection category.",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "C3",
+    "category": "comparative",
+    "question": "Which services support the MITRE ATT&CK standard?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "C4",
+    "category": "comparative",
+    "question": "Which services interact with UBI-ORCH?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "C5",
+    "category": "comparative",
+    "question": "Compare MONT-MMT and TUC-NIDS as intrusion detection options.",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "C6",
+    "category": "comparative",
+    "question": "Which services are available for zero-trust architecture?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "C7",
+    "category": "comparative",
+    "question": "Which open-source services are available in the 5G core category?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "C8",
+    "category": "comparative",
+    "question": "Which services have a current TRL of 7 or higher?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "A1",
+    "category": "adversarial",
+    "question": "Tell me about the UBI-FIREWALL service.",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "A2",
+    "category": "adversarial",
+    "question": "What does the GOOGLE-SHIELD tool do?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "A3",
+    "category": "adversarial",
+    "question": "Which services in the catalog have a current TRL of 12?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "A4",
+    "category": "adversarial",
+    "question": "Tell me about the CISCO services in the repository.",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "A5",
+    "category": "adversarial",
+    "question": "What is the minimum GPU memory requirement for running K3Y-TRUSTEE?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "A6",
+    "category": "adversarial",
+    "question": "Which services are certified by the U.S. National Security Agency (NSA)?",
+    "expectedIntent": "service"
+  },
+  {
+    "id": "G1",
+    "category": "casual",
+    "question": "Hello",
+    "expectedIntent": "casual"
+  },
+  {
+    "id": "G2",
+    "category": "casual",
+    "question": "Hi, how are you today?",
+    "expectedIntent": "casual"
+  },
+  {
+    "id": "G3",
+    "category": "casual",
+    "question": "Thanks for the help.",
+    "expectedIntent": "casual"
+  },
+  {
+    "id": "G4",
+    "category": "casual",
+    "question": "Good morning.",
+    "expectedIntent": "casual"
+  },
+  {
+    "id": "G5",
+    "category": "casual",
+    "question": "Goodbye, see you later.",
+    "expectedIntent": "casual"
+  },
+  {
+    "id": "G6",
+    "category": "casual",
+    "question": "That was helpful, thank you.",
+    "expectedIntent": "casual"
+  }
+]

@@ -1,0 +1,16 @@
+id,category,expected_intent,config,rep,predicted_intent,latency_ms,sources_count,top_source_ids,top_source_scores,answer_length,answer,error
+M1,memory,service,RAG,1,service,50637,4,SAVVY-DEVSRV|AST-DEDISRV|PPC-EMOB|MMT-PROBE,0.483|0.454|0.444|0.435,136,The service you previously asked about (MAG) is not listed in the current repository context. Information about MAG is unavailable here.,
+M1,memory,service,COLD,1,rag-off,17974,0,,,249,The service you asked about (MAG) is not available in the current repository context. No provider or details for MAG were found in the platform catalog. You may need to check the catalog directly or provide additional context for further assistance.,
+M2,memory,service,RAG,1,service,21236,4,SECVDR|AST-DEDISRV|SECNCD|SECOPSTWIN,0.444|0.421|0.417|0.403,226,"The current TRL (Technology Readiness Level) of **MMT-PROBE** is **7** (mature), with an expected progression to TRL 8. This indicates it is currently in a **demonstration or validation phase** within operational environments.",
+M2,memory,service,COLD,1,rag-off,21483,0,,,356,"The service ""MMT-PROBE"" is not listed in the MI Digital Twin Management Platform repository, and no information about its Technology Readiness Level (TRL) is available in the catalog. This may indicate the service is not currently part of the platform's offerings or there may be a typo in the name. Could you verify the name or provide additional context?",
+M3,memory,service,RAG,1,service,29567,4,SECSAC|ORO-5GLAB|SECASSURE4AI|ITPAERO-CFAA,0.621|0.518|0.511|0.509,230,"Among Tecnalia's services in the current context, **SECSAC** explicitly uses the **OSCAL** standard for representing security controls and assessment results.  
+
+No other Tecnalia service in this repository context mentions OSCAL.",
+M3,memory,service,COLD,1,rag-off,12826,0,,,219,"No services provided by Tecnalia were found in the repository catalog. Therefore, there are no services to evaluate for OSCAL standard usage. Please check back later or contact repository support for further assistance.",
+M4,memory,casual,RAG,1,casual,22742,0,,,427,"Yes, the details about **MMT-PROBE** and **MAG** are still available in the repository context. Here’s a summary of what was shared earlier:
+
+- **MMT-PROBE** (`Monitor` module): A traffic analysis probe for DPI-based security monitoring.  
+- **MAG** (`Attack` module): A containerized HTTP attack generator.  
+
+Both are part of Montimage’s attack→detect→respond framework. Let me know if you’d like to revisit specific details!",
+M4,memory,casual,COLD,1,rag-off,28496,0,,,345,"I don’t retain prior messages in our conversation, but I can reference the **current repository context** provided for your latest query. Since no information about ""MMT-PROBE"" or ""MAG"" was found in the catalog, I cannot confirm details about these services. If you have additional context (e.g., provider, use case), I can attempt a new search.",

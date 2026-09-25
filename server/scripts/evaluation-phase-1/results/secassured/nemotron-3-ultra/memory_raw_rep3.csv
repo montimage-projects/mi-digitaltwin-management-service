@@ -1,0 +1,11 @@
+id,category,expected_intent,config,rep,predicted_intent,latency_ms,sources_count,top_source_ids,top_source_scores,answer_length,answer,error
+M1,memory,service,RAG,3,service,51694,4,SAVVY-DEVSRV|AST-DEDISRV|PPC-EMOB|MMT-PROBE,0.483|0.454|0.444|0.435,257,"You just asked about **MAG**, and I answered that its provider is **Montimage (MTI)**. 
+
+(Note: The current repository context does not include a service with the shortName ""MAG"" — the services listed are SAVVY-DEVSRV, AST-DEDISRV, PPC-EMOB, and MMT-PROBE.)",
+M1,memory,service,COLD,3,rag-off,51105,0,,,130,"You asked about **MAG**. However, the repository contains no service with that shortName, so no provider information is available.",
+M2,memory,service,RAG,3,service,50563,4,SECVDR|AST-DEDISRV|SECNCD|SECOPSTWIN,0.444|0.421|0.417|0.403,47,**MMT-PROBE** current TRL: **7** (expected: 8).,
+M2,memory,service,COLD,3,rag-off,35550,0,,,0,,OpenAI-compatible stream error: Upstream error from Nvidia: Service temporarily overloaded (gave up after 5 attempts)
+M3,memory,service,RAG,3,service,2838,4,SECSAC|ORO-5GLAB|SECASSURE4AI|ITPAERO-CFAA,0.621|0.518|0.511|0.509,172,**SECSAC** (Security Assurance Case Tool) — it explicitly lists **OSCAL** in its `standards` field and uses OSCAL for representing security controls and assessment results.,
+M3,memory,service,COLD,3,rag-off,0,0,,,0,,setup turn failed: OpenAI-compatible stream error: Upstream error from Nvidia: Service temporarily overloaded (gave up after 5 attempts)
+M4,memory,casual,RAG,3,casual,1856,0,,,150,"Yes, I can see our previous exchange. You asked about **MMT-PROBE** and **MAG**, and I provided details for both services from the repository context.",
+M4,memory,casual,COLD,3,rag-off,9392,0,,,213,"Yes, I have our conversation history. In the previous message, you asked about **MMT-PROBE** and **MAG** services, and I responded that I couldn't find any information about them in the current repository catalog.",

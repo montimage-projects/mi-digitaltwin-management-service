@@ -1,0 +1,687 @@
+[
+  {
+    "shortName": "AALTO-EDGE5G",
+    "title": "Edge Devices & 5G Testbed",
+    "provider": "AALTO",
+    "category": "5G Testbeds",
+    "sector": "Research",
+    "type": "Software/Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": ["3GPP"],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["Edge Workloads"],
+    "outputs": ["Edge Computing Results"],
+    "interactsWith": [],
+    "useCases": ["Research infrastructure support"],
+    "description": "For IIoT and edge computing.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "AALTO-LUMI",
+    "title": "LUMI Supercomputer",
+    "provider": "AALTO",
+    "category": "HPC & Compute Clusters",
+    "sector": "Research",
+    "type": "Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["AI Training Workloads"],
+    "outputs": ["Trained AI Models"],
+    "interactsWith": [],
+    "useCases": ["Research infrastructure support"],
+    "description": "Top green supercomputer in EU for AI training.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "AI4SOAR",
+    "title": "AI-driven Security Orchestration and Response (AI4SOAR)",
+    "provider": "Montimage (MTI)",
+    "category": "Reaction",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 5,
+      "expected": 8
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Security Alerts"],
+    "outputs": ["Orchestrated Response"],
+    "interactsWith": [],
+    "useCases": ["Reaction module in the Montimage attack→detect→respond scenario"],
+    "description": "Shuffle-based SOAR stack packaged from the Montimage/ai4soar repository, exposing its API/UI on :5000. Ingests MMT-Probe alerts and applies namespace-scoped Kubernetes playbook responses (NetworkPolicy creation, pod deletion, Job scale-down) through its ServiceAccount.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "AST-DEDISRV",
+    "title": "Dedicated Server",
+    "provider": "AST (Assist Software)",
+    "category": "Data Center & Hosting",
+    "sector": "ICT service management (B2B)",
+    "type": "Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["CI/CD Jobs"],
+    "outputs": ["Hosted Dev Environments"],
+    "interactsWith": [],
+    "useCases": ["Cross-cutting infrastructure support"],
+    "description": "For hosting development environments, version control systems, and CI/CD pipelines.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "CI-SIM",
+    "title": "Critical Infrastructure Simulation (CI-SIM)",
+    "provider": "Montimage (MTI)",
+    "category": "Target",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 6,
+      "expected": 8
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["HTTP Requests"],
+    "outputs": ["HTTP Responses & Admin State"],
+    "interactsWith": [],
+    "useCases": [
+      "Interactive attack→detect→respond demo target: block the attacker via /admin/block, let the attack stop the process, and watch Kubernetes restart it"
+    ],
+    "description": "In-repo critical-infrastructure HTTP simulation serving on :8080. Exposes GET / health plus a small service API (/api/status, /api/metrics); POST /admin/block {\"address\":\"<ip>\"} blocklists a source (answered 403 while other sources keep being served), POST /admin/unblock removes it and GET /admin/blocks lists the entries. A sustained request rate from one source over the threshold makes the process log \"service stopped\" and exit, so the Deployment's restartPolicy: Always restarts it while the monitor sidecar holds the pod netns.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "CSAM",
+    "title": "Reference Architecture & Compliance and Security Assurance Model (CSAM)",
+    "provider": "Fraunhofer Fokus (FF)",
+    "category": "Dev Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 5,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": [
+      "ISO/IEC 15408",
+      "EUCC",
+      "EN 17927",
+      "EN 17640",
+      "Cyber Security Act",
+      "Cyber Resilience Act",
+      "AI Act"
+    ],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Stakeholder Requirements"],
+    "outputs": ["Assurance Model"],
+    "interactsWith": [],
+    "useCases": [
+      "Covers 1+ EU regulation, 3+ recommendations to standards, 1+ organisational policy per use case"
+    ],
+    "description": "A holistic, modular assurance model integrating both cybersecurity and regulatory aspects, with a focus on interactions and dependencies between the two. Built with extensible components to adapt to diverse stakeholder needs and hardware/software supply chain requirements. Provides a unified methodology for aligning with certification schemes, standards and regulations including GDPR, the AI Act, and ISO 8000 for data quality.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "HTTP-SIM",
+    "title": "Simulated HTTP Server (HTTP-SIM)",
+    "provider": "Montimage (MTI)",
+    "category": "Target",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 6,
+      "expected": 8
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["HTTP Requests"],
+    "outputs": ["HTTP Responses"],
+    "interactsWith": [],
+    "useCases": ["Target module in the Montimage attack→detect→respond scenario"],
+    "description": "Packaged HTTP victim workload listening on :8080 (`GET /` → 200). The only workload MAG is allowed to reach in the attack→detect→respond scenario; MMT-Probe is injected as a sidecar in its pod to observe the traffic.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "IDEKO-CNC",
+    "title": "Industry 4.0 CNC Controller Digital Laboratory",
+    "provider": "IDEKO",
+    "category": "Manufacturing Labs",
+    "sector": "Manufacturing",
+    "type": "Software/Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["Factory Process Model"],
+    "outputs": ["Digital Factory Simulation"],
+    "interactsWith": [],
+    "useCases": ["Cross-cutting infrastructure support"],
+    "description": "For testing and demonstration purposes where a digital factory can be simulated.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "ITPAERO-CFAA",
+    "title": "CFAA (Basque Country University)",
+    "provider": "ITP Aero",
+    "category": "Manufacturing Labs",
+    "sector": "Manufacturing",
+    "type": "Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["Manufacturing Process Specs"],
+    "outputs": ["Manufactured Components"],
+    "interactsWith": [],
+    "useCases": ["UC2 - Aerospace Digitalization Platform"],
+    "description": "Equipped with advanced manufacturing equipment for joint R&T manufacturing projects.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "ITPAERO-CLUSTER",
+    "title": "Computer Cluster",
+    "provider": "ITP Aero",
+    "category": "HPC & Compute Clusters",
+    "sector": "Manufacturing",
+    "type": "Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["Simulation Jobs"],
+    "outputs": ["Simulation Results"],
+    "interactsWith": [],
+    "useCases": ["UC2 - Aerospace Digitalization Platform"],
+    "description": "Capacity within the world top 500; optimised for CFD simulations, FEM, materials, aerothermal, design optimisation, manufacturing processes and highly complex coupled models.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "MAG",
+    "title": "Montimage Attack Generator (MAG)",
+    "provider": "Montimage (MTI)",
+    "category": "Attack",
+    "type": "Software",
+    "uiType": "terminal",
+    "trl": {
+      "current": 6,
+      "expected": 8
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Attack Profile & Target"],
+    "outputs": ["Attack Traffic"],
+    "interactsWith": [],
+    "useCases": ["Attack module in the Montimage attack→detect→respond scenario"],
+    "description": "Containerized attack-traffic generator distributed by Montimage. Runs its CLI (`mag <attack> --target-ip <ip> --target-port <port>`) sending HTTP attack traffic at the scenario target; in the attack→detect→respond scenario it is deployed as a long-running Deployment the user drives from a shell via `kubectl exec`.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "MMT-PROBE",
+    "title": "MMT Traffic Analysis Probe (MMT-PROBE)",
+    "provider": "Montimage (MTI)",
+    "category": "Monitor",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 7,
+      "expected": 8
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Pod Network Traffic"],
+    "outputs": ["DPI Alerts & Reports"],
+    "interactsWith": [],
+    "useCases": ["Monitor module in the Montimage attack→detect→respond scenario"],
+    "description": "Montimage Monitoring Tool DPI probe (shipped publicly as the `montimage/mmt` image). Injected as a sidecar sharing the target pod network namespace — requires NET_ADMIN and NET_RAW — configured via `mmt-probe.conf` (libconfig) or the `HOST_INTERFACE` env, and emits security alerts/reports consumed by AI4SOAR.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "ORO-3GPP16",
+    "title": "3GPP Rel 16 Commercial Facility",
+    "provider": "ORO (Orange Romania)",
+    "category": "5G Testbeds",
+    "sector": "Digital infrastructure",
+    "type": "Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": ["3GPP"],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["Network Slice Requests"],
+    "outputs": ["Commercial 5G Network Slices"],
+    "interactsWith": [],
+    "useCases": ["UC1 - Telecom Software Development Life Cycle"],
+    "description": "5G infrastructure deployed in 45 cities, providing agility for new 5G communication systems with dedicated/customised network slices (e.g. MEC capabilities).",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "ORO-5GLAB",
+    "title": "Orange 5G Lab",
+    "provider": "ORO (Orange Romania)",
+    "category": "5G Testbeds",
+    "sector": "Digital infrastructure",
+    "type": "Software/Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": ["3GPP"],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["RF & Network Configuration"],
+    "outputs": ["Validated 5G Test Results"],
+    "interactsWith": [],
+    "useCases": ["UC1 - Telecom Software Development Life Cycle"],
+    "description": "5G Full-Stack Development, Testing, And Validation Laboratory with state-of-the-art equipment and access to current 3GPP and future 3GPP-specification technologies.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "PPC-EMOB",
+    "title": "E-mobility Testing Facilities",
+    "provider": "PPC",
+    "category": "E-Mobility & IIoT",
+    "sector": "Energy",
+    "type": "Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["Charging Session Requests"],
+    "outputs": ["Charging Test Results"],
+    "interactsWith": [],
+    "useCases": ["UC5 - Smart Charging Stations"],
+    "description": "A number of charging stations with technological diversity from various vendors; exploited for testing new technologies and services for CPOs and eMSPs.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "PPC-IIOT",
+    "title": "PPC IIoT Lab",
+    "provider": "PPC",
+    "category": "E-Mobility & IIoT",
+    "sector": "Energy",
+    "type": "Software/Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["IIoT Device Traffic"],
+    "outputs": ["Cybersecurity Evaluation Results"],
+    "interactsWith": [],
+    "useCases": ["UC5 - Smart Charging Stations"],
+    "description": "Two virtualisation nodes and a number of IIoT devices for cybersecurity experiments; used for evaluating cybersecurity platforms and products.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SAVVY-DEVSRV",
+    "title": "Development Servers & Operational Networks",
+    "provider": "SAVVY (Savvy Data Systems)",
+    "category": "Data Center & Hosting",
+    "sector": "Digital infrastructure",
+    "type": "Software/Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["Device & Gateway Telemetry"],
+    "outputs": ["Distributed Network Services"],
+    "interactsWith": [],
+    "useCases": ["Cross-cutting infrastructure support"],
+    "description": "Core distributed network in Logroño on a TIER III Data Centre; provides real-time, big data, massive infrastructure for machines and gateways worldwide.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECAISOAR",
+    "title": "AI-driven Security Control Orchestration (secAISOAR)",
+    "provider": "Montimage (MTI)",
+    "category": "Ops Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 6,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Incident & Threat Data"],
+    "outputs": ["Orchestrated Response Playbook"],
+    "interactsWith": [],
+    "useCases": [">=15% improvement in system resilience from proposed remediations"],
+    "description": "Handles intelligent selection of optimal responses to security incidents, building on an enhancement of the \"Shuffle automation\" open-source solution. Analyses real-time data and threat intelligence to improve decision-making, integrating resilience mechanisms within its playbooks that focus on both immediate threat remediation and system recovery/adaptation, with reinforcement learning for better playbook adaptation.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECANOD",
+    "title": "AI-based Attack/Anomaly Detection (secAnoD)",
+    "provider": "Montimage (MTI)",
+    "category": "Ops Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 3,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Threat Intelligence & Telemetry"],
+    "outputs": ["Anomaly Predictions"],
+    "interactsWith": [],
+    "useCases": [
+      ">=80% accuracy of incident prediction; >=70% of studied attacks where the SOAR learns the response solution"
+    ],
+    "description": "Develops explainable LLM-based models for anomaly detection and prediction, extending MMT (Multi-modal Model) with LLMs to automatically generate new detection mechanisms and facilitate operator reporting via an adaptive GUI. Learns from up-to-date threat intelligence (e.g. through RAG), recommends security solutions and autonomously mitigates vulnerabilities identified by security experts.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECASSURE4AI",
+    "title": "Security Assurance Service for AI Components (secAssure4AI)",
+    "provider": "Tecnalia (TEC)",
+    "category": "Dev Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 4,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["AI/ML Component"],
+    "outputs": ["AI Assurance Report"],
+    "interactsWith": [],
+    "useCases": [">=50% of AI/ML relevant attacks tested automatically for at least 2 use cases"],
+    "description": "Elevates security by integrating a holistic view encompassing not only security but also key dimensions of AI trustworthiness: explainability, fairness and robustness. Enhances the integration and automation of tests with AML tools and adds tests for LLM-based services.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECATTSIM",
+    "title": "Attack and Incident Simulator (secAttSIM)",
+    "provider": "Tecnalia (TEC)",
+    "category": "Ops Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 4,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Operation Scenario"],
+    "outputs": ["Simulated Attacks"],
+    "interactsWith": [],
+    "useCases": [">=80% accuracy of attack/anomaly detection"],
+    "description": "Provides new attack simulation tools with white-box and black-box adversarial AI attacks for different operation scenarios. Develops reinforcement learning-guided and LLM-generated attack controls to simulate emerging AI-era attack scenarios, operating in parallel with physical, real IoT-edge-cloud systems and their software components.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECDEVTWIN",
+    "title": "Assurance-driven Security Development Twin (SecDevTwin)",
+    "provider": "SINTEF (STF)",
+    "category": "Dev Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 3,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Software Component Model"],
+    "outputs": ["Digital Twin State"],
+    "interactsWith": [],
+    "useCases": [
+      ">=25% reduction in time to identify non-compliance issues with security standards"
+    ],
+    "description": "A specialised, federated digital twin that continuously supports the software development phase, enabling virtual representation of software components or modules susceptible to vulnerabilities. Integrates the assurance model with Digital Twins for DevOps/TechDebt management, supporting wide collaboration and coordination for multiple assurance tasks and stakeholders within \"Security Engineering Workspaces\".",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECINTERP",
+    "title": "Assurance-driven Standard Interpretation Service (secInterp)",
+    "provider": "Tecnalia (TEC)",
+    "category": "Dev Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 4,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": ["IEC 62443-4-2", "IEEE 1686", "IEC 62351"],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Regulatory Corpus"],
+    "outputs": ["Requirement Mapping"],
+    "interactsWith": [],
+    "useCases": [">=25% reduction in time to derive and interpret security requirements"],
+    "description": "A two-level LLM-based assistant (prioritising open-source models) for the automated extraction and interpretation of cybersecurity requirements. Level 1 (Cybersecurity Standard Mapping Assistant) advises non-cybersecurity experts on relevant norms and standards based on their role and industry sector. Level 2 (Cybersecurity Technical Requirements Assistant) assists software developers in industrial sectors during functional requirements specification, ensuring technical requirements align with industry standards.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECNCD",
+    "title": "AI-based Non-Compliance Detector (secNCD)",
+    "provider": "CERTH",
+    "category": "Dev Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 5,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["System & Compliance Requirements"],
+    "outputs": ["Non-Compliance Report"],
+    "interactsWith": [],
+    "useCases": [
+      ">=25% reduction in time/effort to detect and repair vulnerabilities at design time"
+    ],
+    "description": "An AI-based Non-Compliance Detector that identifies regulatory and security gaps at design time (and even at runtime). Enhances LLMs to act as digital assistants guiding reviewers on checking compliance with security requirements, assisting security and compliance experts in assessing system compliance with complex regulations and standards, identifying non-compliance issues and recommending changes.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECOPSTWIN",
+    "title": "Assurance-driven Security Operation Twin (SecOpsTwin)",
+    "provider": "SINTEF (STF)",
+    "category": "Ops Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 4,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Operational Telemetry"],
+    "outputs": ["Security Assessment Insights"],
+    "interactsWith": [],
+    "useCases": [">=80% accuracy of predicted attack data in simulation for at least 2 use cases"],
+    "description": "A Digital Twin for continuous security monitoring and management, enabling real-time connections to deployed software systems across use cases. Allows human operators to interact with and gain insight into assessment processes using natural language guidance over evaluation results, and includes AI-supported automatic and continuous detection, analysis, evaluation and mitigation of cybersecurity attacks and privacy risks during operation.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECSAC",
+    "title": "Security Assurance Case Tool (secSAC)",
+    "provider": "Tecnalia (TEC)",
+    "category": "Dev Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 3,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": ["OSCAL"],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Requirements & System Information"],
+    "outputs": ["Security Assurance Case"],
+    "interactsWith": [],
+    "useCases": [
+      ">=25% reduction in time to create assurance cases for selected regulations/standards"
+    ],
+    "description": "An LLM-based assistant capable of identifying Security Assurance Cases (SACs) and mapping the necessary information to fulfil and enrich them: extracting data from requirements lists, company-provided system/product information and the assurance patterns catalogue, then synthesising it into a cohesive, structured document guiding the assurance process. Uses OSCAL for representing security controls and assessment results.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECSIM",
+    "title": "Assurance-driven Simulator (secSIM)",
+    "provider": "Montimage (MTI)",
+    "category": "Dev Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 4,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Architecture Changes"],
+    "outputs": ["Simulation Results"],
+    "interactsWith": [],
+    "useCases": ["3 simulation layers covered (architecture, functional, non-functional)"],
+    "description": "An assurance-driven simulator supporting proactive and predictive analysis of emerging security impacts for evolving hardware/software changes and hybrid AI-enabled systems. Covers IoT security simulation with SOAR capabilities to automate detection, analysis and response to security incidents during the design phase, plus zero-trust networking and AI service architecture deployment simulation. Covers 3 simulation layers: architecture, functional and non-functional.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SECVDR",
+    "title": "Vulnerability Discovery and Repair (secVDR)",
+    "provider": "CERTH",
+    "category": "Dev Services",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 5,
+      "expected": 7
+    },
+    "license": "TBD",
+    "standards": [],
+    "repositoryTable": "INTACT_TOOLBOX",
+    "inputs": ["Source & Configuration Code"],
+    "outputs": ["Vulnerability Fixes"],
+    "interactsWith": [],
+    "useCases": ["50% of vulnerabilities repaired with minimum human intervention"],
+    "description": "Detects vulnerabilities residing in the source and configuration code of software programs. Fine-tunes the CodeBERT model for vulnerability detection, covering a wide range of programming languages and considering additional context and system-specific characteristics to increase detection accuracy. Provides proper vulnerability fixes using advanced ML/GenAI models.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "SPS-DEVSECOPS",
+    "title": "DevSecOps Architecture",
+    "provider": "SPS (Safepay Systems)",
+    "category": "DevSecOps Platforms",
+    "sector": "Energy",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["Development Pipelines"],
+    "outputs": ["DevSecOps Environment"],
+    "interactsWith": [],
+    "useCases": ["UC3 - Renewable Prosumer Energy"],
+    "description": "Three system platforms providing a solid background for development activities.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "TELLU-CARE",
+    "title": "TelluCare Product Family",
+    "provider": "TELLU AS",
+    "category": "Healthcare IoT Platforms",
+    "sector": "Health",
+    "type": "Software",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["Patient Health Device Data"],
+    "outputs": ["Remote Healthcare Services"],
+    "interactsWith": [],
+    "useCases": ["UC4 - Healthcare (eHealth SaaS)"],
+    "description": "IPR software product line enabling remote healthcare as SaaS; Personal Health Gateway for managing and operating IoT and Edge infrastructure distributed in patient homes.",
+    "currentVersion": "1.0.0"
+  },
+  {
+    "shortName": "UIH-PROSUMER",
+    "title": "Prosumer Cell",
+    "provider": "UIH (Urban Institute Magyarorszag)",
+    "category": "Energy Grid Infrastructure",
+    "sector": "Energy",
+    "type": "Hardware",
+    "uiType": "web",
+    "trl": {
+      "current": 9,
+      "expected": 9
+    },
+    "license": "N/A (Partner Infrastructure)",
+    "standards": [],
+    "repositoryTable": "OTHER_SERVICES",
+    "inputs": ["Solar Irradiance & Grid Signals"],
+    "outputs": ["Distributed Energy Resource Data"],
+    "interactsWith": [],
+    "useCases": ["UC3 - Renewable Prosumer Energy"],
+    "description": "3.5kW peak capacity solar powered (DER - distributed energy resource) at Balatonfüred site; 5kWh energy storage capacity; connected to local power grid and internet for remote control.",
+    "currentVersion": "1.0.0"
+  }
+]

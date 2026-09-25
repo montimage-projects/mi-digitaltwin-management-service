@@ -1,0 +1,215 @@
+[
+  {
+    "id": "F1",
+    "category": "factual",
+    "expectedIntent": "service",
+    "question": "Who is the provider of the Vulnerability Discovery and Repair service (secVDR)?",
+    "groundTruth": "CERTH."
+  },
+  {
+    "id": "F2",
+    "category": "factual",
+    "expectedIntent": "service",
+    "question": "What is the current Technology Readiness Level (TRL) of the MMT Traffic Analysis Probe (MMT-PROBE)?",
+    "groundTruth": "Current TRL 7 (expected 8)."
+  },
+  {
+    "id": "F3",
+    "category": "factual",
+    "expectedIntent": "service",
+    "question": "Which category does the Montimage Attack Generator (MAG) belong to?",
+    "groundTruth": "Attack."
+  },
+  {
+    "id": "F4",
+    "category": "factual",
+    "expectedIntent": "service",
+    "question": "Is the LUMI Supercomputer (AALTO-LUMI) a software or a hardware service?",
+    "groundTruth": "Hardware."
+  },
+  {
+    "id": "F5",
+    "category": "factual",
+    "expectedIntent": "service",
+    "question": "What standards does the Compliance and Security Assurance Model (CSAM) support?",
+    "groundTruth": "ISO/IEC 15408, EUCC, EN 17927, EN 17640, Cyber Security Act, Cyber Resilience Act, AI Act."
+  },
+  {
+    "id": "F6",
+    "category": "factual",
+    "expectedIntent": "service",
+    "question": "What inputs does AI4SOAR take?",
+    "groundTruth": "Security Alerts (it ingests MMT-Probe alerts)."
+  },
+  {
+    "id": "F7",
+    "category": "factual",
+    "expectedIntent": "service",
+    "question": "What does the Security Assurance Case Tool (secSAC) produce as output?",
+    "groundTruth": "A Security Assurance Case (structured document; uses OSCAL)."
+  },
+  {
+    "id": "F8",
+    "category": "factual",
+    "expectedIntent": "service",
+    "question": "What is the license of the Orange 5G Lab (ORO-5GLAB)?",
+    "groundTruth": "N/A (Partner Infrastructure)."
+  },
+  {
+    "id": "F9",
+    "category": "factual",
+    "expectedIntent": "service",
+    "question": "What is the title of SECOPSTWIN?",
+    "groundTruth": "Assurance-driven Security Operation Twin (SecOpsTwin)."
+  },
+  {
+    "id": "F10",
+    "category": "factual",
+    "expectedIntent": "service",
+    "question": "What kind of user interface does MAG provide?",
+    "groundTruth": "Terminal (CLI: mag <attack> --target-ip <ip> --target-port <port>, driven via kubectl exec)."
+  },
+
+  {
+    "id": "C1",
+    "category": "comparative",
+    "expectedIntent": "service",
+    "question": "Which services are provided by Montimage?",
+    "groundTruth": "AI4SOAR, CI-SIM, HTTP-SIM, MAG, MMT-PROBE, SECAISOAR, SECANOD, SECSIM (8). Retrieval top-k is 4, so a correct partial list without invented services is Partial."
+  },
+  {
+    "id": "C2",
+    "category": "comparative",
+    "expectedIntent": "service",
+    "question": "List the services in the 5G Testbeds category.",
+    "groundTruth": "AALTO-EDGE5G, ORO-3GPP16, ORO-5GLAB."
+  },
+  {
+    "id": "C3",
+    "category": "comparative",
+    "expectedIntent": "service",
+    "question": "Which services are provided by Tecnalia?",
+    "groundTruth": "SECASSURE4AI, SECATTSIM, SECINTERP, SECSAC."
+  },
+  {
+    "id": "C4",
+    "category": "comparative",
+    "expectedIntent": "service",
+    "question": "Which services make up the Montimage attack-detect-respond scenario, and what role does each play?",
+    "groundTruth": "MAG = attack, HTTP-SIM = target (CI-SIM is also an interactive demo target), MMT-PROBE = monitor (sidecar in the target pod), AI4SOAR = reaction."
+  },
+  {
+    "id": "C5",
+    "category": "comparative",
+    "expectedIntent": "service",
+    "question": "Compare MMT-PROBE and secAnoD as attack detection options.",
+    "groundTruth": "Both Montimage. MMT-PROBE: DPI traffic probe, Monitor category, TRL 7->8, input pod network traffic, output DPI alerts/reports. secAnoD: explainable LLM-based anomaly detection/prediction, Ops Services, TRL 3->7, input threat intel & telemetry, output anomaly predictions."
+  },
+  {
+    "id": "C6",
+    "category": "comparative",
+    "expectedIntent": "service",
+    "question": "Which services in the catalog are digital twins?",
+    "groundTruth": "SECDEVTWIN (Security Development Twin) and SECOPSTWIN (Security Operation Twin), both SINTEF."
+  },
+  {
+    "id": "C7",
+    "category": "comparative",
+    "expectedIntent": "service",
+    "question": "Which services belong to the Energy sector?",
+    "groundTruth": "PPC-EMOB, PPC-IIOT, SPS-DEVSECOPS, UIH-PROSUMER."
+  },
+  {
+    "id": "C8",
+    "category": "comparative",
+    "expectedIntent": "service",
+    "question": "Which services have a current TRL of 3?",
+    "groundTruth": "SECANOD, SECDEVTWIN, SECSAC."
+  },
+
+  {
+    "id": "A1",
+    "category": "adversarial",
+    "expectedIntent": "service",
+    "question": "Tell me about the MONT-MMT service.",
+    "groundTruth": "Not in the current catalog (retired). Should say it is unavailable; may point to MMT-PROBE as the current MMT-based probe. Describing MONT-MMT as a current service = hallucination."
+  },
+  {
+    "id": "A2",
+    "category": "adversarial",
+    "expectedIntent": "service",
+    "question": "What does the GOOGLE-SHIELD tool do?",
+    "groundTruth": "No such service in the catalog."
+  },
+  {
+    "id": "A3",
+    "category": "adversarial",
+    "expectedIntent": "service",
+    "question": "Which services in the catalog have a current TRL of 12?",
+    "groundTruth": "None - TRL scale is 1-9."
+  },
+  {
+    "id": "A4",
+    "category": "adversarial",
+    "expectedIntent": "service",
+    "question": "Tell me about the CISCO services in the repository.",
+    "groundTruth": "No CISCO services in the catalog."
+  },
+  {
+    "id": "A5",
+    "category": "adversarial",
+    "expectedIntent": "service",
+    "question": "What is the minimum RAM requirement for running MMT-PROBE?",
+    "groundTruth": "Not specified in the catalog (it only lists NET_ADMIN/NET_RAW capabilities and mmt-probe.conf configuration)."
+  },
+  {
+    "id": "A6",
+    "category": "adversarial",
+    "expectedIntent": "service",
+    "question": "Which services are certified by the U.S. National Security Agency (NSA)?",
+    "groundTruth": "None - no NSA certification appears in the catalog."
+  },
+
+  {
+    "id": "G1",
+    "category": "casual",
+    "expectedIntent": "casual",
+    "question": "Hello",
+    "groundTruth": "Friendly greeting, no catalog content."
+  },
+  {
+    "id": "G2",
+    "category": "casual",
+    "expectedIntent": "casual",
+    "question": "Hi, how are you today?",
+    "groundTruth": "Friendly reply, no catalog content."
+  },
+  {
+    "id": "G3",
+    "category": "casual",
+    "expectedIntent": "casual",
+    "question": "Thanks for the help.",
+    "groundTruth": "Polite acknowledgement."
+  },
+  {
+    "id": "G4",
+    "category": "casual",
+    "expectedIntent": "casual",
+    "question": "Good morning.",
+    "groundTruth": "Friendly greeting."
+  },
+  {
+    "id": "G5",
+    "category": "casual",
+    "expectedIntent": "casual",
+    "question": "Goodbye, see you later.",
+    "groundTruth": "Polite farewell."
+  },
+  {
+    "id": "G6",
+    "category": "casual",
+    "expectedIntent": "casual",
+    "question": "That was helpful, thank you.",
+    "groundTruth": "Polite acknowledgement."
+  }
+]
