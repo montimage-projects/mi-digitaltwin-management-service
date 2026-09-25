@@ -69,6 +69,14 @@ describe('configs', () => {
     ]);
   });
 
+  test('expires stale probe series quickly so a dead component reads down', () => {
+    const config = yamlLoad(collectorConfig([])) as {
+      exporters: { prometheus: { metric_expiration: string } };
+    };
+    // A 200-labelled series from the last good probe must not outlive the target.
+    expect(config.exporters.prometheus.metric_expiration).toBe('25s');
+  });
+
   test('Prometheus scrapes the collector and labels each service target', () => {
     const config = yamlLoad(prometheusConfig(scrapeTargets(NODES))) as {
       scrape_configs: { job_name: string; metrics_path?: string; static_configs: unknown[] }[];
@@ -190,14 +198,14 @@ describe('queryPrometheus', () => {
 describe('collectTraffic', () => {
   const answers: [RegExp, { metric: Record<string, string>; value: number }[]][] = [
     [
-      /^sum by \(http_url\)/,
+      /^\(sum by \(http_url\)/,
       [
         { metric: { http_url: 'http://ci-sim:8080/' }, value: 1 },
         { metric: { http_url: 'http://ai4soar:5000/health' }, value: 0 },
       ],
     ],
     [/^tcpcheck_status_ratio$/, [{ metric: { tcpcheck_endpoint: 'kafka:9092' }, value: 1 }]],
-    [/^avg_over_time\(\(sum/, [{ metric: { http_url: 'http://ci-sim:8080/' }, value: 0.75 }]],
+    [/^avg_over_time\(\(\(sum/, [{ metric: { http_url: 'http://ci-sim:8080/' }, value: 0.75 }]],
     [
       /^avg_over_time\(httpcheck_duration/,
       [{ metric: { http_url: 'http://ci-sim:8080/' }, value: 12 }],

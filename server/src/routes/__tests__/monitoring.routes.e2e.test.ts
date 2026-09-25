@@ -612,9 +612,9 @@ describe('monitoring routes — observability stack readings', () => {
       expect(path).toContain('/namespaces/ns-a/services/secsim-prometheus:9090/proxy/');
       const query = decodeURIComponent(path.split('query=')[1]);
       const url = { http_url: 'http://web:8080/' };
-      if (query.startsWith('sum by (http_url)'))
+      if (query.startsWith('(sum by (http_url)'))
         return { status: 200, body: vector([{ metric: url, value: 0 }]) };
-      if (query.startsWith('avg_over_time((sum'))
+      if (query.startsWith('avg_over_time(((sum'))
         return { status: 200, body: vector([{ metric: url, value: 0.5 }]) };
       if (query.startsWith('avg_over_time(httpcheck_duration'))
         return { status: 200, body: vector([{ metric: url, value: 40 }]) };

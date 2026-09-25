@@ -40,7 +40,15 @@ export const PROMETHEUS_PORT = 9090;
 const COLLECTOR_METRICS_PORT = 8889;
 const COLLECTOR_HEALTH_PORT = 13133;
 /** How often components are probed and Prometheus scrapes. */
-const PROBE_INTERVAL = '15s';
+const PROBE_INTERVAL = '10s';
+/**
+ * How long the collector keeps exporting a series that stopped updating. A
+ * successful probe reports on a series labelled with its status code; when
+ * the target dies that series is no longer updated but, with the exporter's
+ * 5-minute default, would keep reading "up". Just over two probe intervals
+ * turns a dead component "down" within ~35 s (expiry + one scrape).
+ */
+const SERIES_EXPIRATION = '25s';
 const PART_OF = 'secsim-observability';
 const MANAGED_BY = 'secsim';
 
@@ -134,6 +142,7 @@ export function collectorConfig(probes: ProbeTarget[]): string {
     exporters: {
       prometheus: {
         endpoint: `0.0.0.0:${COLLECTOR_METRICS_PORT}`,
+        metric_expiration: SERIES_EXPIRATION,
         resource_to_telemetry_conversion: { enabled: true },
       },
     },
@@ -514,14 +523,23 @@ function probeService(metric: Record<string, string>): string | undefined {
 }
 
 /**
- * PromQL for the dashboard/report window. Probe success per scrape is the
- * sum of the 2xx/3xx `httpcheck_status` series (exactly one class series is
- * 1 on a response; all are 0 when the request failed).
+ * PromQL for the dashboard/report window.
+ *
+ * HTTP probe success: exactly one `httpcheck_status` class series is 1 on a
+ * response (labelled with its status code), all are 0 on a failed request —
+ * but the collector keeps exporting the last 200-labelled series until it
+ * expires. A failing probe also emits `httpcheck_error` at once, so any
+ * error series overrides the 2xx/3xx sum to 0: an outage reads "down" within
+ * a probe and a scrape, and recovery reads "up" once the error series
+ * expires (~35 s).
  */
 export function trafficQueries(
   window: string
 ): Record<keyof Omit<ServiceTraffic, 'probe'>, string[]> {
-  const httpOk = 'sum by (http_url) (httpcheck_status{http_status_class=~"2xx|3xx"})';
+  const httpError = 'max by (http_url) (httpcheck_error)';
+  const httpOk =
+    `(sum by (http_url) (httpcheck_status{http_status_class=~"2xx|3xx"}) unless on (http_url) ${httpError})` +
+    ` or on (http_url) (0 * ${httpError})`;
   return {
     up: [httpOk, 'tcpcheck_status_ratio'],
     availability: [

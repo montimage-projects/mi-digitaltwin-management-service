@@ -68,11 +68,11 @@ graph LR
 
 What is collected for each component:
 
-| Reading                                                             | Source                                                                       | Applies to                                                                                       |
-| ------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Up / down, availability (share of successful probes), probe latency | Collector `httpcheck` (HTTP 2xx/3xx counts as up) or `tcpcheck`, every 15 s  | Every component with a Service. HTTP when the catalog declares a `readinessPath`, TCP otherwise. |
-| Request rate, error rate (5xx), p95 latency                         | Prometheus scrape of `http_requests_total` / `http_request_duration_seconds` | Components whose catalog `deployment` declares `metricsPort` (and optionally `metricsPath`)      |
-| Request rate, error rate, p95 latency                               | Collector `spanmetrics` over spans pushed via OTLP                           | Components with the OpenTelemetry SDK                                                            |
+| Reading                                                             | Source                                                                                                                                                                                       | Applies to                                                                                       |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Up / down, availability (share of successful probes), probe latency | Collector `httpcheck` (HTTP 2xx/3xx counts as up) or `tcpcheck`, every 10 s. A component that stops answering reads down within about 20 s; recovery shows about 35 s after it answers again | Every component with a Service. HTTP when the catalog declares a `readinessPath`, TCP otherwise. |
+| Request rate, error rate (5xx), p95 latency                         | Prometheus scrape of `http_requests_total` / `http_request_duration_seconds`                                                                                                                 | Components whose catalog `deployment` declares `metricsPort` (and optionally `metricsPath`)      |
+| Request rate, error rate, p95 latency                               | Collector `spanmetrics` over spans pushed via OTLP                                                                                                                                           | Components with the OpenTelemetry SDK                                                            |
 
 Every container of an observed run gets `OTEL_EXPORTER_OTLP_ENDPOINT` set to
 `http://secsim-otel-collector:4318` and `OTEL_SERVICE_NAME` set to its node
@@ -82,8 +82,7 @@ reports without extra configuration.
 **Probes are not user traffic.** Availability and probe latency describe the
 collector's checks. Request rate, error rate and p95 latency appear only for
 components that expose metrics or send traces. None of the seeded Montimage
-images do this today. The probes themselves are light (one request every 15
-s from the collector's own pod IP) and do not trip per-source rate limits
+images do this today. The probes themselves are light (one request every 10 s from the collector's own pod IP) and do not trip per-source rate limits
 such as CI-SIM's.
 
 Where the data shows up:

@@ -554,9 +554,9 @@ describe('observability section (issue #25)', () => {
   const get = vi.fn(async (path: string) => {
     const query = decodeURIComponent(path.split('query=')[1]);
     const url = { http_url: 'http://svc-a:8080/' };
-    if (query.startsWith('sum by (http_url)'))
+    if (query.startsWith('(sum by (http_url)'))
       return { status: 200, body: vector([{ metric: url, value: 1 }]) };
-    if (query.startsWith('avg_over_time((sum'))
+    if (query.startsWith('avg_over_time(((sum'))
       return { status: 200, body: vector([{ metric: url, value: 0.975 }]) };
     if (query.startsWith('avg_over_time(httpcheck_duration'))
       return { status: 200, body: vector([{ metric: url, value: 20 }]) };
