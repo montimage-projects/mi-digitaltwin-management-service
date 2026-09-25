@@ -1,0 +1,53 @@
+# OpenTelemetry Collector for the SecSim platform itself. The server exports
+# traces over OTLP (OTEL_EXPORTER_OTLP_ENDPOINT); the spanmetrics connector
+# turns them into request rate / error rate / latency series that Prometheus
+# scrapes from :8889. Shared by the kustomize component and
+# docker-compose.prod.yml, which mounts this same file.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+  batch: {}
+
+connectors:
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2500ms, 5s, 10s]
+    dimensions:
+      - name: http.request.method
+      - name: http.route
+      - name: http.response.status_code
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+  debug:
+    verbosity: basic
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [spanmetrics, debug]
+    metrics:
+      receivers: [otlp, spanmetrics]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus]

@@ -28,6 +28,17 @@ const envSchema = z.object({
   APP_NAME: z.string().optional(),
   ORG_NAME: z.string().optional(),
   ORG_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+  /** Serve Prometheus metrics at `GET /metrics` (default on). */
+  METRICS_ENABLED: z
+    .enum(['true', 'false', '1', '0'])
+    .optional()
+    .transform((v) => v !== 'false' && v !== '0'),
+  /** When set, `/metrics` requires `Authorization: Bearer <METRICS_TOKEN>`. */
+  // gitleaks:allow — variable name, not a credential
+  METRICS_TOKEN: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().min(16, 'METRICS_TOKEN must be at least 16 characters').optional()
+  ),
 });
 
 const parseEnv = () => {

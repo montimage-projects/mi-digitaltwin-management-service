@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
+  Activity,
   LayoutDashboard,
   Server,
   FolderKanban,
@@ -29,6 +30,7 @@ export const navigation: NavItem[] = [
   { name: 'Services', href: '/services', icon: Server },
   { name: 'Projects', href: '/projects', icon: FolderKanban },
   { name: 'Infrastructure', href: '/infrastructure', icon: Network },
+  { name: 'Monitoring', href: '/monitoring', icon: Activity },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

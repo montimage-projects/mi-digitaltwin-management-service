@@ -28,6 +28,7 @@ import type { IDeploymentSpec } from '../models/Service.js';
 import type { INodeConfig } from '../models/Scenario.js';
 import { decrypt } from '../utils/encryption.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { COLLECTOR_NAME, deployObservabilityStack } from './observability.js';
 
 /**
  * Kubernetes deploy engine.
@@ -153,6 +154,8 @@ export interface DeployedServiceResult {
 export interface DeployResult {
   namespace: string;
   services: DeployedServiceResult[];
+  /** The per-namespace observability stack was created (see observability.ts). */
+  observability: boolean;
 }
 
 export interface DeployTopologyOptions {
@@ -171,6 +174,12 @@ export interface DeployTopologyOptions {
   readinessTimeoutMs?: number;
   /** Delay between pod-list polls while waiting on readiness. */
   readinessPollMs?: number;
+  /**
+   * Deploy the per-namespace OTel Collector + Prometheus and point every
+   * container's OTLP exporter at it. Off when omitted; callers pass the
+   * scenario's `observability` option (default on).
+   */
+  observability?: boolean;
 }
 
 /** Default container/service port used for the single mapped port per node. */
@@ -1158,6 +1167,7 @@ export async function deployTopology(
   opts: DeployTopologyOptions
 ): Promise<DeployResult> {
   const resolved = resolveTopologyNodes(opts.nodes, opts.services, opts.edges);
+  if (opts.observability) addTelemetryEnv(resolved);
   // Throws AppError(400) for a sidecar with no monitor edge — before any
   // cluster call, so nothing is created for a topology that cannot deploy.
   const plans = planWorkloads(resolved);
@@ -1195,6 +1205,16 @@ export async function deployTopology(
           })
         )
     );
+
+    // Observability stack (issue #25): best-effort and outside the rollout —
+    // no readiness gate, progress row or outcome depends on it.
+    const observability = opts.observability
+      ? await deployObservabilityStack(
+          clients,
+          opts.namespace,
+          plans.map((p) => p.node)
+        )
+      : false;
 
     // Ordered rollout (task 1.6): workloads go up in ascending `startOrder`
     // tiers — target and monitor first, then reaction, then attack. Plans in
@@ -1314,11 +1334,29 @@ export async function deployTopology(
       };
     });
 
-    return { namespace: opts.namespace, services: results };
+    return { namespace: opts.namespace, services: results, observability };
   } catch (err) {
     // Best-effort teardown of resources already created.
     void clients.core.deleteNamespace({ name: opts.namespace }).catch(() => undefined);
     throw toAppError(err, `deploying topology to namespace ${opts.namespace}`);
+  }
+}
+
+/**
+ * Point every container's OpenTelemetry SDK at the namespace collector under
+ * its own node name, so any OTel-instrumented image reports without extra
+ * configuration. A value the catalog or node config already sets wins.
+ */
+function addTelemetryEnv(resolved: ResolvedNode[]): void {
+  for (const node of resolved) {
+    const env = [...(node.deployment.env ?? [])];
+    const declared = new Set(env.map((e) => e.name));
+    const add = (name: string, value: string) => {
+      if (!declared.has(name)) env.push({ name, value });
+    };
+    add('OTEL_EXPORTER_OTLP_ENDPOINT', `http://${COLLECTOR_NAME}:4318`);
+    add('OTEL_SERVICE_NAME', node.name);
+    node.deployment = { ...node.deployment, env };
   }
 }
 

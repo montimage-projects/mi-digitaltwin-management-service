@@ -11,6 +11,7 @@
     "seed": "tsx src/seed/index.ts",
     "migrate:sectors": "tsx src/migrations/add-sectors-to-services.ts",
     "migrate:category-to-sector": "tsx src/migrations/migrate-category-to-sector.ts",
+    "migrate:close-legacy-executions": "tsx src/migrations/close-legacy-executions.ts",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write src/**/*.ts",
@@ -27,6 +28,13 @@
   },
   "dependencies": {
     "@kubernetes/client-node": "^2.0.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
+    "@opentelemetry/instrumentation": "^0.222.0",
+    "@opentelemetry/instrumentation-express": "^0.70.0",
+    "@opentelemetry/instrumentation-http": "^0.222.0",
+    "@opentelemetry/resources": "^2.11.0",
+    "@opentelemetry/sdk-node": "^0.222.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
     "bcrypt": "^6.0.0",
     "compression": "^1.8.1",
     "cors": "^2.8.6",
@@ -36,6 +44,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.0.0",
     "morgan": "^1.12.0",
+    "prom-client": "^15.1.3",
     "zod": "^4.0.0"
   },
   "devDependencies": {

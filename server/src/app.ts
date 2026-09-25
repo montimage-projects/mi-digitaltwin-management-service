@@ -20,7 +20,9 @@ import partnersRoutes from './routes/partners.routes.js';
 import projectsRoutes from './routes/projects.routes.js';
 import scenariosRoutes from './routes/scenarios.routes.js';
 import infrastructuresRoutes from './routes/infrastructures.routes.js';
+import monitoringRoutes from './routes/monitoring.routes.js';
 import { openApiSpec } from './docs/openapi.js';
+import { metricsHandler, metricsMiddleware } from './telemetry/metrics.js';
 
 const app = express();
 
@@ -51,6 +53,11 @@ app.use(
   })
 );
 app.use(morgan(env.NODE_ENV === 'development' ? 'dev' : 'combined'));
+if (env.METRICS_ENABLED) {
+  app.use(metricsMiddleware());
+  // Before the SPA catch-all registered by configureStaticServing.
+  app.get('/metrics', metricsHandler(env.METRICS_TOKEN));
+}
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -76,6 +83,7 @@ app.use('/api/partners', partnersRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api', scenariosRoutes);
 app.use('/api/infrastructures', infrastructuresRoutes);
+app.use('/api/monitoring', monitoringRoutes);
 
 // Static file serving - always enabled to serve client build
 const staticServingEnabled = configureStaticServing(app);

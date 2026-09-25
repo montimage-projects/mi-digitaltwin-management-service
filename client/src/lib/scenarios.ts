@@ -89,6 +89,8 @@ export interface Scenario {
     status: string;
     endpoint?: string;
   } | null;
+  /** Per-execution observability stack; absent on older documents means on. */
+  observability?: boolean;
   executions: Execution[];
   latestExecution?: {
     status: Execution['status'];
@@ -104,6 +106,7 @@ export interface CreateScenarioData {
   description?: string;
   topology?: Partial<Topology>;
   infrastructureId?: string;
+  observability?: boolean;
 }
 
 /** An observable outcome the runbook checks off live. */

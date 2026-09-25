@@ -6,14 +6,15 @@ respond demo.
 
 ## API surface
 
-| Method | Path             | Description                                                    |
-| ------ | ---------------- | -------------------------------------------------------------- |
-| GET    | `/`              | Health — 200 JSON (the Deployment `readinessPath`)             |
-| GET    | `/api/status`    | Uptime and request counters                                    |
-| GET    | `/api/metrics`   | Per-source request counts inside the rate window               |
-| POST   | `/admin/block`   | `{"address": "<ip>"}` — blocklist a source; it is answered 403 |
-| POST   | `/admin/unblock` | `{"address": "<ip>"}` — remove a blocklist entry               |
-| GET    | `/admin/blocks`  | List the blocklisted addresses                                 |
+| Method | Path             | Description                                                                                                                                                           |
+| ------ | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/`              | Health — 200 JSON (the Deployment `readinessPath`)                                                                                                                    |
+| GET    | `/api/status`    | Uptime and request counters                                                                                                                                           |
+| GET    | `/api/metrics`   | Per-source request counts inside the rate window                                                                                                                      |
+| POST   | `/admin/block`   | `{"address": "<ip>"}` — blocklist a source; it is answered 403                                                                                                        |
+| POST   | `/admin/unblock` | `{"address": "<ip>"}` — remove a blocklist entry                                                                                                                      |
+| GET    | `/admin/blocks`  | List the blocklisted addresses                                                                                                                                        |
+| GET    | `/metrics`       | Prometheus metrics: `http_requests_total` and `http_request_duration_seconds` by method, route and status code. Never rate-limited, blocklisted or counted as traffic |
 
 `X-Forwarded-For` is honoured for the source address so the blocklist and the
 rate watcher keep working behind a proxy or `kubectl port-forward`.

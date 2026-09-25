@@ -55,6 +55,13 @@ export interface IDeploymentSpec {
   rbac?: { apiGroups: string[]; resources: string[]; verbs: string[] }[];
   /** HTTP readiness path (e.g. `/health`). */
   readinessPath?: string;
+  /**
+   * Port serving Prometheus metrics, scraped by the per-execution
+   * observability stack through a `<name>-metrics` ClusterIP Service.
+   */
+  metricsPort?: number;
+  /** Path of those metrics (default `/metrics`). */
+  metricsPath?: string;
   /** Startup ordering — lower starts first. */
   startOrder?: number;
 }
@@ -180,6 +187,8 @@ const deploymentSchema = new Schema<IDeploymentSpec>(
     hostNetwork: { type: Boolean },
     rbac: [deploymentRbacRuleSchema],
     readinessPath: { type: String },
+    metricsPort: { type: Number, min: 1, max: 65535 },
+    metricsPath: { type: String },
     startOrder: { type: Number, min: 0 },
   },
   { _id: false }

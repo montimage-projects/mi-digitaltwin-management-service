@@ -1,4 +1,7 @@
 import { APP_NAME, ORG_NAME, ORG_URL } from '../config/branding.js';
+import { ALERT_METRICS } from '../models/AlertRule.js';
+
+const ALERT_METRIC_ENUM = [...ALERT_METRICS];
 
 export const openApiSpec = {
   openapi: '3.0.0',
@@ -80,6 +83,12 @@ export const openApiSpec = {
           description: { type: 'string' },
           topology: { type: 'object' },
           infrastructureId: { type: 'string' },
+          observability: {
+            type: 'boolean',
+            default: true,
+            description:
+              'Deploy an OpenTelemetry Collector and Prometheus into each execution namespace to probe and scrape every component',
+          },
         },
       },
       Infrastructure: {
@@ -90,6 +99,140 @@ export const openApiSpec = {
           type: { type: 'string', enum: ['kubernetes', 'docker', 'virtual'] },
           endpoint: { type: 'string' },
           status: { type: 'string', enum: ['active', 'inactive', 'error'] },
+        },
+      },
+      AlertRule: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          name: { type: 'string' },
+          metric: { type: 'string', enum: ALERT_METRIC_ENUM },
+          operator: { type: 'string', enum: ['gt', 'gte', 'lt', 'lte'] },
+          threshold: { type: 'number', minimum: 0 },
+          severity: { type: 'string', enum: ['info', 'warning', 'critical'] },
+          scope: {
+            type: 'object',
+            properties: {
+              serviceId: { type: 'string' },
+              infrastructureId: { type: 'string' },
+            },
+          },
+          enabled: { type: 'boolean' },
+          createdBy: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      AlertRuleInput: {
+        type: 'object',
+        required: ['name', 'metric', 'operator', 'threshold', 'severity'],
+        properties: {
+          name: { type: 'string', maxLength: 100 },
+          metric: { type: 'string', enum: ALERT_METRIC_ENUM },
+          operator: { type: 'string', enum: ['gt', 'gte', 'lt', 'lte'] },
+          threshold: { type: 'number', minimum: 0 },
+          severity: { type: 'string', enum: ['info', 'warning', 'critical'] },
+          scope: {
+            type: 'object',
+            properties: {
+              serviceId: { type: 'string' },
+              infrastructureId: { type: 'string' },
+            },
+          },
+          enabled: { type: 'boolean' },
+        },
+      },
+      MonitoringSnapshot: {
+        type: 'object',
+        properties: {
+          collectedAt: { type: 'string', format: 'date-time' },
+          infrastructures: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                infrastructureId: { type: 'string' },
+                name: { type: 'string' },
+                available: { type: 'boolean' },
+                reason: { type: 'string' },
+                namespaces: { type: 'integer' },
+              },
+            },
+          },
+          services: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                key: { type: 'string' },
+                name: { type: 'string' },
+                serviceIds: { type: 'array', items: { type: 'string' } },
+                nodeIds: { type: 'array', items: { type: 'string' } },
+                scenarioId: { type: 'string' },
+                scenarioTitle: { type: 'string' },
+                executionId: { type: 'string' },
+                namespace: { type: 'string' },
+                infrastructureId: { type: 'string' },
+                infrastructureName: { type: 'string' },
+                metricsAvailable: { type: 'boolean' },
+                pods: { type: 'integer' },
+                cpuMillicores: { type: 'number' },
+                memoryBytes: { type: 'number' },
+                containers: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string' },
+                      cpuMillicores: { type: 'number' },
+                      memoryBytes: { type: 'number' },
+                    },
+                  },
+                },
+                observability: {
+                  type: 'boolean',
+                  description: 'The execution runs the observability stack',
+                },
+                traffic: {
+                  type: 'object',
+                  description:
+                    'Readings from the execution observability stack (probes over the last 5 minutes; request metrics only for components exposing Prometheus metrics or sending OTLP traces)',
+                  properties: {
+                    probe: { type: 'string', enum: ['http', 'tcp'] },
+                    up: { type: 'boolean' },
+                    availability: { type: 'number', minimum: 0, maximum: 1 },
+                    probeLatencyMs: { type: 'number' },
+                    requestRate: { type: 'number', description: 'Requests per second' },
+                    errorRate: { type: 'number', minimum: 0, maximum: 1 },
+                    latencyP95Ms: { type: 'number' },
+                  },
+                },
+                trafficReason: {
+                  type: 'string',
+                  description: 'Why the observability stack gave no reading',
+                },
+              },
+            },
+          },
+          alerts: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                ruleId: { type: 'string' },
+                ruleName: { type: 'string' },
+                serviceKey: { type: 'string' },
+                serviceName: { type: 'string' },
+                executionId: { type: 'string' },
+                infrastructureId: { type: 'string' },
+                metric: { type: 'string', enum: ALERT_METRIC_ENUM },
+                operator: { type: 'string', enum: ['gt', 'gte', 'lt', 'lte'] },
+                value: { type: 'number' },
+                threshold: { type: 'number' },
+                severity: { type: 'string', enum: ['info', 'warning', 'critical'] },
+              },
+            },
+          },
         },
       },
     },
@@ -374,6 +517,24 @@ export const openApiSpec = {
                     errorLogs: { type: 'array', items: { type: 'object' } },
                     events: { type: 'array', items: { type: 'object' } },
                     alerts: { type: 'array', items: { type: 'object' } },
+                    traffic: {
+                      type: 'array',
+                      description:
+                        'Per-component health and traffic over the run, read from the execution observability stack before teardown; absent when the run had none',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          service: { type: 'string' },
+                          probe: { type: 'string', enum: ['http', 'tcp'] },
+                          up: { type: 'boolean' },
+                          availability: { type: 'number' },
+                          probeLatencyMs: { type: 'number' },
+                          requestRate: { type: 'number' },
+                          errorRate: { type: 'number' },
+                          latencyP95Ms: { type: 'number' },
+                        },
+                      },
+                    },
                     omitted: { type: 'object' },
                     partial: { type: 'boolean' },
                     captureErrors: { type: 'array', items: { type: 'string' } },
@@ -482,12 +643,120 @@ export const openApiSpec = {
         },
       },
     },
+    '/monitoring/metrics': {
+      get: {
+        tags: ['Monitoring'],
+        summary: 'CPU/memory snapshot of running services with fired alerts',
+        description:
+          'Reads the Kubernetes metrics-server (`metrics.k8s.io`) once per active execution ' +
+          'namespace and evaluates the enabled alert rules. Requires metrics-server in the ' +
+          'cluster and RBAC get/list on `pods.metrics.k8s.io`; otherwise that infrastructure ' +
+          'is reported `available: false` with a reason (the request still succeeds). ' +
+          'Request rate, error rate and latency are not available yet.',
+        parameters: [
+          { name: 'infrastructureId', in: 'query', schema: { type: 'string' } },
+          { name: 'serviceId', in: 'query', schema: { type: 'string' } },
+          {
+            name: 'severity',
+            in: 'query',
+            schema: { type: 'string', enum: ['info', 'warning', 'critical'] },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Metrics snapshot',
+            content: {
+              'application/json': { schema: { $ref: '#/components/schemas/MonitoringSnapshot' } },
+            },
+          },
+          400: { description: 'Invalid filter' },
+        },
+      },
+    },
+    '/monitoring/alert-rules': {
+      get: {
+        tags: ['Monitoring'],
+        summary: 'List alert rules',
+        responses: {
+          200: {
+            description: 'Alert rules, newest first',
+            content: {
+              'application/json': {
+                schema: { type: 'array', items: { $ref: '#/components/schemas/AlertRule' } },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ['Monitoring'],
+        summary: 'Create an alert rule (admin)',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/AlertRuleInput' } },
+          },
+        },
+        responses: {
+          201: { description: 'Alert rule created' },
+          400: { description: 'Validation error' },
+          403: { description: 'Admin role required' },
+        },
+      },
+    },
+    '/monitoring/alert-rules/{id}': {
+      put: {
+        tags: ['Monitoring'],
+        summary: 'Update an alert rule (admin)',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': { schema: { $ref: '#/components/schemas/AlertRuleInput' } },
+          },
+        },
+        responses: {
+          200: { description: 'Alert rule updated' },
+          400: { description: 'Validation error' },
+          403: { description: 'Admin role required' },
+          404: { description: 'Alert rule not found' },
+        },
+      },
+      delete: {
+        tags: ['Monitoring'],
+        summary: 'Delete an alert rule (admin)',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Alert rule deleted' },
+          403: { description: 'Admin role required' },
+          404: { description: 'Alert rule not found' },
+        },
+      },
+    },
     '/health': {
       get: {
         tags: ['Health'],
         summary: 'Health check endpoint',
         security: [],
         responses: { 200: { description: 'Service is healthy' } },
+      },
+    },
+    '/metrics': {
+      // Served at the root, not under the /api base URL.
+      servers: [{ url: '/', description: 'Server root' }],
+      get: {
+        tags: ['Health'],
+        summary: 'Prometheus metrics of the SecSim server (RED + process + live executions)',
+        description:
+          'Open unless METRICS_TOKEN is set, then requires a bearer token. Disabled with METRICS_ENABLED=false.',
+        security: [],
+        responses: {
+          200: {
+            description: 'Prometheus text exposition format',
+            content: { 'text/plain': { schema: { type: 'string' } } },
+          },
+          401: { description: 'METRICS_TOKEN is set and the bearer token is missing or wrong' },
+        },
       },
     },
   },

@@ -37,9 +37,11 @@ import {
   type IReportOmitted,
   type IReportServiceStatus,
   type IReportStatusCounts,
+  type IReportTraffic,
   type ReportDeployStatus,
 } from '../models/ExecutionReport.js';
 import { logger } from '../utils/logger.js';
+import { collectTraffic, type ApiGet } from './observability.js';
 
 /** Most recent log lines kept in a report. */
 export const MAX_LOG_LINES = 2000;
@@ -98,6 +100,8 @@ export interface ReportExecutionView {
   completedAt?: Date | string | null;
   durationMs?: number | null;
   outcome?: ExecutionOutcome | null;
+  /** The namespace runs the observability stack (issue #25). */
+  observability?: boolean | null;
 }
 
 /** Minimal read-only view of the owning scenario. */
@@ -114,6 +118,8 @@ export interface CapturedArtifacts {
   restarts: number;
   logs: PodLogLine[];
   events: NamespaceEventEntry[];
+  /** Health/traffic per deployed component; undefined when not collected. */
+  traffic?: IReportTraffic[];
   /** One entry per capture step that failed (or the timeout). */
   captureErrors: string[];
 }
@@ -137,6 +143,8 @@ export interface ExecutionReportData {
   errorLogs: IReportLogLine[];
   events: IReportEvent[];
   alerts: IReportAlert[];
+  /** Per-component health and traffic, when the run had the observability stack. */
+  traffic?: IReportTraffic[];
   omitted: IReportOmitted;
   /** True when part of the capture failed — see `captureErrors`. */
   partial: boolean;
@@ -457,6 +465,13 @@ export function buildReport(input: ReportInput): ExecutionReportData {
     errorLogs: errorLogs.kept,
     events: events.kept,
     alerts: alerts.kept,
+    ...(artifacts?.traffic
+      ? {
+          traffic: artifacts.traffic
+            .slice(0, MAX_TRAFFIC_ROWS)
+            .map((t) => ({ ...t, service: capName(t.service) ?? '' })),
+        }
+      : {}),
     omitted: {
       logs: logs.omitted,
       errorLogs: errorLogs.omitted,
@@ -524,6 +539,7 @@ export function toReportData(
     errorLogs: stored.errorLogs ?? [],
     events: stored.events ?? [],
     alerts: stored.alerts ?? [],
+    ...(Array.isArray(stored.traffic) ? { traffic: stored.traffic } : {}),
     omitted: {
       logs: stored.omitted?.logs ?? 0,
       errorLogs: stored.omitted?.errorLogs ?? 0,
@@ -543,6 +559,18 @@ export function toReportData(
 // Cluster capture + persistence
 // ---------------------------------------------------------------------------
 
+/** Components kept in a report's health/traffic table. */
+const MAX_TRAFFIC_ROWS = 100;
+
+/**
+ * PromQL range covering the run, at least one minute (so a short run still
+ * spans a few 15 s probes) and at most the stack's one-day retention.
+ */
+export function runWindow(startedAt: Date | undefined, now: Date): string {
+  const seconds = startedAt ? Math.ceil((now.getTime() - startedAt.getTime()) / 1000) : 0;
+  return `${Math.min(86_400, Math.max(60, seconds))}s`;
+}
+
 /**
  * Read the run's final cluster state: workload statuses, container restarts,
  * the full pod logs and the namespace events (fresh `seen` state, so every
@@ -552,7 +580,12 @@ export function toReportData(
  */
 export async function collectArtifacts(
   clients: K8sClients,
-  opts: { namespace: string; names: string[] },
+  opts: {
+    namespace: string;
+    names: string[];
+    /** Read the observability stack over `window` (e.g. the run's length). */
+    traffic?: { get: ApiGet; window: string };
+  },
   timeoutMs: number = CAPTURE_TIMEOUT_MS
 ): Promise<CapturedArtifacts> {
   const acc: CapturedArtifacts = {
@@ -602,11 +635,27 @@ export async function collectArtifacts(
     });
   };
 
+  // Runs alongside the cluster reads; only deployed components are kept —
+  // span-derived series carry a pushed, untrusted service name.
+  const collectObservability = async (): Promise<void> => {
+    const traffic = opts.traffic;
+    if (!traffic) return;
+    await step('observability', async () => {
+      const byService = await collectTraffic(traffic.get, namespace, {
+        window: traffic.window,
+        timeoutMs: Math.max(1000, Math.floor(timeoutMs / 2)),
+      });
+      acc.traffic = names
+        .filter((name) => byService.has(name))
+        .map((name) => ({ service: name, ...byService.get(name) }));
+    });
+  };
+
   let timer: ReturnType<typeof setTimeout> | undefined;
   let timedOut = false;
   try {
     await Promise.race([
-      collect(),
+      Promise.all([collect(), collectObservability()]),
       new Promise<void>((resolve) => {
         timer = setTimeout(() => {
           timedOut = true;
@@ -624,6 +673,7 @@ export async function collectArtifacts(
     restarts: acc.restarts,
     logs: [...acc.logs],
     events: [...acc.events],
+    ...(acc.traffic ? { traffic: [...acc.traffic] } : {}),
     captureErrors: [...acc.captureErrors],
   };
   if (timedOut) result.captureErrors.push(`capture timed out after ${timeoutMs}ms`);
@@ -696,6 +746,8 @@ export async function captureReport(opts: {
   scenario: ReportScenarioView;
   execution: ReportExecutionView;
   timeoutMs?: number;
+  /** API-server reader for the execution's observability stack, if it has one. */
+  observabilityGet?: ApiGet;
 }): Promise<RunCloseSummary> {
   const { clients, scenario, execution } = opts;
   const executionId = String(execution._id ?? '');
@@ -733,6 +785,14 @@ export async function captureReport(opts: {
               names: (execution.deployedServices ?? [])
                 .map((s) => s.name)
                 .filter((n): n is string => Boolean(n)),
+              ...(execution.observability && opts.observabilityGet
+                ? {
+                    traffic: {
+                      get: opts.observabilityGet,
+                      window: runWindow(toDate(execution.executedAt), now),
+                    },
+                  }
+                : {}),
             },
             opts.timeoutMs
           )
@@ -957,6 +1017,33 @@ export function summarizeReport(report: ExecutionReportData): ReportConclusion {
 }
 
 /** Render the report as GitHub-flavored Markdown; all untrusted text escaped. */
+const TRAFFIC_HEADERS = [
+  'Component',
+  'Probe',
+  'Availability',
+  'Probe latency',
+  'Requests/s',
+  'Errors',
+  'p95 latency',
+];
+
+/** Plain-text cells of the component health table (escaped by each renderer). */
+function trafficRows(traffic: IReportTraffic[]): string[][] {
+  const pct = (v?: number) => (v === undefined ? '—' : `${(v * 100).toFixed(1)}%`);
+  const ms = (v?: number) => (v === undefined ? '—' : `${Math.round(v)} ms`);
+  return traffic.map((t) => [
+    t.service,
+    t.probe
+      ? `${t.probe.toUpperCase()}${t.up === undefined ? '' : t.up ? ' · up' : ' · down'}`
+      : '—',
+    pct(t.availability),
+    ms(t.probeLatencyMs),
+    t.requestRate === undefined ? '—' : t.requestRate.toFixed(2),
+    pct(t.errorRate),
+    ms(t.latencyP95Ms),
+  ]);
+}
+
 export function renderMarkdown(report: ExecutionReportData): string {
   const m = report.metrics;
   const out: string[] = [];
@@ -1054,6 +1141,23 @@ export function renderMarkdown(report: ExecutionReportData): string {
     out.push('_No services were deployed._');
   }
   out.push('');
+
+  if (report.traffic) {
+    out.push('## Component health', '');
+    out.push(
+      '_Probed by the OpenTelemetry Collector deployed with the run; request metrics only for components that expose Prometheus metrics or send OpenTelemetry traces._',
+      ''
+    );
+    out.push(
+      report.traffic.length
+        ? mdTable(
+            TRAFFIC_HEADERS,
+            trafficRows(report.traffic).map((row) => row.map((c) => escapeMarkdown(c)))
+          )
+        : '_The observability stack returned no readings._'
+    );
+    out.push('');
+  }
 
   out.push('## Security alerts', '');
   if (report.alerts.length) {
@@ -1475,6 +1579,16 @@ export function renderHtml(report: ExecutionReportData): string {
       : htmlEmpty('No services were deployed.'),
     m.services.total
   );
+
+  if (report.traffic) {
+    section(
+      'Component health',
+      report.traffic.length
+        ? htmlTable(TRAFFIC_HEADERS, trafficRows(report.traffic), [2, 3, 4, 5, 6])
+        : htmlEmpty('The observability stack returned no readings.'),
+      report.traffic.length
+    );
+  }
 
   section(
     'Kubernetes events',

@@ -86,6 +86,11 @@ export const runSeedIfNeeded = async (): Promise<void> => {
 
 const main = async (): Promise<void> => {
   await runSeedIfNeeded();
+  // Tracing must start before express is imported so its loader hook can
+  // patch http/express; it is opt-in through the standard OTel variable.
+  if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
+    await import('./telemetry/tracing.js');
+  }
   await import('./app.js');
 };
 

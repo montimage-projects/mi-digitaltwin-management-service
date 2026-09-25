@@ -93,6 +93,13 @@ const deploymentSpecSchema = z.strictObject({
     .max(500)
     .regex(/^\//, 'readinessPath must be an absolute path')
     .optional(),
+  metricsPort: z.number().int().min(1).max(65535).optional(),
+  metricsPath: z
+    .string()
+    .min(1)
+    .max(500)
+    .regex(/^\//, 'metricsPath must be an absolute path')
+    .optional(),
   startOrder: z.number().int().min(0).max(1000).optional(),
 });
 

@@ -96,6 +96,7 @@ describe('Scenario route — validation schemas', () => {
       .string()
       .refine((val) => !val || objectIdSchema.safeParse(val).success, 'Invalid infrastructure ID')
       .optional(),
+    observability: z.boolean().optional(),
   });
 
   const updateScenarioSchema = createScenarioSchema.partial();
@@ -120,6 +121,15 @@ describe('Scenario route — validation schemas', () => {
         infrastructureId: '507f1f77bcf86cd799439011',
       });
       expect(result.success).toBe(true);
+    });
+
+    test('accepts the observability flag and rejects a non-boolean', () => {
+      expect(createScenarioSchema.safeParse({ title: 'T', observability: false }).success).toBe(
+        true
+      );
+      expect(createScenarioSchema.safeParse({ title: 'T', observability: 'no' }).success).toBe(
+        false
+      );
     });
 
     test('accepts minimal payload (only title)', () => {

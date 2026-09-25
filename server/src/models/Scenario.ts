@@ -37,6 +37,8 @@ export interface IExecution {
   durationMs?: number;
   /** Overall verdict recorded when the run closed (issue #26). */
   outcome?: 'passed' | 'failed' | 'partial';
+  /** The namespace got the observability stack (issue #25). */
+  observability?: boolean;
 }
 
 /**
@@ -78,6 +80,12 @@ export interface IScenario extends Document {
   infrastructureId?: Types.ObjectId;
   /** Step-by-step test guide rendered per execution (services/runbook.ts). */
   runbook?: Runbook;
+  /**
+   * Deploy the per-namespace observability stack (OTel Collector +
+   * Prometheus) with each execution. Defaults to on; documents saved before
+   * the field existed read `undefined`, which the engine also treats as on.
+   */
+  observability?: boolean;
   executions: IExecution[];
   /**
    * Seed bookkeeping mirroring the catalog models — a seeded scenario (the
@@ -132,6 +140,7 @@ const executionSchema = new Schema<IExecution>(
     completedAt: { type: Date },
     durationMs: { type: Number, min: 0 },
     outcome: { type: String, enum: ['passed', 'failed', 'partial'] },
+    observability: { type: Boolean },
   },
   { _id: true }
 );
@@ -173,6 +182,10 @@ const scenarioSchema = new Schema<IScenario>(
     },
     runbook: {
       type: Schema.Types.Mixed,
+    },
+    observability: {
+      type: Boolean,
+      default: true,
     },
     executions: [executionSchema],
     deprecated: {

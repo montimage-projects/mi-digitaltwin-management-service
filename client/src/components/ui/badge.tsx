@@ -13,6 +13,11 @@ const badgeVariants = cva(
         destructive:
           'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
         outline: 'text-foreground',
+        // Semantic status variants: fixed palette colours chosen for >= 4.5:1
+        // text contrast in both light and dark themes.
+        success: 'border-transparent bg-green-700 text-white hover:bg-green-700/90',
+        warning: 'border-transparent bg-amber-500 text-amber-950 hover:bg-amber-500/90',
+        danger: 'border-transparent bg-red-700 text-white hover:bg-red-700/90',
       },
     },
     defaultVariants: {

@@ -26,6 +26,7 @@ import { AppError } from '../middleware/errorHandler.js';
 import { logger } from '../utils/logger.js';
 import { executeScenario, planExecution } from '../services/scenarioExecution.js';
 import { runSSEStream } from '../services/scenarioSSE.js';
+import { apiGetFor } from '../services/observability.js';
 import { ExecutionReport } from '../models/ExecutionReport.js';
 import {
   buildProvisionalReport,
@@ -93,6 +94,8 @@ const createScenarioSchema = z.object({
     .string()
     .refine((val) => !val || objectIdSchema.safeParse(val).success, 'Invalid infrastructure ID')
     .optional(),
+  /** Per-execution observability stack; omitted means the model default (on). */
+  observability: z.boolean().optional(),
 });
 
 const updateScenarioSchema = createScenarioSchema.partial();
@@ -452,20 +455,25 @@ router.delete(
     if (!execution) throw new AppError('Execution not found', 404);
 
     // Only reach the cluster when something was actually deployed.
-    const clients =
+    const infrastructure =
       execution.namespace && scenario.infrastructureId
-        ? buildClientFromInfrastructure(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (await findById(Infrastructure, scenario.infrastructureId.toString())) as any
-          )
+        ? await findById(Infrastructure, scenario.infrastructureId.toString())
         : null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const clients = infrastructure ? buildClientFromInfrastructure(infrastructure as any) : null;
+    // The run's observability stack is read before it is deleted with the namespace.
+    const observabilityGet =
+      infrastructure && execution.observability
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          apiGetFor(buildKubeConfig(infrastructure as any))
+        : undefined;
 
     // Close the run with a report (issue #26) *before* the namespace — and
     // with it every pod log and event — is deleted. The outcome is computed
     // from the status the run had before teardown; capture is bounded by a
     // timeout and never throws, so a slow or failing cluster read yields a
     // partial report rather than blocking the teardown.
-    const closed = await captureReport({ clients, scenario, execution });
+    const closed = await captureReport({ clients, scenario, execution, observabilityGet });
 
     if (clients && execution.namespace) {
       await teardownDeployment(clients, execution.namespace);

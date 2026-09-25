@@ -201,6 +201,16 @@ curl -X DELETE http://localhost:3000/api/users/user123 \
 curl http://localhost:3000/api/health
 ```
 
+#### Prometheus Metrics
+
+- **GET** `/metrics` (outside `/api`, served ahead of the SPA)
+- **Auth:** None, unless `METRICS_TOKEN` is set, in which case `Authorization: Bearer <METRICS_TOKEN>` is required (`401` otherwise)
+- **Response:** Prometheus text format: `http_requests_total` and `http_request_duration_seconds` (labels `method`, `route` template, `status_code`), Node.js process metrics and `secsim_live_executions`. Disabled with `METRICS_ENABLED=false`. See [Observability](integration/observability.md).
+
+```bash
+curl http://localhost:3000/metrics
+```
+
 ### API Documentation (Development)
 
 #### OpenAPI Spec
@@ -466,7 +476,8 @@ curl -X GET "http://localhost:3000/api/projects/proj123/scenarios" \
 
 - **POST** `/api/projects/:projectId/scenarios`
 - **Auth:** Required
-- **Body:** `{ title: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string }`
+- **Body:** `{ title: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string, observability?: boolean }`
+- **Note:** `observability` (default `true`) deploys an OpenTelemetry Collector and Prometheus into each execution namespace; see [Scenario observability](#scenario-observability).
 - **Note:** a topology node may carry `data.config` overrides for the service's `deployment` spec — `config.env` (`{ name: string, value?: string, fromEdge?: "target" | "reaction" }[]`) and `config.args` (`string[]`). Invalid overrides are rejected with `400`.
 - **Response:** `{ scenario: Scenario }` (populated with infrastructure)
 
@@ -500,7 +511,7 @@ curl -X GET http://localhost:3000/api/scenarios/scen123 \
 
 - **PUT** `/api/scenarios/:id`
 - **Auth:** Required
-- **Body:** `{ title?: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string }`
+- **Body:** `{ title?: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string, observability?: boolean }`
 - **Note:** `data.config` node overrides (`env`, `args`) are validated as in Create Scenario.
 - **Response:** `{ scenario: Scenario }`
 
@@ -568,7 +579,11 @@ and duration, final per-service and per-container status, key metrics
 (service/container counts by status, container restarts, log and error-line
 counts, namespace events by reason, security alerts by verdict) and the capped
 tail of the logs (≤2000 lines), error lines (≤200), events (≤500) and alerts
-(≤200). The report is generated automatically when the run is torn down or its
+(≤200). A run with the observability stack also gets `traffic`, one entry per
+deployed component with its probe status, availability, probe latency and, when
+the component reports them, request rate, error rate and p95 latency over the
+run. It is read before teardown and rendered as a **Component health** table.
+The report is generated automatically when the run is torn down or its
 deploy fails. Before that, a provisional report (`provisional: true`) built
 from the execution record alone is returned — this endpoint never reads the
 cluster.
@@ -698,6 +713,86 @@ curl -X POST http://localhost:3000/api/infrastructures/infra123/test \
  -H "Authorization: Bearer $TOKEN"
 ```
 
+### Monitoring
+
+Live CPU and memory of every running service, read on demand from the
+Kubernetes metrics-server (`metrics.k8s.io`) of the infrastructure each
+execution was deployed to, plus health and traffic from the execution's
+observability stack (OTel Collector + Prometheus, deployed when the scenario's
+`observability` option is on), and threshold alert rules evaluated against
+each snapshot. See [Observability](integration/observability.md).
+
+**Prerequisites:** metrics-server must be installed in the target cluster and
+the stored credentials need RBAC `get`/`list` on `pods.metrics.k8s.io`. Without
+them the infrastructure is reported as `available: false` with a `reason`
+(`metrics-server is not installed…`, `Missing RBAC permission…`, …) — the
+endpoint still answers `200` for the other infrastructures.
+
+**Health and traffic** (`traffic` on each service, over the last 5 minutes):
+every component with a Service is probed, over HTTP on its `readinessPath` or
+over TCP. This gives `up`, `availability` and `probeLatencyMs`. `requestRate`,
+`errorRate` and `latencyP95Ms` appear only for components that expose
+Prometheus metrics (catalog `metricsPort`) or send OpenTelemetry traces;
+probes are not user traffic. The stack is read through the API server's
+service proxy, so the credentials need `get` on `services/proxy`. When the
+read fails, the service carries a fixed `trafficReason` instead of readings.
+
+#### Get Metrics Snapshot
+
+- **GET** `/api/monitoring/metrics`
+- **Auth:** Required
+- **Query Parameters:**
+- `infrastructureId` (ObjectId, optional) - Only executions deployed to this infrastructure
+- `serviceId` (ObjectId, optional) - Only workloads running this catalog service (host or sidecar)
+- `severity` (`info` | `warning` | `critical`, optional) - Only alerts of this severity
+- **Response:** `MonitoringSnapshot` — `{ collectedAt, infrastructures: [{ infrastructureId, name, available, reason?, namespaces }], services: [{ key, name, serviceIds, nodeIds, scenarioId, scenarioTitle, executionId, namespace, infrastructureId, infrastructureName, metricsAvailable, pods, cpuMillicores, memoryBytes, containers: [{ name, cpuMillicores, memoryBytes }], observability, traffic?: { probe?: 'http' | 'tcp', up?, availability?, probeLatencyMs?, requestRate?, errorRate?, latencyP95Ms? }, trafficReason? }], alerts: FiredAlert[] }`
+- **Errors:** `400` invalid filter
+
+One metrics call is made per live execution namespace: one that has not been torn down (no `completedAt`) and has not failed. A run whose rollout settled as `completed` stays live until teardown.
+Sidecar containers are reported inside their host workload's `containers`.
+Credentials are never part of the response.
+
+```bash
+curl "http://localhost:3000/api/monitoring/metrics?severity=critical" \
+ -H "Authorization: Bearer $TOKEN"
+```
+
+#### List Alert Rules
+
+- **GET** `/api/monitoring/alert-rules`
+- **Auth:** Required
+- **Response:** `AlertRule[]` (newest first)
+
+#### Create Alert Rule
+
+- **POST** `/api/monitoring/alert-rules`
+- **Auth:** Required — `admin` role
+- **Body:** `{ name: string, metric: "cpu_millicores"|"memory_mib"|"availability_pct"|"probe_latency_ms"|"request_rate"|"error_rate_pct"|"latency_p95_ms", operator: "gt"|"gte"|"lt"|"lte", threshold: number (>= 0), severity: "info"|"warning"|"critical", scope?: { serviceId?: string, infrastructureId?: string }, enabled?: boolean }`
+- **Response:** `201` `AlertRule`
+- **Errors:** `400` validation error · `403` not an admin
+
+```bash
+curl -X POST http://localhost:3000/api/monitoring/alert-rules \
+ -H "Authorization: Bearer $TOKEN" \
+ -H "Content-Type: application/json" \
+ -d '{"name":"High CPU","metric":"cpu_millicores","operator":"gt","threshold":800,"severity":"critical"}'
+```
+
+#### Update Alert Rule
+
+- **PUT** `/api/monitoring/alert-rules/:id`
+- **Auth:** Required — `admin` role
+- **Body:** any subset of the create body (at least one field)
+- **Response:** `AlertRule`
+- **Errors:** `400` invalid id or body · `403` not an admin · `404` rule not found
+
+#### Delete Alert Rule
+
+- **DELETE** `/api/monitoring/alert-rules/:id`
+- **Auth:** Required — `admin` role
+- **Response:** `{ message: "Alert rule deleted successfully" }`
+- **Errors:** `400` invalid id · `403` not an admin · `404` rule not found
+
 ## Data Models
 
 ### User
@@ -758,23 +853,25 @@ a spec deploy with the engine defaults (Deployment, port 80, standalone).
 Validated on `POST`/`PUT /api/services`; invalid specs are rejected with
 `400`. Unknown fields are not allowed (the schema is strict).
 
-| Field             | Type                                                                    | Description                                                                      |
-| ----------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `kind`            | `'Deployment' \| 'Job'`                                                 | **Required.** `Job` for finite runs; MAG is a terminal `Deployment` (#233).      |
-| `role`            | `'attack' \| 'target' \| 'monitor' \| 'reaction' \| 'generic'`          | **Required.** Scenario role — drives node badges and edge validation.            |
-| `attachMode`      | `'standalone' \| 'sidecar'`                                             | `sidecar` injects the container into the target pod's network namespace.         |
-| `containerPort`   | number (int, 1–65535)                                                   | Container port — replaces the engine's default of 80.                            |
-| `exposePort`      | boolean                                                                 | Whether a Kubernetes Service exposes the port (`false` for sidecars and Jobs).   |
-| `command`         | string[]                                                                | Container ENTRYPOINT override, ahead of `args` — e.g. MAG's idle shell loop.     |
-| `args`            | string[]                                                                | Container arguments (e.g. `mag <attack> --target-ip …`).                         |
-| `env`             | `{ name: string; value?: string; fromEdge?: 'target' \| 'reaction' }[]` | Env vars — `fromEdge` marks a value the engine resolves from a topology edge.    |
-| `configFiles`     | `{ mountPath: string; content: string }[]`                              | Files rendered into a ConfigMap mounted at `mountPath`.                          |
-| `volumes`         | `{ name: string; mountPath: string; emptyDir: true }[]`                 | `emptyDir` volumes shared between the pod's containers.                          |
-| `securityContext` | `{ capabilities?: string[]; privileged?: boolean }`                     | Container security context (e.g. `capabilities: ['NET_ADMIN', 'NET_RAW']`).      |
-| `hostNetwork`     | boolean                                                                 | Run the pod on the host network (a sidecar `attachMode` is preferred).           |
-| `rbac`            | `{ apiGroups: string[]; resources: string[]; verbs: string[] }[]`       | Namespace-scoped Role rules bound to the pod's ServiceAccount (`''` = core API). |
-| `readinessPath`   | string                                                                  | HTTP readiness path — must start with `/` (e.g. `/health`).                      |
-| `startOrder`      | number (int, ≥ 0)                                                       | Startup ordering — lower starts first.                                           |
+| Field             | Type                                                                    | Description                                                                                          |
+| ----------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `kind`            | `'Deployment' \| 'Job'`                                                 | **Required.** `Job` for finite runs; MAG is a terminal `Deployment` (#233).                          |
+| `role`            | `'attack' \| 'target' \| 'monitor' \| 'reaction' \| 'generic'`          | **Required.** Scenario role — drives node badges and edge validation.                                |
+| `attachMode`      | `'standalone' \| 'sidecar'`                                             | `sidecar` injects the container into the target pod's network namespace.                             |
+| `containerPort`   | number (int, 1–65535)                                                   | Container port — replaces the engine's default of 80.                                                |
+| `exposePort`      | boolean                                                                 | Whether a Kubernetes Service exposes the port (`false` for sidecars and Jobs).                       |
+| `command`         | string[]                                                                | Container ENTRYPOINT override, ahead of `args` — e.g. MAG's idle shell loop.                         |
+| `args`            | string[]                                                                | Container arguments (e.g. `mag <attack> --target-ip …`).                                             |
+| `env`             | `{ name: string; value?: string; fromEdge?: 'target' \| 'reaction' }[]` | Env vars — `fromEdge` marks a value the engine resolves from a topology edge.                        |
+| `configFiles`     | `{ mountPath: string; content: string }[]`                              | Files rendered into a ConfigMap mounted at `mountPath`.                                              |
+| `volumes`         | `{ name: string; mountPath: string; emptyDir: true }[]`                 | `emptyDir` volumes shared between the pod's containers.                                              |
+| `securityContext` | `{ capabilities?: string[]; privileged?: boolean }`                     | Container security context (e.g. `capabilities: ['NET_ADMIN', 'NET_RAW']`).                          |
+| `hostNetwork`     | boolean                                                                 | Run the pod on the host network (a sidecar `attachMode` is preferred).                               |
+| `rbac`            | `{ apiGroups: string[]; resources: string[]; verbs: string[] }[]`       | Namespace-scoped Role rules bound to the pod's ServiceAccount (`''` = core API).                     |
+| `readinessPath`   | string                                                                  | HTTP readiness path — must start with `/` (e.g. `/health`). Also the observability probe path.       |
+| `metricsPort`     | number (1–65535)                                                        | Prometheus metrics port, scraped by the scenario observability stack via a `<name>-metrics` Service. |
+| `metricsPath`     | string                                                                  | Path of those metrics — must start with `/` (default `/metrics`).                                    |
+| `startOrder`      | number (int, ≥ 0)                                                       | Startup ordering — lower starts first.                                                               |
 
 ### Project
 
@@ -804,7 +901,8 @@ Validated on `POST`/`PUT /api/services`; invalid specs are rejected with
     edges: object[];
   };
   infrastructureId?: string; // Reference to Infrastructure
-  status: 'draft' | 'ready' | 'executed';
+  observability: boolean; // default true — per-execution OTel Collector + Prometheus
+  runbook?: object;
   executions: Execution[];
   createdAt: Date;
   updatedAt: Date;
@@ -842,6 +940,37 @@ Validated on `POST`/`PUT /api/services`; invalid specs are rejected with
   updatedAt: Date;
 }
 ```
+
+### AlertRule
+
+```typescript
+{
+  _id: string;
+  name: string;
+  metric:
+    | 'cpu_millicores'
+    | 'memory_mib'
+    | 'availability_pct' // 0–100, observability stack
+    | 'probe_latency_ms'
+    | 'request_rate' // req/s
+    | 'error_rate_pct' // 0–100
+    | 'latency_p95_ms';
+  operator: 'gt' | 'gte' | 'lt' | 'lte';
+  threshold: number; // >= 0, in the metric's unit
+  severity: 'info' | 'warning' | 'critical';
+  scope: { serviceId?: string; infrastructureId?: string }; // empty = all services
+  enabled: boolean;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+A rule never fires on a service with no reading for its metric. CPU and memory
+need a pod reporting to metrics-server; the other metrics need the execution's
+observability stack. A fired alert (`FiredAlert`, in the metrics snapshot) carries `ruleId`,
+`ruleName`, `serviceKey`, `serviceName`, `executionId`, `infrastructureId`,
+`metric`, `operator`, `value`, `threshold` and `severity`.
 
 ### Category
 
