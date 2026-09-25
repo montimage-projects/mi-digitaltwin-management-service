@@ -3,7 +3,11 @@ import { AppError } from '../middleware/errorHandler.js';
 import { logger } from '../utils/logger.js';
 import { ConversationManager } from './conversation-manager.js';
 import { getRAGRetriever, getLLMGateway, getIntentClassifier } from './index.js';
-import { BOSS_AGENT_SYSTEM_PROMPT, buildRagContextPrompt } from './prompts.js';
+import {
+  BOSS_AGENT_SYSTEM_PROMPT,
+  EMPTY_ANSWER_FALLBACK,
+  buildRagContextPrompt,
+} from './prompts.js';
 import type { ChatMessage } from './types.js';
 
 export interface ChatResult {
@@ -123,7 +127,14 @@ export class AgentService {
       llmMessages = [{ role: 'system', content: BOSS_AGENT_SYSTEM_PROMPT }, ...historyMessages];
     }
 
-    const response = await getLLMGateway().chat(llmMessages, onToken);
+    let response = await getLLMGateway().chat(llmMessages, onToken);
+    if (!response.trim()) {
+      logger.warn('LLM returned an empty answer; sending fallback message', {
+        conversationId: activeConversationId,
+      });
+      response = EMPTY_ANSWER_FALLBACK;
+      onToken?.(response);
+    }
     const sources: IConversationSource[] = retrieved.map((item) => ({
       serviceId: item.serviceId,
       shortName: item.shortName,
