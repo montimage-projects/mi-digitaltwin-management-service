@@ -17,6 +17,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import https from 'node:https';
 import http from 'node:http';
+import type { IncomingHttpHeaders } from 'node:http';
 import type { Request, Response } from 'express';
 import type { KubeConfig } from '@kubernetes/client-node';
 import { env } from '../config/env.js';
@@ -67,6 +68,40 @@ const DROP_REQUEST_HEADERS = new Set([
 ]);
 
 /**
+ * CSP set on every proxied response. The proxied UI is served from the
+ * platform origin, where the SPA keeps its JWT in localStorage; the sandbox
+ * (deliberately without `allow-same-origin`) gives the document an opaque
+ * origin, so its scripts still run but cannot read the platform's storage or
+ * cookies, nor call the API with the admin's credentials.
+ */
+export const PROXIED_CSP = 'sandbox allow-scripts allow-forms allow-popups';
+
+/**
+ * Upstream response headers never relayed: hop-by-hop headers, the proxied
+ * app's own CSP (replaced by PROXIED_CSP) and Set-Cookie (it would land on
+ * the platform origin).
+ */
+const DROP_RESPONSE_HEADERS = new Set([
+  'connection',
+  'transfer-encoding',
+  'set-cookie',
+  'content-security-policy',
+  'content-security-policy-report-only',
+]);
+
+/** Response headers to send for a proxied upstream response. */
+export function proxiedResponseHeaders(
+  upstream: IncomingHttpHeaders
+): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  for (const [key, value] of Object.entries(upstream)) {
+    if (value !== undefined && !DROP_RESPONSE_HEADERS.has(key.toLowerCase())) out[key] = value;
+  }
+  out['content-security-policy'] = PROXIED_CSP;
+  return out;
+}
+
+/**
  * Relay one request to `<service>:<port>` through the API server's service
  * proxy, streaming the response back. `path` is the part after the signed
  * prefix (no leading slash) plus the original query string.
@@ -111,13 +146,13 @@ export async function proxyToService(
   await new Promise<void>((resolve, reject) => {
     const transport = base.protocol === 'https:' ? https : http;
     const upstream = transport.request(options, (up) => {
-      // The platform's own CSP would block the proxied app's scripts/styles.
+      // Replace the platform's CSP (it would block the proxied app's
+      // scripts/styles) with a sandboxing one — see PROXIED_CSP.
       res.removeHeader('Content-Security-Policy');
+      res.removeHeader('Content-Security-Policy-Report-Only');
       res.status(up.statusCode ?? 502);
-      for (const [key, value] of Object.entries(up.headers)) {
-        if (value !== undefined && key !== 'connection' && key !== 'transfer-encoding') {
-          res.setHeader(key, value);
-        }
+      for (const [key, value] of Object.entries(proxiedResponseHeaders(up.headers))) {
+        res.setHeader(key, value);
       }
       up.pipe(res);
       up.on('end', resolve);

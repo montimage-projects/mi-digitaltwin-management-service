@@ -1,5 +1,16 @@
 import { describe, test, expect } from 'vitest';
-import { PROXY_LINK_TTL_S, signProxyPath, verifyProxySignature } from '../serviceProxy.js';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import express from 'express';
+import type { KubeConfig } from '@kubernetes/client-node';
+import {
+  PROXIED_CSP,
+  PROXY_LINK_TTL_S,
+  proxiedResponseHeaders,
+  proxyToService,
+  signProxyPath,
+  verifyProxySignature,
+} from '../serviceProxy.js';
 
 const target = {
   scenarioId: 'a'.repeat(24),
@@ -28,5 +39,72 @@ describe('service proxy links', () => {
     const { expires, sig } = parse(signProxyPath(target));
     expect(verifyProxySignature({ ...target, service: 'ai4soar' }, expires, sig)).toBe(false);
     expect(verifyProxySignature(target, expires + 60, sig)).toBe(false);
+  });
+});
+
+describe('proxied response headers', () => {
+  test('replaces the upstream CSP with a sandbox that omits allow-same-origin', () => {
+    const headers = proxiedResponseHeaders({
+      'content-type': 'text/html',
+      'content-security-policy': "default-src 'self'",
+      'content-security-policy-report-only': "default-src 'none'",
+    });
+    expect(headers['content-security-policy']).toBe(PROXIED_CSP);
+    expect(PROXIED_CSP).toMatch(/^sandbox /);
+    expect(PROXIED_CSP).not.toContain('allow-same-origin');
+    expect(headers).not.toHaveProperty('content-security-policy-report-only');
+    expect(headers['content-type']).toBe('text/html');
+  });
+
+  test('strips upstream Set-Cookie and hop-by-hop headers', () => {
+    const headers = proxiedResponseHeaders({
+      'set-cookie': ['session=abc; Path=/'],
+      connection: 'keep-alive',
+      'transfer-encoding': 'chunked',
+      'x-app': 'ok',
+    });
+    expect(headers).not.toHaveProperty('set-cookie');
+    expect(headers).not.toHaveProperty('connection');
+    expect(headers).not.toHaveProperty('transfer-encoding');
+    expect(headers['x-app']).toBe('ok');
+  });
+
+  test('proxyToService sends the sandbox CSP and no Set-Cookie to the browser', async () => {
+    const upstream = http.createServer((_req, res) => {
+      res.setHeader('Set-Cookie', 'session=abc; Path=/');
+      res.setHeader('Content-Security-Policy', "default-src 'self'");
+      res.setHeader('Content-Type', 'text/html');
+      res.end('<html>ui</html>');
+    });
+    await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', r));
+    const upPort = (upstream.address() as AddressInfo).port;
+    const kc = {
+      getCurrentCluster: () => ({ server: `http://127.0.0.1:${upPort}` }),
+      applyToHTTPSOptions: async () => {},
+    } as unknown as KubeConfig;
+
+    const app = express();
+    app.use((_req, res, next) => {
+      res.setHeader('Content-Security-Policy', "default-src 'self'");
+      next();
+    });
+    app.get('/p', (req, res, next) => {
+      proxyToService(kc, 'ns', 'svc', 80, '', req, res).catch(next);
+    });
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise<void>((r) => server.once('listening', r));
+    try {
+      const port = (server.address() as AddressInfo).port;
+      const resp = await fetch(`http://127.0.0.1:${port}/p`);
+      expect(resp.status).toBe(200);
+      expect(await resp.text()).toBe('<html>ui</html>');
+      expect(resp.headers.get('content-security-policy')).toBe(PROXIED_CSP);
+      expect(resp.headers.get('set-cookie')).toBeNull();
+    } finally {
+      server.closeAllConnections();
+      server.close();
+      upstream.closeAllConnections();
+      upstream.close();
+    }
   });
 });
