@@ -556,9 +556,11 @@ export function trafficQueries(
       `sum by (service) (rate(http_requests_total[${window}]))`,
       `sum by (service_name) (rate(${SPAN_CALLS}{${SPAN_SERVER}}[${window}]))`,
     ],
+    // Zero-filled from the denominator: 5xx / error series only exist after
+    // the first error, and a healthy component must read 0 %, not "no data".
     errorRate: [
-      `sum by (service) (rate(http_requests_total{status_code=~"5.."}[${window}]) or rate(http_requests_total{code=~"5.."}[${window}])) / sum by (service) (rate(http_requests_total[${window}]))`,
-      `sum by (service_name) (rate(${SPAN_CALLS}{${SPAN_SERVER},status_code="STATUS_CODE_ERROR"}[${window}])) / sum by (service_name) (rate(${SPAN_CALLS}{${SPAN_SERVER}}[${window}]))`,
+      `(sum by (service) (rate(http_requests_total{status_code=~"5.."}[${window}]) or rate(http_requests_total{code=~"5.."}[${window}])) or 0 * sum by (service) (rate(http_requests_total[${window}]))) / sum by (service) (rate(http_requests_total[${window}]))`,
+      `(sum by (service_name) (rate(${SPAN_CALLS}{${SPAN_SERVER},status_code="STATUS_CODE_ERROR"}[${window}])) or 0 * sum by (service_name) (rate(${SPAN_CALLS}{${SPAN_SERVER}}[${window}]))) / sum by (service_name) (rate(${SPAN_CALLS}{${SPAN_SERVER}}[${window}]))`,
     ],
     latencyP95Ms: [
       `histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket[${window}]))) * 1000`,

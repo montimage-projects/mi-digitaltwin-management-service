@@ -10,6 +10,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { configureStaticServing } from './middleware/staticServe.js';
 import { runStartupChecks, printServerReady } from './utils/startup.js';
 import { autoSeedIfEmpty } from './seed/auto-seed.js';
+import { closeLegacyExecutions } from './migrations/close-legacy-executions.js';
 
 import authRoutes from './routes/auth.routes.js';
 import usersRoutes from './routes/users.routes.js';
@@ -125,6 +126,11 @@ const startServer = async (): Promise<void> => {
 
     // Auto-seed database if empty (for cloud deployments)
     await autoSeedIfEmpty();
+
+    // Best-effort data fix; never blocks startup.
+    await closeLegacyExecutions().catch((error: unknown) =>
+      console.warn('Could not close legacy executions:', error)
+    );
 
     app.listen(env.PORT, () => {
       printServerReady(env.PORT, staticServingEnabled);
