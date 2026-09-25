@@ -517,6 +517,24 @@ export const openApiSpec = {
                     errorLogs: { type: 'array', items: { type: 'object' } },
                     events: { type: 'array', items: { type: 'object' } },
                     alerts: { type: 'array', items: { type: 'object' } },
+                    traffic: {
+                      type: 'array',
+                      description:
+                        'Per-component health and traffic over the run, read from the execution observability stack before teardown; absent when the run had none',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          service: { type: 'string' },
+                          probe: { type: 'string', enum: ['http', 'tcp'] },
+                          up: { type: 'boolean' },
+                          availability: { type: 'number' },
+                          probeLatencyMs: { type: 'number' },
+                          requestRate: { type: 'number' },
+                          errorRate: { type: 'number' },
+                          latencyP95Ms: { type: 'number' },
+                        },
+                      },
+                    },
                     omitted: { type: 'object' },
                     partial: { type: 'boolean' },
                     captureErrors: { type: 'array', items: { type: 'string' } },

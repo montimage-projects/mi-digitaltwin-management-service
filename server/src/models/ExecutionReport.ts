@@ -76,6 +76,23 @@ export interface IReportMetrics {
   alerts: { total: number; uniqueAttackers: number; byVerdict: IReportCount[] };
 }
 
+/**
+ * Per-component health and traffic over the run, read from the execution's
+ * observability stack before teardown (issue #25). Only deployed components.
+ */
+export interface IReportTraffic {
+  service: string;
+  probe?: 'http' | 'tcp';
+  /** Last probe before teardown succeeded. */
+  up?: boolean;
+  /** Share of successful probes over the run, 0–1. */
+  availability?: number;
+  probeLatencyMs?: number;
+  requestRate?: number;
+  errorRate?: number;
+  latencyP95Ms?: number;
+}
+
 /** Number of artifact entries dropped by the caps, per artifact kind. */
 export interface IReportOmitted {
   logs: number;
@@ -100,6 +117,8 @@ export interface IExecutionReport extends Document {
   errorLogs: IReportLogLine[];
   events: IReportEvent[];
   alerts: IReportAlert[];
+  /** Absent when the run had no observability stack. */
+  traffic?: IReportTraffic[];
   omitted: IReportOmitted;
   partial: boolean;
   captureErrors: string[];
@@ -164,6 +183,20 @@ const alertSchema = new Schema<IReportAlert>(
   { _id: false }
 );
 
+const trafficSchema = new Schema<IReportTraffic>(
+  {
+    service: { type: String, required: true },
+    probe: { type: String, enum: ['http', 'tcp'] },
+    up: { type: Boolean },
+    availability: { type: Number },
+    probeLatencyMs: { type: Number },
+    requestRate: { type: Number },
+    errorRate: { type: Number },
+    latencyP95Ms: { type: Number },
+  },
+  { _id: false }
+);
+
 const executionReportSchema = new Schema<IExecutionReport>(
   {
     scenarioId: { type: Schema.Types.ObjectId, ref: 'Scenario', required: true },
@@ -182,6 +215,7 @@ const executionReportSchema = new Schema<IExecutionReport>(
     errorLogs: [logLineSchema],
     events: [eventSchema],
     alerts: [alertSchema],
+    traffic: { type: [trafficSchema], default: undefined },
     omitted: {
       logs: { type: Number, default: 0 },
       errorLogs: { type: Number, default: 0 },

@@ -55,6 +55,7 @@ const {
   truncateBytes,
   MAX_LOG_LINES,
   MAX_TEXT_BYTES,
+  runWindow,
 } = await import('../executionReport.js');
 type CapturedArtifacts = import('../executionReport.js').CapturedArtifacts;
 type K8sClients = import('../kubernetesDeploy.js').K8sClients;
@@ -535,5 +536,103 @@ describe('renderers', () => {
     expect(formatDuration(42_000)).toBe('42s');
     expect(formatDuration(185_000)).toBe('3m 05s');
     expect(formatDuration(3_723_000)).toBe('1h 02m 03s');
+  });
+});
+
+describe('observability section (issue #25)', () => {
+  const vector = (result: { metric: Record<string, string>; value: number }[]) =>
+    JSON.stringify({
+      status: 'success',
+      data: {
+        resultType: 'vector',
+        result: result.map((r) => ({ metric: r.metric, value: [0, String(r.value)] })),
+      },
+    });
+  const hostile = '<img src=x onerror=alert(1)>';
+
+  /** svc-a probed at 97.5 % / 20 ms; a pushed span series names an undeployed service. */
+  const get = vi.fn(async (path: string) => {
+    const query = decodeURIComponent(path.split('query=')[1]);
+    const url = { http_url: 'http://svc-a:8080/' };
+    if (query.startsWith('sum by (http_url)'))
+      return { status: 200, body: vector([{ metric: url, value: 1 }]) };
+    if (query.startsWith('avg_over_time((sum'))
+      return { status: 200, body: vector([{ metric: url, value: 0.975 }]) };
+    if (query.startsWith('avg_over_time(httpcheck_duration'))
+      return { status: 200, body: vector([{ metric: url, value: 20 }]) };
+    if (query.startsWith('sum by (service_name) (rate(traces') && !query.includes('/'))
+      return { status: 200, body: vector([{ metric: { service_name: hostile }, value: 9 }]) };
+    return { status: 200, body: vector([]) };
+  });
+
+  test('bounds the query window to the run, between a minute and a day', () => {
+    const now = new Date('2026-09-24T12:00:00Z');
+    expect(runWindow(new Date('2026-09-24T11:59:50Z'), now)).toBe('60s');
+    expect(runWindow(new Date('2026-09-24T11:00:00Z'), now)).toBe('3600s');
+    expect(runWindow(new Date('2026-09-20T00:00:00Z'), now)).toBe('86400s');
+    expect(runWindow(undefined, now)).toBe('60s');
+  });
+
+  test('collects health for deployed components only, over the given window', async () => {
+    deploy.statuses = [{ name: 'svc-a', status: 'running', containers: [] }];
+    const result = await collectArtifacts(fakeClients(), {
+      namespace: 'ns',
+      names: ['svc-a'],
+      traffic: { get, window: '185s' },
+    });
+
+    expect(result.traffic).toEqual([
+      { service: 'svc-a', probe: 'http', up: true, availability: 0.975, probeLatencyMs: 20 },
+    ]);
+    expect(get.mock.calls.some(([path]) => decodeURIComponent(path).includes('[185s'))).toBe(true);
+    expect(result.captureErrors).toEqual([]);
+  });
+
+  test('an unreachable stack is a capture error, not a failed capture', async () => {
+    deploy.statuses = [{ name: 'svc-a', status: 'running', containers: [] }];
+    const result = await collectArtifacts(fakeClients(), {
+      namespace: 'ns',
+      names: ['svc-a'],
+      traffic: { get: async () => ({ status: 503, body: '' }), window: '60s' },
+    });
+    expect(result.traffic).toBeUndefined();
+    expect(result.services).toHaveLength(1);
+    expect(result.captureErrors).toEqual(['observability: Prometheus query failed (HTTP 503)']);
+  });
+
+  test('renders a component health table in both formats, escaped', () => {
+    const report = buildReport({
+      scenario,
+      execution: makeExecution(),
+      completedAt,
+      artifacts: makeArtifacts({
+        traffic: [
+          { service: 'svc-a', probe: 'http', up: false, availability: 0.5, probeLatencyMs: 20 },
+          { service: hostile, requestRate: 4.2, errorRate: 0.1, latencyP95Ms: 180 },
+        ],
+      }),
+    });
+
+    const md = renderMarkdown(report);
+    expect(md).toContain('## Component health');
+    expect(md).toMatch(/svc-a \| HTTP · down \| 50\.0% \| 20 ms/);
+    expect(md).toMatch(/4\.20 \| 10\.0% \| 180 ms/);
+
+    const html = renderHtml(report);
+    expect(html).toContain('Component health');
+    expect(html).not.toContain(hostile);
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
+  });
+
+  test('omits the section for runs without the stack', () => {
+    const report = buildReport({
+      scenario,
+      execution: makeExecution(),
+      completedAt,
+      artifacts: makeArtifacts(),
+    });
+    expect(report).not.toHaveProperty('traffic');
+    expect(renderMarkdown(report)).not.toContain('Component health');
+    expect(renderHtml(report)).not.toContain('Component health');
   });
 });
