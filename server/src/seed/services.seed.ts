@@ -1181,6 +1181,10 @@ const infrastructureServices: ServiceSeed[] = [
       containerPort: 8080,
       exposePort: true,
       readinessPath: '/',
+      // Prometheus request/error/latency series (sim/ci-sim/server.py),
+      // scraped by the scenario observability stack (issue #25).
+      metricsPort: 8080,
+      metricsPath: '/metrics',
       startOrder: 10,
     },
   },

@@ -81,8 +81,13 @@ reports without extra configuration.
 
 **Probes are not user traffic.** Availability and probe latency describe the
 collector's checks. Request rate, error rate and p95 latency appear only for
-components that expose metrics or send traces. None of the seeded Montimage
-images do this today. The probes themselves are light (one request every 10 s from the collector's own pod IP) and do not trip per-source rate limits
+components that expose metrics or send traces. CI-SIM exposes
+`/metrics` from `sim/ci-sim/server.py` and its seeded catalog entry declares
+`metricsPort: 8080`, so an image built from this repository reports real
+request rate, error rate (including the 503 when a flood stops it) and latency.
+The published `ci-sim:v1.0.0` image predates this: until it is rebuilt, its
+scrape target is down and only probes show. No other seeded image reports
+traffic yet. The probes themselves are light (one request every 10 s from the collector's own pod IP) and do not trip per-source rate limits
 such as CI-SIM's.
 
 Where the data shows up:
