@@ -741,5 +741,23 @@ export const openApiSpec = {
         responses: { 200: { description: 'Service is healthy' } },
       },
     },
+    '/metrics': {
+      // Served at the root, not under the /api base URL.
+      servers: [{ url: '/', description: 'Server root' }],
+      get: {
+        tags: ['Health'],
+        summary: 'Prometheus metrics of the SecSim server (RED + process + live executions)',
+        description:
+          'Open unless METRICS_TOKEN is set, then requires a bearer token. Disabled with METRICS_ENABLED=false.',
+        security: [],
+        responses: {
+          200: {
+            description: 'Prometheus text exposition format',
+            content: { 'text/plain': { schema: { type: 'string' } } },
+          },
+          401: { description: 'METRICS_TOKEN is set and the bearer token is missing or wrong' },
+        },
+      },
+    },
   },
 };

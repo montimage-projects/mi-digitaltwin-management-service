@@ -210,6 +210,10 @@ docker-compose logs -f
 # Monitor resources
 docker stats
 
+# Prometheus (loopback only) — server RED metrics and span metrics
+# from the bundled OpenTelemetry Collector; see docs/integration/observability.md
+curl -s localhost:9090/api/v1/query --data-urlencode 'query=sum(rate(http_requests_total[5m]))'
+
 # Database backup
 docker exec intact-mongodb mongodump --out /backup/$(date +%Y%m%d)
 ```

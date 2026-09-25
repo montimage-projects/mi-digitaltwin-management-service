@@ -300,7 +300,19 @@ over SSE. Some unused orchestrator configuration keys may still linger in
 environment files pending a follow-up cleanup, but nothing in the execution path
 uses them.
 
+## Observability
+
+When the scenario's `observability` option is on (the default), the rollout
+also creates `secsim-otel-collector` and `secsim-prometheus` in the execution
+namespace. These are best-effort: they are not part of `deployedServices`,
+readiness gating or the outcome, and they need no RBAC. Every container gets
+`OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_SERVICE_NAME` unless its spec sets them.
+Teardown removes the stack with the namespace, after the report has read it.
+See [Observability](observability.md).
+
 ## Related Documentation
+
+- [Observability](observability.md)
 
 - [External Services](external-services.md)
 - [Architecture Overview](../architecture/overview.md)
