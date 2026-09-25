@@ -42,6 +42,9 @@ export interface SecurityAlertEvent {
   line: string;
 }
 
+/** Minimum gap between two `alert` events for the same detection. */
+const ALERT_THROTTLE_MS = 5_000;
+
 /** Field spellings that carry the attacker source address in a report. */
 const ATTACKER_KEYS = ['ip.src', 'ip_src', 'src', 'attacker', 'source_ip', 'src_ip'];
 /** Field spellings that carry the detection verdict/summary. */
@@ -111,6 +114,36 @@ export function parseSecurityAlert(entry: PodLogLine): SecurityAlertEvent | null
   const line = entry.line;
   const trimmed = line.trim();
 
+  // mmt-security's JSON report (secAnoD / mmt-probe `output.format = JSON`)
+  // is an array: [10, probe, iface, ts, rule, verdict, type, description,
+  // events], the attacker address in events.event_1.attributes.
+  if (trimmed.startsWith('[10,')) {
+    try {
+      const report = JSON.parse(trimmed) as unknown[];
+      const verdict = report[5];
+      if (verdict === 'detected' || verdict === 'not_respected') {
+        const events = report[8] as { event_1?: { attributes?: unknown[] } } | null | undefined;
+        const pair = (events?.event_1?.attributes ?? []).find(
+          (a): a is [string, unknown] =>
+            Array.isArray(a) && (a[0] === 'ip.src' || a[0] === 'ipv6.src')
+        );
+        const ts = report[3];
+        return {
+          service: entry.name,
+          pod: entry.pod,
+          container: entry.container,
+          timestamp: typeof ts === 'number' ? new Date(ts * 1000).toISOString() : undefined,
+          verdict: `rule ${String(report[4])}: ${String(report[7])}`,
+          attacker: pair ? String(pair[1]) : undefined,
+          line,
+        };
+      }
+      return null;
+    } catch {
+      /* not an mmt-security report — fall through */
+    }
+  }
+
   if (trimmed.startsWith('{')) {
     try {
       const report = JSON.parse(trimmed) as Record<string, unknown>;
@@ -178,12 +211,18 @@ export function runSSEStream(
   execution: {
     status: string;
     namespace?: string;
+    completedAt?: Date;
     deployedServices?: { name?: string; uiType?: string }[];
   },
   infrastructure: {
     endpoint: string;
     credentials: { iv: string; encrypted: string; authTag: string };
-  } | null
+  } | null,
+  /**
+   * Current execution state — the rollout runs in the background after
+   * POST /execute answers, so a deploy failure is only visible in the record.
+   */
+  readState?: () => Promise<{ status: string; completedAt?: Date }>
 ): () => void {
   const namespace = execution.namespace;
   const deployed = execution.deployedServices ?? [];
@@ -196,11 +235,10 @@ export function runSSEStream(
 
   // Nothing was deployed, or the execution has already reached a terminal
   // state — there is nothing to poll for. Emit a single snapshot and close.
+  // `completed` only means the rollout settled; teardown stamps
+  // `completedAt` — a settled, still-deployed execution keeps streaming.
   const terminal =
-    !namespace ||
-    names.length === 0 ||
-    execution.status === 'completed' ||
-    execution.status === 'failed';
+    !namespace || names.length === 0 || !!execution.completedAt || execution.status === 'failed';
 
   // Build the cluster client (may throw on bad credentials) *before*
   // switching the response to an event stream, so a failure returns a
@@ -240,12 +278,25 @@ export function runSSEStream(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const clients = buildClientFromInfrastructure(infraForPoll as any);
   const seen = new Map<string, number>();
+  // mmt-security reports every matching packet — a flood yields hundreds of
+  // identical detections, so one `alert` per container/verdict/attacker is
+  // sent per ALERT_THROTTLE_MS (the raw lines still stream as `log`).
+  const lastAlertAt = new Map<string, number>();
   // `<uid>:<count>` keys of namespace events already streamed (task 2.3).
   const seenEvents = new Set<string>();
 
+  let state: { status: string; completedAt?: Date } = execution;
   const poll = async (): Promise<void> => {
     if (closed) return;
     try {
+      if (readState) {
+        state = await readState();
+        if (state.status === 'failed') {
+          send('error', { message: 'Deployment failed — see the execution report for details' });
+          cleanup();
+          return;
+        }
+      }
       const { statuses, progress } = await getDeploymentStatus(clients, { namespace, names });
       send('progress', { progress, services: statuses });
 
@@ -260,7 +311,14 @@ export function runSSEStream(
         // A probe security report on stdout also surfaces as a typed `alert`
         // event so the console can list detections (issue #234).
         const alert = parseSecurityAlert(entry);
-        if (alert) send('alert', alert);
+        if (alert) {
+          const key = `${alert.container}|${alert.verdict}|${alert.attacker}`;
+          const now = Date.now();
+          if (now - (lastAlertAt.get(key) ?? 0) >= ALERT_THROTTLE_MS) {
+            lastAlertAt.set(key, now);
+            send('alert', alert);
+          }
+        }
       }
 
       // Namespace events (pod scheduled, image pulled, container started,
@@ -294,6 +352,9 @@ export function runSSEStream(
         cleanup();
         return;
       }
+      // Still rolling out in the background — the namespace or workloads
+      // may not exist yet; keep polling.
+      if (state.status === 'pending') return;
       send('error', { message: err instanceof Error ? err.message : String(err) });
       cleanup();
     }

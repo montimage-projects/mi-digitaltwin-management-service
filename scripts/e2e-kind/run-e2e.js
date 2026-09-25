@@ -9,7 +9,8 @@
  *
  *   1. `kubectl exec` attack #1 runs the seeded `mag http-flood` profile in
  *      the idling MAG Deployment (issue #233)
- *   2. MMT-Probe emits an alert carrying the attacker `ip.src` (#234)
+ *   2. secAnoD detects the flood (rule 56) and publishes the report, carrying
+ *      the attacker `ip.src`, to Kafka; AI4SOAR consumes it (#234)
  *   3. The flood pushes CI-SIM over its rate threshold — it logs
  *      "service stopped", exits, and the Deployment restarts it (#231)
  *   4. AI4SOAR's playbook POSTs the attacker address to ci-sim
@@ -64,7 +65,10 @@ const CONTAINMENT_POLICY = 'mag-egress';
 // MAG is a Deployment since issue #233 — same resource name, driven via exec.
 const MAG_DEPLOYMENT = 'mag';
 const HOST_APP = 'ci-sim';
-const PROBE_CONTAINER = 'mmt-probe';
+// secAnoD publishes its mmt-security reports to Kafka and to stdout — the
+// detections are read from the `secanod` sidecar's log.
+const PROBE_CONTAINER = 'secanod';
+const REACTION_APP = 'ai4soar';
 // The seeded R1 attack profiles (demo.seed.ts `config.profiles`, #236): both
 // runs exec the same `mag http-flood` command; attack #2 is rate-limited via
 // MAG_REQUEST_COUNT so it alerts the probe (≥8 concurrent connections) while
@@ -293,12 +297,14 @@ async function registerInfrastructure() {
 }
 
 /**
- * Repoint the four seeded Montimage services at the stub image and inject a
- * STUB_ROLE env var per module. The demo scenario document itself is left
- * untouched — image resolution flows through `versions[].dockerImage` exactly
- * as production deploys do. The probe additionally gets `MMT_ALERT_URL` with
- * `fromEdge: 'reaction'`, exercising the engine's notify-edge env resolution
- * (task 1.4) against the real topology.
+ * Repoint the seeded private-registry Montimage services (MAG, CI-SIM,
+ * AI4SOAR) at the stub image and inject a STUB_ROLE env var per module. The
+ * demo scenario document itself is left untouched — image resolution flows
+ * through `versions[].dockerImage` exactly as production deploys do. The
+ * secAnoD sidecar and the Kafka broker keep their images
+ * (secanod-mmt-image:kafka — load it into kind first — and apache/kafka), so
+ * detection runs the real secAnoD rules
+ * and alerts travel over the real Kafka bus to the stubbed AI4SOAR.
  */
 // The demo scenario's target is CI-SIM since issue #236 — the stub stands in
 // for whatever catalog service the seeded `attacks`/`monitors`/`acts-on`
@@ -306,7 +312,6 @@ async function registerInfrastructure() {
 const STUB_ROLES = {
   MAG: 'attack',
   'CI-SIM': 'target',
-  'MMT-PROBE': 'monitor',
   AI4SOAR: 'reaction',
 };
 
@@ -325,9 +330,6 @@ async function patchServicesToStub() {
       (e) => e.name !== 'STUB_ROLE' && e.name !== 'MMT_ALERT_URL'
     );
     env.push({ name: 'STUB_ROLE', value: stubRole });
-    if (stubRole === 'monitor') {
-      env.push({ name: 'MMT_ALERT_URL', fromEdge: 'reaction' });
-    }
     deployment.env = env;
 
     await api('PUT', `/api/services/${found._id}`, {
@@ -358,7 +360,19 @@ async function executeScenario() {
     fail(`Execute response missing executionId/namespace: ${JSON.stringify(result)}`);
   }
   note(`Execution ${executionId} deploying into namespace ${namespace}`);
-  for (const svc of result.services ?? []) {
+  // POST /execute answers 202 with the plan; the rollout (readiness gate
+  // included) runs in the background — wait for the record to leave pending.
+  const execution = await poll(
+    async () => {
+      const scenario = await api('GET', `/api/scenarios/${scenarioId}`);
+      const record = (scenario.executions ?? []).find((e) => e._id === executionId);
+      return record && record.status !== 'pending' ? record : null;
+    },
+    TIMING.executeMs,
+    `execution ${executionId} to finish rolling out`
+  );
+  if (execution.status === 'failed') fail(`Background deploy failed for ${executionId}`);
+  for (const svc of execution.deployedServices ?? []) {
     note(
       `  service ${svc.name} (${svc.uiType}) status=${svc.status}${svc.dashboardUrl ? ` url=${svc.dashboardUrl}` : ''}`
     );
@@ -481,28 +495,70 @@ async function assertExecAttack(round, command) {
   }
 }
 
-function probeAlertLines() {
+/**
+ * secAnoD detections logged since `sinceTime` (RFC 3339) — mmt-security JSON
+ * reports `[10, probe, iface, ts, rule, "detected", …]`, one per matching
+ * packet, so a time window rather than a line count separates the attacks.
+ */
+function probeAlertLines(sinceTime) {
   const out = kubectl(
-    ['-n', namespace, 'logs', '-l', `app=${HOST_APP}`, '-c', PROBE_CONTAINER, '--tail=500'],
+    [
+      '-n',
+      namespace,
+      'logs',
+      '-l',
+      `app=${HOST_APP}`,
+      '-c',
+      PROBE_CONTAINER,
+      `--since-time=${sinceTime}`,
+    ],
     { allowFail: true }
   );
-  // Case-sensitive `ALERT ` — the probe's detection text (embedded in the
-  // JSON report's `alert` field since #237). A lowercase match would also
-  // hit the startup "alerting to …" banner.
-  return out.split('\n').filter((l) => /\bALERT[:\s]/.test(l));
+  // Match on the report's own packet timestamp too: --since-time filters by
+  // log-write time, which can trail the packet that raised the detection.
+  const sinceEpoch = Date.parse(sinceTime) / 1000;
+  return out.split('\n').filter((l) => {
+    if (!l.startsWith('[10,') || !l.includes('"detected"')) return false;
+    try {
+      return JSON.parse(l)[3] >= sinceEpoch;
+    } catch {
+      return false;
+    }
+  });
 }
 
-async function assertProbeAlert(minCount, name) {
+async function assertProbeAlert(sinceTime, name) {
   try {
     const lines = await poll(
       async () => {
-        const found = probeAlertLines();
-        return found.length >= minCount ? found : null;
+        const found = probeAlertLines(sinceTime);
+        return found.length > 0 ? found : null;
       },
       TIMING.alertMs,
-      `${minCount} MMT-Probe alert(s) in the sidecar logs`
+      `a secAnoD detection in the sidecar logs since ${sinceTime}`
     );
     record(name, true, lines[lines.length - 1]?.slice(0, 160));
+  } catch (err) {
+    record(name, false, err.message);
+  }
+}
+
+/** AI4SOAR consumed secAnoD's report from the Kafka alert bus. */
+async function assertKafkaDelivery(sinceTime) {
+  const name = 'AI4SOAR consumes the secAnoD alert from Kafka';
+  try {
+    const line = await poll(
+      async () => {
+        const out = kubectl(
+          ['-n', namespace, 'logs', '-l', `app=${REACTION_APP}`, `--since-time=${sinceTime}`],
+          { allowFail: true }
+        );
+        return out.split('\n').find((l) => l.includes('ALERT from kafka')) ?? null;
+      },
+      TIMING.alertMs,
+      'an AI4SOAR "ALERT from kafka" log line'
+    );
+    record(name, true, line.slice(0, 160));
   } catch (err) {
     record(name, false, err.message);
   }
@@ -850,9 +906,11 @@ async function main() {
     await assertMagDeployment();
     // Attack #1 — the seeded runbook verbatim; the flood trips the probe's
     // connection alert AND pushes CI-SIM over its rate threshold.
+    const attack1Start = new Date().toISOString();
     await assertExecAttack(1, ATTACK_1_CMD);
-    await assertProbeAlert(1, 'MMT-Probe emits an alert for attack #1');
+    await assertProbeAlert(attack1Start, 'secAnoD emits an alert for attack #1');
     await assertTargetStoppedAndRecovered();
+    await assertKafkaDelivery(attack1Start);
     const attacker = await assertBlocklistEntry();
     endGroup();
 
@@ -860,10 +918,10 @@ async function main() {
     // Let attack #1's hits age out of ci-sim's 10 s rate window so attack
     // #2's 25-request burst cannot re-trip the stop threshold.
     if (attacker) await waitForRateWindowDrain(attacker);
-    const alertsBefore = probeAlertLines().length;
+    const attack2Start = new Date().toISOString();
     const restartsBefore = targetContainerStatus().restarts;
     await assertExecAttack(2, ATTACK_2_CMD);
-    await assertProbeAlert(alertsBefore + 1, 'MMT-Probe alerts again for attack #2');
+    await assertProbeAlert(attack2Start, 'secAnoD alerts again for attack #2');
     await assertTargetStillHealthy(restartsBefore);
     await sampleStatusStream();
     endGroup();

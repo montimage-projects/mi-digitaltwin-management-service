@@ -12,6 +12,7 @@ import {
   buildClientFromInfrastructure,
   deployTopology,
   deriveNamespace,
+  planDeployedServices,
   type DeployResult,
   type ServiceImageSource,
 } from './kubernetesDeploy.js';
@@ -31,6 +32,37 @@ export interface ExecutionResult {
   namespace: string;
   status: string;
   services: DeployResult['services'];
+}
+
+/**
+ * The execution's positional filter, matching only while it has not been
+ * torn down (`completedAt` unset) — so a background rollout that finishes
+ * after a teardown cannot reopen the closed run.
+ */
+function liveExecutionFilter(scenarioId: Types.ObjectId, executionId: string) {
+  return {
+    _id: scenarioId,
+    executions: {
+      $elemMatch: {
+        _id: new mongoose.Types.ObjectId(executionId),
+        completedAt: { $exists: false },
+      },
+    },
+  };
+}
+
+/** Whether the execution was closed by a teardown (it carries `completedAt`). */
+async function wasTornDown(scenarioId: Types.ObjectId, executionId: string): Promise<boolean> {
+  const closed = await Scenario.exists({
+    _id: scenarioId,
+    executions: {
+      $elemMatch: {
+        _id: new mongoose.Types.ObjectId(executionId),
+        completedAt: { $exists: true },
+      },
+    },
+  });
+  return closed !== null;
 }
 
 /**
@@ -108,18 +140,16 @@ export async function executeScenario(
       uiType: s.uiType,
       status: s.status,
       dashboardUrl: s.dashboardUrl,
+      webInterface: s.webInterface,
     }));
 
-    await Scenario.findOneAndUpdate(
-      { _id: scenario._id, 'executions._id': new mongoose.Types.ObjectId(executionId) },
-      {
-        $set: {
-          'executions.$.namespace': result.namespace,
-          'executions.$.status': execItem.status,
-          'executions.$.deployedServices': execItem.deployedServices,
-        },
-      }
-    );
+    await Scenario.findOneAndUpdate(liveExecutionFilter(scenario._id, executionId), {
+      $set: {
+        'executions.$.namespace': result.namespace,
+        'executions.$.status': execItem.status,
+        'executions.$.deployedServices': execItem.deployedServices,
+      },
+    });
 
     return {
       executionId,
@@ -128,6 +158,12 @@ export async function executeScenario(
       services: result.services,
     };
   } catch (deployError) {
+    // Torn down while still rolling out: the teardown already closed the run
+    // (completed + report) and deleting the namespace is what broke the
+    // deploy — leave that record alone instead of flipping it to failed.
+    if (await wasTornDown(scenario._id, executionId)) {
+      throw new AppError('Deployment was torn down before rollout finished', 409);
+    }
     // Surface the deploy failure but leave a durable, failed execution record
     // closed with its run-end stamps (issue #26).
     const completedAt = new Date();
@@ -137,18 +173,15 @@ export async function executeScenario(
       : Math.max(0, completedAt.getTime() - executedAt.getTime());
     execItem.namespace = namespace;
     execItem.status = 'failed';
-    await Scenario.findOneAndUpdate(
-      { _id: scenario._id, 'executions._id': new mongoose.Types.ObjectId(executionId) },
-      {
-        $set: {
-          'executions.$.namespace': namespace,
-          'executions.$.status': 'failed',
-          'executions.$.completedAt': completedAt,
-          'executions.$.durationMs': durationMs,
-          'executions.$.outcome': 'failed',
-        },
-      }
-    );
+    await Scenario.findOneAndUpdate(liveExecutionFilter(scenario._id, executionId), {
+      $set: {
+        'executions.$.namespace': namespace,
+        'executions.$.status': 'failed',
+        'executions.$.completedAt': completedAt,
+        'executions.$.durationMs': durationMs,
+        'executions.$.outcome': 'failed',
+      },
+    });
     // Best-effort failure report; never throws, so it cannot mask deployError.
     await recordDeployFailure({
       scenario: { _id: scenario._id, title: scenario.title },
@@ -172,4 +205,49 @@ export async function executeScenario(
  * names must be DNS-1123 labels (lowercase alphanumeric or `-`, ≤63 chars).
  * Re-exported from kubernetesDeploy for use by the SSE service.
  */
+/**
+ * Record the rollout plan on the freshly pushed execution — namespace and
+ * the per-node rows `deployTopology` will produce, status `pending` — and
+ * return it, so the route can answer right away and open the console while
+ * `executeScenario` rolls the topology out in the background. Throws (before
+ * anything is deployed) for a topology that cannot resolve.
+ */
+export async function planExecution(
+  scenario: {
+    _id: Types.ObjectId;
+    topology?: { nodes?: unknown[]; edges?: unknown[] };
+    executions: unknown[];
+  },
+  services: { _id: Types.ObjectId | string }[]
+): Promise<ExecutionResult> {
+  const execItem = scenario.executions[scenario.executions.length - 1] as Record<string, unknown>;
+  const executionId = (execItem?._id as Types.ObjectId)?.toString() ?? '';
+  if (!executionId) throw new AppError('No execution id available', 500);
+
+  const namespace = deriveNamespace(scenario._id.toString(), executionId);
+  const planned = planDeployedServices({
+    nodes: scenario.topology?.nodes ?? [],
+    edges: scenario.topology?.edges ?? [],
+    services: services as unknown as ServiceImageSource[],
+  });
+
+  await Scenario.findOneAndUpdate(
+    { _id: scenario._id, 'executions._id': new mongoose.Types.ObjectId(executionId) },
+    {
+      $set: {
+        'executions.$.namespace': namespace,
+        'executions.$.deployedServices': planned.map((s) => ({
+          serviceId: s.serviceId,
+          nodeId: s.nodeId,
+          name: s.name,
+          uiType: s.uiType,
+          status: s.status,
+          webInterface: s.webInterface,
+        })),
+      },
+    }
+  );
+  return { executionId, namespace, status: 'pending', services: planned };
+}
+
 export { deriveNamespace } from './kubernetesDeploy.js';

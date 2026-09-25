@@ -146,6 +146,8 @@ export interface DeployedServiceResult {
   status: DeployStatus;
   dashboardUrl?: string;
   nodePort?: number;
+  /** The node gets a web-reachable Service (not a sidecar, Job or unexposed). */
+  webInterface?: boolean;
 }
 
 export interface DeployResult {
@@ -544,6 +546,26 @@ function endpointHost(endpoint: string): string {
  */
 export function buildClientFromInfrastructure(infrastructure: IInfrastructure): K8sClients {
   try {
+    const kc = buildKubeConfig(infrastructure);
+    return {
+      core: kc.makeApiClient(CoreV1Api),
+      apps: kc.makeApiClient(AppsV1Api),
+      batch: kc.makeApiClient(BatchV1Api),
+      networking: kc.makeApiClient(NetworkingV1Api),
+      rbac: kc.makeApiClient(RbacAuthorizationV1Api),
+    };
+  } catch (err) {
+    throw toAppError(err, 'building the Kubernetes client');
+  }
+}
+
+/**
+ * KubeConfig for an Infrastructure's stored credentials — a full kubeconfig
+ * or a bearer token against `endpoint`. Also used directly where a typed API
+ * client is not enough (e.g. `Exec` for attack profiles).
+ */
+export function buildKubeConfig(infrastructure: IInfrastructure): KubeConfig {
+  try {
     const raw = decrypt(infrastructure.credentials).trim();
     const kc = new KubeConfig();
 
@@ -567,13 +589,7 @@ export function buildClientFromInfrastructure(infrastructure: IInfrastructure): 
       });
     }
 
-    return {
-      core: kc.makeApiClient(CoreV1Api),
-      apps: kc.makeApiClient(AppsV1Api),
-      batch: kc.makeApiClient(BatchV1Api),
-      networking: kc.makeApiClient(NetworkingV1Api),
-      rbac: kc.makeApiClient(RbacAuthorizationV1Api),
-    };
+    return kc;
   } catch (err) {
     throw toAppError(err, 'building the Kubernetes client');
   }
@@ -1080,6 +1096,45 @@ async function waitForWorkloadsReady(
 }
 
 /**
+ * The per-node result rows a deploy of this topology will produce, computed
+ * without touching the cluster — so an execution can be recorded (and its
+ * console opened) before the rollout, which runs in the background. Same
+ * row rules as `deployTopology`: a sidecar row carries its host's resource
+ * name; no NodePort/URL exists yet.
+ */
+export function planDeployedServices(
+  opts: Pick<DeployTopologyOptions, 'nodes' | 'edges' | 'services'>
+): DeployedServiceResult[] {
+  const resolved = resolveTopologyNodes(opts.nodes, opts.services, opts.edges);
+  const plans = planWorkloads(resolved);
+  const hostByNode = new Map<string, ResolvedNode>();
+  for (const plan of plans) {
+    hostByNode.set(plan.node.nodeId, plan.node);
+    for (const sidecar of plan.sidecars) hostByNode.set(sidecar.nodeId, plan.node);
+  }
+  return resolved.map((node) => {
+    const owner = hostByNode.get(node.nodeId) ?? node;
+    return {
+      nodeId: node.nodeId,
+      serviceId: node.serviceId,
+      name: owner.name,
+      uiType: node.uiType,
+      status: 'pending' as DeployStatus,
+      webInterface: exposesWebInterface(node, owner),
+    };
+  });
+}
+
+/** Whether a node's row gets a reachable Service port. */
+function exposesWebInterface(node: ResolvedNode, owner: ResolvedNode): boolean {
+  return (
+    node.deployment.attachMode !== 'sidecar' &&
+    owner.deployment.kind !== 'Job' &&
+    owner.deployment.exposePort !== false
+  );
+}
+
+/**
  * Deploy a scenario topology into a fresh per-execution namespace: create the
  * namespace (PodSecurity-labelled when a node needs `privileged` admission),
  * then one egress NetworkPolicy per `role: 'attack'` node, then per
@@ -1255,6 +1310,7 @@ export async function deployTopology(
         status: 'pending' as DeployStatus,
         nodePort,
         dashboardUrl: nodePort ? `http://${host}:${nodePort}` : undefined,
+        webInterface: !!nodePort,
       };
     });
 

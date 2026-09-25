@@ -6,13 +6,14 @@
  * Seeds a ready-to-run demo so a fresh install can execute the R1 two-attack
  * flow end-to-end: a "Montimage Demo" project holding the scenario
  * "CI attack → MMT detection → AI4SOAR block" whose topology wires the
- * four catalog modules (issue #186, task 0.1; CI-SIM from issue #231)
+ * catalog modules (issue #186, task 0.1; CI-SIM from issue #231; secAnoD monitor)
  * exactly as the playbook's revised runtime topology wiring table
  * prescribes:
  *
  *   MAG       --attacks-->  CI-SIM     (attack target → exec-driven attack)
- *   MMT-PROBE --monitors--> CI-SIM     (probe injected as target-pod sidecar)
- *   MMT-PROBE --notifies--> AI4SOAR    (probe security output → SOAR ingest)
+ *   SECANOD   --monitors-->  CI-SIM     (secAnoD injected as target-pod sidecar)
+ *   SECANOD   --publishes--> KAFKA      (mmt-security reports → mmt-security-alerts)
+ *   KAFKA     --consumes-->  AI4SOAR    (AI4SOAR consumes the alert topic)
  *   AI4SOAR   --acts-on-->  CI-SIM     (playbook POSTs /admin/block — #235)
  *
  * Node ids double as the Kubernetes resource names the engine derives
@@ -27,6 +28,7 @@ import { Project } from '../models/Project.js';
 import { Scenario, type INodeConfig } from '../models/Scenario.js';
 import { Service } from '../models/Service.js';
 import { upsertRecord } from './sync-helpers.js';
+import type { Runbook } from '../services/runbook.js';
 
 const DEMO_PROJECT_SHORTNAME = 'MONTIMAGE-DEMO';
 const DEMO_SCENARIO_TITLE = 'CI attack → MMT detection → AI4SOAR block';
@@ -36,8 +38,8 @@ const DEMO_SCENARIO_TITLE = 'CI attack → MMT detection → AI4SOAR block';
 // scenario.
 const LEGACY_SCENARIO_TITLE = 'HTTP attack → MMT detection → AI4SOAR response';
 
-type ScenarioRole = 'attack' | 'target' | 'monitor' | 'reaction';
-type DemoNodeId = 'mag' | 'ci-sim' | 'mmt-probe' | 'ai4soar';
+type ScenarioRole = 'attack' | 'target' | 'monitor' | 'reaction' | 'generic';
+type DemoNodeId = 'mag' | 'ci-sim' | 'secanod' | 'kafka' | 'ai4soar';
 
 interface DemoNodeSpec {
   /** Topology node id — also the derived Kubernetes resource name. */
@@ -52,7 +54,7 @@ interface DemoNodeSpec {
 }
 
 /**
- * The four nodes of the demo topology. Positions lay the flow out
+ * The nodes of the demo topology. Positions lay the flow out
  * left-to-right (attack → target ← monitor / reaction); the renderer re-docks
  * the `sidecar` probe onto its `monitors`-edge host at display time, so the
  * stored position is only a fallback.
@@ -91,8 +93,19 @@ const demoNodes: DemoNodeSpec[] = [
         {
           name: 'attack-2-already-blocked',
           description:
-            'Attack #2 — the same profile re-run after AI4SOAR POSTs the MAG pod address to ci-sim:8080/admin/block; CI-SIM answers 403 while the MMT-Probe sidecar still raises the alert.',
-          args: ['mag', 'http-flood', '--target-ip', 'ci-sim', '--target-port', '8080'],
+            'Attack #2 — the same profile re-run after AI4SOAR POSTs the MAG pod address to ci-sim:8080/admin/block; CI-SIM answers 403 while the secAnoD sidecar still raises the alert.',
+          // Capped so the second run still trips secAnoD without pushing CI-SIM
+          // over its stop threshold again.
+          args: [
+            'mag',
+            'http-flood',
+            '--target-ip',
+            'ci-sim',
+            '--target-port',
+            '8080',
+            '--count',
+            '25',
+          ],
         },
       ],
     },
@@ -104,11 +117,17 @@ const demoNodes: DemoNodeSpec[] = [
     position: { x: 320, y: 160 },
   },
   {
-    id: 'mmt-probe',
-    serviceShortName: 'MMT-PROBE',
+    id: 'secanod',
+    serviceShortName: 'SECANOD',
     role: 'monitor',
     attachMode: 'sidecar',
     position: { x: 320, y: 340 },
+  },
+  {
+    id: 'kafka',
+    serviceShortName: 'KAFKA',
+    role: 'generic',
+    position: { x: 600, y: 340 },
   },
   {
     id: 'ai4soar',
@@ -118,21 +137,14 @@ const demoNodes: DemoNodeSpec[] = [
   },
 ];
 
-/** The four typed edges of the wiring table (task 3.2 spellings). */
+/** The typed edges of the wiring table (task 3.2 spellings). */
 const demoEdges: { id: string; source: DemoNodeId; target: DemoNodeId; edgeType: string }[] = [
   { id: 'edge-mag-attacks-ci-sim', source: 'mag', target: 'ci-sim', edgeType: 'attacks' },
-  {
-    id: 'edge-mmt-probe-monitors-ci-sim',
-    source: 'mmt-probe',
-    target: 'ci-sim',
-    edgeType: 'monitors',
-  },
-  {
-    id: 'edge-mmt-probe-notifies-ai4soar',
-    source: 'mmt-probe',
-    target: 'ai4soar',
-    edgeType: 'notifies',
-  },
+  { id: 'edge-secanod-monitors-ci-sim', source: 'secanod', target: 'ci-sim', edgeType: 'monitors' },
+  // Alert bus: untyped for the engine (no env/sidecar wiring derives from
+  // them) — the Kafka endpoints are the static kafka:9092 Service name.
+  { id: 'edge-secanod-publishes-kafka', source: 'secanod', target: 'kafka', edgeType: 'publishes' },
+  { id: 'edge-kafka-consumes-ai4soar', source: 'kafka', target: 'ai4soar', edgeType: 'consumes' },
   {
     id: 'edge-ai4soar-acts-on-ci-sim',
     source: 'ai4soar',
@@ -140,6 +152,100 @@ const demoEdges: { id: string; source: DemoNodeId; target: DemoNodeId; edgeType:
     edgeType: 'acts-on',
   },
 ];
+
+/**
+ * The R1 demo runbook (docs/playbooks/montimage-attack-detect-respond-plan.md,
+ * "Run it yourself") as data the Execution console renders against a live
+ * run — see services/runbook.ts for the placeholders. Expectations only count
+ * events after their step's attack was started, so attack #2's beats are not
+ * satisfied by attack #1's.
+ */
+const demoRunbook: Runbook = {
+  steps: [
+    {
+      id: 'check-deployment',
+      title: 'Check the deployment',
+      description:
+        'Every service should be Running: MAG idling, CI-SIM with its secAnoD sidecar (2/2), Kafka and AI4SOAR. CI-SIM and AI4SOAR answer on their web interfaces.',
+      links: ['ci-sim', 'ai4soar'],
+      commands: ['kubectl get pods -n {{namespace}}'],
+    },
+    {
+      id: 'attack-1',
+      title: 'Attack #1 — stop the service',
+      description:
+        'MAG floods ci-sim:8080 until CI-SIM crosses its rate threshold and stops. secAnoD (rule 56, SYN flooding) publishes the detection to Kafka; AI4SOAR consumes it and blocks the MAG pod address ({{ip:mag}}) on CI-SIM.',
+      profile: { nodeId: 'mag', name: 'attack-1-stop-the-server' },
+      commands: [
+        "kubectl exec -it deploy/mag -n {{namespace}} -- sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'",
+      ],
+      expect: [
+        { label: 'secAnoD detects the flood', source: 'alert', container: 'secanod' },
+        {
+          label: 'CI-SIM stops under the flood ("service stopped")',
+          source: 'log',
+          container: 'ci-sim',
+          pattern: 'service stopped',
+        },
+        {
+          label: 'AI4SOAR consumes the alert from Kafka',
+          source: 'log',
+          container: 'ai4soar',
+          pattern: 'ALERT from kafka',
+        },
+        {
+          label: 'AI4SOAR blocks the attacker {{ip:mag}} on CI-SIM',
+          source: 'log',
+          container: 'ai4soar',
+          pattern: 'blocked {{ip:mag}}',
+        },
+      ],
+    },
+    {
+      id: 'confirm-block',
+      title: 'Confirm the block',
+      description:
+        'CI-SIM restarted once (RESTARTS 1) and its blocklist holds {{ip:mag}}. The Kafka topic holds the secAnoD reports.',
+      commands: [
+        'kubectl get pods -n {{namespace}}',
+        'kubectl exec -n {{namespace}} deploy/ci-sim -c ci-sim -- python3 -c "import urllib.request as u; print(u.urlopen(\'http://127.0.0.1:8080/admin/blocks\').read().decode())"',
+        'kubectl exec -n {{namespace}} deploy/kafka -- /opt/kafka/bin/kafka-get-offsets.sh --bootstrap-server localhost:9092 --topic mmt-security-alerts',
+      ],
+    },
+    {
+      id: 'attack-2',
+      title: 'Attack #2 — already blocked',
+      description:
+        'The same flood, capped at 25 requests. CI-SIM refuses the blocked attacker (403) and stays up; secAnoD still detects the traffic.',
+      profile: { nodeId: 'mag', name: 'attack-2-already-blocked' },
+      commands: [
+        "kubectl exec -it deploy/mag -n {{namespace}} -- sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 --count 25 2>&1 | tee /proc/1/fd/1'",
+      ],
+      expect: [
+        { label: 'secAnoD detects the flood again', source: 'alert', container: 'secanod' },
+        {
+          label: 'AI4SOAR receives the new alert from Kafka',
+          source: 'log',
+          container: 'ai4soar',
+          pattern: 'ALERT from kafka',
+        },
+        {
+          label: 'MAG requests are refused (403 / blocked)',
+          source: 'log',
+          container: 'mag',
+          pattern: '403|[1-9][0-9]* blocked',
+        },
+      ],
+    },
+    {
+      id: 'teardown',
+      title: 'Tear down',
+      description:
+        'Use Tear Down in the header (or the command) — deleting the namespace removes every resource the engine created, and the run closes with its execution report.',
+      commands: ['kubectl delete namespace {{namespace}}'],
+    },
+  ],
+};
 
 /**
  * Render the `topology.yaml` mirror the canvas' `nodesToYaml` produces
@@ -178,7 +284,7 @@ function topologyYaml(
 export const seedDemoScenario = async (): Promise<void> => {
   console.info('Seeding demo project and scenario...');
 
-  // Resolve the four catalog modules the demo wires together (task 0.1).
+  // Resolve the catalog modules the demo wires together (task 0.1).
   // `uiType` rides along so node badges/exec hints mirror the catalog entry
   // (MAG is `terminal` since issue #233) instead of a hardcoded 'web'.
   const serviceByShortName = new Map<
@@ -296,8 +402,9 @@ export const seedDemoScenario = async (): Promise<void> => {
     { projectId: project._id, title: DEMO_SCENARIO_TITLE },
     {
       description:
-        "Montimage attack → detect → respond demo (R1): MAG deploys as a long-running terminal Deployment carrying the two default attack profiles in its node `config.profiles` — drive them with `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'` (the tee lands the output in the MAG container log the SSE stream ships). Attack #1 stops the CI-SIM server (rate over its threshold → 'service stopped' → restart); attack #2 re-runs after AI4SOAR's playbook POSTs the reported `ip.src` to ci-sim:8080/admin/block, so it is answered 403 while the MMT-Probe sidecar still reports JSON alerts (Kafka, stdout, file). Wiring follows the revised runtime topology of docs/playbooks/montimage-attack-detect-respond-plan.md.",
+        "Montimage attack → detect → respond demo (R1): MAG deploys as a long-running terminal Deployment carrying the two default attack profiles in its node `config.profiles` — drive them with `kubectl exec -it deploy/mag -n <exec-ns> -- sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 2>&1 | tee /proc/1/fd/1'` (the tee lands the output in the MAG container log the SSE stream ships). Attack #1 stops the CI-SIM server (rate over its threshold → 'service stopped' → restart); attack #2 re-runs after AI4SOAR's playbook POSTs the reported `ip.src` to ci-sim:8080/admin/block, so it is answered 403 while the secAnoD sidecar still detects the flood (reports published to the Kafka alert bus AI4SOAR consumes). Wiring follows the revised runtime topology of docs/playbooks/montimage-attack-detect-respond-plan.md.",
       topology: { yaml, nodes, edges },
+      runbook: demoRunbook,
     }
   );
 

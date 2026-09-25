@@ -1,3 +1,4 @@
+import type { Runbook } from '../services/runbook.js';
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IDeployedService {
@@ -11,6 +12,8 @@ export interface IDeployedService {
   status?: 'pending' | 'running' | 'completed' | 'failed';
   /** Reachable NodePort URL for the deployed service. */
   dashboardUrl?: string;
+  /** The node has a web-reachable Service (opened through the proxy). */
+  webInterface?: boolean;
 }
 
 export interface IConclusion {
@@ -73,6 +76,8 @@ export interface IScenario extends Document {
   description?: string;
   topology: ITopology;
   infrastructureId?: Types.ObjectId;
+  /** Step-by-step test guide rendered per execution (services/runbook.ts). */
+  runbook?: Runbook;
   executions: IExecution[];
   /**
    * Seed bookkeeping mirroring the catalog models — a seeded scenario (the
@@ -98,6 +103,7 @@ const deployedServiceSchema = new Schema<IDeployedService>(
       default: 'pending',
     },
     dashboardUrl: { type: String },
+    webInterface: { type: Boolean },
   },
   { _id: false }
 );
@@ -164,6 +170,9 @@ const scenarioSchema = new Schema<IScenario>(
     infrastructureId: {
       type: Schema.Types.ObjectId,
       ref: 'Infrastructure',
+    },
+    runbook: {
+      type: Schema.Types.Mixed,
     },
     executions: [executionSchema],
     deprecated: {

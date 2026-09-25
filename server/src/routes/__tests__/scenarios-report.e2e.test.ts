@@ -514,9 +514,16 @@ describe('execution reports', () => {
       method: 'POST',
       headers: authHeader,
     });
-    expect(res.status).toBe(502);
-
-    const scenario = await Scenario.findById(scenarioId).lean();
+    // The deploy runs in the background after a 202 — wait for it to fail.
+    expect(res.status).toBe(202);
+    let scenario = await Scenario.findById(scenarioId).lean();
+    await vi.waitFor(
+      async () => {
+        scenario = await Scenario.findById(scenarioId).lean();
+        expect(scenario!.executions.at(-1)?.status).toBe('failed');
+      },
+      { timeout: 5000, interval: 50 }
+    );
     const failed = scenario!.executions[scenario!.executions.length - 1];
     const executionId = failed._id!.toString();
     expect(failed.status).toBe('failed');

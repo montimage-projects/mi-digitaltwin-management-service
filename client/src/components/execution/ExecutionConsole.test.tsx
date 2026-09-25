@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { ExecutionConsole } from './ExecutionConsole';
 import * as sseModule from '@/lib/sse';
-import type { ExecutionEventHandlers } from '@/lib/api';
+import { scenariosApi, type ExecutionEventHandlers } from '@/lib/api';
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -338,6 +338,31 @@ describe('ExecutionConsole', () => {
     fireEvent.click(hint);
     await vi.waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(expected);
+    });
+  });
+
+  it('runs a seeded attack profile from its button', async () => {
+    const profile = {
+      nodeId: 'mag',
+      name: 'attack-1-stop-the-server',
+      description: 'Attack #1',
+      args: ['mag', 'http-flood'],
+    };
+    vi.spyOn(scenariosApi, 'listProfiles').mockResolvedValue([profile]);
+    const run = vi
+      .spyOn(scenariosApi, 'runProfile')
+      .mockResolvedValue({ pod: 'mag-pod', container: 'mag', message: 'Profile started' });
+
+    await renderWithMockedStream({
+      ...defaultProps,
+      services: [
+        { nodeId: 'n1', serviceId: 's1', name: 'mag', uiType: 'terminal', status: 'running' },
+      ],
+    });
+
+    fireEvent.click(await screen.findByTestId('run-profile-attack-1-stop-the-server'));
+    await vi.waitFor(() => {
+      expect(run).toHaveBeenCalledWith('scenario-1', 'exec-1', profile);
     });
   });
 });
