@@ -365,4 +365,34 @@ describe('ExecutionConsole', () => {
       expect(run).toHaveBeenCalledWith('scenario-1', 'exec-1', profile);
     });
   });
+
+  it('opens a web interface in a tab severed from window.opener', async () => {
+    const tab = { opener: window, location: { href: '' }, close: vi.fn() };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    vi.spyOn(scenariosApi, 'getServiceLink').mockResolvedValue({
+      url: '/api/proxy/1/sig/scenario-1/exec-1/ci-sim/',
+    });
+
+    await renderWithMockedStream({
+      ...defaultProps,
+      services: [
+        {
+          nodeId: 'n1',
+          serviceId: 's1',
+          name: 'ci-sim',
+          uiType: 'web',
+          status: 'running',
+          webInterface: 'http://node:30080',
+        },
+      ],
+    });
+
+    fireEvent.click(await screen.findByTestId('open-interface-ci-sim'));
+    await vi.waitFor(() => {
+      expect(tab.location.href).toBe('/api/proxy/1/sig/scenario-1/exec-1/ci-sim/');
+    });
+    expect(open).toHaveBeenCalledWith('about:blank', '_blank');
+    expect(tab.opener).toBeNull();
+    open.mockRestore();
+  });
 });

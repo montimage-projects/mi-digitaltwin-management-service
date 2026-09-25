@@ -22,6 +22,9 @@ export interface RunbookAlert {
 interface RunbookPanelProps {
   steps: RunbookStep[];
   isLoading: boolean;
+  /** The runbook query failed — shown instead of the empty state. */
+  isError?: boolean;
+  onRetry?: () => void;
   logs: RunbookLogLine[];
   alerts: RunbookAlert[];
   /** Deployment still up — actions are offered only then. */
@@ -75,6 +78,8 @@ export function expectationMet(
 export function RunbookPanel({
   steps,
   isLoading,
+  isError = false,
+  onRetry,
   logs,
   alerts,
   live,
@@ -118,6 +123,21 @@ export function RunbookPanel({
     return (
       <div className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading runbook…
+      </div>
+    );
+  }
+  if (isError) {
+    return (
+      <div
+        role="alert"
+        className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground"
+      >
+        <p>Could not load the runbook.</p>
+        {onRetry && (
+          <Button size="sm" variant="outline" onClick={onRetry}>
+            Retry
+          </Button>
+        )}
       </div>
     );
   }
@@ -200,9 +220,10 @@ export function RunbookPanel({
                     Expected
                     {step.profile && !started && ' — press Run to start checking'}
                   </div>
-                  <ul className="space-y-1">
+                  <ul className="space-y-1" aria-live="polite">
                     {step.expect.map((expectation, index) => {
                       const ok = met.has(`${step.id}:${index}`);
+                      const checking = started || !step.profile;
                       return (
                         <li
                           key={expectation.label}
@@ -211,12 +232,24 @@ export function RunbookPanel({
                           className="flex items-center gap-2 text-sm"
                         >
                           {ok ? (
-                            <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400" />
-                          ) : started || !step.profile ? (
-                            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                            <CheckCircle2
+                              aria-hidden="true"
+                              className="h-4 w-4 shrink-0 text-green-600 dark:text-green-400"
+                            />
+                          ) : checking ? (
+                            <Loader2
+                              aria-hidden="true"
+                              className="h-4 w-4 shrink-0 animate-spin text-muted-foreground"
+                            />
                           ) : (
-                            <Circle className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                            <Circle
+                              aria-hidden="true"
+                              className="h-4 w-4 shrink-0 text-muted-foreground/60"
+                            />
                           )}
+                          <span className="sr-only">
+                            {ok ? 'Met' : checking ? 'Checking' : 'Not started'}:
+                          </span>
                           <span className={ok ? '' : 'text-muted-foreground'}>
                             {expectation.label}
                           </span>

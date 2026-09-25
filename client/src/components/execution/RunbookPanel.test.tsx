@@ -67,4 +67,35 @@ describe('RunbookPanel', () => {
     fireEvent.click(screen.getByText('kubectl exec -it deploy/mag -n ns -- mag'));
     expect(p.copy).toHaveBeenCalledWith('kubectl exec -it deploy/mag -n ns -- mag');
   });
+
+  it('announces each beat state as text, not only by icon', () => {
+    const p = props();
+    const { rerender } = render(<RunbookPanel {...p} />);
+    const beat = screen.getByTestId('runbook-expect-attack-1-0');
+    expect(beat).toHaveTextContent('Not started:');
+    expect(beat.closest('ul')).toHaveAttribute('aria-live', 'polite');
+    expect(beat.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+
+    fireEvent.click(screen.getByTestId('runbook-run-attack-1'));
+    expect(screen.getByTestId('runbook-expect-attack-1-0')).toHaveTextContent('Checking:');
+
+    rerender(
+      <RunbookPanel
+        {...p}
+        logs={[
+          { service: 'ci-sim', container: 'ci-sim', line: 'service stopped', at: Date.now() + 1 },
+        ]}
+      />
+    );
+    expect(screen.getByTestId('runbook-expect-attack-1-0')).toHaveTextContent('Met:');
+  });
+
+  it('shows a load error with a retry instead of the empty state', () => {
+    const onRetry = vi.fn();
+    render(<RunbookPanel {...props({ steps: [], isError: true, onRetry })} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load the runbook.');
+    expect(screen.queryByText('This scenario has no runbook.')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
 });

@@ -176,7 +176,10 @@ export function ExecutionConsole({
   // NodePort URL is unreachable when the cluster nodes are not (kind).
   const openInterface = async (serviceName: string) => {
     // Open synchronously so the popup blocker treats it as user-initiated.
+    // 'noopener' would make window.open return null, so sever the proxied
+    // page's handle on this window by hand before navigating it.
     const tab = window.open('about:blank', '_blank');
+    if (tab) tab.opener = null;
     try {
       const { url } = await scenariosApi.getServiceLink(scenarioId, executionId, serviceName);
       if (tab) tab.location.href = url;
@@ -189,7 +192,12 @@ export function ExecutionConsole({
   // Console ↔ Runbook view; the runbook is resolved against this run
   // (namespace, pod names/IPs) and refetched once the rollout settles.
   const [view, setView] = useState<'console' | 'runbook'>('console');
-  const { data: runbook, isLoading: runbookLoading } = useQuery({
+  const {
+    data: runbook,
+    isLoading: runbookLoading,
+    isError: runbookError,
+    refetch: refetchRunbook,
+  } = useQuery({
     queryKey: ['execution-runbook', scenarioId, executionId, phase],
     queryFn: () => scenariosApi.getRunbook(scenarioId, executionId),
     enabled: view === 'runbook',
@@ -630,6 +638,8 @@ export function ExecutionConsole({
             <RunbookPanel
               steps={runbook?.steps ?? []}
               isLoading={runbookLoading}
+              isError={runbookError}
+              onRetry={() => void refetchRunbook()}
               logs={logs}
               alerts={alerts}
               live={!tornDown && phase !== 'failed'}
