@@ -93,6 +93,8 @@ const createScenarioSchema = z.object({
     .string()
     .refine((val) => !val || objectIdSchema.safeParse(val).success, 'Invalid infrastructure ID')
     .optional(),
+  /** Per-execution observability stack; omitted means the model default (on). */
+  observability: z.boolean().optional(),
 });
 
 const updateScenarioSchema = createScenarioSchema.partial();

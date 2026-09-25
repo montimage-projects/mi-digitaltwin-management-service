@@ -466,7 +466,8 @@ curl -X GET "http://localhost:3000/api/projects/proj123/scenarios" \
 
 - **POST** `/api/projects/:projectId/scenarios`
 - **Auth:** Required
-- **Body:** `{ title: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string }`
+- **Body:** `{ title: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string, observability?: boolean }`
+- **Note:** `observability` (default `true`) deploys an OpenTelemetry Collector and Prometheus into each execution namespace; see [Scenario observability](#scenario-observability).
 - **Note:** a topology node may carry `data.config` overrides for the service's `deployment` spec — `config.env` (`{ name: string, value?: string, fromEdge?: "target" | "reaction" }[]`) and `config.args` (`string[]`). Invalid overrides are rejected with `400`.
 - **Response:** `{ scenario: Scenario }` (populated with infrastructure)
 
@@ -500,7 +501,7 @@ curl -X GET http://localhost:3000/api/scenarios/scen123 \
 
 - **PUT** `/api/scenarios/:id`
 - **Auth:** Required
-- **Body:** `{ title?: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string }`
+- **Body:** `{ title?: string, description?: string, topology?: { yaml?: string, nodes?: object[], edges?: object[] }, infrastructureId?: string, observability?: boolean }`
 - **Note:** `data.config` node overrides (`env`, `args`) are validated as in Create Scenario.
 - **Response:** `{ scenario: Scenario }`
 
@@ -876,7 +877,8 @@ Validated on `POST`/`PUT /api/services`; invalid specs are rejected with
     edges: object[];
   };
   infrastructureId?: string; // Reference to Infrastructure
-  status: 'draft' | 'ready' | 'executed';
+  observability: boolean; // default true — per-execution OTel Collector + Prometheus
+  runbook?: object;
   executions: Execution[];
   createdAt: Date;
   updatedAt: Date;

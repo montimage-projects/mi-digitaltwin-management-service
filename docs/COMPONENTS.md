@@ -413,6 +413,11 @@ Components for specific features located in `client/src/components/`.
 - Topology editor integration
 - Service selection
 
+**ScenarioForm**
+
+- Title, description and target infrastructure of a scenario (Add/Edit Scenario pages)
+- **Collect observability data** checkbox (`observability`, on by default; older scenarios without the field show as on) — deploys an OpenTelemetry Collector and Prometheus with each run
+
 **TopologyEditor**
 
 - Visual canvas for building scenarios

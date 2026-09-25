@@ -78,6 +78,12 @@ export interface IScenario extends Document {
   infrastructureId?: Types.ObjectId;
   /** Step-by-step test guide rendered per execution (services/runbook.ts). */
   runbook?: Runbook;
+  /**
+   * Deploy the per-namespace observability stack (OTel Collector +
+   * Prometheus) with each execution. Defaults to on; documents saved before
+   * the field existed read `undefined`, which the engine also treats as on.
+   */
+  observability?: boolean;
   executions: IExecution[];
   /**
    * Seed bookkeeping mirroring the catalog models — a seeded scenario (the
@@ -173,6 +179,10 @@ const scenarioSchema = new Schema<IScenario>(
     },
     runbook: {
       type: Schema.Types.Mixed,
+    },
+    observability: {
+      type: Boolean,
+      default: true,
     },
     executions: [executionSchema],
     deprecated: {

@@ -80,6 +80,12 @@ export const openApiSpec = {
           description: { type: 'string' },
           topology: { type: 'object' },
           infrastructureId: { type: 'string' },
+          observability: {
+            type: 'boolean',
+            default: true,
+            description:
+              'Deploy an OpenTelemetry Collector and Prometheus into each execution namespace to probe and scrape every component',
+          },
         },
       },
       Infrastructure: {
