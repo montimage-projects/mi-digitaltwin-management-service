@@ -218,7 +218,7 @@ export function Monitoring() {
           </div>
 
           {/* Summary cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             <SummaryCard icon={Activity} label="Running services" value={visibleServices.length} />
             <SummaryCard
               icon={HeartPulse}
@@ -240,7 +240,15 @@ export function Monitoring() {
             {visibleServices.length === 0 ? (
               <p className="py-8 text-center text-muted-foreground">No running services</p>
             ) : (
-              <Table>
+              <Table
+                containerProps={{
+                  role: 'region',
+                  'aria-label': 'Service metrics',
+                  tabIndex: 0,
+                  className:
+                    'rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                }}
+              >
                 <TableHeader>
                   <TableRow>
                     <TableHead>Service</TableHead>
@@ -279,20 +287,24 @@ export function Monitoring() {
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <span className="w-20">{formatCpu(service.cpuMillicores)}</span>
-                                <MetricSparkline
-                                  values={points.map((p) => p.cpuMillicores)}
-                                  label={`${service.name} CPU, latest ${formatCpu(service.cpuMillicores)}`}
-                                />
+                                <span className="hidden xl:inline-flex">
+                                  <MetricSparkline
+                                    values={points.map((p) => p.cpuMillicores)}
+                                    label={`${service.name} CPU, latest ${formatCpu(service.cpuMillicores)}`}
+                                  />
+                                </span>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <span className="w-20">{formatMemory(service.memoryBytes)}</span>
-                                <MetricSparkline
-                                  values={points.map((p) => p.memoryBytes)}
-                                  label={`${service.name} memory, latest ${formatMemory(service.memoryBytes)}`}
-                                  className="text-blue-500"
-                                />
+                                <span className="hidden xl:inline-flex">
+                                  <MetricSparkline
+                                    values={points.map((p) => p.memoryBytes)}
+                                    label={`${service.name} memory, latest ${formatMemory(service.memoryBytes)}`}
+                                    className="text-blue-500"
+                                  />
+                                </span>
                               </div>
                             </TableCell>
                           </>
@@ -364,7 +376,7 @@ function HealthCell({ service }: { service: ServiceMetrics }) {
   return (
     <TableCell>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant={traffic.up ? 'default' : 'destructive'}>{traffic.up ? 'Up' : 'Down'}</Badge>
+        <Badge variant={traffic.up ? 'success' : 'danger'}>{traffic.up ? 'Up' : 'Down'}</Badge>
         <span className="text-sm text-muted-foreground">
           {[
             traffic.availability !== undefined && `${formatPercent(traffic.availability)} avail.`,

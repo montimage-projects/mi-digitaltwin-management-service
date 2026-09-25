@@ -53,9 +53,9 @@ interface AlertRulesPanelProps {
   serviceOptions: ServiceOption[];
 }
 
-export const SEVERITY_BADGE: Record<AlertSeverity, 'destructive' | 'default' | 'secondary'> = {
-  critical: 'destructive',
-  warning: 'default',
+export const SEVERITY_BADGE: Record<AlertSeverity, 'danger' | 'warning' | 'secondary'> = {
+  critical: 'danger',
+  warning: 'warning',
   info: 'secondary',
 };
 
@@ -291,12 +291,12 @@ export function AlertRulesPanel({ serviceOptions }: AlertRulesPanelProps) {
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label>Metric</Label>
+                <Label htmlFor="alert-rule-metric">Metric</Label>
                 <Select
                   value={form.metric}
                   onValueChange={(v) => setForm({ ...form, metric: v as AlertMetric })}
                 >
-                  <SelectTrigger aria-label="Metric">
+                  <SelectTrigger id="alert-rule-metric">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -309,12 +309,12 @@ export function AlertRulesPanel({ serviceOptions }: AlertRulesPanelProps) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Operator</Label>
+                <Label htmlFor="alert-rule-operator">Operator</Label>
                 <Select
                   value={form.operator}
                   onValueChange={(v) => setForm({ ...form, operator: v as AlertOperator })}
                 >
-                  <SelectTrigger aria-label="Operator">
+                  <SelectTrigger id="alert-rule-operator">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -349,12 +349,12 @@ export function AlertRulesPanel({ serviceOptions }: AlertRulesPanelProps) {
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Severity</Label>
+                <Label htmlFor="alert-rule-severity">Severity</Label>
                 <Select
                   value={form.severity}
                   onValueChange={(v) => setForm({ ...form, severity: v as AlertSeverity })}
                 >
-                  <SelectTrigger aria-label="Severity">
+                  <SelectTrigger id="alert-rule-severity">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -367,12 +367,12 @@ export function AlertRulesPanel({ serviceOptions }: AlertRulesPanelProps) {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Applies to</Label>
+                <Label htmlFor="alert-rule-scope">Applies to</Label>
                 <Select
                   value={form.serviceId}
                   onValueChange={(v) => setForm({ ...form, serviceId: v })}
                 >
-                  <SelectTrigger aria-label="Applies to">
+                  <SelectTrigger id="alert-rule-scope">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

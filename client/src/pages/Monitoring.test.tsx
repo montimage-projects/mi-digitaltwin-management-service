@@ -165,6 +165,13 @@ describe('Monitoring', () => {
     expect(within(dbRow).getByText('No metrics')).toBeInTheDocument();
   });
 
+  it('makes the scrollable services table a focusable, labelled region', async () => {
+    renderPage();
+    const region = await screen.findByRole('region', { name: 'Service metrics' });
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(within(region).getByRole('table')).toBeInTheDocument();
+  });
+
   it('explains where health and traffic readings come from', async () => {
     renderPage();
     expect(
@@ -267,6 +274,18 @@ describe('Monitoring', () => {
     expect(threshold).toHaveAttribute('aria-invalid', 'true');
     expect(threshold).toHaveAttribute('aria-describedby', message.id);
     expect(screen.getByRole('button', { name: 'Create rule' })).toBeDisabled();
+  });
+
+  it('associates each rule select with its visible label', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /New rule/ }));
+    for (const name of ['Metric', 'Operator', 'Severity', 'Applies to']) {
+      const trigger = screen.getByRole('combobox', { name });
+      expect(trigger).not.toHaveAttribute('aria-label');
+      expect(screen.getByText(name, { selector: 'label' })).toHaveAttribute('for', trigger.id);
+    }
   });
 
   it('lets an admin create an alert rule', async () => {
