@@ -21,6 +21,22 @@ docker run --rm \
 Adjust the source/target volume names above to match the compose file you use (e.g. append
 `-prod` or `-atlas`), then restart the stack.
 
+## Upgrade Note: Close Pre-#249 Executions
+
+Executions torn down before execution reports (#249) were never stamped with
+`completedAt`, so the Monitoring page and `secsim_live_executions` count them
+as still live. Run this idempotent migration once after upgrading. It closes
+`completed` runs started before the #249 cutover that have no `completedAt`,
+and sets `completedAt` to the run's start time:
+
+```bash
+# From a checkout, with the deployment's MONGODB_URI and required secrets exported
+npm run migrate:close-legacy-executions -w server
+
+# Or inside the running Docker Compose app container (distroless: call node directly)
+docker exec montimage-app /nodejs/bin/node dist/migrations/close-legacy-executions.js
+```
+
 ## Prerequisites
 
 Before deploying, ensure you have:

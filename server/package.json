@@ -11,6 +11,7 @@
     "seed": "tsx src/seed/index.ts",
     "migrate:sectors": "tsx src/migrations/add-sectors-to-services.ts",
     "migrate:category-to-sector": "tsx src/migrations/migrate-category-to-sector.ts",
+    "migrate:close-legacy-executions": "tsx src/migrations/close-legacy-executions.ts",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write src/**/*.ts",
