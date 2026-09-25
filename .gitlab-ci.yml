@@ -2,7 +2,7 @@
 #   git ls-remote --refs https://$CI_SERVER_FQDN/secassured/ci-cd-components.git 'refs/tags/v1.2.4'
 #   Then replace the @v1.2.4 tag with the full SHA.
 include:
-  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.4
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.4.0
     inputs:
       job_prefix: server
       build_stage: build
@@ -31,7 +31,7 @@ include:
       gitops_repo_branch: main
       gitops_environment: $DEPLOY_ENV
       gitops_values_file: $GITOPS_VALUES_FILE
-  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.4
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.4.0
     inputs:
       job_prefix: client
       build_stage: build
