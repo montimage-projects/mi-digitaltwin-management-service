@@ -557,13 +557,11 @@ export function trafficQueries(
 export async function collectTraffic(
   get: ApiGet,
   namespace: string,
-  probes: { service: string; kind: 'http' | 'tcp' }[],
   opts: { window?: string; timeoutMs?: number } = {}
 ): Promise<Map<string, ServiceTraffic>> {
   const window = opts.window ?? '5m';
   const timeoutMs = opts.timeoutMs ?? 5000;
   const out = new Map<string, ServiceTraffic>();
-  for (const p of probes) out.set(p.service, { probe: p.kind });
 
   const queries = trafficQueries(window);
   const jobs = (Object.keys(queries) as (keyof typeof queries)[]).flatMap((field) =>
@@ -582,6 +580,8 @@ export async function collectTraffic(
         sample.metric.service ?? sample.metric.service_name ?? probeService(sample.metric);
       if (!service) continue;
       const entry = out.get(service) ?? {};
+      if (sample.metric.http_url) entry.probe = 'http';
+      else if (sample.metric.tcpcheck_endpoint) entry.probe = 'tcp';
       if (field === 'up') entry.up = sample.value >= 1;
       else entry[field] = sample.value;
       out.set(service, entry);

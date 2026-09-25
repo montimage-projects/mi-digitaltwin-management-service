@@ -2,12 +2,21 @@
  * Service monitoring types and API functions (issue #25).
  *
  * CPU and memory come from the Kubernetes metrics-server of each
- * infrastructure; request rate, error rate and latency are not available yet.
+ * infrastructure. Availability, probe latency, request rate, error rate and
+ * p95 latency come from the per-execution observability stack (OTel
+ * Collector + Prometheus) when the scenario's `observability` option is on.
  */
 
 import api from './api-core';
 
-export type AlertMetric = 'cpu_millicores' | 'memory_mib';
+export type AlertMetric =
+  | 'cpu_millicores'
+  | 'memory_mib'
+  | 'availability_pct'
+  | 'probe_latency_ms'
+  | 'request_rate'
+  | 'error_rate_pct'
+  | 'latency_p95_ms';
 export type AlertOperator = 'gt' | 'gte' | 'lt' | 'lte';
 export type AlertSeverity = 'info' | 'warning' | 'critical';
 
@@ -23,6 +32,22 @@ export interface ContainerUsage {
   name: string;
   cpuMillicores: number;
   memoryBytes: number;
+}
+
+/** Readings from the execution's observability stack. */
+export interface ServiceTraffic {
+  /** How the component is probed: HTTP on its readiness path, else TCP. */
+  probe?: 'http' | 'tcp';
+  /** Last probe succeeded. */
+  up?: boolean;
+  /** Share of successful probes over the last 5 minutes, 0–1. */
+  availability?: number;
+  probeLatencyMs?: number;
+  /** Real traffic, when the component exposes metrics or pushes OTLP. */
+  requestRate?: number;
+  /** Share of 5xx / error responses, 0–1. */
+  errorRate?: number;
+  latencyP95Ms?: number;
 }
 
 export interface ServiceMetrics {
@@ -42,6 +67,11 @@ export interface ServiceMetrics {
   cpuMillicores: number;
   memoryBytes: number;
   containers: ContainerUsage[];
+  /** The execution runs the observability stack. */
+  observability: boolean;
+  traffic?: ServiceTraffic;
+  /** Why the stack gave no reading, when it is on. */
+  trafficReason?: string;
 }
 
 export interface FiredAlert {

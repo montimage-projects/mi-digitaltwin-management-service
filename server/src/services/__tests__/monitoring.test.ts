@@ -204,6 +204,33 @@ describe('evaluateAlertRules', () => {
     expect(evaluateAlertRules([sample({ pods: 0 })], [rule()])).toEqual([]);
   });
 
+  test('skips CPU/memory rules when metrics-server gave no reading', () => {
+    expect(evaluateAlertRules([sample({ metricsAvailable: false })], [rule()])).toEqual([]);
+  });
+
+  test.each([
+    ['availability_pct', 'lt', 99, { availability: 0.5 }, 50],
+    ['probe_latency_ms', 'gt', 100, { probeLatencyMs: 250.456 }, 250.46],
+    ['request_rate', 'gt', 10, { requestRate: 12.5 }, 12.5],
+    ['error_rate_pct', 'gte', 5, { errorRate: 0.1 }, 10],
+    ['latency_p95_ms', 'gt', 500, { latencyP95Ms: 900 }, 900],
+  ] as const)(
+    'fires %s rules on observability readings',
+    (metric, operator, threshold, traffic, value) => {
+      const [alert] = evaluateAlertRules(
+        [sample({ pods: 0, traffic })],
+        [rule({ metric, operator, threshold })]
+      );
+      expect(alert).toMatchObject({ metric, value });
+    }
+  );
+
+  test('never fires a traffic rule without a reading', () => {
+    const r = rule({ metric: 'availability_pct', operator: 'lt', threshold: 99 });
+    expect(evaluateAlertRules([sample()], [r])).toEqual([]);
+    expect(evaluateAlertRules([sample({ traffic: { up: true } })], [r])).toEqual([]);
+  });
+
   test('applies scoped rules only to the matching service and infrastructure', () => {
     const samples = [
       sample(),

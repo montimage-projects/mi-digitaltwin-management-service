@@ -103,6 +103,11 @@ export function formatMemory(bytes: number): string {
 export const METRIC_LABELS: Record<AlertMetric, string> = {
   cpu_millicores: 'CPU (millicores)',
   memory_mib: 'Memory (MiB)',
+  availability_pct: 'Availability (%)',
+  probe_latency_ms: 'Probe latency (ms)',
+  request_rate: 'Request rate (req/s)',
+  error_rate_pct: 'Error rate (%)',
+  latency_p95_ms: 'p95 latency (ms)',
 };
 
 export const OPERATOR_LABELS: Record<AlertOperator, string> = {
@@ -114,7 +119,30 @@ export const OPERATOR_LABELS: Record<AlertOperator, string> = {
 
 export const SEVERITIES: AlertSeverity[] = ['critical', 'warning', 'info'];
 
+const ALERT_UNITS: Record<AlertMetric, (value: number) => string> = {
+  cpu_millicores: (v) => `${Math.round(v)}m`,
+  memory_mib: (v) => `${v} MiB`,
+  availability_pct: (v) => `${v}%`,
+  probe_latency_ms: (v) => `${v} ms`,
+  request_rate: (v) => `${v} req/s`,
+  error_rate_pct: (v) => `${v}%`,
+  latency_p95_ms: (v) => `${v} ms`,
+};
+
 /** Alert value in the rule's own unit. */
 export function formatAlertValue(metric: AlertMetric, value: number): string {
-  return metric === 'cpu_millicores' ? `${Math.round(value)}m` : `${value} MiB`;
+  return ALERT_UNITS[metric](value);
+}
+
+export function formatPercent(ratio: number): string {
+  const pct = ratio * 100;
+  return `${pct >= 99.95 || pct === 0 ? pct.toFixed(0) : pct.toFixed(1)}%`;
+}
+
+export function formatLatency(ms: number): string {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${Math.round(ms)} ms`;
+}
+
+export function formatRate(perSecond: number): string {
+  return `${perSecond >= 10 ? perSecond.toFixed(0) : perSecond.toFixed(2)} req/s`;
 }

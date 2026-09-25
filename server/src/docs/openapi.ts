@@ -1,4 +1,7 @@
 import { APP_NAME, ORG_NAME, ORG_URL } from '../config/branding.js';
+import { ALERT_METRICS } from '../models/AlertRule.js';
+
+const ALERT_METRIC_ENUM = [...ALERT_METRICS];
 
 export const openApiSpec = {
   openapi: '3.0.0',
@@ -103,7 +106,7 @@ export const openApiSpec = {
         properties: {
           _id: { type: 'string' },
           name: { type: 'string' },
-          metric: { type: 'string', enum: ['cpu_millicores', 'memory_mib'] },
+          metric: { type: 'string', enum: ALERT_METRIC_ENUM },
           operator: { type: 'string', enum: ['gt', 'gte', 'lt', 'lte'] },
           threshold: { type: 'number', minimum: 0 },
           severity: { type: 'string', enum: ['info', 'warning', 'critical'] },
@@ -125,7 +128,7 @@ export const openApiSpec = {
         required: ['name', 'metric', 'operator', 'threshold', 'severity'],
         properties: {
           name: { type: 'string', maxLength: 100 },
-          metric: { type: 'string', enum: ['cpu_millicores', 'memory_mib'] },
+          metric: { type: 'string', enum: ALERT_METRIC_ENUM },
           operator: { type: 'string', enum: ['gt', 'gte', 'lt', 'lte'] },
           threshold: { type: 'number', minimum: 0 },
           severity: { type: 'string', enum: ['info', 'warning', 'critical'] },
@@ -186,6 +189,28 @@ export const openApiSpec = {
                     },
                   },
                 },
+                observability: {
+                  type: 'boolean',
+                  description: 'The execution runs the observability stack',
+                },
+                traffic: {
+                  type: 'object',
+                  description:
+                    'Readings from the execution observability stack (probes over the last 5 minutes; request metrics only for components exposing Prometheus metrics or sending OTLP traces)',
+                  properties: {
+                    probe: { type: 'string', enum: ['http', 'tcp'] },
+                    up: { type: 'boolean' },
+                    availability: { type: 'number', minimum: 0, maximum: 1 },
+                    probeLatencyMs: { type: 'number' },
+                    requestRate: { type: 'number', description: 'Requests per second' },
+                    errorRate: { type: 'number', minimum: 0, maximum: 1 },
+                    latencyP95Ms: { type: 'number' },
+                  },
+                },
+                trafficReason: {
+                  type: 'string',
+                  description: 'Why the observability stack gave no reading',
+                },
               },
             },
           },
@@ -200,7 +225,7 @@ export const openApiSpec = {
                 serviceName: { type: 'string' },
                 executionId: { type: 'string' },
                 infrastructureId: { type: 'string' },
-                metric: { type: 'string', enum: ['cpu_millicores', 'memory_mib'] },
+                metric: { type: 'string', enum: ALERT_METRIC_ENUM },
                 operator: { type: 'string', enum: ['gt', 'gte', 'lt', 'lte'] },
                 value: { type: 'number' },
                 threshold: { type: 'number' },

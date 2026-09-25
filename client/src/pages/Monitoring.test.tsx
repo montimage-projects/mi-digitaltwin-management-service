@@ -60,6 +60,16 @@ const SNAPSHOT: MonitoringSnapshot = {
         { name: 'web', cpuMillicores: 250, memoryBytes: 224 * MIB },
         { name: 'mmt-probe', cpuMillicores: 50, memoryBytes: 32 * MIB },
       ],
+      observability: true,
+      traffic: {
+        probe: 'http',
+        up: true,
+        availability: 0.995,
+        probeLatencyMs: 12.3,
+        requestRate: 4.2,
+        errorRate: 0.02,
+        latencyP95Ms: 180,
+      },
     },
     {
       key: 'e2:db',
@@ -77,6 +87,8 @@ const SNAPSHOT: MonitoringSnapshot = {
       cpuMillicores: 0,
       memoryBytes: 0,
       containers: [],
+      observability: true,
+      trafficReason: 'the observability stack is not running in this namespace yet',
     },
   ],
   alerts: [
@@ -153,11 +165,41 @@ describe('Monitoring', () => {
     expect(within(dbRow).getByText('No metrics')).toBeInTheDocument();
   });
 
-  it('states that request rate, error rate and latency are not available yet', async () => {
+  it('explains where health and traffic readings come from', async () => {
     renderPage();
     expect(
-      await screen.findByText(/Request rate, error rate and latency are not yet available/)
+      await screen.findByText(/request rate, error rate and\s+p95 latency appear for components/)
     ).toBeInTheDocument();
+  });
+
+  it('shows probe health and real traffic from the observability stack', async () => {
+    renderPage();
+    const row = (await screen.findByText('Web scenario')).closest('tr')!;
+    expect(within(row).getByText('Up')).toBeInTheDocument();
+    expect(within(row).getByText('99.5% avail. · 12 ms · HTTP')).toBeInTheDocument();
+    expect(within(row).getByText('4.20 req/s · 2.0% errors · p95 180 ms')).toBeInTheDocument();
+    expect(screen.getByText('1/1')).toBeInTheDocument();
+
+    const dbRow = screen.getByText('Db scenario').closest('tr')!;
+    expect(
+      within(dbRow).getByText(/Unavailable \(the observability stack is not running/)
+    ).toBeInTheDocument();
+  });
+
+  it('marks services of runs without observability', async () => {
+    vi.mocked(monitoringApi.getMetrics).mockResolvedValue({
+      ...SNAPSHOT,
+      services: SNAPSHOT.services.map((s) => ({
+        ...s,
+        observability: false,
+        traffic: undefined,
+        trafficReason: undefined,
+      })),
+    });
+    renderPage();
+    const row = (await screen.findByText('Web scenario')).closest('tr')!;
+    expect(within(row).getByText('Observability off')).toBeInTheDocument();
+    expect(screen.getByText('—', { selector: 'p' })).toBeInTheDocument();
   });
 
   it('shows a banner for an infrastructure without metrics', async () => {

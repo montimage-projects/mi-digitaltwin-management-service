@@ -1,4 +1,4 @@
-import { Metrics, ApiException, type PodMetric } from '@kubernetes/client-node';
+import { Metrics, ApiException, type KubeConfig, type PodMetric } from '@kubernetes/client-node';
 import { Types } from 'mongoose';
 import { Scenario, type IDeployedService } from '../models/Scenario.js';
 import { Infrastructure, type IInfrastructure } from '../models/Infrastructure.js';
@@ -9,6 +9,12 @@ import {
   type AlertSeverity,
 } from '../models/AlertRule.js';
 import { buildKubeConfig } from './kubernetesDeploy.js';
+import {
+  apiGetFor,
+  classifyObservabilityError,
+  collectTraffic,
+  type ServiceTraffic,
+} from './observability.js';
 
 /**
  * Service monitoring (issue #25).
@@ -199,6 +205,10 @@ export interface AlertSample {
   pods: number;
   cpuMillicores: number;
   memoryBytes: number;
+  /** False when metrics-server gave no reading for the namespace. */
+  metricsAvailable?: boolean;
+  /** Probe and traffic readings from the observability stack. */
+  traffic?: ServiceTraffic;
 }
 
 /** Rule fields the evaluation needs (a lean `AlertRule` document fits). */
@@ -229,10 +239,30 @@ export interface FiredAlert {
 
 const SEVERITY_RANK: Record<AlertSeverity, number> = { critical: 0, warning: 1, info: 2 };
 
-function metricValue(sample: AlertSample, metric: AlertMetric): number {
-  return metric === 'cpu_millicores'
-    ? sample.cpuMillicores
-    : Math.round((sample.memoryBytes / MIB) * 100) / 100;
+const round2 = (value: number) => Math.round(value * 100) / 100;
+
+/**
+ * The sample's value in the rule's unit, or undefined when there is no
+ * reading — no data is not a zero reading, so the rule does not fire.
+ */
+function metricValue(sample: AlertSample, metric: AlertMetric): number | undefined {
+  const traffic = sample.traffic;
+  switch (metric) {
+    case 'cpu_millicores':
+    case 'memory_mib':
+      if (sample.pods === 0 || sample.metricsAvailable === false) return undefined;
+      return metric === 'cpu_millicores' ? sample.cpuMillicores : round2(sample.memoryBytes / MIB);
+    case 'availability_pct':
+      return traffic?.availability === undefined ? undefined : round2(traffic.availability * 100);
+    case 'probe_latency_ms':
+      return traffic?.probeLatencyMs === undefined ? undefined : round2(traffic.probeLatencyMs);
+    case 'request_rate':
+      return traffic?.requestRate === undefined ? undefined : round2(traffic.requestRate);
+    case 'error_rate_pct':
+      return traffic?.errorRate === undefined ? undefined : round2(traffic.errorRate * 100);
+    case 'latency_p95_ms':
+      return traffic?.latencyP95Ms === undefined ? undefined : round2(traffic.latencyP95Ms);
+  }
 }
 
 function compare(operator: AlertOperator, value: number, threshold: number): boolean {
@@ -250,9 +280,10 @@ function compare(operator: AlertOperator, value: number, threshold: number): boo
 
 /**
  * Fire every enabled rule whose threshold the sample crosses. Scoped rules only
- * apply to samples of that catalog service / infrastructure; samples without
- * any pod reporting metrics are skipped (no data is not a zero reading).
- * Alerts are ordered critical first.
+ * apply to samples of that catalog service / infrastructure; a sample with no
+ * reading for the rule's metric is skipped (no data is not a zero reading) —
+ * CPU/memory need a pod reporting to metrics-server, traffic metrics need the
+ * observability stack. Alerts are ordered critical first.
  */
 export function evaluateAlertRules(samples: AlertSample[], rules: AlertRuleLike[]): FiredAlert[] {
   const alerts: FiredAlert[] = [];
@@ -263,11 +294,10 @@ export function evaluateAlertRules(samples: AlertSample[], rules: AlertRuleLike[
       ? String(rule.scope.infrastructureId)
       : undefined;
     for (const sample of samples) {
-      if (sample.pods === 0) continue;
       if (scopeService && !sample.serviceIds.includes(scopeService)) continue;
       if (scopeInfra && sample.infrastructureId !== scopeInfra) continue;
       const value = metricValue(sample, rule.metric);
-      if (!compare(rule.operator, value, rule.threshold)) continue;
+      if (value === undefined || !compare(rule.operator, value, rule.threshold)) continue;
       alerts.push({
         ruleId: String(rule._id),
         ruleName: rule.name,
@@ -291,6 +321,13 @@ export function evaluateAlertRules(samples: AlertSample[], rules: AlertRuleLike[
 // ---------------------------------------------------------------------------
 
 class MetricsTimeoutError extends Error {}
+
+/** Fixed reason for a failed observability-stack read. */
+function classifyTrafficError(err: unknown): string {
+  return err instanceof MetricsTimeoutError
+    ? 'the observability stack did not answer in time'
+    : classifyObservabilityError(err);
+}
 
 /**
  * Fixed, user-facing reason for a failed metrics read. Never echoes the error
@@ -347,6 +384,10 @@ export interface ServiceMetrics extends AlertSample {
   /** False when no metrics could be read for this service's namespace. */
   metricsAvailable: boolean;
   containers: ContainerUsage[];
+  /** The execution runs the observability stack (scenario option). */
+  observability: boolean;
+  /** Why the stack gave no reading, when it is on but could not be read. */
+  trafficReason?: string;
 }
 
 export interface MonitoringSnapshot {
@@ -362,6 +403,7 @@ interface ActiveExecution {
   executionId: string;
   namespace: string;
   deployedServices: DeployedServiceRef[];
+  observability: boolean;
 }
 
 async function collectInfrastructure(
@@ -375,28 +417,41 @@ async function collectInfrastructure(
   const name = infrastructure?.name ?? '';
 
   const podsByNamespace = new Map<string, PodMetric[]>();
+  const trafficByNamespace = new Map<string, Map<string, ServiceTraffic>>();
+  const trafficReasons = new Map<string, string>();
+  const observed = [...new Set(executions.filter((e) => e.observability).map((e) => e.namespace))];
   let reason: string | undefined;
 
   if (!infrastructure) {
     reason = 'Infrastructure not found';
   } else {
-    let metrics: Metrics | undefined;
+    let kc: KubeConfig | undefined;
     try {
-      metrics = new Metrics(buildKubeConfig(infrastructure as unknown as IInfrastructure));
+      kc = buildKubeConfig(infrastructure as unknown as IInfrastructure);
     } catch {
       reason = 'Could not build a Kubernetes client from the stored credentials';
     }
-    if (metrics) {
-      const client = metrics;
-      const results = await Promise.allSettled(
-        namespaces.map((ns) => withTimeout(client.getPodMetrics(ns), timeoutMs))
-      );
-      results.forEach((result, i) => {
+    if (kc) {
+      const client = new Metrics(kc);
+      const get = apiGetFor(kc);
+      const [metricsResults, trafficResults] = await Promise.all([
+        Promise.allSettled(
+          namespaces.map((ns) => withTimeout(client.getPodMetrics(ns), timeoutMs))
+        ),
+        Promise.allSettled(
+          observed.map((ns) => withTimeout(collectTraffic(get, ns, { timeoutMs }), timeoutMs))
+        ),
+      ]);
+      metricsResults.forEach((result, i) => {
         if (result.status === 'fulfilled') {
           podsByNamespace.set(namespaces[i], result.value.items ?? []);
         } else {
           reason ??= classifyMetricsError(result.reason);
         }
+      });
+      trafficResults.forEach((result, i) => {
+        if (result.status === 'fulfilled') trafficByNamespace.set(observed[i], result.value);
+        else trafficReasons.set(observed[i], classifyTrafficError(result.reason));
       });
     }
   }
@@ -422,8 +477,26 @@ async function collectInfrastructure(
         cpuMillicores: workload.cpuMillicores,
         memoryBytes: workload.memoryBytes,
         containers: workload.containers,
+        observability: execution.observability,
+        ...trafficFields(execution, workload.name),
       });
     }
+  }
+
+  function trafficFields(
+    execution: ActiveExecution,
+    workloadName: string
+  ): Pick<ServiceMetrics, 'traffic' | 'trafficReason'> {
+    if (!execution.observability) return {};
+    const traffic = trafficByNamespace.get(execution.namespace);
+    if (!traffic) {
+      return {
+        trafficReason:
+          trafficReasons.get(execution.namespace) ?? 'the observability stack could not be queried',
+      };
+    }
+    const entry = traffic.get(workloadName);
+    return entry ? { traffic: entry } : {};
   }
 
   return {
@@ -480,6 +553,7 @@ export async function collectMonitoringSnapshot(
         executionId: String(execution._id),
         namespace: execution.namespace,
         deployedServices: execution.deployedServices,
+        observability: execution.observability === true,
       });
       byInfrastructure.set(infrastructureId, group);
     }
@@ -506,10 +580,9 @@ export async function collectMonitoringSnapshot(
   const rules = services.length
     ? await AlertRule.find({ enabled: true }).lean<AlertRuleLike[]>()
     : [];
-  const alerts = evaluateAlertRules(
-    services.filter((s) => s.metricsAvailable),
-    rules
-  ).filter((a) => !filters.severity || a.severity === filters.severity);
+  const alerts = evaluateAlertRules(services, rules).filter(
+    (a) => !filters.severity || a.severity === filters.severity
+  );
 
   return { collectedAt: new Date().toISOString(), infrastructures, services, alerts };
 }

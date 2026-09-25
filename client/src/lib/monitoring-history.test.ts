@@ -6,6 +6,9 @@ import {
   filterAlerts,
   filterServices,
   formatAlertValue,
+  formatLatency,
+  formatPercent,
+  formatRate,
   formatCpu,
   formatMemory,
   pointsInRange,
@@ -132,5 +135,18 @@ describe('formatting', () => {
   it('formats alert values in the rule unit', () => {
     expect(formatAlertValue('cpu_millicores', 300.2)).toBe('300m');
     expect(formatAlertValue('memory_mib', 256)).toBe('256 MiB');
+    expect(formatAlertValue('availability_pct', 50)).toBe('50%');
+    expect(formatAlertValue('request_rate', 12.5)).toBe('12.5 req/s');
+    expect(formatAlertValue('latency_p95_ms', 900)).toBe('900 ms');
+  });
+
+  it('formats observability readings', () => {
+    expect(formatPercent(1)).toBe('100%');
+    expect(formatPercent(0)).toBe('0%');
+    expect(formatPercent(0.9951)).toBe('99.5%');
+    expect(formatLatency(12.4)).toBe('12 ms');
+    expect(formatLatency(2500)).toBe('2.50 s');
+    expect(formatRate(0.5)).toBe('0.50 req/s');
+    expect(formatRate(42.4)).toBe('42 req/s');
   });
 });

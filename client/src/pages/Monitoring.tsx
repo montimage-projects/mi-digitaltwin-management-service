@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, AlertTriangle, Bell, Cpu, Info, Loader2, MemoryStick } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  Bell,
+  Cpu,
+  HeartPulse,
+  Info,
+  Loader2,
+  MemoryStick,
+} from 'lucide-react';
 import { monitoringApi, type AlertSeverity } from '@/lib/api';
+import type { ServiceMetrics } from '@/lib/monitoring';
 import {
   ALL,
   TIME_RANGES,
@@ -11,7 +21,10 @@ import {
   filterServices,
   formatAlertValue,
   formatCpu,
+  formatLatency,
   formatMemory,
+  formatPercent,
+  formatRate,
   pointsInRange,
   rangeMs,
   METRIC_LABELS,
@@ -90,6 +103,8 @@ export function Monitoring() {
   const totalCpu = withMetrics.reduce((sum, s) => sum + s.cpuMillicores, 0);
   const totalMemory = withMetrics.reduce((sum, s) => sum + s.memoryBytes, 0);
   const range = rangeMs(timeRange);
+  const probed = visibleServices.filter((s) => s.traffic?.up !== undefined);
+  const upCount = probed.filter((s) => s.traffic?.up).length;
 
   if (isLoading) {
     return (
@@ -112,10 +127,13 @@ export function Monitoring() {
       <div className="flex items-start gap-3 rounded-lg border bg-muted/40 p-4 text-sm">
         <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
         <p>
-          CPU and memory come from the Kubernetes metrics-server of each infrastructure. Request
-          rate, error rate and latency are not yet available: they need Prometheus integration.
-          Sparkline history is collected in this tab since the page was opened (up to 1 hour) and
-          resets on reload.
+          CPU and memory come from the Kubernetes metrics-server of each infrastructure. Health and
+          traffic come from the OpenTelemetry Collector and Prometheus deployed with each run of a
+          scenario that has observability on: every component with a Service is probed (availability
+          and latency over the last 5 minutes), and request rate, error rate and p95 latency appear
+          for components that expose Prometheus metrics or send OpenTelemetry traces. Sparkline
+          history is collected in this tab since the page was opened (up to 1 hour) and resets on
+          reload.
         </p>
       </div>
 
@@ -200,8 +218,13 @@ export function Monitoring() {
           </div>
 
           {/* Summary cards */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <SummaryCard icon={Activity} label="Running services" value={visibleServices.length} />
+            <SummaryCard
+              icon={HeartPulse}
+              label="Components up"
+              value={probed.length ? `${upCount}/${probed.length}` : '—'}
+            />
             <SummaryCard icon={Cpu} label="Total CPU" value={formatCpu(totalCpu)} />
             <SummaryCard
               icon={MemoryStick}
@@ -226,6 +249,8 @@ export function Monitoring() {
                     <TableHead>Pods</TableHead>
                     <TableHead>CPU</TableHead>
                     <TableHead>Memory</TableHead>
+                    <TableHead>Health</TableHead>
+                    <TableHead>Traffic</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -276,6 +301,8 @@ export function Monitoring() {
                             No metrics
                           </TableCell>
                         )}
+                        <HealthCell service={service} />
+                        <TrafficCell service={service} />
                       </TableRow>
                     );
                   })}
@@ -315,6 +342,59 @@ export function Monitoring() {
 
       <AlertRulesPanel serviceOptions={serviceOptions} />
     </div>
+  );
+}
+
+/** Probe status, availability and latency from the observability stack. */
+function HealthCell({ service }: { service: ServiceMetrics }) {
+  const traffic = service.traffic;
+  if (!service.observability) {
+    return <TableCell className="text-muted-foreground">Observability off</TableCell>;
+  }
+  if (service.trafficReason) {
+    return (
+      <TableCell className="text-sm text-muted-foreground">
+        Unavailable ({service.trafficReason})
+      </TableCell>
+    );
+  }
+  if (traffic?.up === undefined) {
+    return <TableCell className="text-muted-foreground">Not probed</TableCell>;
+  }
+  return (
+    <TableCell>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={traffic.up ? 'default' : 'destructive'}>{traffic.up ? 'Up' : 'Down'}</Badge>
+        <span className="text-sm text-muted-foreground">
+          {[
+            traffic.availability !== undefined && `${formatPercent(traffic.availability)} avail.`,
+            traffic.probeLatencyMs !== undefined && formatLatency(traffic.probeLatencyMs),
+            traffic.probe?.toUpperCase(),
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
+      </div>
+    </TableCell>
+  );
+}
+
+/** Real request rate, error rate and p95 latency, when the component reports them. */
+function TrafficCell({ service }: { service: ServiceMetrics }) {
+  const traffic = service.traffic;
+  if (!service.observability || traffic?.requestRate === undefined) {
+    return <TableCell className="text-muted-foreground">—</TableCell>;
+  }
+  return (
+    <TableCell className="text-sm">
+      {[
+        formatRate(traffic.requestRate),
+        traffic.errorRate !== undefined && `${formatPercent(traffic.errorRate)} errors`,
+        traffic.latencyP95Ms !== undefined && `p95 ${formatLatency(traffic.latencyP95Ms)}`,
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+    </TableCell>
   );
 }
 

@@ -47,6 +47,10 @@ const {
     deleteNamespace: async (): Promise<unknown> => ({}),
     createNamespace: async (): Promise<unknown> => ({}),
     getPodMetrics: (async () => ({ items: [] })) as (namespace?: string) => Promise<unknown>,
+    // Proxied Prometheus of an execution's observability stack.
+    promGet: (async () => ({ status: 503, body: '' })) as (
+      path: string
+    ) => Promise<{ status: number; body: string }>,
   };
 
   // Namespaces the metrics client was asked for, in call order.
@@ -111,6 +115,11 @@ vi.mock('@kubernetes/client-node', () => ({
   RbacAuthorizationV1Api,
   ApiException,
   Metrics,
+}));
+
+vi.mock('../../services/observability.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/observability.js')>()),
+  apiGetFor: () => (path: string) => impl.promGet(path),
 }));
 
 const { env } = await import('../../config/env.js');
@@ -247,7 +256,8 @@ beforeAll(async () => {
       infrastructureId: infraA._id,
       topology: { yaml: '', nodes: [], edges: [] },
       executions: [
-        execution('running', 'ns-a', [{ id: web._id, name: 'web' }]),
+        // Deployed with the observability stack (scenario option on).
+        { ...execution('running', 'ns-a', [{ id: web._id, name: 'web' }]), observability: true },
         // A torn-down run (completedAt stamped) must not be polled.
         execution('completed', 'ns-a-old', [{ id: web._id, name: 'web' }], new Date()),
       ],
@@ -583,5 +593,83 @@ describe('GET /api/monitoring/metrics', () => {
       const res = await fetch(`${METRICS_URL()}?${query}`, { headers: adminHeader });
       expect(res.status).toBe(400);
     }
+  });
+});
+
+describe('monitoring routes — observability stack readings', () => {
+  const vector = (result: { metric: Record<string, string>; value: number }[]) =>
+    JSON.stringify({
+      status: 'success',
+      data: {
+        resultType: 'vector',
+        result: result.map((r) => ({ metric: r.metric, value: [0, String(r.value)] })),
+      },
+    });
+
+  /** web's probe answers half the time at 40 ms. */
+  function useStack(): void {
+    impl.promGet = async (path: string) => {
+      expect(path).toContain('/namespaces/ns-a/services/secsim-prometheus:9090/proxy/');
+      const query = decodeURIComponent(path.split('query=')[1]);
+      const url = { http_url: 'http://web:8080/' };
+      if (query.startsWith('sum by (http_url)'))
+        return { status: 200, body: vector([{ metric: url, value: 0 }]) };
+      if (query.startsWith('avg_over_time((sum'))
+        return { status: 200, body: vector([{ metric: url, value: 0.5 }]) };
+      if (query.startsWith('avg_over_time(httpcheck_duration'))
+        return { status: 200, body: vector([{ metric: url, value: 40 }]) };
+      return { status: 200, body: vector([]) };
+    };
+  }
+
+  test('adds probe readings to services of executions running the stack', async () => {
+    if (!mongoAvailable) return;
+    useHealthyClusters();
+    useStack();
+    const snapshot = await (await fetch(METRICS_URL(), { headers: viewerHeader })).json();
+    const byName = Object.fromEntries(
+      snapshot.services.map((s: { name: string }) => [s.name, s])
+    ) as Record<string, Record<string, unknown>>;
+
+    expect(byName.web).toMatchObject({
+      observability: true,
+      traffic: { probe: 'http', up: false, availability: 0.5, probeLatencyMs: 40 },
+    });
+    expect(byName.web).not.toHaveProperty('trafficReason');
+    expect(byName.db).toMatchObject({ observability: false });
+    expect(byName.db).not.toHaveProperty('traffic');
+  });
+
+  test('fires availability rules from the stack', async () => {
+    if (!mongoAvailable) return;
+    useHealthyClusters();
+    useStack();
+    await fetch(RULES_URL(), {
+      method: 'POST',
+      headers: adminHeader,
+      body: JSON.stringify({
+        name: 'Unavailable',
+        metric: 'availability_pct',
+        operator: 'lt',
+        threshold: 90,
+        severity: 'critical',
+      }),
+    });
+    const snapshot = await (await fetch(METRICS_URL(), { headers: viewerHeader })).json();
+    expect(snapshot.alerts).toEqual([
+      expect.objectContaining({ serviceName: 'web', metric: 'availability_pct', value: 50 }),
+    ]);
+  });
+
+  test('explains an unreachable stack without failing the snapshot', async () => {
+    if (!mongoAvailable) return;
+    useHealthyClusters();
+    impl.promGet = async () => ({ status: 503, body: 'upstream: secret-host' });
+    const res = await fetch(METRICS_URL(), { headers: viewerHeader });
+    expect(res.status).toBe(200);
+    const web = (await res.json()).services.find((s: { name: string }) => s.name === 'web');
+    expect(web.metricsAvailable).toBe(true);
+    expect(web.trafficReason).toBe('the observability stack is not running in this namespace yet');
+    expect(JSON.stringify(web)).not.toContain('secret-host');
   });
 });

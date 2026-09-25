@@ -218,11 +218,7 @@ describe('collectTraffic', () => {
   };
 
   test('maps probe, scraped and span series back to each component', async () => {
-    const traffic = await collectTraffic(get, 'ns', [
-      { service: 'ci-sim', kind: 'http' },
-      { service: 'kafka', kind: 'tcp' },
-      { service: 'ai4soar', kind: 'http' },
-    ]);
+    const traffic = await collectTraffic(get, 'ns');
     expect(traffic.get('ci-sim')).toEqual({
       probe: 'http',
       up: true,
@@ -235,11 +231,11 @@ describe('collectTraffic', () => {
 
   test('throws only when the stack answered no query at all', async () => {
     const down: ApiGet = async () => ({ status: 503, body: '' });
-    await expect(collectTraffic(down, 'ns', [])).rejects.toBeInstanceOf(ObservabilityError);
+    await expect(collectTraffic(down, 'ns')).rejects.toBeInstanceOf(ObservabilityError);
 
     let n = 0;
     const flaky: ApiGet = async (path) => (n++ === 0 ? get(path, 0) : { status: 503, body: '' });
-    await expect(collectTraffic(flaky, 'ns', [])).resolves.toBeInstanceOf(Map);
+    await expect(collectTraffic(flaky, 'ns')).resolves.toBeInstanceOf(Map);
   });
 });
 

@@ -10,7 +10,16 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
  * service and/or one infrastructure.
  */
 
-export const ALERT_METRICS = ['cpu_millicores', 'memory_mib'] as const;
+export const ALERT_METRICS = [
+  'cpu_millicores',
+  'memory_mib',
+  // From the per-execution observability stack (services/observability.ts).
+  'availability_pct',
+  'probe_latency_ms',
+  'request_rate',
+  'error_rate_pct',
+  'latency_p95_ms',
+] as const;
 export const ALERT_OPERATORS = ['gt', 'gte', 'lt', 'lte'] as const;
 export const ALERT_SEVERITIES = ['info', 'warning', 'critical'] as const;
 
