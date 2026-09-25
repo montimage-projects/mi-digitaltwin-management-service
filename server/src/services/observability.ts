@@ -214,7 +214,7 @@ function stackDeployment(
       template: {
         metadata: { labels: labels(name) },
         spec: {
-          automountServiceAccountToken: false,
+          automountServiceAccountToken: false, // gitleaks:allow — Kubernetes field
           securityContext: {
             runAsNonRoot: true,
             runAsUser: uid,

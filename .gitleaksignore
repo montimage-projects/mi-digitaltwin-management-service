@@ -10,3 +10,14 @@ ce6016d093543fe3f4c50bf0d6054f6891a72882:docs/playbooks/montimage-attack-detect-
 c885ab6d3d35f9282c001d959999f0971517c41b:docker-compose.deploy.yml:generic-secret:11
 9b1a7d63d1cda9cca30e436cf67c515b9c490865:client/src/store/auth-store.ts:generic-secret:51
 b63293d70e0e3b65bbdac6012f1adc40c8dba87d:docker-compose.prod.yml:generic-secret:39
+
+# False positives from the generic-secret rule on the #25 monitoring/observability
+# branch: a MongoDB healthcheck default reformatted by prettier, and TOKEN/Token
+# identifiers (env var names, parameters, automountServiceAccountToken). The
+# current lines carry gitleaks:allow; these keep the per-commit diff scan quiet.
+9035947a1d2175880adc1d38d351da39fb281067:docker-compose.prod.yml:generic-secret:25
+9035947a1d2175880adc1d38d351da39fb281067:docker-compose.prod.yml:generic-secret:70
+9035947a1d2175880adc1d38d351da39fb281067:server/.env.example:generic-secret:41
+9035947a1d2175880adc1d38d351da39fb281067:server/src/config/env.ts:generic-secret:37
+9035947a1d2175880adc1d38d351da39fb281067:server/src/telemetry/metrics.ts:generic-secret:84
+8208a485500f083eb36818253ea4ad0d210535b2:server/src/services/observability.ts:generic-secret:206

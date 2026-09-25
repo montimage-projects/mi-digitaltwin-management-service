@@ -34,6 +34,7 @@ const envSchema = z.object({
     .optional()
     .transform((v) => v !== 'false' && v !== '0'),
   /** When set, `/metrics` requires `Authorization: Bearer <METRICS_TOKEN>`. */
+  // gitleaks:allow — variable name, not a credential
   METRICS_TOKEN: z.preprocess(
     (v) => (v === '' ? undefined : v),
     z.string().min(16, 'METRICS_TOKEN must be at least 16 characters').optional()

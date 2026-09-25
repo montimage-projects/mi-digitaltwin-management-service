@@ -81,6 +81,7 @@ export function metricsMiddleware(): RequestHandler {
   };
 }
 
+// gitleaks:allow — parameter name, not a credential
 function tokenMatches(header: string | undefined, token: string): boolean {
   const expected = Buffer.from(`Bearer ${token}`);
   const actual = Buffer.from(header ?? '');

@@ -15,14 +15,13 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-}
       MONGO_INITDB_DATABASE: intact
     healthcheck:
-      test:
-        [
+      test: [
           'CMD',
           'mongosh',
           '-u',
           '${MONGO_ROOT_USERNAME:-admin}',
           '-p',
-          '${MONGO_ROOT_PASSWORD:-admin123}',
+          '${MONGO_ROOT_PASSWORD:-admin123}', # gitleaks:allow — documented dev default
           '--authenticationDatabase',
           'admin',
           '--eval',
@@ -67,7 +66,7 @@ services:
       # Observability: Prometheus scrapes /metrics; traces go to the collector.
       # Set OTEL_EXPORTER_OTLP_ENDPOINT= (empty) to turn tracing off.
       - METRICS_ENABLED=${METRICS_ENABLED:-true}
-      - METRICS_TOKEN=${METRICS_TOKEN:-}
+      - METRICS_TOKEN=${METRICS_TOKEN:-} # gitleaks:allow — empty by default, set in .env
       - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT-http://otel-collector:4318}
       - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-secsim-server}
     depends_on:
