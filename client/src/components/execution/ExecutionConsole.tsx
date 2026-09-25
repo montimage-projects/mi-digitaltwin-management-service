@@ -633,23 +633,27 @@ export function ExecutionConsole({
           </ScrollArea>
         </div>
 
-        {view === 'runbook' ? (
-          <div className="flex min-h-0 flex-col">
-            <RunbookPanel
-              steps={runbook?.steps ?? []}
-              isLoading={runbookLoading}
-              isError={runbookError}
-              onRetry={() => void refetchRunbook()}
-              logs={logs}
-              alerts={alerts}
-              live={!tornDown && phase !== 'failed'}
-              runProfile={(profile) => runProfile.mutate(profile)}
-              isRunning={runProfile.isPending}
-              openInterface={(name) => void openInterface(name)}
-              copy={(text) => void copyToClipboard(text).then(() => toast.success('Copied'))}
-            />
-          </div>
-        ) : (
+        {/* Kept mounted while hidden so runbook progress survives view switches. */}
+        <div
+          hidden={view !== 'runbook'}
+          data-testid="runbook-view"
+          className={view === 'runbook' ? 'flex min-h-0 flex-col' : 'hidden'}
+        >
+          <RunbookPanel
+            steps={runbook?.steps ?? []}
+            isLoading={runbookLoading}
+            isError={runbookError}
+            onRetry={() => void refetchRunbook()}
+            logs={logs}
+            alerts={alerts}
+            live={!tornDown && phase !== 'failed'}
+            runProfile={(profile) => runProfile.mutate(profile)}
+            isRunning={runProfile.isPending}
+            openInterface={(name) => void openInterface(name)}
+            copy={(text) => void copyToClipboard(text).then(() => toast.success('Copied'))}
+          />
+        </div>
+        {view === 'console' && (
           /* Log console */
           <div className="flex min-h-0 flex-col bg-zinc-950">
             <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">

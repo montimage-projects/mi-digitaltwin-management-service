@@ -395,4 +395,40 @@ describe('ExecutionConsole', () => {
     expect(tab.opener).toBeNull();
     open.mockRestore();
   });
+  it('keeps runbook progress across console/runbook view switches', async () => {
+    vi.spyOn(scenariosApi, 'getRunbook').mockResolvedValue({
+      steps: [
+        {
+          id: 'flood',
+          title: 'Flood the server',
+          profile: { nodeId: 'mag', name: 'attack-1' },
+          expect: [{ label: 'Attack started', source: 'log', pattern: 'attack started' }],
+        },
+      ],
+    } as never);
+    vi.spyOn(scenariosApi, 'runProfile').mockResolvedValue({
+      pod: 'mag-pod',
+      container: 'mag',
+      message: 'Profile started',
+    });
+    const handlers = await renderWithMockedStream();
+
+    fireEvent.click(screen.getByTestId('view-runbook'));
+    fireEvent.click(await screen.findByTestId('runbook-run-flood'));
+    act(() => {
+      handlers.onLog?.({
+        service: 'mag',
+        pod: 'mag-pod',
+        container: 'mag',
+        line: 'attack started',
+      });
+    });
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('runbook-expect-flood-0')).toHaveAttribute('data-met', 'true');
+    });
+
+    fireEvent.click(screen.getByTestId('view-console'));
+    fireEvent.click(screen.getByTestId('view-runbook'));
+    expect(screen.getByTestId('runbook-expect-flood-0')).toHaveAttribute('data-met', 'true');
+  });
 });
