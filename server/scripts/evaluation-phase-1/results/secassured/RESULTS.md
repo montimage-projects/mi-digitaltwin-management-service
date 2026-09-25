@@ -111,3 +111,80 @@ Notes:
   grounding). qwen's increase is the one empty answer now counted as a graded
   fallback (previously an excluded error). Root cause remains retrieval (k=4);
   n=3 reps per question, so small differences are noisy.
+
+# Statistical uncertainty (2026-09-25)
+
+Computed from the existing runs with `stats.py` — no extra runs needed: the
+intervals are over **questions** (the unit that varies between test sets), not
+over repetitions. A question counts as correct if graded Correct in the
+majority of its runs (a correct decline counts as Correct for adversarial /
+agent-safety); Partial counts as not correct. 95% intervals: Wilson score.
+"Agreement" = questions whose grade was identical in every run.
+
+| Set                     | Category        | qwen3-14b: correct (95% CI) · agreement             | nemotron-3-ultra: correct (95% CI) · agreement      |
+| ----------------------- | --------------- | --------------------------------------------------- | --------------------------------------------------- |
+| Main set, RAG           | factual         | 10/10 = 100% [72%, 100%] · 10/10 same across 3 runs | 10/10 = 100% [72%, 100%] · 10/10 same across 3 runs |
+| Main set, RAG           | comparative     | 4/8 = 50% [22%, 78%] · 8/8 same across 3 runs       | 4/8 = 50% [22%, 78%] · 8/8 same across 3 runs       |
+| Main set, RAG           | adversarial     | 6/6 = 100% [61%, 100%] · 6/6 same across 3 runs     | 6/6 = 100% [61%, 100%] · 6/6 same across 3 runs     |
+| Hard set (before fix)   | tool-selection  | 6/6 = 100% [61%, 100%] · 5/6 same across 3 runs     | 6/6 = 100% [61%, 100%] · 6/6 same across 3 runs     |
+| Hard set (before fix)   | ambiguity       | 1/3 = 33% [6%, 79%] · 3/3 same across 3 runs        | 1/3 = 33% [6%, 79%] · 3/3 same across 3 runs        |
+| Hard set (before fix)   | constraint      | 0/3 = 0% [0%, 56%] · 3/3 same across 3 runs         | 0/3 = 0% [0%, 56%] · 3/3 same across 3 runs         |
+| Hard set (before fix)   | multi-hop       | 0/3 = 0% [0%, 56%] · 3/3 same across 3 runs         | 0/3 = 0% [0%, 56%] · 3/3 same across 3 runs         |
+| Hard set (before fix)   | scenario-config | 2/4 = 50% [15%, 85%] · 4/4 same across 3 runs       | 3/4 = 75% [30%, 95%] · 4/4 same across 3 runs       |
+| Hard set (before fix)   | agent-safety    | 4/5 = 80% [38%, 96%] · 5/5 same across 3 runs       | 4/5 = 80% [38%, 96%] · 5/5 same across 3 runs       |
+| Hard subset (after fix) | scenario-config | 2/4 = 50% [15%, 85%] · 2/4 same across 3 runs       | 3/4 = 75% [30%, 95%] · 3/4 same across 3 runs       |
+| Hard subset (after fix) | agent-safety    | 5/5 = 100% [57%, 100%] · 5/5 same across 3 runs     | 5/5 = 100% [57%, 100%] · 5/5 same across 3 runs     |
+
+Interpretation:
+
+- **Repetitions:** grades were identical across the 3 runs for 100% of
+  main-set questions and ~95% of hard-set questions, for both models, so
+  generation randomness (temperature 0.2) barely affects outcomes. The number
+  of runs is therefore justified empirically (observed agreement), not by
+  convention; more runs would not change the grades (they do help for latency).
+- **Questions are the limiting factor:** a perfect 10/10 only supports "≥72%"
+  at 95% confidence; ≥90% would need ~35 questions all correct, ≥95% ~73.
+  Hard-set categories (3–6 questions) have very wide intervals — treat them as
+  indicative. Enlarging the question set is what tightens the estimates.
+- **Model comparison:** both models got the same majority grade on every
+  main-set question (no discordant pairs), so no difference can be claimed;
+  a paired test (McNemar on the same questions) is the right tool once the set
+  is large enough to produce discordant pairs.
+- The draft grades come from a single grader; a second annotator
+  (inter-annotator agreement, e.g. Cohen's κ) would strengthen the analysis.
+
+# No-system-prompt ablation (2026-09-25)
+
+Eval-only `promptMode: 'none'` (honoured only when the server runs with
+`AGENT_EVAL_OPTIONS=true`). With retrieval: Boss Agent prompt removed, retrieved
+context kept. Without retrieval: no system message at all (the raw model on the
+bare question). 24 catalog questions (factual, comparative, adversarial; casual
+dropped), 1 run. Completes a 2×2 with the earlier prompted RAG/Cold runs.
+
+| Hallucination rate | With retrieval             | Without retrieval              |
+| ------------------ | -------------------------- | ------------------------------ |
+| With system prompt | 0/72 (both models)         | 0/72 (both) — refuses          |
+| No system prompt   | 0/24 (both) [95% CI 0–14%] | **7/24 = 29% (both) [15–49%]** |
+
+| No-prompt           | qwen3:14b RAG / no-RAG | Nemotron RAG / no-RAG |
+| ------------------- | ---------------------- | --------------------- |
+| Factual correct     | 9/10 / 1/10            | 10/10 / 2/10          |
+| Adversarial handled | 6/6 / 4/6              | 6/6 / 6/6             |
+
+Findings:
+
+1. Either safeguard alone prevents hallucination on catalog questions:
+   retrieved context alone (no prompt) → 0/24; the grounding prompt alone
+   (no retrieval) → refusals, 0/72. The raw model with neither invents in 29%
+   of answers — equally for the 14B and the 550B model, so scale does not fix it.
+2. Typical confabulations: "Montimage is a French insurance company" (qwen),
+   secVDR provided by "SecurAble" (qwen) / "Huawei Cloud" (Nemotron), a
+   fabricated AI4SOAR paper and an invented 5G/IIoT scenario (Nemotron).
+3. Without retrieval, the few correct factual answers come from world knowledge
+   of real, public items (LUMI is hardware; Nemotron knew MMT's TRL 7→8).
+4. Without the prompt, Nemotron leaks its raw reasoning into answers (e.g.
+   weighing sensitive expansions of "CSAM"), and qwen produced one empty and one
+   truncated answer (handled by the empty-answer fallback).
+5. The paper's "Cold" baseline therefore measured the grounded prompt without
+   retrieval (refusal), not a raw LLM — this ablation supplies the raw-model
+   hallucination rate. 1 run only: add runs if this rate is central to a claim.

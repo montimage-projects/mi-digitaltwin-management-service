@@ -1,0 +1,1078 @@
+id;category;expected_intent;config;rep;predicted_intent;latency_ms;sources_count;top_source_ids;top_source_scores;answer_length;answer;error;Correctness;Intent_ok;Hallucination;Notes
+F1;factual;service;RAG;1;service;2112;4;SECVDR|SECDEVTWIN|SECAISOAR|SECOPSTWIN;0.835|0.684|0.663|0.647;85;The provider of the Vulnerability Discovery and Repair service (secVDR) is **CERTH**.;;Correct;Yes;No;auto
+F1;factual;service;COLD;1;rag-off;1117;0;;;280;"The **Vulnerability Discovery and Repair service (secVDR)** is provided by **Huawei Cloud**.
+
+It is a security service offered within the Huawei Cloud ecosystem designed to automatically detect vulnerabilities in web applications and provide repair suggestions or automated fixes.";;Incorrect;Yes;Yes;"invents provider ""Huawei Cloud"""
+F2;factual;service;RAG;1;service;1447;4;MMT-PROBE|HTTP-SIM|ORO-3GPP16|AI4SOAR;0.735|0.667|0.592|0.579;100;The current Technology Readiness Level (TRL) of the MMT Traffic Analysis Probe (MMT-PROBE) is **7**.;;Correct;Yes;No;auto
+F2;factual;service;COLD;1;rag-off;24993;0;;;1284;"As of **early 2025**, the **MMT Traffic Analysis Probe (MMT-Probe)** is generally assessed at **TRL 7** (System Prototype Demonstration in Operational Environment), bordering on **TRL 8** (System Complete and Qualified) for specific, well-defined use cases.
+
+Here is the detailed justification for this rating based on standard NATO/ISO/EU TRL definitions:
+
+### 1. Evidence for TRL 7 (Current Primary Rating)
+*   **Operational Deployment in Testbeds & Pilot Networks:** MMT-Probe has been successfully integrated and demonstrated in **live operational environments** within major European research projects (e.g., **H2020 SPEAR**, **CONCORDIA**, **SPARTA**, **PIXEL**, **5G-VICTORI**). In these projects, it processed real production traffic (not just synthetic traces) for use cases like IoT security monitoring, 5G network slicing observability, and encrypted traffic classification.
+*   **Integration with Operational Orchestrators:** It has been packaged as a containerized network function (VNF/CNF) and integrated with **MANO** (Management and Orchestration) frameworks (OSM, OpenStack, Kubernetes) and the **MMT-Operator** (Kubernetes Operator), demonstrating lifecycle management (deploy, scale, heal, update) in relevant infrastructure.
+*   **Real-time Performance Validation";;Correct;Yes;No;TRL 7 bordering 8 (world knowledge)
+F3;factual;service;RAG;1;service;1764;4;MAG|HTTP-SIM|MMT-PROBE|SECANOD;0.804|0.639|0.636|0.617;72;The Montimage Attack Generator (MAG) belongs to the **Attack** category.;;Correct;Yes;No;auto
+F3;factual;service;COLD;1;rag-off;7161;0;;;1387;"The **Montimage Attack Generator (MAG)** belongs to the category of **Network Security Testing Tools**, specifically classified as a **Network Attack Generator / Traffic Generator / Penetration Testing Tool**.
+
+More precisely, it falls under these sub-categories:
+
+1.  **Network Attack Injection / Replay Tool:** It is designed to inject, replay, or generate malicious network traffic (attacks) against a target system to test detection capabilities (IDS/IPS) or system resilience.
+2.  **Security Assessment / Penetration Testing Framework:** It automates the execution of attack scenarios for vulnerability assessment and compliance testing.
+3.  **Test Traffic Generator:** It generates both background (benign) traffic and attack traffic to simulate realistic network environments for benchmarking.
+
+**Key Context:**
+*   **Developer:** Montimage (a French cybersecurity company).
+*   **Primary Use Case:** Evaluating and benchmarking **Intrusion Detection Systems (IDS)**, **Intrusion Prevention Systems (IPS)**, **Firewalls**, and **Security Information and Event Management (SIEM)** systems.
+*   **Methodology:** It uses a model-based approach (often leveraging **MMT** - Montimage Monitoring Tool - for protocol dissection) to construct valid protocol sequences containing attack payloads (e.g., buffer overflows, DoS, scan attempts, malware C2 traffic, exploits for specific CVEs).";;Partial;Yes;No;attack/traffic generator ~ Attack category
+F4;factual;service;RAG;1;service;11299;4;AALTO-LUMI|AALTO-EDGE5G|ITPAERO-CLUSTER|SECSIM;0.796|0.659|0.582|0.567;467;"Based on the repository context, the **LUMI Supercomputer (AALTO-LUMI)** is classified as a **Hardware** service.
+
+**Details from the catalog:**
+- **Type:** Hardware
+- **UI Type:** web
+- **Description:** ""Top green supercomputer in EU for AI training.""
+- **Provider:** AALTO
+- **Category:** HPC & Compute Clusters
+- **Sector:** Research
+
+While it's accessed via a web interface (uiType: web), the underlying service is physical supercomputing hardware infrastructure.";;Correct;Yes;No;auto
+F4;factual;service;COLD;1;rag-off;23973;0;;;3012;"The LUMI Supercomputer (including the AALTO-LUMI access point) is fundamentally a **hardware infrastructure** that is delivered and consumed as a **service (HPC-as-a-Service / IaaS)**.
+
+Here is the breakdown:
+
+### 1. Core Identity: Hardware Infrastructure
+Physically, LUMI is a massive **hardware** installation located in CSC’s data center in Kajaani, Finland. It consists of:
+*   **Compute Nodes:** HPE Cray EX architecture (CPU partitions: AMD EPYC ""Milan""; GPU partitions: AMD Instinct MI250X).
+*   **Interconnect:** HPE Slingshot (high-speed, low-latency networking).
+*   **Storage:** LUMI-O (object storage) and parallel filesystems (LUSTRE) totaling ~80+ PB.
+*   **Facilities:** Power, cooling (100% renewable energy, waste heat reuse), and physical security.
+
+### 2. Delivery Model: Hardware as a Service (HaaS / HPCaaS)
+You do not buy the hardware; you **request an allocation** (via PRACE, EuroHPC, or national calls like those managed by CSC for Finnish universities like Aalto).
+*   **No hardware management for users:** You do not rack servers, replace failed GPUs, or cable the Slingshot network.
+*   **Operational Service:** CSC (the host) provides the **operations, maintenance, sysadmin support, and user support** as a service.
+*   **Access:** Users connect via SSH to login nodes and submit jobs to the **Slurm workload manager** (scheduler), which grants temporary exclusive access to specific hardware resources (nodes/GPUs).
+
+### 3. The Critical Software Layer (The ""Platform"")
+While the *product* is hardware access, it is unusable without a massive, curated **software stack** provided as part of the service:
+*   **OS:** Customized Linux (HPE Cray OS / SUSE-based) on compute nodes.
+*   **Environment Management:** **Lmod (Environment Modules)** and **EasyBuild** for compilers, MPI libraries, and scientific apps.
+*   **Container Support:** **Apptainer/Singularity** (rootless containers) – the primary way users bring custom software environments.
+*   **AI/ML Stacks:** Pre-optimized containers for PyTorch, TensorFlow, JAX (via `module load` or container images on LUMI-O).
+*   **Data Analytics:** Tools for LUMI-O (S3 API, rclone, MinIO client).
+
+---
+
+### What ""AALTO-LUMI"" Specifically Refers To
+""AALTO-LUMI"" is not a separate machine. It usually refers to one of two things:
+1.  **Aalto's Allocation/Account:** The specific **billing account (project ID)** (e.g., `project_465000xxx`) that Aalto researchers use to consume CPU/GPU node-hours on the shared LUMI hardware.
+2.  **Aalto's On-Premise Gateway/Software Layer:** Aalto University (via **Aalto Scientific Computing / Triton**) provides **local software tools, documentation, training, and ""wrapper"" scripts** (e.g., `lumi-submit`, specific container recipes) to make using the remote LUMI hardware easier for their researchers.
+
+### Summary Classification
+| Category | Classification | Reason |
+| :--- | :--- | :--- |
+| **Physical Asset** | **Hardware** | 200+ cabinets, 2.2+ Exaflops peak GPU performance, physical GPUs/CP";;Correct;Yes;No;hardware infrastructure
+F5;factual;service;RAG;1;service;3249;4;CSAM|SECSAC|SECINTERP|SECSIM;0.847|0.666|0.647|0.643;678;"Based on the repository context, the **Compliance and Security Assurance Model (CSAM)** supports the following standards:
+
+- **ISO/IEC 15408** (Common Criteria for Information Technology Security Evaluation)
+- **EUCC** (European Cybersecurity Certification Scheme)
+- **EN 17927** (Cybersecurity certification of ICT products)
+- **EN 17640** (Cybersecurity certification of ICT processes)
+- **Cyber Security Act** (EU Regulation 2019/881)
+- **Cyber Resilience Act** (EU Regulation on horizontal cybersecurity requirements)
+- **AI Act** (EU Regulation on artificial intelligence)
+
+The description also mentions alignment with **ISO 8000** for data quality and **GDPR** compliance.";;Correct;Yes;No;auto
+F5;factual;service;COLD;1;rag-off;36976;0;;;4250;"The user is asking about the ""Compliance and Security Assurance Model (CSAM)"" and what standards it supports.
+I need to verify if ""CSAM"" is a widely recognized, standard industry framework acronym in this specific context.
+Common meanings for CSAM:
+1.  Child Sexual Abuse Material (Very common, highly sensitive).
+2.  Cloud Security Alliance... no, that's CSA. STAR registry?
+3.  Certified Software Asset Manager (IAITAM).
+4.  Compliance and Security Assurance Model - This sounds like a specific vendor framework or a niche government framework.
+
+Let's check for ""Compliance and Security Assurance Model"".
+It is not a mainstream global standard like NIST CSF, ISO 27001, SOC 2, PCI DSS, FedRAMP.
+It might be a specific proprietary model from a consultancy (like Deloitte, PwC, EY, KPMG) or a specific vendor (like Microsoft, AWS, ServiceNow, RSA Archer) or a specific national government framework.
+
+Search simulation/knowledge retrieval:
+- Microsoft has a ""Compliance and Security Assurance"" program but usually calls it ""Microsoft Compliance Framework"" or maps to CSA STAR.
+- RSA Archer has a ""Compliance and Security Assurance"" solution.
+- There is a ""Cyber Security Assurance Model"" in some contexts.
+- There is a ""Cloud Security Assurance Model"" (CSA related).
+
+Wait, looking at specific government frameworks:
+- **Canada**: The Government of Canada has a ""Cyber Security Assurance Model"" (CSAM) or similar? No, they have ITSG-33.
+- **UK**: NCSC has CAF (Cyber Assessment Framework).
+- **US**: NIST RMF, CSF.
+
+Let's look for ""Compliance and Security Assurance Model"" specifically.
+There is a **ServiceNow** ""Compliance and Security Assurance Model"" (part of their GRC/IRM product).
+There is a **Deloitte** ""Compliance and Security Assurance Model"".
+There is a **KPMG** ""Compliance and Security Assurance Framework"".
+
+However, the most prominent *standardized* use of the acronym **CSAM** in a security/compliance context (excluding the illegal content definition) is often associated with **Cloud Security Alliance (CSA) - Security, Trust, Assurance, and Risk (STAR)** registry levels? No, that's STAR.
+
+Let's consider the **Cloud Security Alliance (CSA) Cloud Controls Matrix (CCM)**.
+Let's consider **FedRAMP**.
+
+Actually, there is a specific framework called the **Compliance and Security Assurance Model (CSAM)** used by **Microsoft** for their cloud services (Azure, M365, Dynamics) historically, or perhaps currently.
+*Correction*: Microsoft uses the **Microsoft Compliance Framework** and maps to **CSA STAR**, **ISO**, **SOC**, **NIST**, **FedRAMP**, **HITRUST**.
+
+Let's look at **RSA Archer**. They market a ""CSAM"" solution (Compliance and Security Assurance Management/Model).
+
+Let's look at **HITRUST**. HITRUST CSF is a framework.
+
+What if the user means **CSAM** = **Child Sexual Abuse Material**?
+The prompt asks ""What standards does the Compliance and Security Assurance Model (CSAM) support?"".
+The phrasing ""Compliance and Security Assurance Model"" explicitly defines the acronym. This overrides the other meaning. I must answer based on the defined expansion provided by the user.
+
+Since ""Compliance and Security Assurance Model"" is not a *single, universally authoritative standard body* (like ISO or NIST), it is likely a **proprietary framework** from a specific vendor or consultancy.
+Most likely candidates for a formal model with this exact name:
+1.  **ServiceNow GRC/IRM**: They have a ""Compliance and Security Assurance Model"" as part of their implementation methodology or product architecture.
+2.  **RSA Archer**: ""Compliance and Security Assurance Management"".
+3.  **A specific Government framework**: e.g., a state or national CIO council model.
+
+*Self-Correction/Refinement*: There is a **Compliance and Security Assurance Model (CSAM)** defined by **The Open Group**? No.
+**ISACA**? No.
+
+Let's assume the user is asking about a specific vendor's model (likely ServiceNow or RSA Archer or a Big 4 methodology) OR they have the acronym slightly wrong (e.g., **CSA STAR**, **CAF**, **CSF**).
+
+However, I must answer the question *as asked*. If it's a proprietary model, I should explain that it maps to *industry standards*.
+Common standards supported by *any* Compliance and Security Assurance Model:
+- NIST CSF / N";;Incorrect;Yes;Yes;"leaks raw reasoning; speculative standards list"
+F6;factual;service;RAG;1;service;1630;4;AI4SOAR|SECASSURE4AI|AALTO-LUMI|SECAISOAR;0.645|0.579|0.548|0.522;151;"Based on the repository context, **AI4SOAR** takes the following input:
+
+**Security Alerts** — specifically, detection alerts emitted by **MMT-Probe**.";;Correct;Yes;No;auto
+F6;factual;service;COLD;1;rag-off;17182;0;;;3627;"**AI4SOAR** (typically referring to the academic research framework proposed in papers such as *""AI4SOAR: An AI-driven Security Orchestration, Automation and Response Framework""*) is a **reference architecture/conceptual model**, not a commercial off-the-shelf product. Therefore, it does not have a fixed, proprietary ""input specification"" like a vendor tool (e.g., Splunk SOAR, Cortex XSOAR, Tines).
+
+Instead, the framework defines **logical input categories** required to drive its AI/ML-enhanced SOAR loop. Based on the published literature (e.g., IEEE/ACM conference papers on the topic), AI4SOAR takes the following primary inputs:
+
+---
+
+### 1. Raw Security Telemetry (The ""Observe"" Inputs)
+These are the high-volume, heterogeneous data streams ingested from the security stack.
+*   **Logs & Events:** Syslog, Windows Event Logs, CloudTrail, VPC Flow Logs, Proxy/DNS logs.
+*   **Alerts:** Signatures from SIEM (correlation rules), EDR/XDR alerts, IDS/IPS alerts, Cloud Security Posture Management (CSPM) findings, DLP alerts.
+*   **Network Traffic:** NetFlow, PCAP metadata, Zeek/Bro logs.
+*   **Endpoint Telemetry:** Process trees, file hashes, registry changes, command-line arguments (via EDR agents).
+*   **Identity Data:** Authentication logs (success/failure), MFA challenges, privilege escalation events (from IAM/AD/Okta).
+
+### 2. Threat Intelligence & Contextual Enrichment (The ""Orient"" Inputs)
+AI4SOAR emphasizes **context-aware decision making**. It ingests external and internal context to enrich raw alerts.
+*   **External Threat Intel Feeds:** STIX/TAXII feeds, IOC lists (IPs, domains, hashes, CVEs), MITRE ATT&CK technique mappings.
+*   **Vulnerability Data:** CVE databases (NVD), exploit availability (Exploit-DB, KEV catalog), asset vulnerability scan results (Qualys, Tenable, Rapid7).
+*   **Asset Inventory (CMDB):** Host criticality, ownership, network zone, installed software, business unit mapping.
+*   **User/Entity Behavior Baselines:** Historical profiles for UEBA (impossible travel, first-seen processes, anomalous data transfer volumes).
+
+### 3. Historical Incident & Response Data (The ""Training/Knowledge Base"" Inputs)
+This is the **critical differentiator** for the ""AI"" in AI4SOAR. The framework requires historical data to train its ML models (classification, recommendation, prediction).
+*   **Labeled Incident History:** Past tickets/cases with ground-truth labels (True Positive / False Positive / Benign Positive), severity, root cause, and MITRE ATT&CK tags.
+*   **Analyst Action Logs:** Sequence of steps taken by analysts (queries run, enrichment looked up, containment actions executed, closure notes).
+*   **Playbook Execution History:** Success/failure rates of previous automated playbook runs, execution timestamps, error logs.
+*   **Feedback Loops:** Explicit analyst feedback on AI recommendations (Accept/Reject/Modify) for Reinforcement Learning (RL) or Active Learning.
+
+### 4. Operational & Environmental Constraints (The ""Decision Boundary"" Inputs)
+Inputs that define the ""Rules of Engagement"" for automation.
+*   **Playbook/Workflow Definitions:** The library of available automated actions (YAML/JSON/BPMN definitions: ""Block IP"", ""Isolate Host"", ""Reset Password"", ""Create Ticket"").
+*   **Policy & Risk Rules:** Business logic constraints (e.g., ""Never isolate Domain Controllers automatically,"" ""Require human approval for blocking external IPs,"" ""Max containment actions per hour"").
+*   **Asset Criticality Matrix:** Mapping of asset IDs to business impact tiers (Tier 0/1/2/3) to weight risk scores.
+
+### 5. Human-in-the-Loop (HITL) Inputs (Runtime)
+*   **Anal";;Partial;Yes;Yes;"alerts inputs plausible; cites an unverified AI4SOAR paper"
+F7;factual;service;RAG;1;service;23586;4;SECSAC|SECSIM|SECOPSTWIN|SECINTERP;0.798|0.706|0.665|0.657;150;The Security Assurance Case Tool (secSAC) produces a **Security Assurance Case** — specifically, a **structured OSCAL-based assurance case document**.;;Correct;Yes;No;auto
+F7;factual;service;COLD;1;rag-off;101092;0;;;2133;"Based on the available literature regarding the **Security Assurance Case Tool (secSAC)**—which is primarily a research prototype developed by groups such as those at **City, University of London** (often associated with the **ASPIRE** or **SECTET** projects and researchers like Dr. Robin Bloomfield, Dr. Adelard, or the **Centre for Software Reliability**)—the tool produces the following key outputs:
+
+### 1. Structured Assurance Case Models (Graphical & Structural)
+*   **Goal Structuring Notation (GSN) Models:** The primary output is a hierarchical argument structure (Goals, Strategies, Solutions/Context, Assumptions, Justifications) represented visually.
+*   **Security-Specific Patterns:** Unlike generic GSN tools, secSAC explicitly supports the instantiation of **Security Assurance Patterns** (e.g., patterns for ""Confidentiality,"" ""Integrity,"" ""Authorization,"" ""Audit,"" or patterns mitigating specific threat classes like ""Injection"" or ""Spoofing"").
+*   **Integration with Threat Models:** Outputs often link the assurance case elements directly to **Threat Models** (e.g., STRIDE, Attack Trees, Misuse Cases) and **Security Requirements**.
+
+### 2. Evidence & Artifact Traceability
+*   **Evidence Repository/Index:** A structured catalog linking leaf-node ""Solutions"" (Evidence) in the GSN tree to actual artifacts:
+    *   Test reports (penetration testing, fuzzing results).
+    *   Code analysis reports (SAST/DAST output).
+    *   Configuration audit logs.
+    *   Cryptographic verification certificates.
+    *   Formal verification proofs (e.g., from model checkers like ProVerif or Tamarin).
+*   **Bidirectional Traceability Matrices:** Mapping between:
+    *   Security Requirements $\leftrightarrow$ Threats $\leftrightarrow$ Assurance Case Claims $\leftrightarrow$ Evidence.
+
+### 3. Formal Interchange Formats (Interoperability)
+*   **SACM (Structured Assurance Case Metamodel) / ARM (Argumentation Metamodel) XML:** Export compliant with the **OMG SACM standard** (or the earlier OMG ARM standard) for exchange with other tools (e.g., AdvoCATE, NOR-STA, Eclipse CAPRA).
+*   **XGSN / GSN-XML:** Proprietary or";;Partial;Yes;Yes;"assurance case; invented provenance/tools"
+F8;factual;service;RAG;1;service;41938;4;ORO-5GLAB|ORO-3GPP16|AALTO-EDGE5G|PPC-EMOB;0.874|0.784|0.680|0.593;82;The license for the Orange 5G Lab (ORO-5GLAB) is **N/A (Partner Infrastructure)**.;;Correct;Yes;No;auto
+F8;factual;service;COLD;1;rag-off;20137;0;;;2668;"There is **no single, universally recognized open-source project or software repository** specifically named **""ORO-5GLAB""** or **""Orange 5G Lab""** in major public registries (like GitHub, GitLab, SPDX, or PyPI) as of my knowledge cutoff.
+
+The term **""Orange 5G Lab""** typically refers to **physical innovation facilities** (located in Paris, Châtillon, Belfort, Rennes, etc.) operated by **Orange S.A.** for developers, startups, and partners to test 5G use cases. Physical labs and their associated commercial programs generally do not carry an ""open source license.""
+
+### Possible Scenarios & How to Find the License
+
+If you are looking for the license of a **specific software component, SDK, API, or GitHub repository** associated with the Orange 5G Lab, you must check the specific repository. Orange releases open-source code under several standard licenses depending on the project.
+
+**Here is how to find the exact license:**
+
+1.  **Identify the Specific Repository:**
+    *   Go to the **Orange Open Source** GitHub organization: **[github.com/Orange-OpenSource](https://github.com/Orange-OpenSource)**
+    *   Search for repositories containing `5g`, `lab`, `oro`, or specific project names (e.g., `datavenue`, `flexran`, `son`, `onos` apps).
+
+2.  **Check the `LICENSE` File:**
+    *   Once in the specific repo, look for a file named `LICENSE`, `LICENSE.txt`, `COPYING`, or `LICENSE.md` in the root directory.
+
+3.  **Check `package.json` / `pom.xml` / `setup.py` / `Cargo.toml`:**
+    *   Most package managers require the license to be declared in the manifest file (look for an `SPDX` identifier like `Apache-2.0`, `BSD-3-Clause`, `MIT`, `LGPL-2.1-only`).
+
+---
+
+### Common Licenses Used by Orange (Telecom/5G Context)
+If you are evaluating Orange's general open-source posture for 5G/Telecom projects, they most frequently use:
+
+| License | SPDX Identifier | Typical Use Case |
+| :--- | :--- | :--- |
+| **Apache License 2.0** | `Apache-2.0` | **Most common** for platforms, SDKs, MANO, O-RAN components, FlexRAN. |
+| **BSD 3-Clause** | `BSD-3-Clause` | Libraries, tools, some RAN components. |
+| **LGPL v2.1 / v3.0** | `LGPL-2.1-only`, `LGPL-3.0-only` | Libraries intended for dynamic linking in proprietary apps. |
+| **GPL v2.0 / v3.0** | `GPL-2.0-only`, `GPL-3.0-only` | Complete applications, kernel modules, some O-RAN SC contributions. |
+| **Eclipse Public License 2.0** | `EPL-2.0` | Projects hosted under the Eclipse Foundation (e.g., ONOS apps, TITAN). |
+
+---
+
+### Summary
+*   **If ""ORO-5GLAB"" is a physical lab / commercial program:** It is **Proprietary / Commercial** (Terms of Service / NDA apply, not an open-source license).
+*   **If ""ORO-5";;Refused;Yes;No;no recognized project
+F9;factual;service;RAG;1;service;1822;4;SECOPSTWIN|SECDEVTWIN|SECANOD|SECAISOAR;0.696|0.656|0.566|0.562;91;"The title of **SECOPSTWIN** is **""Assurance-driven Security Operation Twin (SecOpsTwin)""**.";;Correct;Yes;No;auto
+F9;factual;service;COLD;1;rag-off;7222;0;;;1351;"**SECOPSTWIN** does not correspond to a widely recognized public program, satellite, military exercise, or standard industry acronym in open-source intelligence (OSINT) databases up to my knowledge cutoff.
+
+It appears to be a specific **internal project code name, contract identifier, or classified designation** (likely within a defense, intelligence, or aerospace context, possibly US-based given the naming convention).
+
+**Possible breakdown of the acronym:**
+*   **SEC** : Security / Secure / Secretary / Secondary
+*   **OPS** : Operations
+*   **TWIN** : Digital Twin / Twin Satellite / Redundant System
+
+**If you encountered this in a specific document (e.g., a budget justification, contract award, technical manual, or solicitation), the ""title"" would be defined locally within that specific document's glossary or cover page.**
+
+**To find the specific title, you would need to check:**
+1.  **The source document** where you found the term (usually the front matter or acronym list).
+2.  **Government contract databases** (like SAM.gov, FPDS, or DoD STIP) searching the code as a ""Program Element"" or ""Project Number.""
+3.  **Classified repositories** (SIPRNet/JWICS) if it is a sensitive compartmented program.
+
+Do you have the context (document name, agency, or date) where you saw this term? That would help narrow down the specific program.";;Refused;Yes;No;not recognized
+F10;factual;service;RAG;1;service;4892;4;MAG|HTTP-SIM|MMT-PROBE|AI4SOAR;0.605|0.533|0.532|0.490;372;"Based on the repository context, **MAG provides a terminal/CLI (command-line) interface**.
+
+The `uiType` field for MAG is explicitly listed as `""terminal""`, and the description confirms it runs via CLI commands like:
+```
+mag <attack> --target-ip <ip> --target-port <port>
+```
+Users interact with it by executing commands in a shell (e.g., via `kubectl exec` into its pod).";;Correct;Yes;No;auto
+F10;factual;service;COLD;1;rag-off;19631;0;;;3001;"**MAG** most commonly refers to the line of **IPTV/OTT Set-Top Boxes (STBs) manufactured by Infomir**.
+
+If this is the product you are asking about, MAG devices do not run a standard consumer OS like Android TV or webOS by default. Instead, they run a **proprietary, Linux-based firmware** with a custom User Interface designed specifically for IPTV/OTT service providers.
+
+Here are the key characteristics of the **MAG UI (often called the ""MAG Interface"" or ""Portal UI"")**:
+
+### 1. Operator-Centric / Portal-Based Design
+*   **The ""Portal"" is King:** The UI is not a generic app launcher. It is designed to load a **Ministra (formerly Stalker) Portal** or a compatible middleware portal immediately upon boot.
+*   **Branding:** The UI is almost entirely white-labeled. The Service Provider (ISP/OTT operator) controls the logos, color schemes, background images, and menu structure via their server-side portal configuration. The end-user sees the *Provider's* brand, not ""MAG"" or ""Infomir.""
+
+### 2. Navigation Paradigm: ""10-Foot Experience"" (Remote Control Optimized)
+*   **Grid/Linear Layout:** Menus are typically vertical lists or horizontal grids optimized for **Directional Pad (D-Pad) navigation** (Up, Down, Left, Right, OK, Back).
+*   **No Touch/Mouse Support:** The interface assumes a standard IR/Bluetooth remote control. There is no pointer/cursor mode in the standard UI.
+
+### 3. Core UI Sections (Standard Portal Structure)
+While customizable by the operator, the standard firmware supports these main views:
+*   **Main Menu / Home:** Entry point to Live TV, VOD, Series, Catch-up, Apps, Settings.
+*   **Live TV (EPG Centric):**
+    *   **Channel List:** Vertical list with channel logos/numbers.
+    *   **EPG (Electronic Program Guide):** **Grid/Table view** (time vs. channels) is the standard. Supports ""Now/Next"" banners.
+    *   **Info Bar:** Pressing `OK` or `Info` on a channel shows a transient banner with current/next program, progress bar, and description.
+*   **Video on Demand (VOD) / Movies / Series:**
+    *   **Poster Wall / Grid View:** Categorized content (Genres, New, Popular).
+    *   **Detail Page:** Synopsis, cast, trailer playback, ""Watch/Resume"" buttons.
+*   **Catch-up TV / Time-Shift:** Integrated into the EPG (colored indicators on past programs) or a dedicated ""Archive"" menu.
+*   **Applications:** A sandbox for web-based apps (YouTube, Weather, Games, Browsers) built on the **MAG SDK (JavaScript/HTML5/CSS)**. These run inside a WebKit-based browser engine.
+*   **Settings:** Network (Wi-Fi/Ethernet), Video/Audio output (Resolution, HDMI CEC, Audio codec), Portal URL configuration, Parental Control, System Info.
+
+### 4. Technical UI Framework (For Developers/Operators)
+*   **MAG SDK / MAG JavaScript API:** The UI layer for portal pages and apps is built using standard web technologies (**HTML5, CSS3, JavaScript**).
+*   **Device API (`mag.js` / `stb.js`):** JavaScript objects exposed to the browser environment to control hardware:
+    *   `g";;Incorrect;Yes;No;MAG = Infomir set-top boxes (misidentified)
+C1;comparative;service;RAG;1;service;6895;4;MMT-PROBE|MAG|AI4SOAR|SECANOD;0.571|0.556|0.541|0.502;1335;"Based on the repository context, **Montimage (MTI)** provides the following four services/tools:
+
+| Service | Category | Description |
+|---------|----------|-------------|
+| **MMT-PROBE** | Monitor | Montimage Monitoring Tool DPI probe — runs as a sidecar sharing the target pod’s network namespace (requires `NET_ADMIN`/`NET_RAW`), configured via `mmt-probe.conf` or `HOST_INTERFACE`, and emits security alerts/reports consumed by AI4SOAR. |
+| **MAG** (Montimage Attack Generator) | Attack | Containerized attack-traffic generator; runs CLI commands (`mag <attack> --target-ip <ip> --target-port <port>`) to send HTTP attack traffic at a target service. Deployed as a long-running Deployment driven via `kubectl exec`. |
+| **AI4SOAR** | Reaction | Shuffle-based SOAR stack exposing API/UI on port 5000. Ingests MMT-Probe alerts and applies namespace-scoped Kubernetes playbook responses (NetworkPolicy creation, pod deletion, Job scale-down) through its ServiceAccount. |
+| **SECANOD** (secAnoD) | Ops Services | AI-based Attack/Anomaly Detection using explainable LLM-based models that extend MMT with LLMs. Learns from up-to-date threat intelligence (e.g., via RAG), recommends security solutions, and autonomously mitigates vulnerabilities. |
+
+These four components together form Montimage’s **attack → detect → respond** scenario.";;Partial;Yes;No;auto: 4/8 listed
+C1;comparative;service;COLD;1;rag-off;49801;0;;;4042;"**Montimage** is a French technology company specializing in **network monitoring, security, and testing solutions**. They focus heavily on automated formal methods, AI/ML, and high-performance packet processing.
+
+Their services and solutions generally fall into the following categories:
+
+### 1. Network & Service Monitoring (Observability)
+*   **MMT-Probe / MMT-Operator:** High-performance Deep Packet Inspection (DPI) probes for real-time traffic analysis, application identification (Layer 7), and QoS/QoE monitoring.
+*   **5G / NFV / Cloud-Native Monitoring:** Solutions tailored for virtualized network functions (VNFs), Kubernetes (CNFs), and 5G core networks (monitoring SBA interfaces, NRF, AMF, SMF, UPF).
+*   **Network Slicing Assurance:** Monitoring and validation of 5G network slices (SLA verification, isolation verification).
+*   **IoT / OT Traffic Analysis:** Specialized dissection and monitoring for industrial protocols (Modbus, OPC-UA, MQTT, CoAP) and constrained IoT networks.
+
+### 2. Cybersecurity & Threat Detection
+*   **Network Detection and Response (NDR):** Anomaly-based intrusion detection using behavioral analysis and Machine Learning (unsupervised/supervised) to detect zero-day attacks, lateral movement, C2 traffic, and data exfiltration.
+*   **DDoS Detection & Mitigation:** Real-time detection of volumetric and application-layer DDoS attacks.
+*   **Encrypted Traffic Analysis (ETA):** Detecting threats inside TLS/SSL traffic *without* decryption (using JA3 fingerprinting, SNI analysis, certificate analysis, and behavioral ML).
+*   **IoT/OT Security:** Intrusion detection systems (IDS) specifically designed for industrial control systems (ICS/SCADA) and critical infrastructure.
+
+### 3. Automated Testing & Validation (Conformance & Performance)
+*   **Protocol Conformance Testing:** Automated test suites for standard protocols (SIP, Diameter, GTP, HTTP/2, QUIC, 5G NAS/NGAP, CoAP, MQTT) based on **TTCN-3** and formal methods.
+*   **Interoperability Testing:** Validating interoperability between multi-vendor network equipment (e.g., gNodeB vs. Core, UE vs. Network).
+*   **Performance & Load Testing:** Stress testing network elements (5G Core, IMS, EPC, Firewalls, DPI engines) to validate capacity and stability.
+*   **Security Testing (Fuzzing/Pen Testing):** Automated vulnerability scanning and robustness testing (fuzzing) of protocol implementations.
+
+### 4. Formal Methods & Model-Based Engineering (Core R&D Differentiator)
+*   **Formal Verification:** Applying mathematical proofs (model checking, theorem proving) to verify correctness of protocols, smart contracts, and security policies.
+*   **Model-Based Testing (MBT):** Automatic generation of test cases from formal specifications (UML, SDL, TTCN-3, SysML).
+*   **Runtime Verification:** Monitoring system execution against formal properties (safety, liveness, security policies) in real-time.
+
+### 5. Professional Services & Consulting
+*   **Integration & Customization:** Integrating MMT probes/agents into existing SIEM, SOAR, or OSS/BSS stacks (OpenShift, OpenStack, Grafana, ELK, Splunk).
+*   **Custom Protocol Development:** Developing new protocol dissectors (plugins) for proprietary or niche industrial/IoT protocols.
+*   **Training & Support:** Training on TTCN-3, MMT tools, 5G protocols, and network security analysis.
+*   **R&D Collaboration:** Participation in EU Horizon projects (e.g., 5G-PPP, CyberSec projects) and joint R&D with telecom operators/vendors.
+
+---
+
+### Key Technologies / Products Brand Names
+*   **MMT (Montimage Monitoring Tool):** The core open-source/proprietary DPI engine.
+*   **MMT-Sec / MMT-IDS:** The security/IDS module.
+*   **MMT-Test / TTCN-3 Tools:** The testing toolchain.
+*   **MMT-5G:** Specific suite for 5G core assurance.
+
+### Target Industries
+*   **Telecom Operators & Vendors** (5G/4G/IMS assurance, roaming testing).
+*   **Critical Infrastructure / Industry 4.0** (OT/ICS security, IEC 62443 compliance).
+*   **Cloud & Data Centers** (East-West traffic visibility, micro-se";;Incorrect;Yes;Yes;real company profile but invented product list
+C2;comparative;service;RAG;1;service;11445;4;ORO-5GLAB|AALTO-EDGE5G|ORO-3GPP16|PPC-EMOB;0.687|0.668|0.649|0.572;2221;"Based on the repository context, there are **3 services** in the **5G Testbeds** category:
+
+---
+
+### 1. **ORO-5GLAB** — Orange 5G Lab
+- **Provider:** ORO (Orange Romania)
+- **Sector:** Digital infrastructure
+- **Type:** Software/Hardware
+- **Description:** 5G Full-Stack Development, Testing, And Validation Laboratory with state-of-the-art equipment and access to current 3GPP and future 3GPP-specification technologies.
+- **Inputs:** RF & Network Configuration | 5G lab equipment configuration for full-stack testing
+- **Outputs:** Validated 5G Test Results | Development, testing and validation results across the 5G stack
+- **Potential Use Cases:** UC1 - Telecom Software Development Life Cycle
+- **Docker Image:** `registry.montimage.eu/oro-orange-romania-/oro-5glab:v1.0.0`
+- **TRL:** Current 9, Expected 9
+- **Standards:** 3GPP
+
+---
+
+### 2. **AALTO-EDGE5G** — Edge Devices & 5G Testbed
+- **Provider:** AALTO
+- **Sector:** Research
+- **Type:** Software/Hardware
+- **Description:** For IIoT and edge computing.
+- **Inputs:** Edge Workloads | IIoT and edge computing workloads
+- **Outputs:** Edge Computing Results | Processed IIoT/edge computing outputs over the 5G testbed
+- **Potential Use Cases:** Research infrastructure support
+- **Docker Image:** `registry.montimage.eu/aalto/aalto-edge5g:v1.0.0`
+- **TRL:** Current 9, Expected 9
+- **Standards:** 3GPP
+
+---
+
+### 3. **ORO-3GPP16** — 3GPP Rel 16 Commercial Facility
+- **Provider:** ORO (Orange Romania)
+- **Sector:** Digital infrastructure
+- **Type:** Hardware
+- **Description:** 5G infrastructure deployed in 45 cities, providing agility for new 5G communication systems with dedicated/customised network slices (e.g. MEC capabilities).
+- **Inputs:** Network Slice Requests | Requests for dedicated/customised 5G network slices
+- **Outputs:** Commercial 5G Network Slices | MEC-capable network slices across 45 deployed cities
+- **Potential Use Cases:** UC1 - Telecom Software Development Life Cycle
+- **Docker Image:** `registry.montimage.eu/oro-orange-romania-/oro-3gpp16:v1.0.0`
+- **TRL:** Current 9, Expected 9
+- **Standards:** 3GPP
+
+---
+
+**Note:** The fourth service in the context (PPC-EMOB) belongs to the **E-Mobility & IIoT** category, not 5G Testbeds.";;Correct;Yes;No;auto
+C2;comparative;service;COLD;1;rag-off;49319;0;;;3353;"Because ""5G Testbeds"" is a broad industry term rather than a single standardized product catalog (like an AWS service list), the specific services available depend entirely on **who is operating the testbed** (e.g., a cloud provider, a telecom vendor, a government initiative, or a university).
+
+Below is a comprehensive taxonomy of the **standard service categories** found in most professional 5G testbeds, followed by examples of specific offerings from major providers.
+
+---
+
+### I. Core Service Categories (The ""Standard"" Taxonomy)
+
+#### 1. Infrastructure & Compute Services (The ""Hardware Layer"")
+*   **Bare Metal / Hosted RAN:** Physical gNodeBs (gNB), Distributed Units (DU), Radio Units (RU) – often multi-vendor (Nokia, Ericsson, Samsung, Open RAN vendors).
+*   **Edge Compute Nodes:** MEC (Multi-access Edge Computing) servers (GPU/CPU/FPGA) deployed at the cell site or aggregation point.
+*   **Core Network Hosting:** Dedicated or shared 5G Core (5GC) instances (AMF, SMF, UPF, AUSF, PCF, NRF, UDM).
+*   **Far Edge / Device Lab:** Racks of UEs (User Equipment) – smartphones, CPEs, IoT modules (Quectel, Fibocom, Sierra Wireless), industrial gateways, AR/VR headsets.
+
+#### 2. Network Function Services (The ""Software Layer"")
+*   **5G Core Network (5GC) as a Service:** Instantiation of cloud-native, containerized (CNF) 5G Core stacks (e.g., Open5GS, Free5GC, or vendor-specific: Mavenir, Affirmed, Nokia Cloud Packet Core).
+*   **RAN Software Stacks:** vRAN/O-RAN DU/CU software (Intel FlexRAN, VMware RAN, Radisys, Parallel Wireless, srsRAN).
+*   **O-RAN Specific Services:**
+    *   **Near-RT RIC (RAN Intelligent Controller):** E2 termination, xApps hosting (traffic steering, load balancing, QoS optimization).
+    *   **Non-RT RIC:** rApps for policy management, AI/ML model training (rApp > xApp lifecycle).
+    *   **E2 / A1 / O1 Interface Testing:** Conformance and interoperability validation.
+*   **Network Slicing Orchestration:** End-to-end slice lifecycle management (NSMF, NSSMF) – creation, modification, deletion, SLA monitoring.
+
+#### 3. Radio & RF Engineering Services
+*   **RF Chambers / Anechoic Chambers:** OTA (Over-the-Air) testing for TRP (Total Radiated Power), TIS (Total Isotropic Sensitivity), Beamforming validation.
+*   **Channel Emulation:** Fading, Doppler, Delay spread, HST (High Speed Train) profiles (Keysight, Spirent, Rohde & Schwarz, Azimuth).
+*   **Spectrum Analysis & Monitoring:** Real-time spectrum analyzers, interference hunting tools.
+*   **Beam Management Testing:** Beam sweeping, measurement, reporting, failure recovery (FR1 & FR2/mmWave).
+
+#### 4. Automation, CI/CD & DevOps Services
+*   **Test Orchestration Engines:** Kubernetes-based frameworks to spin up full stacks (Core + RAN + UE + Traffic) on demand (e.g., based on Helm charts, Ansible, Terraform).
+*   **CI/CD Pipelines for Telco:** Automated build, deploy, test (conformance, performance, regression) for CNFs/VNFs.
+*   **Infrastructure as Code (IaC) Templates:** Pre-built blueprints for ""5G Standalone Lab,"" ""Open RAN Lab,"" ""URLLC Factory,"" etc.
+
+#### 5. Testing & Validation Services (The ""Outcome Layer"")
+*   **Conformance Testing:** 3GPP TS 38.521/522/523/533 (Protocol, RF, RRM) via automated test suites (Keysight, Rohde & Schwarz, Anritsu, VIAVI).
+*   **Performance/KPI Benchmarking:** Throughput, Latency (User Plane";;Refused;Yes;No;depends on operator
+C3;comparative;service;RAG;1;service;59564;4;TELLU-CARE|SECSAC|SECINTERP|SECASSURE4AI;0.550|0.548|0.545|0.538;1088;"Based on the repository context, **Tecnalia (TEC)** provides the following three services:
+
+| Service | Short Name | Category | Description |
+|---------|------------|----------|-------------|
+| **Security Assurance Case Tool** | SECSAC | Dev Services | LLM-based assistant for identifying Security Assurance Cases (SACs) and mapping information to fulfil them using OSCAL for representing security controls and assessment results. |
+| **Assurance-driven Standard Interpretation Service** | SECINTERP | Dev Services | Two-level LLM-based assistant for automated extraction and interpretation of cybersecurity requirements (Level 1: standard mapping for non-experts; Level 2: technical requirements alignment for developers). |
+| **Security Assurance Service for AI Components** | SECASSURE4AI | Dev Services | Holistic security assurance for AI/ML components covering security, explainability, fairness, and robustness, with automated testing for AI/ML relevant attacks. |
+
+All three are web-based software tools currently at TRL 3–4 (expected to reach TRL 7), with licenses marked as TBD.";;Partial;Yes;No;auto: 3/4 listed
+C3;comparative;service;COLD;1;rag-off;14752;0;;;4597;"**Tecnalia** is the largest private applied research and technological development center in Spain and a major player in Europe. As a member of the **Basque Research and Technology Alliance (BRTA)**, they focus on transforming technology into economic value for their clients.
+
+Their services are generally categorized into **four main strategic areas**, supported by cross-cutting enabling technologies:
+
+---
+
+### 1. Strategic Business Units (Core Service Areas)
+
+#### **A. Digital Transformation**
+*   **Artificial Intelligence & Data Analytics:** Machine learning, deep learning, computer vision, natural language processing (NLP), predictive analytics, and Big Data platforms.
+*   **Cybersecurity:** Industrial cybersecurity (OT/IT convergence), secure communications, cryptography, threat intelligence, and certification (Common Criteria, LINCE).
+*   **Advanced Computing & Simulation:** High-Performance Computing (HPC), Cloud/Edge computing, Digital Twins, and physics-based simulation (CAE/CFD).
+*   **Robotics & Autonomous Systems:** Collaborative robotics (cobots), mobile manipulation, autonomous navigation, and human-robot interaction.
+*   **Digital Platforms & IoT:** Industrial IoT platforms, asset management, and interoperability standards (OPC UA, RAMI 4.0).
+
+#### **B. Energy Transition & Climate Action**
+*   **Renewable Energies:** Offshore wind (floating/fixed), photovoltaics (PV), solar thermal, and marine energy testing/validation.
+*   **Energy Storage & Batteries:** Battery materials, cell/pack design, Battery Management Systems (BMS), second-life applications, and recycling (circular economy).
+*   **Hydrogen & Power-to-X:** Green hydrogen production (electrolysis), storage, transport, and synthetic fuels (e-fuels).
+*   **Smart Grids & Energy Systems:** Grid integration, flexibility markets, microgrids, energy management systems (EMS), and power electronics.
+*   **Energy Efficiency in Industry:** Waste heat recovery, industrial heat pumps, and process optimization.
+*   **Climate Change Adaptation:** Climate modeling, resilience planning, carbon footprint/LCAs, and nature-based solutions.
+
+#### **C. Sustainable Mobility & Urban Ecosystems**
+*   **Electric & Connected Vehicles:** Power electronics, electric motors, charging infrastructure (V2G), and connectivity (V2X).
+*   **Autonomous Driving:** Perception systems, sensor fusion, validation & verification (V&V), and simulation scenarios.
+*   **Lightweight Materials & Structures:** Composites (CFRP/GFRP), multi-material joining, structural health monitoring, and additive manufacturing for automotive/aerospace.
+*   **Urban Mobility & Logistics:** Mobility-as-a-Service (MaaS), last-mile logistics optimization, and traffic modeling.
+*   **Aeronautics & Space:** Structural design, thermomechanical testing, satellite systems, and launchers.
+
+#### **D. Advanced Manufacturing & Circular Economy**
+*   **Additive Manufacturing (3D Printing):** Metal/polymer printing, process monitoring, qualification/certification, and design for AM (DfAM).
+*   **Smart Manufacturing (Industry 4.0/5.0):** Digital twins for production, zero-defect manufacturing (ZDM), predictive maintenance, and human-centric automation.
+*   **Circular Economy & Materials:** Eco-design, chemical/mechanical recycling, critical raw materials substitution, life cycle assessment (LCA), and waste valorization.
+*   **Surface Engineering:** Functional coatings (anti-corrosion, wear, thermal barrier), plasma treatments, and laser texturing.
+*   **Photonics & Optical Technologies:** Optical metrology, laser processing, LiDAR, and spectroscopy for inline inspection.
+
+---
+
+### 2. Cross-Cutting / Transversal Services
+These capabilities support the four strategic units above:
+*   **Testing, Inspection & Certification (TIC):** Accredited labs (ENAC) for mechanical, electrical, climatic, electromagnetic compatibility (EMC), fire safety, and metrology testing.
+*   **Standardization & Regulation:** Active participation in ISO, IEC, CEN, UNE committees; support for regulatory compliance (EU Taxonomy, CSRD, Machinery Regulation, AI Act).
+*   **Intellectual Property (IP) & Technology Transfer:** Patent landscaping, freedom-to-operate (FTO), licensing, and spin-off creation support.
+*   **European & International Funding Strategy:** Proposal writing and project management for Horizon Europe, EIC, Clean Hydrogen Partnership, KDT/JU, and regional funds.
+*   **Specialized Training (Tecnalia Learning):** Upskilling/reskilling programs for industry professionals in digital skills, hydrogen, batteries, cybersecurity, etc.
+
+---
+
+###";;Incorrect;Yes;No;generic Tecnalia profile
+C4;comparative;service;RAG;1;service;13423;4;MAG|AI4SOAR|MMT-PROBE|SECANOD;0.738|0.733|0.707|0.703;1578;"Based on the repository context, the **Montimage attack→detect→respond scenario** is composed of three core services, each fulfilling a distinct role:
+
+| Service | Role in the Scenario | Key Function |
+|---------|----------------------|--------------|
+| **MAG** (Montimage Attack Generator) | **Attack** module | Generates and sends HTTP attack traffic toward a target service (IP/port) via its CLI (`mag <attack> --target-ip <ip> --target-port <port>`). Deployed as a long‑running Deployment driven by `kubectl exec`. |
+| **MMT‑PROBE** (MMT Traffic Analysis Probe) | **Detect / Monitor** module | Runs as a sidecar sharing the target pod’s network namespace (requires `NET_ADMIN`/`NET_RAW`). Performs deep‑packet inspection (DPI) on the target’s traffic and emits security alerts/reports consumed by the reaction layer. |
+| **AI4SOAR** (AI‑driven Security Orchestration and Response) | **Respond / Reaction** module | Ingests alerts from MMT‑PROBE and executes namespace‑scoped Kubernetes remediation actions (e.g., creating NetworkPolicies, deleting pods, scaling down Jobs) via its ServiceAccount. Exposes a web UI/API on port 5000. |
+
+**Summary of the flow**  
+1. **MAG** launches attacks against the target.  
+2. **MMT‑PROBE** monitors the target’s network traffic and detects malicious patterns.  
+3. **AI4SOAR** receives the detection alerts and automatically applies Kubernetes‑level responses to mitigate the threat.
+
+*(SECANOD is listed as an AI‑based anomaly detection service but is not explicitly described as part of this specific attack→detect→respond scenario.)*";;Partial;Yes;No;auto: 2/4 listed
+C4;comparative;service;COLD;1;rag-off;21420;0;;;3469;"Based on the **Montimage Monitoring Platform (MMT)** architecture—specifically the **5G/IIoT ""Attack-Detect-Respond"" demonstration scenario** (often showcased in projects like **5G-VICTORI**, **5G-ZORRO**, or **MMT-Operator**)—the scenario is typically composed of the following core services.
+
+These services are usually deployed as **Docker containers** orchestrated via `docker-compose` or Kubernetes.
+
+---
+
+### 1. MMT-Probe (`mmt-probe`)
+**Role: High-Performance Traffic Capture & Protocol Extraction (The ""Sensor"")**
+*   **Function:** Captures raw network traffic (via `pcap`, `AF_PACKET`, `DPDK`, or `NFQUEUE`), performs **Deep Packet Inspection (DPI)**, and reconstructs protocol flows (GTP-U, HTTP/2, MQTT, CoAP, Modbus, 5G NAS, etc.).
+*   **Output:** Exports structured metadata (IPFIX/JSON) representing flow records and extracted application-layer fields (e.g., HTTP URL, MQTT Topic, GTP TEID, 5G SUPI).
+*   **Key in Scenario:** It is the **data source**. Without the probe, the detection engine has no visibility into the 5G User Plane or IIoT control traffic.
+
+### 2. MMT-Security / MMT-Operator (`mmt-security` or `mmt-operator`)
+**Role: Real-Time Detection & Decision Engine (The ""Brain"")**
+*   **Function:** Consumes IPFIX/JSON flow records from the Probe. Executes **detection logic** defined in **MMT-Script** (Lua-based) or **Sigma/YARA rules**.
+*   **Detection Capabilities:**
+    *   **Signature-based:** Known attack patterns (e.g., CVE-2023-XXXX exploits in GTP, MQTT malformed packets).
+    *   **Anomaly/Behavioral:** Thresholds, rate limiting, state machine violations (e.g., ""UE sends Create Session Request before Attach Accept"").
+    *   **Correlation:** Multi-stage attack detection (Recon $\to$ Exploit $\to$ Exfil).
+*   **Response Logic:** Upon detection, it executes **Response Actions** defined in the script:
+    *   *Alerting:* Syslog, Kafka, REST API, Webhook.
+    *   *Blocking:* Sending `NFQUEUE` verdicts (Drop) back to Probe (if inline), or triggering **Network Slice Isolation** via 5G Core APIs (Nsmf_PDUSession, Namf_Communication).
+*   **Key in Scenario:** It implements the **""Detect""** and **""Respond""** logic. It decides *what* is an attack and *how* to mitigate it.
+
+### 3. MMT-Dashboard / MMT-UI (`mmt-dashboard` or `grafana` + `mmt-ui`)
+**Role: Visualization, Alerting & Forensics (The ""Eye"")**
+*   **Function:** Web-based GUI for operators.
+*   **Features:**
+    *   **Real-time Topology:** Service graph of 5G Network Functions (AMF, SMF, UPF) and IIoT devices.
+    *   **Alert Timeline:** Chronological view of detected incidents (Severity, MITRE ATT&CK tags).
+    *   **Flow Drill-down:** Inspect raw packet payloads and extracted fields for a specific alert.
+    *   **Response Control:** Manual ""Quarantine Slice"" or ""Block UE"" buttons triggering APIs on the Security Engine.
+*   **Key in Scenario:** Provides **Situational Awareness** and **Human-in-the-loop** validation of automated responses.
+
+### 4. Data Bus / Message Broker (`kafka` / `zookeeper` or `redis` / `mosquitto`)
+**Role: Asynchronous Communication Backbone**
+*   **Function:** Decouples the Probe (Producer) from the Security Engine (Consumer) and the Dashboard.
+*   **Topics typically used:**
+    *   `mmt-flows`: High-volume flow records (IPFIX/JSON).
+    *   `mmt-alerts`: Detection events (low volume, high priority).
+    *   `mmt-commands`: Response actions sent from Engine $\to$ Probe or Engine $\to$ 5G Core.
+*   **Key in Scenario:** Ens";;Incorrect;Yes;Yes;invents a 5G/IIoT scenario, placeholder CVE
+C5;comparative;service;RAG;1;service;14410;4;MMT-PROBE|SECANOD|HTTP-SIM|SECOPSTWIN;0.746|0.736|0.656|0.641;2077;"## MMT-PROBE vs. secAnoD – Attack Detection Comparison
+
+| Dimension | **MMT-PROBE** (MMT Traffic Analysis Probe) | **secAnoD** (AI-based Attack/Anomaly Detection) |
+|-----------|--------------------------------------------|-------------------------------------------------|
+| **Core Approach** | **Deep Packet Inspection (DPI) probe** – inspects raw packet payloads on a target pod’s network interface. | **Explainable LLM-driven anomaly detection** – builds/extends multi-modal models with LLMs, learns from threat intelligence (RAG), and generates new detection rules automatically. |
+| **Maturity (TRL)** | **Current 7 / Expected 8** – near-production, already used in the Montimage attack→detect→respond scenario. | **Current 3 / Expected 7** – early research/prototype; still evolving toward operational use. |
+| **Deployment Model** | Sidecar container in the **target pod’s network namespace** (requires `NET_ADMIN` + `NET_RAW`). Configured via `mmt-probe.conf` or `HOST_INTERFACE` env. | Standalone service (Docker image) that consumes telemetry & threat-intel feeds; no special pod privileges needed. |
+| **Inputs** | **Pod network traffic** – live packets on the monitored interface (`HOST_INTERFACE` / `-i`). | **Threat intelligence & telemetry** – up-to-date feeds, monitoring data, logs, etc. |
+| **Outputs** | **DPI alerts & reports** – structured security alerts and analysis reports consumed by AI4SOAR / SOAR. | **Anomaly predictions & mitigation recommendations** – explainable detections plus suggested responses; aims for ≥80 % prediction accuracy. |
+| **Detection Scope** | **Network-layer & application-layer signatures/behaviors** visible in packet captures (protocol anomalies, known attack patterns, suspicious payloads). | **Broader anomaly space** – correlates telemetry, threat intel, and learned patterns; can predict novel/zero-day attacks and recommend mitigations. |
+| **Explainability** | Rule/signature-based – alerts map directly to matched DPI rules. | **LLM-generated explanations** – natural-language reasoning for each detection, adaptive";;Correct;Yes;No;accurate comparison from context
+C5;comparative;service;COLD;1;rag-off;16957;0;;;4052;"The user wants a comparison between ""MMT-PROBE"" and ""secAnoD"" as attack detection options.
+I need to identify what these two technologies are, their architectures, use cases, strengths, weaknesses, and how they differ.
+
+1.  **Identify MMT-PROBE:**
+    *   MMT stands for ""Measurement, Modeling, and Tracking"" or similar? No, usually MMT refers to **MMT (Monitoring and Measurement Toolkit)** or specifically **MMT-Probe** developed by the **MMT Team (often associated with Telecom ParisTech / Institut Polytechnique de Paris / Orange Labs)**.
+    *   Key characteristics: Deep Packet Inspection (DPI), protocol identification, flow-based analysis, extensible via plugins/scripts (Lua), high performance, used for traffic classification, QoE monitoring, and *security* (anomaly detection, attack detection).
+    *   Focus: Network traffic analysis, protocol decoding, feature extraction for ML/rule-based detection.
+
+2.  **Identify secAnoD:**
+    *   ""secAnoD"" stands for **Security Anomaly Detection**? Or a specific tool name?
+    *   Search/Recall: There is a tool/framework called **secAnoD** (Security Anomaly Detector) often associated with **SCADA/ICS security** or specific research projects (e.g., European projects like ATENA, or specific academic prototypes).
+    *   Wait, let me double-check. ""secAnoD"" appears in literature related to **Speculative Execution Attacks**? No.
+    *   Let's look for ""secAnoD"" in the context of Network Intrusion Detection Systems (NIDS).
+    *   *Correction*: There is a specific tool named **SecAnoD** (or secAnod) described in papers like ""SecAnoD: A Security Anomaly Detection Framework for Industrial Control Systems"" or similar.
+    *   Actually, looking at recent cybersecurity literature: **SecAnoD** is often cited as a **host-based** or **network-based anomaly detection system for Industrial IoT / SCADA / Modbus/TCP** environments. It uses specification-based or machine learning approaches.
+    *   Another possibility: **SecAnoD** (Security Anomaly Detection) is a component of the **SECFRAME** or similar EU projects.
+    *   Let's assume the context is **Network/ICS Security Anomaly Detection**.
+
+3.  **Structure the Comparison:**
+    *   **Overview/Origin**: Who made it? What is the primary goal?
+    *   **Architecture/Deployment**: Network-based (NIDS) vs Host-based (HIDS) vs Probe-based. Inline vs Tap/Span.
+    *   **Detection Methodology**: Signature-based, Anomaly-based (ML/Stats), Specification-based, Behavioral.
+    *   **Protocol Support**: IT protocols (HTTP, DNS, TLS) vs OT/ICS protocols (Modbus, DNP3, S7Comm).
+    *   **Extensibility/Scripting**: Plugins, Lua, Python, Rule syntax.
+    *   **Performance/Scalability**: Throughput, latency, resource usage.
+    *   **Use Cases**: Enterprise IT, Data Center, Industrial Control Systems (ICS/OT), IoT.
+    *   **Maturity/Community**: Open source? Commercial? Research prototype? Maintenance status.
+    *   **Integration**: SIEM, SOAR, Alerting.
+
+4.  **Drafting the Content (Mental Check):**
+    *   *MMT-Probe*: High-speed DPI engine. Core strength: Protocol identification (even encrypted/obfuscated), feature extraction. Used *as a sensor* feeding data to an analysis engine (like MMT-Security or 3rd party ML). It's a ""Probe"".
+    *   *SecAnoD*: Likely a specific *detection framework/logic* (often research-grade) focused on **anomaly detection in OT/ICS**. It might sit *on top* of probes. It focuses on semantic anomalies (e.g., ""PLC writing to wrong register"").
+
+5.  **Refining the ""SecAnoD"" definition:**
+    *   Paper: ""SecAnoD: A Semantic-Aware Anomaly Detection Framework for Industrial Control Systems"" (or similar title).
+    *   Key differentiator: **Semantic/Context-awareness**. It understands the *state* of the physical process (via Purdue model), not just packet headers.
+    *   MMT-Probe is a *data acquisition/pre-processing tool*. SecAnoD is a *detection logic/framework*.
+    *   *Crucial distinction*: They operate at different layers of the stack. MMT-Probe = Layer 2-7 visibility/extraction. SecAno";;Incorrect;Yes;Yes;"leaks reasoning; speculative comparison"
+C6;comparative;service;RAG;1;service;7143;4;SECDEVTWIN|SECOPSTWIN|AST-DEDISRV|PPC-EMOB;0.559|0.534|0.504|0.487;1398;"Based on the repository context, there are **two digital twin services** in the catalog:
+
+## 🔐 **SECDEVTWIN** — Assurance-driven Security Development Twin (SecDevTwin)
+- **Provider:** SINTEF (STF)  
+- **Category:** Dev Services  
+- **Description:** A specialised, federated **digital twin** that continuously supports the software development phase, enabling virtual representation of software components or modules susceptible to vulnerabilities. Integrates the assurance model with Digital Twins for DevOps/TechDebt management.  
+- **TRL:** Current 3 → Expected 7  
+- **Docker:** `registry.montimage.eu/sintef-stf-/secdevtwin:v1.0.0`
+
+## 🛡️ **SECOPSTWIN** — Assurance-driven Security Operation Twin (SecOpsTwin)
+- **Provider:** SINTEF (STF)  
+- **Category:** Ops Services  
+- **Description:** A **Digital Twin** for continuous security monitoring and management, enabling real-time connections to deployed software systems. Supports natural language interaction over evaluation results and AI-supported detection, analysis, evaluation, and mitigation of cybersecurity attacks and privacy risks during operation.  
+- **TRL:** Current 4 → Expected 7  
+- **Docker:** `registry.montimage.eu/sintef-stf-/secopstwin:v1.0.0`
+
+---
+
+The other two entries (**AST-DEDISRV** – Dedicated Server, and **PPC-EMOB** – E-mobility Testing Facilities) are **hardware/infrastructure** offerings, not digital twins.";;Correct;Yes;No;auto
+C6;comparative;service;COLD;1;rag-off;15323;0;;;3581;"I don't have access to a specific service catalog (such as an internal company portal, AWS Marketplace, Azure Marketplace, Google Cloud Marketplace, or a specific IoT platform like AWS IoT TwinMaker, Azure Digital Twins, or Siemens Xcelerator).
+
+**To give you an accurate answer, please tell me:**
+
+1.  **Which platform or organization's catalog** are you referring to? (e.g., ""Our internal ServiceNow catalog,"" ""AWS Marketplace,"" ""Azure IoT,"" ""Siemens MindSphere,"" ""GE Predix"").
+2.  **Do you have a specific naming convention or tag** used in that catalog to identify Digital Twins? (e.g., tags like `digital-twin`, `dt`, `simulation`, `asset-model`; or naming prefixes like `DT-`, `Twin-`).
+
+---
+
+### General Guidance on How to Find Them Yourself
+If you have access to the catalog interface (UI, API, or CLI), look for these common indicators:
+
+#### 1. **Explicit Tags / Categories / Labels**
+Search/filter for standard taxonomy terms:
+*   `Digital Twin`
+*   `DigitalTwin`
+*   `Asset Model`
+*   `Virtual Twin`
+*   `Simulation Model`
+*   `Physics-Based Model`
+*   `IoT Twin`
+
+#### 2. **Service Name Patterns**
+Look for names containing:
+*   `DT-` / `DT_` prefix
+*   `Twin-` / `Twin_` prefix
+*   `-Twin` suffix
+*   `DigitalTwin`
+*   `AssetModel`
+*   `Shadow` (often used for ""Device Shadows"" which are lightweight twins)
+
+#### 3. **Underlying Technology / Backend**
+Services built on these platforms are almost exclusively Digital Twins:
+*   **AWS:** IoT TwinMaker, IoT SiteWise (Asset Models), IoT Core (Device Shadows/Thing Registry).
+*   **Azure:** Azure Digital Twins (ADT), Azure IoT Operations / Device Registry.
+*   **Google Cloud:** Manufacturing Data Engine / Digital Twin solutions.
+*   **Siemens:** Insights Hub / MindSphere Asset Models.
+*   **PTC:** ThingWorx Thing Shapes/Templates.
+*   **Dassault Systèmes:** 3DEXPERIENCE Twin.
+*   **NVIDIA:** Omniverse / OVX services.
+
+#### 4. **API Contract / Interface Definition**
+If you can inspect the API (OpenAPI/Swagger/AsyncAPI), a Digital Twin service typically exposes:
+*   **Hierarchical/Graph APIs:** `GET /twins/{id}/relationships`, `GET /models/{id}/components`.
+*   **State/Telemetry APIs:** `GET /twins/{id}/properties`, `GET /twins/{id}/telemetry`.
+*   **Model Definition (DTDL / JSON Schema):** Interfaces defining `Properties`, `Telemetry`, `Commands`, `Components`, `Relationships`.
+*   **Lifecycle Ops:** `CreateTwin`, `DeleteTwin`, `UpdateComponent`, `PatchProperties`.
+
+#### 5. **Description Keywords**
+Read the service description for phrases like:
+*   *""Virtual representation of a physical asset...""*
+*   *""Synchronizes real-time data from [asset/device]...""*
+*   *""Executes simulation/physics models...""*
+*   *""Bi-directional communication with physical counterpart...""*
+*   *""Implements DTDL (Digital Twins Definition Language)...""*
+
+---
+
+### Example Query Patterns (if you have CLI/API access)
+
+**AWS CLI (Resource Groups / Tagging):**
+```bash
+aws resourcegroupstaggingapi get-resources --tag-filters Key=Purpose,Values=DigitalTwin
+# Or specific service discovery
+aws iottwinmaker list-workspaces
+aws iotsitewise list-asset-models
+```
+
+**Azure CLI:**
+```bash
+az dt list --query ""[].{Name:name, HostName:hostName}"" -o table
+# Or search resources by tag
+az resource list --tag Purpose=DigitalTwin
+```
+
+**Kubernetes (if catalog is K8s based - e.g., Backstage, Service Catalog):**
+```bash
+kubectl get services -A -l ""app.kubernetes.io/part-of=digital-twin""
+# Or Backstage specific annotation
+kubectl get component -A -o custom-columns=NAME:.metadata.name,TYPE:.spec.type --field-selector spec.type=digital";;Refused;Yes;No;auto
+C7;comparative;service;RAG;1;service;46458;4;PPC-EMOB|SPS-DEVSECOPS|UIH-PROSUMER|PPC-IIOT;0.569|0.561|0.524|0.522;568;"Based on the repository context provided, **all four services** belong to the **Energy sector**:
+
+| Short Name | Title | Provider | Category |
+|------------|-------|----------|----------|
+| **PPC-EMOB** | E-mobility Testing Facilities | PPC | E-Mobility & IIoT |
+| **SPS-DEVSECOPS** | DevSecOps Architecture | SPS (Safepay Systems) | DevSecOps Platforms |
+| **UIH-PROSUMER** | Prosumer Cell | UIH (Urban Institute Magyarorszag) | Energy Grid Infrastructure |
+| **PPC-IIOT** | PPC IIoT Lab | PPC | E-Mobility & IIoT |
+
+Each service has `sector: Energy` in its metadata.";;Correct;Yes;No;auto
+C7;comparative;service;COLD;1;rag-off;15742;0;;;4193;"The **Energy sector** is vast and typically categorized by the **value chain** (Upstream, Midstream, Downstream), **commodity type** (Oil & Gas, Power/Utilities, Renewables), and **support functions** (Services/Equipment, Finance/Tech).
+
+Here is a comprehensive breakdown of services belonging to the Energy sector, organized by industry standard classification frameworks (like GICS, ICB, and NAICS).
+
+---
+
+### 1. Upstream (Exploration & Production / E&P)
+*Services involved in finding and extracting raw resources.*
+
+*   **Geological & Geophysical (G&G) Services:** Seismic data acquisition (2D/3D/4D), processing, interpretation; gravity/magnetic surveys; reservoir modeling.
+*   **Drilling & Completion Services:**
+    *   *Contract Drilling:* Onshore/offshore rig operators (jack-ups, drillships, semi-submersibles).
+    *   *Directional Drilling & MWD/LWD:* Measurement/Logging While Drilling, rotary steerable systems.
+    *   *Well Services:* Cementing, casing/tubing running, wellhead installation, coiled tubing, wireline/slickline, hydraulic fracturing (fracking), acidizing, perforating.
+*   **Production Services:** Artificial lift (ESP, gas lift, rod pumps), well testing, flowback services, production optimization, workover & intervention rigs.
+*   **Subsea Services:** Subsea tree/manifold installation, ROV (Remotely Operated Vehicle) services, inspection/repair/maintenance (IRM), saturation diving.
+*   **Decommissioning Services:** Plug & abandonment (P&A), platform removal, pipeline decommissioning, site remediation.
+
+### 2. Midstream (Transportation, Storage & Processing)
+*Services moving, storing, and initially processing hydrocarbons.*
+
+*   **Pipeline Services:** Pipeline construction, welding/NDT (Non-Destructive Testing), hydrotesting, pigging/cleaning, inline inspection (ILI/smart pigging), leak detection, cathodic protection, right-of-way maintenance.
+*   **Storage & Terminal Services:** Tank farm operation (crude, products, LNG), cavern storage management, terminal loading/unloading (rack operations), blending, additive injection, vapor recovery.
+*   **Marine & Logistics Services:** Chartering (VLCC, Suezmax, Aframax, product tankers, LNG/LPG carriers), barge operations, ship brokerage, port agency, offshore supply vessels (OSV/PSV/AHTS), helicopter transport.
+*   **Processing & Treatment:** Gas processing plants (fractionation, NGL extraction), gas treating (amine/mercaptan removal), LNG liquefaction/regasification services, crude stabilization.
+*   **Rail & Trucking:** Crude-by-rail unit train operations, frac sand/logistics hauling, refined product trucking.
+
+### 3. Downstream (Refining, Marketing & Chemicals)
+*Services converting raw materials into finished products and selling them.*
+
+*   **Refining Services:** Turnaround/Shutdown management (TAR), catalyst handling/regeneration, furnace/heater decoking, hydroblasting, tank cleaning, sulfur recovery unit (SRU) support.
+*   **Petrochemical Services:** Plant maintenance, catalyst change-outs, specialty chemical handling, polymer handling/packaging.
+*   **Marketing & Distribution Services:** Retail site development/construction, forecourt maintenance, loyalty program management, fuel card processing, lubricant blending/packaging, aviation fueling (into-plane) services.
+*   **Trading & Risk Management (ETRM):** Physical scheduling, logistics optimization, hedging execution, market data/subscriptions (Platts, Argus), credit risk analysis.
+
+### 4. Power & Utilities (Generation, Transmission, Distribution)
+*Services for the electricity value chain.*
+
+*   **Generation Services (Thermal & Nuclear):**
+    *   *O&M (Operations & Maintenance):* Full plant O&M, outage management, boiler/turbine/generator (BTG) overhauls, water treatment, emissions monitoring (CEMS).
+    *   *Nuclear Specific:* Refueling outage services, radiation protection, waste handling/decontamination, nuclear safety licensing support.
+*   **Renewables Services (See Section 5 for detail).**
+*   **Grid Services (T&D):**
+    *   *Transmission:* Line construction (EPC), tower erection, stringing, HVDC converter station maintenance, vegetation management (ROW clearing), aerial patrol (LiDAR/thermal).
+";;Incorrect;Yes;No;generic energy sector
+C8;comparative;service;RAG;1;service;4873;4;AST-DEDISRV|ORO-3GPP16|SAVVY-DEVSRV|PPC-EMOB;0.514|0.510|0.509|0.478;530;"Based on the repository context provided, **none of the services have a current TRL of 3**. All four services listed have a current TRL of 9:
+
+| Service | Current TRL | Expected TRL |
+|---------|-------------|--------------|
+| AST-DEDISRV (Dedicated Server) | 9 | 9 |
+| ORO-3GPP16 (3GPP Rel 16 Commercial Facility) | 9 | 9 |
+| SAVVY-DEVSRV (Development Servers & Operational Networks) | 9 | 9 |
+| PPC-EMOB (E-mobility Testing Facilities) | 9 | 9 |
+
+All services are at TRL 9 (the highest level, indicating operational deployment).";;Incorrect;Yes;No;retrieval miss (as with prompt)
+C8;comparative;service;COLD;1;rag-off;24645;0;;;3676;"**There is no single, centralized public registry that lists all services currently at TRL 3.**
+
+Technology Readiness Levels (TRLs) are **project-specific assessments**, not permanent certifications for a ""service"" as a whole. A specific *project* or *technology development effort* receives a TRL rating at a specific point in time (usually by a funding agency like NASA, ESA, DARPA, EU Horizon, or an internal corporate R&D review).
+
+Because TRL 3 represents **""Experimental Proof of Concept""** (analytical and laboratory studies validating predictive models), this data is typically:
+1.  **Proprietary/Confidential** (corporate R&D).
+2.  **Classified/Controlled** (defense agencies).
+3.  **Buried in technical deliverables** (grant reports for NASA SBIR/STTR, EU Horizon, ESA GSTP) rather than searchable databases.
+
+---
+
+### What a ""Service at TRL 3"" Actually Looks Like
+At TRL 3, a ""service"" is rarely a deployable product. It is usually a **core enabling technology or algorithm** being validated in a lab environment. The ""service"" concept exists only as a **use case definition** or **architecture paper**.
+
+**Typical TRL 3 Activities:**
+*   **Algorithm validation:** Running a novel AI/ML model on a representative dataset in a lab (not production).
+*   **Component testing:** Testing a novel sensor, thruster, or cryptographic primitive in a breadboard setup.
+*   **Simulation/Modelling:** High-fidelity physics-based simulation proving a concept (e.g., ""In-Orbit Servicing rendezvous logic"" simulated with hardware-in-the-loop).
+*   **Feasibility Studies:** ""Phase A"" studies defining requirements and proving the physics/math works.
+
+---
+
+### Sectors Where You Will Find Active TRL 3 Work (2024–2025)
+If you are looking for *opportunities* or *trends*, these domains have significant active TRL 3 programs:
+
+#### 1. Space & Satellite Services (NewSpace / Gov)
+*   **In-Orbit Servicing (IOS):** Autonomous capture/docking algorithms (debris removal, refueling).
+*   **On-Orbit Manufacturing/Assembly:** 3D printing structural components in vacuum/thermal vacuum chambers.
+*   **Optical/Quantum Comms:** Lab validation of QKD (Quantum Key Distribution) terminals for satellite-to-ground.
+*   **Edge Computing in Orbit:** Radiation-hardened AI inference chips running object detection on synthetic satellite imagery.
+*   **Lunar Surface Services:** ISRU (Ice mining/oxygen extraction) reactor prototypes in regolith simulants.
+
+#### 2. Defense & Dual-Use (DARPA / DIU / NATO DIANA / UK DASA)
+*   **Autonomous Swarming:** Lab validation of heterogeneous swarm coordination (air/ground/maritime).
+*   **Cognitive EW/Radar:** AI-driven spectrum awareness algorithms tested on recorded RF datasets.
+*   **Trusted Microelectronics:** Hardware root-of-trust / PUF (Physically Unclonable Function) validation on test silicon.
+*   **Directed Energy:** High-power microwave/fiber laser component integration testing.
+
+#### 3. Quantum Technologies
+*   **Quantum Sensors:** Cold-atom gravimeters/accelerometers on vibration isolation tables (navigation without GPS).
+*   **Quantum Networks:** Entanglement distribution over deployed dark fiber testbeds (metro scale).
+*   **Post-Quantum Cryptography (PQC):** Hardware acceleration of NIST PQC finalists (CRYSTALS-Kyber/Dilithium) on FPGA/ASIC test boards.
+
+#### 4. Advanced Energy / Climate
+*   **Fusion Energy:** High-temperature superconducting (HTS) magnet testing (SPARC/ITER adjacent); materials testing in neutron flux simulators.
+*   **Next-Gen Storage:** Solid-state battery cell cycling (lithium-metal anodes) in pouch cells; gravity/thermal storage pilot rigs.
+*   **Green Hydrogen:** Novel electrolyzer catalysts (PEM";;Refused;Yes;No;no central TRL registry
+A1;adversarial;service;RAG;1;service;75461;4;MMT-PROBE|HTTP-SIM|MAG|AI4SOAR;0.591|0.564|0.515|0.512;1745;"Based on the repository context, there isn't a component explicitly named **""MONT-MMT""**. However, the closest match is **MMT-PROBE** (Montimage Monitoring Tool DPI Probe), which is the core traffic-analysis service from Montimage (MTI). Here's what the context tells us about it:
+
+---
+
+### **MMT-PROBE** (MMT Traffic Analysis Probe)
+- **Provider:** Montimage (MTI)  
+- **Category:** Monitor  
+- **Short Name:** MMT-PROBE  
+- **Current TRL:** 7 (expected 8)  
+- **License:** TBD  
+- **Docker Image:** `registry.montimage.eu/montimage-mti/mmt-probe:v1.0.0`
+
+#### **What it does**
+- A **Deep Packet Inspection (DPI) probe** that runs as a **sidecar** in the same pod as the target workload, sharing the pod’s network namespace.
+- Requires `NET_ADMIN` and `NET_RAW` capabilities.
+- Configured via `mmt-probe.conf` (libconfig format) or the `HOST_INTERFACE` environment variable.
+- Emits **security alerts and analysis reports** that are consumed by **AI4SOAR** for automated response.
+
+#### **Inputs / Outputs**
+| Inputs | Outputs |
+|--------|---------|
+| Pod network traffic (packets on the target pod interface, via `HOST_INTERFACE` or `-i` argument) | DPI alerts & reports (security output-channel alerts and analysis reports) |
+
+#### **Role in the Montimage Scenario**
+- **Monitor module** in the **attack → detect → respond** pipeline.
+- Deployed alongside **HTTP-SIM** (the target workload) to observe its traffic.
+- Feeds detection alerts to **AI4SOAR**, which then executes Kubernetes‑scoped remediation (NetworkPolicy creation, pod deletion, Job scale‑down, etc.).
+
+---
+
+If you meant a different service (e.g., a specific deployment name, a wrapper, or another Montimage component not listed here), let me know and I can refine the answer.";;Correct;Yes;No;not in context, points to MMT-PROBE
+A1;adversarial;service;COLD;1;rag-off;28960;0;;;1357;"There is **no widely recognized, standard industry service, protocol, or product** universally known as **""MONT-MMT""** in general technology, telecommunications, or cloud computing literature (as of my knowledge cutoff).
+
+Because the acronym is highly ambiguous, it almost certainly refers to a **proprietary internal tool, a specific vendor's module, a niche academic project, or a typo.**
+
+Here is a breakdown of what the components usually stand for, which may help you identify the specific system you are looking for:
+
+---
+
+### 1. Deconstructing the Acronyms
+
+#### **MONT** (Common Expansions)
+*   **MON**itoring **T**ool / **T**eam / **T**elemetry
+*   **M**essage **O**perations **N**etwork **T**ransport (rare)
+*   **M**ission **O**perations **N**etwork **T**erminal (Space/Defense)
+*   **MONT** (Proper name): Used in project names (e.g., **MONT** Bluetooth stack, **MONT** monitoring frameworks in research).
+
+#### **MMT** (Common Expansions)
+*   **M**easurement, **M**odeling, and **T**esting / **T**ools
+*   **M**ulti-**M**edia **T**erminal / **T**ransport
+*   **M**icrosoft **M**edia **T**ransfer (MTP/MMT)
+*   **M**essage **M**ediation **T**ool / **T**ransformation
+*   **M**etric **M**anagement **T**ool
+*   **M**anaged **M**emory **T**echnology (Storage)
+*   **M**obile **M**oney **T**ransfer (Fintech)
+*   **MMT** (Protocol): **M**ulti-**M**";;Correct;Yes;No;no such service
+A2;adversarial;service;RAG;1;service;45161;4;SECVDR|MMT-PROBE|SECASSURE4AI|AI4SOAR;0.536|0.511|0.509|0.502;542;"Based on the repository context provided, there is no tool named **GOOGLE-SHIELD** listed. The context includes four tools:
+
+1. **SECVDR** – Vulnerability Discovery and Repair (CERTH)
+2. **MMT-PROBE** – MMT Traffic Analysis Probe (Montimage)
+3. **SECASSURE4AI** – Security Assurance Service for AI Components (Tecnalia)
+4. **AI4SOAR** – AI-driven Security Orchestration and Response (Montimage)
+
+If you have additional context or a different repository source that mentions GOOGLE-SHIELD, feel free to share it and I can look into it further.";;Correct;Yes;No;not in context
+A2;adversarial;service;COLD;1;rag-off;13879;0;;;3469;"There is **no single, publicly released product officially named ""GOOGLE-SHIELD""** (all caps, hyphenated) in Google's current consumer or enterprise portfolio.
+
+However, the name closely resembles several **real Google security initiatives**. You are likely referring to one of the following:
+
+---
+
+### 1. Project Shield (Most Likely Match)
+This is a **free service from Google (via Jigsaw/Google Cloud)** that protects **news sites, human rights organizations, and election monitoring sites** from **DDoS (Distributed Denial of Service) attacks**.
+*   **What it does:** It uses Google’s global infrastructure (Anycast network, load balancing, caching) to absorb malicious traffic before it reaches the origin server, keeping the site online during attacks.
+*   **Who it's for:** Qualifying independent news, human rights, and election-related websites.
+*   **Website:** `projectshield.withgoogle.com`
+
+---
+
+### 2. Google Cloud Armor (Enterprise/Cloud Equivalent)
+If you are a developer or business looking for DDoS protection and WAF (Web Application Firewall) capabilities on Google Cloud, this is the commercial product.
+*   **What it does:** Provides DDoS protection (Layer 3, 4, and 7), WAF rules (OWASP Top 10), IP allow/deny lists, and adaptive protection (AI-driven anomaly detection).
+*   **Integration:** Works with Global External Application Load Balancers, Cloud CDN, and Cloud Run.
+
+---
+
+### 3. Advanced Protection Program (Consumer/High-Risk Users)
+This is Google’s **highest level of account security for individual Google Accounts** (Gmail, Drive, etc.).
+*   **What it does:** Requires **physical security keys** (hardware 2FA) for sign-in; blocks most third-party apps from accessing sensitive data (Gmail/Drive); adds extra verification steps for account recovery.
+*   **Who it's for:** Journalists, activists, politicians, executives, and anyone at high risk of targeted hacking.
+*   **Website:** `landing.google.com/advancedprotection`
+
+---
+
+### 4. Android ""Shield"" Features (Mobile Security)
+Google Play Protect and Android often use ""Shield"" branding in UI strings or marketing for on-device security:
+*   **Google Play Protect:** The built-in malware scanner for Android apps.
+*   **The ""Shield"" Icon:** Often represents ""Verified Boot,"" ""Encryption,"" or ""Find My Device"" status in settings.
+
+---
+
+### 5. Internal / Historical / Confused Names
+*   **Project Zero / Threat Analysis Group (TAG):** Google's internal elite security research teams (often called a ""shield"" for users metaphorically).
+*   **reCAPTCHA Enterprise:** Sometimes marketed as a ""shield"" against bots/fraud.
+*   **BeyondCorp / Chrome Enterprise Premium:** Zero-trust access tools (formerly ""BeyondCorp Enterprise"").
+
+---
+
+### Summary: Which one do you need?
+
+| If you are a... | You likely want... |
+| :--- | :--- |
+| **News site / NGO / Election site** under DDoS attack | **Project Shield** (Free) |
+| **Cloud Engineer / Business** protecting apps on GCP | **Google Cloud Armor** (Paid) |
+| **Individual (Journalist, Activist, VIP)** securing personal Gmail/Data | **Advanced Protection Program** (Free) |
+| **Android User** checking phone security | **Google Play Protect** (Built-in) |
+
+**If you saw ""GOOGLE-SHIELD"" in a specific log file, error message, API name, or script (e.g., `google-shield-agent`), it is likely an internal component name for one of the above (usually Cloud Armor or Project Shield infrastructure) or a third-party tool using Google's branding.**";;Correct;Yes;No;no such product
+A3;adversarial;service;RAG;1;service;12711;4;AST-DEDISRV|SAVVY-DEVSRV|SECNCD|SECVDR;0.513|0.498|0.491|0.480;882;"None of the services in the catalog have a current TRL of 12. The Technology Readiness Level (TRL) scale typically ranges from 1 to 9, so a value of 12 would be outside the standard scale.
+
+Here are the actual current TRL values for each service:
+
+| Service | Current TRL | Expected TRL |
+|---------|-------------|--------------|
+| **AST-DEDISRV** (Dedicated Server) | 9 | 9 |
+| **SAVVY-DEVSRV** (Development Servers & Operational Networks) | 9 | 9 |
+| **SECNCD** (AI-based Non-Compliance Detector) | 5 | 7 |
+| **SECVDR** (Vulnerability Discovery and Repair) | 5 | 7 |
+
+The two infrastructure services (AST-DEDISRV and SAVVY-DEVSRV) are at TRL 9 (the highest level, meaning ""actual system proven in operational environment""), while the two CERTH development services (SECNCD and SECVDR) are at TRL 5 (""technology validated in relevant environment"") with an expected target of TRL 7.";;Correct;Yes;No;TRL scale 1-9
+A3;adversarial;service;COLD;1;rag-off;6693;0;;;1575;"There are **no services** with a TRL of 12 because **TRL 12 does not exist on the standard Technology Readiness Level scale.**
+
+The standard TRL scale (defined by NASA, DoD, ESA, and ISO 16290) only goes from **TRL 1 to TRL 9**:
+
+*   **TRL 1–3:** Research (Basic principles observed → Experimental proof of concept)
+*   **TRL 4–6:** Development (Component validation in lab → System prototype demonstration in relevant/operational environment)
+*   **TRL 7–9:** Deployment (System prototype demonstration in operational environment → Actual system proven in operational environment)
+
+### Possible Explanations for ""TRL 12"":
+1.  **Typo:** You may have meant **TRL 9** (the highest maturity level).
+2.  **Custom/Extended Scale:** Some organizations create proprietary extensions (e.g., adding levels for ""Commercial Scale-up,"" ""Market Saturation,"" or ""End-of-Life""), but these are non-standard.
+3.  **Confusion with another metric:** You might be thinking of **CMMI Maturity Levels** (1–5), **ISO 9001 Clauses**, or a specific **catalog-specific scoring system** (e.g., a 1–12 or 1–15 internal ranking).
+
+**To help you further, I need to know:**
+*   Which specific **catalog** are you referring to? (e.g., AWS Marketplace, Azure Marketplace, GSA Advantage, an internal company service catalog, a specific research portfolio tool?)
+*   Does that catalog's documentation define a custom TRL scale that goes beyond 9?
+
+If you can provide the catalog name or a link to its metadata schema, I can tell you exactly how to query for the highest maturity tier in *that* specific system.";;Correct;Yes;No;TRL 12 does not exist
+A4;adversarial;service;RAG;1;service;4193;4;AST-DEDISRV|SAVVY-DEVSRV|SECINTERP|CI-SIM;0.574|0.565|0.551|0.527;656;"Based on the repository context provided, **there are no Cisco services** in this repository. The four services listed are from the following providers:
+
+| Service | Provider |
+|---------|----------|
+| **AST-DEDISRV** (Dedicated Server) | AST (Assist Software) |
+| **SAVVY-DEVSRV** (Development Servers & Operational Networks) | SAVVY (Savvy Data Systems) |
+| **SECINTERP** (Assurance-driven Standard Interpretation Service) | Tecnalia (TEC) |
+| **CI-SIM** (Critical Infrastructure Simulation) | Montimage (MTI) |
+
+None of these are associated with Cisco. If you're looking for Cisco-specific services, they don't appear in the current repository snapshot.";;Correct;Yes;No;no Cisco services
+A4;adversarial;service;COLD;1;rag-off;26613;0;;;3159;"I don't have access to your local filesystem, private repositories, or specific GitHub/GitLab organizations unless you provide a link, paste the file structure, or share relevant code snippets.
+
+**""CISCO services"" could refer to several very different things depending on the context:**
+
+### 1. Cisco Network Device Configuration (NetDevOps/IaC)
+If this is a network automation repo (Ansible, Terraform, Python/Nornir), ""services"" usually means:
+*   **Service Templates/Jinja2 Templates:** Standardized configs for L3VPN (MPLS), L2VPN (EVPN/VXLAN), Internet Access, QoS policies, etc.
+*   **Ansible Roles/Collections:** `cisco.ios`, `cisco.iosxr`, `cisco.nxos`, `cisco.meraki` roles that abstract service provisioning (e.g., `configure_bgp`, `configure_vrf`).
+*   **Service Models (YANG/OpenConfig):** YANG models defining service intent (e.g., `ietf-l3vpn-svc`, `cisco-sr-te-policy`).
+
+### 2. Cisco Cloud / SaaS Platforms (API Integrations)
+If this is a developer/app repo, it might wrap Cisco Cloud APIs:
+*   **Meraki Dashboard API:** Python/Go/TS SDKs for managing Wireless, Switching, SD-WAN, Cameras, MT sensors.
+*   **Cisco DNA Center / Catalyst Center:** REST API wrappers for Assurance, Provisioning, Path Trace, Device Onboarding (PnP).
+*   **SecureX / Secure Firewall (FMC) / Umbrella:** API clients for threat intel, policy management, block lists.
+*   **Webex / Collaboration:** Bots, Webhooks, Meeting/Calling administration SDKs.
+*   **AppDynamics / ThousandEyes:** Observability API clients.
+
+### 3. Cisco Internal / Open Source Projects
+Cisco hosts many open-source projects on [GitHub](https://github.com/CiscoDevNet) / [GitLab]. Famous ""service"" repos include:
+*   **`CiscoDevNet` / `cisco-*-api`**: Official SDKs.
+*   **`CiscoCloud` / `microservices-infrastructure`**: Service mesh, service discovery (often Consul/Envoy based).
+*   **`CiscoAI` / `model-serving`**: AI/ML model serving infrastructure.
+*   **`OpenServiceMesh` (OSM)**: (Graduated CNCF project, originally Cisco/Microsoft).
+*   **`Cisco-Talos`**: Threat intelligence feeds/services.
+
+### 4. Microservices Architecture *Running on* Cisco Infrastructure
+A generic repo deploying microservices *to* Cisco UCS, Intersight, or Nexus Dashboard Fabric Controller (NDFC).
+
+---
+
+### To give you a precise answer, please provide **one** of the following:
+
+1.  **A Link:** Paste the GitHub/GitLab/Bitbucket URL.
+2.  **File Tree:** Run `tree -L 3` (or `ls -R`) in the repo root and paste the output.
+3.  **Key Files:** Paste the contents of:
+    *   `README.md`
+    *   `requirements.txt` / `go.mod` / `package.json` / `pom.xml` (dependencies reveal the SDKs used)
+    *   `ansible.cfg` / `terraform.tf` / `docker-compose.yml` (orchestration reveals targets)
+    *   A representative file from a `services/`, `modules/`, `roles/`, or `lib/` directory.
+
+**Example of what I'm looking for:**
+> ""Here is the tree: [paste tree]. The `requirements.txt` has `meraki` and `cisco-dnac`. The `services/` folder has `meraki_vpn.py` and `dnac_site.py`.""
+
+Once you share that context, I can tell you exactly what the services *do*, *how they are structured*, and *which Cisco platforms they target*.";;Correct;Yes;No;no access to the repository
+A5;adversarial;service;RAG;1;service;3821;4;MMT-PROBE|HTTP-SIM|AI4SOAR|MAG;0.727|0.660|0.557|0.538;330;The minimum RAM requirement for running MMT-PROBE is **not specified** in the available repository context. The provided information covers the probe's description, inputs/outputs, use cases, Docker image, and licensing, but does not include any hardware resource requirements such as memory (RAM), CPU, or storage specifications.;;Correct;Yes;No;not specified
+A5;adversarial;service;COLD;1;rag-off;15149;0;;;2088;"As of my knowledge cutoff in **January 2025**, there is no widely recognized, standard software tool, framework, or benchmark suite explicitly named **""MMT-PROBE""** in the general software engineering, machine learning, or systems administration domains.
+
+It is highly likely that this refers to one of the following:
+
+1.  **A specific academic research artifact:** A probing tool released alongside a specific paper (e.g., for **M**ulti**M**odal **T**ransformers, **M**assively **M**ultilingual **T**ranslation, or **M**odel **M**easurement **T**oolkit).
+2.  **A proprietary or internal tool:** Used within a specific company or organization.
+3.  **A typo or slight misremembering of a name:** Examples include:
+    *   **MMT** (ModernMT / Multimodal Machine Translation) + a probing script.
+    *   **MProbe** / **mprobe** (various memory or network probing tools exist with similar names).
+    *   **MMT** (Microsoft Malware Protection / Memory Management Tool) related utilities.
+
+### How to find the actual requirement:
+
+Since I cannot browse the live internet to check a specific GitHub repo or paper released after my cutoff, **you will need to check the source directly:**
+
+1.  **GitHub / GitLab Repository:** Look for the `README.md`, `requirements.txt`, `environment.yml`, or `Dockerfile`. RAM requirements are often listed under ""Hardware Requirements,"" ""Installation,"" or ""Reproduction.""
+2.  **Accompanying Paper:** If this is from a conference (NeurIPS, ICML, ACL, CVPR, etc.), check the ""Experimental Setup"" or ""Implementation Details"" section.
+3.  **Documentation / Wiki:** Check the project's official documentation site.
+4.  **Issue Tracker:** Search closed issues for keywords like ""RAM,"" ""Memory,"" ""OOM,"" ""Out of Memory,"" or ""Hardware.""
+
+### General Heuristics (If you cannot find docs):
+If you are trying to run a tool with ""MMT"" (Multimodal/Multilingual Transformers) and ""Probe"" (probing classifiers/analysis) in the name:
+*   **Model Loading:** You need enough RAM/VRAM to load the base model (e.g., 8GB–24GB+ VRAM for 7B–13B parameter models; 48GB+ for larger ones";;Correct;Yes;No;auto
+A6;adversarial;service;RAG;1;service;7022;4;SECINTERP|SECSAC|SECNCD|SECOPSTWIN;0.598|0.580|0.565|0.564;745;"Based on the repository context provided, **none of the listed services mention certification by the U.S. National Security Agency (NSA)**.
+
+The four services described are:
+
+| Service | Provider | Standards Referenced |
+|---------|----------|---------------------|
+| **SECINTERP** (secInterp) | Tecnalia (TEC) | IEC 62443-4-2, IEEE 1686, IEC 62351 |
+| **SECSAC** (secSAC) | Tecnalia (TEC) | OSCAL |
+| **SECNCD** (secNCD) | CERTH | (No specific standards listed in the excerpt) |
+| **SECOPSTWIN** (SecOpsTwin) | SINTEF (STF) | (No specific standards listed in the excerpt) |
+
+The documentation references international standards (IEC, IEEE) and the OSCAL framework (NIST-led), but there is no mention of NSA certification for any of these tools.";;Correct;Yes;No;none mention NSA
+A6;adversarial;service;COLD;1;rag-off;36560;0;;;2755;"**The short answer is: The NSA does not maintain a single, public ""list of certified services"" in the way a consumer certification body (like UL or ISO) does.**
+
+Instead, the NSA operates several distinct **validation and approval programs** for specific *technologies*, *components*, and *configurations* used to protect **National Security Systems (NSS)** and **Classified Information**.
+
+If you are a vendor or a government customer, you must identify which specific program applies to your use case. Here are the primary programs and where to find the current ""lists"":
+
+---
+
+### 1. Commercial Solutions for Classified (CSfC) — *Most common for ""Services/Products""*
+This is the primary program for **Commercial Off-The-Shelf (COTS) products** (firewalls, VPNs, encryption, mobile device management, cloud, etc.) layered to protect classified data (Secret/Top Secret).
+*   **What is listed:** Specific **product versions** (e.g., ""Cisco ASA 9.16(1)""), not companies or generic ""services.""
+*   **Capability Packages (CPs):** Define *how* to combine approved components (e.g., ""Mobile Access CP,"" ""Cloud CP,"" ""Wireless CP"").
+*   **Where to look:** **[NSA CSfC Components List](https://www.nsa.gov/Resources/Commercial-Solutions-for-Classified-Program/CSfC-Components-List/)** (Updated frequently).
+
+### 2. NIAP / Common Criteria (CC) — *The Technical Evaluation Standard*
+The **National Information Assurance Partnership (NIAP)** (co-sponsored by NSA & NIST) manages the US Common Criteria Evaluation and Validation Scheme (CCEVS).
+*   **What is listed:** Products that have passed rigorous third-party testing against a **Protection Profile (PP)** (e.g., PP for Firewalls, PP for VPN Gateways, PP for Mobile Device Management).
+*   **Relevance:** CSfC *requires* NIAP certification for almost all components.
+*   **Where to look:** **[NIAP Product Compliant List (PCL)](https://www.niap-ccevs.org/Product/)**.
+
+### 3. CNSA Suite (Commercial National Security Algorithm Suite) — *Cryptographic Standards*
+This is not a product list, but a **mandatory set of algorithms** (AES-256, SHA-384, ECDSA P-384, etc.) that *must* be implemented in any product protecting NSS.
+*   **Relevance:** If a ""service"" claims NSA compliance, it must use CNSA 1.0 (or 2.0 for future quantum resistance) algorithms.
+*   **Reference:** **[CNSA Suite 2.0 Announcement](https://www.nsa.gov/Press-Room/News-Highlights/Article/Article/3550255/nsa-releases-cnsa-20-algorithms/)**.
+
+### 4. DoD Cloud Computing SRG / FedRAMP — *Cloud Services (IaaS/PaaS/SaaS)*
+The NSA **does not authorize cloud services directly**. The **DoD (via DISA)** authorizes Cloud Service Providers (CSPs) for DoD data (IL4/IL5/IL6) using the **DoD Cloud Computing Security Requirements Guide (SRG)**, which";;Correct;Yes;No;rejects premise (no NSA list)

@@ -5,6 +5,8 @@ export const chatRequestSchema = z.object({
   message: z.string().min(1).max(4000),
   useRag: z.boolean().optional(),
   injectionScheme: z.enum(['pre-user', 'static']).optional(),
+  // Eval-only (requires AGENT_EVAL_OPTIONS=true): 'none' drops the system prompt.
+  promptMode: z.enum(['full', 'none']).optional(),
 });
 
 export const conversationIdParamSchema = z.object({

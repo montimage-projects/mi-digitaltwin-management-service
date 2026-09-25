@@ -122,12 +122,16 @@ router.post('/chat', validateBody(chatRequestSchema), async (req, res, next) => 
       throw new AppError('Unauthorized', 401);
     }
 
-    const { message, conversationId, useRag, injectionScheme } = req.body as {
+    const { message, conversationId, useRag, injectionScheme, promptMode } = req.body as {
       message: string;
       conversationId?: string;
       useRag?: boolean;
       injectionScheme?: 'pre-user' | 'static';
+      promptMode?: 'full' | 'none';
     };
+    if (promptMode === 'none' && !env.AGENT_EVAL_OPTIONS) {
+      throw new AppError('promptMode is only available on evaluation servers', 403);
+    }
 
     let activeConversationId = conversationId;
     if (activeConversationId) {
@@ -163,7 +167,7 @@ router.post('/chat', validateBody(chatRequestSchema), async (req, res, next) => 
       (token) => {
         writeEvent('token', { content: token });
       },
-      { useRag, injectionScheme }
+      { useRag, injectionScheme, promptMode }
     );
 
     writeEvent('sources', result.sources);

@@ -28,6 +28,12 @@ export interface ChatOptions {
   //                          the boss-agent prompt; reproduces the pre-fix
   //                          behaviour used as the ablation baseline.
   injectionScheme?: 'pre-user' | 'static';
+  // Evaluation-only ablation (gated by AGENT_EVAL_OPTIONS in the route):
+  //   'full' (default) — Boss Agent system prompt + context messages.
+  //   'none'           — no Boss Agent system prompt. With useRag the retrieved
+  //                      context is kept; without it, no system message at all
+  //                      (the raw model on the bare question).
+  promptMode?: 'full' | 'none';
 }
 
 export class AgentService {
@@ -125,6 +131,12 @@ export class AgentService {
         content: buildRagContextPrompt(ragContext),
       });
       llmMessages = [{ role: 'system', content: BOSS_AGENT_SYSTEM_PROMPT }, ...historyMessages];
+    }
+
+    if (options.promptMode === 'none') {
+      llmMessages = llmMessages.filter(
+        (m) => m.content !== BOSS_AGENT_SYSTEM_PROMPT && (useRag || m.role !== 'system')
+      );
     }
 
     let response = await getLLMGateway().chat(llmMessages, onToken);

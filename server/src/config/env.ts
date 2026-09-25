@@ -46,6 +46,13 @@ const envSchema = z.object({
   CHAT_API_KEY: z.string().default(''),
   // Empty falls back to OLLAMA_MODEL (so the default ollama path is unchanged).
   CHAT_MODEL: z.string().default(''),
+  // Evaluation-only chat options (e.g. promptMode='none' for the no-system-prompt
+  // ablation). Off by default: normal servers must never let a client remove the
+  // Boss Agent's system prompt (it carries the safety rules).
+  AGENT_EVAL_OPTIONS: z
+    .enum(['true', 'false', '1', '0'])
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
   // Generate conversation titles with the chat LLM (default). Evaluation runs
   // set this to false: the title call is awaited before retrieval, so it would
   // double the LLM requests and inflate measured latency.

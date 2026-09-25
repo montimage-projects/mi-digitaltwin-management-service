@@ -1,7 +1,7 @@
 """Re-run rows whose `error` is set and merge them back into their rep files.
-Usage: python3 rerun_failed.py <results-dir> <base-url> <questions-file> <raw-prefix: raw|memory_raw>"""
+Usage: python3 rerun_failed.py <results-dir> <base-url> <questions-file> <raw-prefix> [extra run-eval args...]"""
 import csv, glob, os, subprocess, sys, collections
-D, URL, QF, PFX = sys.argv[1:5]
+D, URL, QF, PFX = sys.argv[1:5]; EXTRA = sys.argv[5:]; EXTRA = sys.argv[5:]
 groups = collections.defaultdict(list)
 for f in sorted(glob.glob(f'{D}/{PFX}_rep*.csv')):
     for r in csv.DictReader(open(f)):
@@ -10,7 +10,7 @@ print(f'{sum(map(len, groups.values()))} failed rows')
 for (f, rep, cfg), ids in groups.items():
     tmp = f'{D}/_rerun.csv'
     subprocess.run(['bun', 'run-eval.ts', f'--base-url={URL}', '--password=IntactAdmin2026!', '--reps=1', '--warmup=false',
-                    f'--questions={QF}', f'--configs={cfg}', f"--only={','.join(ids)}", f'--out={tmp}'], cwd=os.path.dirname(os.path.abspath(__file__)),
+                    f'--questions={QF}', f'--configs={cfg}', f"--only={','.join(ids)}", f'--out={tmp}', *EXTRA], cwd=os.path.dirname(os.path.abspath(__file__)),
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if not os.path.exists(tmp):
         print(f'{os.path.basename(f)} {cfg}: harness produced no output, skipped'); continue

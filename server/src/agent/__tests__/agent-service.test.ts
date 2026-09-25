@@ -57,3 +57,44 @@ describe('BOSS_AGENT_SYSTEM_PROMPT', () => {
     expect(BOSS_AGENT_SYSTEM_PROMPT).toMatch(/Never reveal credentials/);
   });
 });
+
+describe('AgentService.chat promptMode (eval-only ablation)', () => {
+  beforeEach(() => chat.mockReset().mockResolvedValue('ok'));
+  const sent = () => chat.mock.calls[0][0] as { role: string; content: string }[];
+
+  it("'none' without retrieval sends only the conversation (no system messages)", async () => {
+    await new AgentService(fakeConversationManager().manager).chat(
+      'u',
+      'Hello',
+      undefined,
+      undefined,
+      {
+        useRag: false,
+        promptMode: 'none',
+      }
+    );
+    expect(sent().every((m) => m.role !== 'system')).toBe(true);
+  });
+
+  it("'none' with retrieval drops the Boss Agent prompt but keeps the context", async () => {
+    await new AgentService(fakeConversationManager().manager).chat(
+      'u',
+      'Hello',
+      undefined,
+      undefined,
+      {
+        useRag: true,
+        promptMode: 'none',
+      }
+    );
+    expect(sent().some((m) => m.content === BOSS_AGENT_SYSTEM_PROMPT)).toBe(false);
+    expect(
+      sent().some((m) => m.role === 'system' && m.content.includes('Repository context'))
+    ).toBe(true);
+  });
+
+  it('default keeps the Boss Agent prompt', async () => {
+    await new AgentService(fakeConversationManager().manager).chat('u', 'Hello');
+    expect(sent()[0]).toMatchObject({ role: 'system', content: BOSS_AGENT_SYSTEM_PROMPT });
+  });
+});

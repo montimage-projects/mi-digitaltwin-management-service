@@ -67,6 +67,8 @@ interface CliArgs {
   // useRag values to run, from --configs=RAG,COLD (default both)
   configs: boolean[];
   questionsFile: string;
+  // --prompt=none: eval-only no-system-prompt ablation (server needs AGENT_EVAL_OPTIONS=true)
+  promptMode: 'full' | 'none';
 }
 
 const __filename = fileURLToPath(import.meta.url);
@@ -101,6 +103,7 @@ function parseArgs(argv: string[]): CliArgs {
     only: only.length > 0 ? only.split(',').map((s) => s.trim()) : null,
     configs: configs.length > 0 ? configs : [true, false],
     questionsFile: get('questions', 'questions.json'),
+    promptMode: get('prompt', 'full') === 'none' ? 'none' : 'full',
   };
 }
 
@@ -149,7 +152,7 @@ async function sendChat(
         Authorization: `Bearer ${token}`,
         Accept: 'text/event-stream',
       },
-      body: JSON.stringify({ message: question, useRag, conversationId }),
+      body: JSON.stringify({ message: question, useRag, conversationId, promptMode: args.promptMode }),
     });
   } catch (err) {
     result.error = (err as Error).message;
