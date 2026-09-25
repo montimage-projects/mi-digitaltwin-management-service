@@ -14,7 +14,10 @@ b63293d70e0e3b65bbdac6012f1adc40c8dba87d:docker-compose.prod.yml:generic-secret:
 # False positives from the generic-secret rule on the #25 monitoring/observability
 # branch: a MongoDB healthcheck default reformatted by prettier, and TOKEN/Token
 # identifiers (env var names, parameters, automountServiceAccountToken). The
-# current lines carry gitleaks:allow; these keep the per-commit diff scan quiet.
+# fingerprints below keep the per-commit diff scan quiet. The YAML, .env.example
+# and observability.ts lines also carry an inline gitleaks:allow; in env.ts and
+# telemetry/metrics.ts prettier keeps the marker on the line above, where
+# gitleaks ignores it, so those two rely on the fingerprints only.
 9035947a1d2175880adc1d38d351da39fb281067:docker-compose.prod.yml:generic-secret:25
 9035947a1d2175880adc1d38d351da39fb281067:docker-compose.prod.yml:generic-secret:70
 9035947a1d2175880adc1d38d351da39fb281067:server/.env.example:generic-secret:41
