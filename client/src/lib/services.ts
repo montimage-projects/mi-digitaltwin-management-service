@@ -52,6 +52,9 @@ export interface ServiceDeployment {
   hostNetwork?: boolean;
   rbac?: { apiGroups: string[]; resources: string[]; verbs: string[] }[];
   readinessPath?: string;
+  /** Prometheus metrics port scraped by the scenario observability stack. */
+  metricsPort?: number;
+  metricsPath?: string;
   startOrder?: number;
 }
 

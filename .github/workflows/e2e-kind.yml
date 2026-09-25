@@ -61,6 +61,9 @@ jobs:
       STUB_IMAGE: 'secsim-e2e-stub:local'
       SECANOD_IMAGE: 'secanod-mmt-image:kafka'
       KAFKA_IMAGE: 'apache/kafka:3.9.1'
+      # Per-execution observability stack (server/src/services/observability.ts).
+      OTEL_COLLECTOR_IMAGE: 'otel/opentelemetry-collector-contrib:0.161.0'
+      PROMETHEUS_IMAGE: 'prom/prometheus:v3.14.0'
       KIND_CLUSTER_NAME: 'secsim-e2e'
       KIND_VERSION: 'v0.30.0'
       KUBECTL_VERSION: 'v1.34.0'
@@ -136,13 +139,16 @@ jobs:
           cache-from: type=gha,scope=secanod-kafka
           cache-to: type=gha,scope=secanod-kafka,mode=max
 
-      - name: Load the secAnoD and Kafka images into kind
+      - name: Load the secAnoD, Kafka and observability images into kind
         run: |
           kind load docker-image "${SECANOD_IMAGE}" --name "${KIND_CLUSTER_NAME}"
-          # Pre-load the broker image so pods do not pull from Docker Hub
-          # (anonymous pull throttling).
-          docker pull "${KAFKA_IMAGE}"
-          kind load docker-image "${KAFKA_IMAGE}" --name "${KIND_CLUSTER_NAME}"
+          # Pre-load the Docker Hub images so pods do not pull from Docker Hub
+          # (anonymous pull throttling). The demo scenario deploys the
+          # observability stack by default.
+          for image in "${KAFKA_IMAGE}" "${OTEL_COLLECTOR_IMAGE}" "${PROMETHEUS_IMAGE}"; do
+            docker pull "${image}"
+            kind load docker-image "${image}" --name "${KIND_CLUSTER_NAME}"
+          done
 
       - name: Start the platform (auto-seeds catalog, demo scenario, admin)
         run: |

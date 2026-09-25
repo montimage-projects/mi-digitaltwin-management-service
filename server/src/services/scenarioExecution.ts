@@ -84,6 +84,8 @@ export async function executeScenario(
     title?: string;
     topology?: { nodes?: unknown[]; edges?: unknown[] };
     infrastructureId?: Types.ObjectId;
+    /** Scenario option; absent on older documents, which means on. */
+    observability?: boolean;
     executions: unknown[];
     save?(): Promise<unknown>;
   } | null,
@@ -127,6 +129,7 @@ export async function executeScenario(
       edges: scenario.topology?.edges ?? [],
       services: resolvedServices as unknown as ServiceImageSource[],
       endpoint: infrastructure.endpoint,
+      observability: scenario.observability !== false,
     });
 
     // Update the execution record atomically via positional operator
@@ -148,6 +151,7 @@ export async function executeScenario(
         'executions.$.namespace': result.namespace,
         'executions.$.status': execItem.status,
         'executions.$.deployedServices': execItem.deployedServices,
+        'executions.$.observability': result.observability,
       },
     });
 

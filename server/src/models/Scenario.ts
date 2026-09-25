@@ -37,6 +37,8 @@ export interface IExecution {
   durationMs?: number;
   /** Overall verdict recorded when the run closed (issue #26). */
   outcome?: 'passed' | 'failed' | 'partial';
+  /** The namespace got the observability stack (issue #25). */
+  observability?: boolean;
 }
 
 /**
@@ -138,6 +140,7 @@ const executionSchema = new Schema<IExecution>(
     completedAt: { type: Date },
     durationMs: { type: Number, min: 0 },
     outcome: { type: String, enum: ['passed', 'failed', 'partial'] },
+    observability: { type: Boolean },
   },
   { _id: true }
 );
