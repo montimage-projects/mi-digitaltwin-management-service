@@ -266,8 +266,7 @@ function isRetryable(error: unknown): boolean {
 /**
  * Parse an OpenAI-compatible SSE stream: `data:` lines carry JSON chunks,
  * terminated by `data: [DONE]`. Comment/keepalive lines are ignored. An error
- * chunk (e.g. provider overload after the HTTP 200) or an empty answer is
- * surfaced as an error rather than silently returning an empty string.
+ * chunk (e.g. provider overload after the HTTP 200) is surfaced as an error.
  */
 async function readOpenAIStream(
   body: ReadableStream<Uint8Array>,
@@ -323,9 +322,7 @@ async function readOpenAIStream(
     }
   }
 
-  if (!fullResponse.trim()) {
-    throw new Error('OpenAI-compatible chat returned an empty answer');
-  }
-
+  // An empty answer is returned as-is: agent-service replaces it with a
+  // fallback message, the same way as for the Ollama path.
   return fullResponse;
 }
