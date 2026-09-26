@@ -13,6 +13,7 @@ const CONTRAST_PAIRS: Array<[string, string]> = [
   ['primary', 'primary-foreground'],
   ['secondary', 'secondary-foreground'],
   ['accent', 'accent-foreground'],
+  ['muted', 'muted-foreground'],
 ];
 
 const THEMES = { light: ':root', dark: '.dark' } as const;
