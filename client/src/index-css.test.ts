@@ -3,8 +3,17 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const css = readFileSync(path.resolve(__dirname, 'index.css'), 'utf8');
+const sourceFiles = {
+  topologyEditor: readFileSync(
+    path.resolve(__dirname, 'components/topology/TopologyEditor.tsx'),
+    'utf8'
+  ),
+  projectForm: readFileSync(path.resolve(__dirname, 'components/projects/ProjectForm.tsx'), 'utf8'),
+  dashboard: readFileSync(path.resolve(__dirname, 'pages/Dashboard.tsx'), 'utf8'),
+};
 
 type Hsl = [number, number, number];
+type Rgb = [number, number, number];
 
 const CONTRAST_PAIRS: Array<[string, string]> = [
   ['background', 'foreground'],
@@ -14,6 +23,7 @@ const CONTRAST_PAIRS: Array<[string, string]> = [
   ['secondary', 'secondary-foreground'],
   ['accent', 'accent-foreground'],
   ['muted', 'muted-foreground'],
+  ['destructive', 'destructive-foreground'],
 ];
 
 const THEMES = { light: ':root', dark: '.dark' } as const;
@@ -62,6 +72,29 @@ function contrastRatio(a: Hsl, b: Hsl): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
+function hexToRgb(hex: string): Rgb {
+  const value = hex.replace('#', '');
+  return [
+    Number.parseInt(value.slice(0, 2), 16),
+    Number.parseInt(value.slice(2, 4), 16),
+    Number.parseInt(value.slice(4, 6), 16),
+  ];
+}
+
+function rgbRelativeLuminance(rgb: Rgb): number {
+  const channels = rgb.map((value) => {
+    const normalized = value / 255;
+    return normalized <= 0.04045 ? normalized / 12.92 : Math.pow((normalized + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function rgbContrastRatio(a: Rgb, b: Rgb): number {
+  const la = rgbRelativeLuminance(a);
+  const lb = rgbRelativeLuminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
 describe.each(Object.entries(THEMES))('index.css %s theme', (_name, selector) => {
   const tokens = themeTokens(selector);
 
@@ -77,6 +110,41 @@ describe.each(Object.entries(THEMES))('index.css %s theme', (_name, selector) =>
     expect(contrastRatio(tokens.background, tokens['muted-foreground'])).toBeGreaterThanOrEqual(
       4.5
     );
+  });
+});
+
+describe('index.css destructive token', () => {
+  it('keeps the light destructive background at WCAG AA against white', () => {
+    const tokens = themeTokens(':root');
+    expect(contrastRatio(tokens.destructive, [0, 0, 100])).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('hard-coded status utility palettes', () => {
+  it('keeps the unsaved badge readable in both themes', () => {
+    expect(sourceFiles.topologyEditor).toContain('text-yellow-700');
+    expect(sourceFiles.topologyEditor).toContain('border-yellow-700');
+    expect(sourceFiles.topologyEditor).toContain('dark:text-yellow-400');
+    expect(sourceFiles.topologyEditor).toContain('dark:border-yellow-400');
+    expect(rgbContrastRatio(hexToRgb('#a16207'), hexToRgb('#ffffff'))).toBeGreaterThanOrEqual(4.5);
+    expect(rgbContrastRatio(hexToRgb('#facc15'), hexToRgb('#0a0a0a'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps project warning text readable in both themes', () => {
+    expect(sourceFiles.projectForm).toContain('text-amber-700');
+    expect(sourceFiles.projectForm).toContain('dark:text-amber-400');
+    expect(rgbContrastRatio(hexToRgb('#b45309'), hexToRgb('#ffffff'))).toBeGreaterThanOrEqual(4.5);
+    expect(rgbContrastRatio(hexToRgb('#fbbf24'), hexToRgb('#0a0a0a'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps dashboard icon and active badge readable in both themes', () => {
+    expect(sourceFiles.dashboard).toContain('h-6 w-6 text-green-700');
+    expect(sourceFiles.dashboard).toContain('text-green-700 border-green-700');
+    expect(sourceFiles.dashboard).toContain('dark:text-green-400');
+    expect(sourceFiles.dashboard).toContain('dark:border-green-400');
+    expect(rgbContrastRatio(hexToRgb('#15803d'), hexToRgb('#dcfce7'))).toBeGreaterThanOrEqual(4.5);
+    expect(rgbContrastRatio(hexToRgb('#15803d'), hexToRgb('#ffffff'))).toBeGreaterThanOrEqual(4.5);
+    expect(rgbContrastRatio(hexToRgb('#4ade80'), hexToRgb('#0a0a0a'))).toBeGreaterThanOrEqual(4.5);
   });
 });
 

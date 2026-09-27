@@ -304,7 +304,10 @@ export function TopologyEditor({
             </Button>
           </div>
           {isDirty && (
-            <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+            <Badge
+              variant="outline"
+              className="text-yellow-700 border-yellow-700 dark:text-yellow-400 dark:border-yellow-400"
+            >
               Unsaved changes
             </Badge>
           )}

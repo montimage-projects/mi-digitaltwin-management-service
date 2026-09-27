@@ -320,7 +320,9 @@ export function ProjectForm({ project, onSubmit, isSubmitting }: ProjectFormProp
                         </span>
                       )}
                       {!isAvailable && sectorOption !== 'Cross-Sector' && (
-                        <span className="text-xs text-amber-600">(no services)</span>
+                        <span className="text-xs text-amber-700 dark:text-amber-400">
+                          (no services)
+                        </span>
                       )}
                     </span>
                   </SelectItem>
@@ -329,7 +331,7 @@ export function ProjectForm({ project, onSubmit, isSubmitting }: ProjectFormProp
             </SelectContent>
           </Select>
           {infrastructureServices.length === 0 && (
-            <p className="text-xs text-amber-600 flex items-center gap-1">
+            <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
               <AlertCircle className="h-3 w-3" />
               No infrastructure services available. Sector filtering disabled.
             </p>
@@ -434,7 +436,7 @@ export function ProjectForm({ project, onSubmit, isSubmitting }: ProjectFormProp
             ))}
           </div>
           {selectedAtomicProjects.length < 2 && sector === 'Cross-Sector' && (
-            <p className="text-xs text-amber-600">
+            <p className="text-xs text-amber-700 dark:text-amber-400">
               Cross-sector projects should compose at least 2 atomic projects
             </p>
           )}
