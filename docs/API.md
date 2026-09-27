@@ -45,6 +45,14 @@ Response:
 
 **Token Expiry:** 24 hours
 
+An unknown username or incorrect password returns HTTP 401 with the same response:
+
+```json
+{
+  "error": "Invalid credentials"
+}
+```
+
 ## Response Format
 
 ### Success Response
