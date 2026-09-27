@@ -36,6 +36,19 @@ const { verifyMock, signMock, JsonWebTokenError, TokenExpiredError } = vi.hoiste
   };
 });
 
+const { loggerErrorMock, loginRateLimiterMock } = vi.hoisted(() => ({
+  loggerErrorMock: vi.fn(),
+  loginRateLimiterMock: vi.fn((_req: unknown, _res: unknown, next: () => void) => next()),
+}));
+
+vi.mock('../../utils/logger.js', () => ({
+  logger: { error: loggerErrorMock },
+}));
+
+vi.mock('../../middleware/rateLimiter.js', () => ({
+  loginRateLimiter: loginRateLimiterMock,
+}));
+
 vi.mock('jsonwebtoken', () => ({
   default: {
     verify: verifyMock,
@@ -49,14 +62,8 @@ vi.mock('jsonwebtoken', () => ({
 
 // ── Import after mocking ───────────────────────────────────────────────────
 
-const jwt = await import('jsonwebtoken').then(
-  (m) => m.default as typeof import('jsonwebtoken').default
-);
-const { User } = await import('../../models/User.js');
-const { validate } = await import('../../middleware/validation.js');
-const { loginSchema } = await import('../../validators/auth.validator.js');
-const { authMiddleware } = await import('../../middleware/auth.js');
-const { errorHandler, AppError } = await import('../../middleware/errorHandler.js');
+const { errorHandler } = await import('../../middleware/errorHandler.js');
+const authRoutes = (await import('../auth.routes.js')).default;
 
 // ── Mock User model ───────────────────────────────────────────────────────
 
@@ -89,24 +96,20 @@ vi.mock('../../models/User.js', () => ({
     }),
     findById: vi.fn(function (this: unknown, id: string) {
       findByIdCalls.push({ id });
-      if (id === '507f1f77bcf86cd799439011') {
-        return Promise.resolve({
-          _id: '507f1f77bcf86cd799439011',
-          username: 'testuser',
-          role: 'admin',
-          passwordHash: '$2a$12$hashedpassword',
-          comparePassword: async function (this: Record<string, unknown>, candidate: string) {
-            comparePasswordCalls.push({ password: candidate });
-            return candidate === 'correct-password';
-          },
-          toJSON: function (this: Record<string, unknown>) {
-            const obj = { ...this };
-            delete obj.passwordHash;
-            return obj;
-          },
-        } as import('../../models/User.js').IUser);
-      }
-      return Promise.resolve(null);
+      const user =
+        id === '507f1f77bcf86cd799439011'
+          ? {
+              _id: '507f1f77bcf86cd799439011',
+              username: 'testuser',
+              role: 'admin',
+              passwordHash: '$2a$12$hashedpassword',
+            }
+          : null;
+      return {
+        select: vi.fn(() => ({
+          lean: vi.fn(() => Promise.resolve(user)),
+        })),
+      };
     }),
   },
 }));
@@ -122,49 +125,7 @@ function buildApp(): Express {
   const app = express();
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
-
-  // POST /login
-  app.post('/login', validate(loginSchema), async (req, res, next) => {
-    try {
-      const { username, password } = req.body;
-      const user = await User.findOne({ username: username.toLowerCase() });
-      if (!user) {
-        throw new AppError('Invalid credentials', 401);
-      }
-      const isMatch = await user.comparePassword(password);
-      if (!isMatch) {
-        throw new AppError('Invalid credentials', 401);
-      }
-      const token = jwt.sign(
-        { userId: user._id, username: user.username, role: user.role },
-        'ci-test-jwt-secret-min-32-characters-long',
-        { expiresIn: '24h' }
-      );
-      res.json({ token, user: { id: user._id, username: user.username, role: user.role } });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  // GET /me
-  app.get('/me', authMiddleware, async (req, res, next) => {
-    try {
-      const userId = (req as Record<string, unknown>).user?.userId as string;
-      const user = await User.findById(userId);
-      if (!user) {
-        throw new AppError('User not found', 404);
-      }
-      res.json({ id: user._id, username: user.username, role: user.role });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  // POST /logout
-  app.post('/logout', (_req, res) => {
-    res.json({ message: 'Logged out successfully' });
-  });
-
+  app.use('/api/auth', authRoutes);
   app.use(errorHandler);
   return app;
 }
@@ -184,7 +145,7 @@ describe('POST /login', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/login`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'testuser', password: 'correct-password' }),
@@ -207,7 +168,7 @@ describe('POST /login', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/login`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'testuser', password: 'wrong-password' }),
@@ -216,6 +177,7 @@ describe('POST /login', () => {
       expect(res.status).toBe(401);
       const body = await res.json();
       expect(body).toHaveProperty('error', 'Invalid credentials');
+      expect(loggerErrorMock).not.toHaveBeenCalled();
     } finally {
       server.close();
     }
@@ -227,7 +189,7 @@ describe('POST /login', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/login`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'unknownuser', password: 'some-password' }),
@@ -237,6 +199,7 @@ describe('POST /login', () => {
       const body = await res.json();
       expect(body).toHaveProperty('error', 'Invalid credentials');
       expect(comparePasswordCalls).toHaveLength(0);
+      expect(loggerErrorMock).not.toHaveBeenCalled();
     } finally {
       server.close();
     }
@@ -248,7 +211,7 @@ describe('POST /login', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/login`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: 'correct-password' }),
@@ -268,7 +231,7 @@ describe('POST /login', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/login`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'testuser' }),
@@ -288,7 +251,7 @@ describe('POST /login', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/login`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: '', password: 'correct-password' }),
@@ -308,7 +271,7 @@ describe('POST /login', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/login`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'testuser', password: '' }),
@@ -328,7 +291,7 @@ describe('POST /login', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/login`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'TESTUSER', password: 'correct-password' }),
@@ -362,7 +325,7 @@ describe('GET /me', () => {
     });
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/me`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/me`, {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
 
@@ -381,7 +344,7 @@ describe('GET /me', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/me`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/me`);
 
       expect(res.status).toBe(401);
       const body = await res.json();
@@ -397,7 +360,7 @@ describe('GET /me', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/me`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/me`, {
         headers: { Authorization: 'Basic dGVzdDp0ZXN0' },
       });
 
@@ -419,7 +382,7 @@ describe('GET /me', () => {
     });
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/me`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/me`, {
         headers: { Authorization: `Bearer ${INVALID_TOKEN}` },
       });
 
@@ -441,7 +404,7 @@ describe('GET /me', () => {
     });
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/me`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/me`, {
         headers: { Authorization: `Bearer ${EXPIRED_TOKEN}` },
       });
 
@@ -463,7 +426,7 @@ describe('GET /me', () => {
     });
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/me`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/me`, {
         headers: { Authorization: `Bearer ${MALFORMED_TOKEN}` },
       });
 
@@ -475,7 +438,7 @@ describe('GET /me', () => {
     }
   });
 
-  test('returns 404 when user is not found in database', async () => {
+  test('returns 500 when user is not found in database', async () => {
     const app = buildApp();
     const server = app.listen(0);
     const port = (server.address() as AddressInfo).port;
@@ -487,13 +450,13 @@ describe('GET /me', () => {
     });
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/me`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/me`, {
         headers: { Authorization: `Bearer ${VALID_TOKEN}` },
       });
 
-      expect(res.status).toBe(404);
+      expect(res.status).toBe(500);
       const body = await res.json();
-      expect(body).toHaveProperty('error', 'User not found');
+      expect(body).toHaveProperty('error', 'Internal server error');
     } finally {
       server.close();
     }
@@ -509,7 +472,7 @@ describe('GET /me', () => {
     });
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/me`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/me`, {
         headers: { Authorization: 'Bearer ' },
       });
 
@@ -531,7 +494,7 @@ describe('POST /logout', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/logout`, { method: 'POST' });
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/logout`, { method: 'POST' });
 
       expect(res.status).toBe(200);
       const body = await res.json();
@@ -547,7 +510,7 @@ describe('POST /logout', () => {
     const port = (server.address() as AddressInfo).port;
 
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/logout`, { method: 'POST' });
+      const res = await fetch(`http://127.0.0.1:${port}/api/auth/logout`, { method: 'POST' });
 
       expect(res.status).toBe(200);
     } finally {

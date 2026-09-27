@@ -7,6 +7,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { loginRateLimiter } from '../middleware/rateLimiter.js';
 import { loginSchema } from '../validators/auth.validator.js';
 import { asyncHandler } from '../middleware/entityLoader.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 const router: RouterType = Router();
 
@@ -21,13 +22,13 @@ router.post(
     const user = await User.findOne({ username: username.toLowerCase() });
 
     if (!user) {
-      throw new Error('Invalid credentials');
+      throw new AppError('Invalid credentials', 401);
     }
 
     const isMatch = await user.comparePassword(password);
 
     if (!isMatch) {
-      throw new Error('Invalid credentials');
+      throw new AppError('Invalid credentials', 401);
     }
 
     const token = jwt.sign(
