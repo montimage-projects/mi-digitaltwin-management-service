@@ -7,7 +7,7 @@ export const openApiSpec = {
   openapi: '3.0.0',
   info: {
     title: `${APP_NAME} API`,
-    version: '1.1.0',
+    version: '1.1.1',
     description:
       'API for managing cybersecurity services, digital twin projects, scenarios, and infrastructure.',
     contact: {

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-09-27
+
+### Bug Fixes
+
+- Return HTTP 401 with `{"error":"Invalid credentials"}` for failed logins — unknown username or incorrect password — instead of an unexpected HTTP 500 (#259, #261)
+- Restore readable text in light mode and meet WCAG AA contrast requirements (#256, #257, #258, #260)
+
+### Chore
+
+- Bump the GitLab security-pipeline catalog components to v1.4.0
+
 ## [1.1.0] - 2026-09-25
 
 > **Upgrade note (#253).** `POST /api/scenarios/:id/execute` now returns
