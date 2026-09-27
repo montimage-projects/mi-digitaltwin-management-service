@@ -73,7 +73,7 @@ export function Dashboard() {
         >
           <div className="flex items-center gap-4">
             <div className="rounded-full bg-green-100 p-3">
-              <FolderKanban className="h-6 w-6 text-green-600" />
+              <FolderKanban className="h-6 w-6 text-green-800" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Projects</p>
@@ -102,7 +102,10 @@ export function Dashboard() {
                 <div className="flex items-center gap-2">
                   <p className="text-2xl font-bold">{totalInfrastructures}</p>
                   {activeInfrastructures > 0 && (
-                    <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
+                    <Badge
+                      variant="outline"
+                      className="text-green-700 border-green-700 dark:text-green-400 dark:border-green-400 text-xs"
+                    >
                       {activeInfrastructures} active
                     </Badge>
                   )}

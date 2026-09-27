@@ -11,7 +11,7 @@ const badgeVariants = cva(
         secondary:
           'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
         destructive:
-          'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
+          'border-transparent bg-destructive text-destructive-foreground hover:bg-red-700',
         outline: 'text-foreground',
         // Semantic status variants: fixed palette colours chosen for >= 4.5:1
         // text contrast in both light and dark themes.

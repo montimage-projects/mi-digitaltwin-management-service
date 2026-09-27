@@ -259,7 +259,7 @@ export function ScenarioDetail() {
                   blocker.proceed();
                   setNavConfirmOpen(false);
                 }}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-destructive text-destructive-foreground hover:bg-red-700"
               >
                 Leave anyway
               </AlertDialogAction>
