@@ -311,6 +311,7 @@ export function ProjectForm({ project, onSubmit, isSubmitting }: ProjectFormProp
                     key={sectorOption}
                     value={sectorOption}
                     disabled={!isAvailable && sectorOption !== 'Cross-Sector'}
+                    className="data-[disabled]:opacity-100"
                   >
                     <span className="flex items-center gap-2">
                       {sectorOption}

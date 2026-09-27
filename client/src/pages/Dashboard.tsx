@@ -73,7 +73,7 @@ export function Dashboard() {
         >
           <div className="flex items-center gap-4">
             <div className="rounded-full bg-green-100 p-3">
-              <FolderKanban className="h-6 w-6 text-green-700" />
+              <FolderKanban className="h-6 w-6 text-green-800" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Projects</p>
