@@ -465,7 +465,7 @@ export function ExecutionConsole({
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleTeardownConfirm}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-destructive text-destructive-foreground hover:bg-red-700"
                 >
                   Tear down
                 </AlertDialogAction>

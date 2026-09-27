@@ -15,6 +15,21 @@ const sourceFiles = {
   dashboard: readFileSync(path.resolve(__dirname, 'pages/Dashboard.tsx'), 'utf8'),
   badge: readFileSync(path.resolve(__dirname, 'components/ui/badge.tsx'), 'utf8'),
   button: readFileSync(path.resolve(__dirname, 'components/ui/button.tsx'), 'utf8'),
+  confirmDialog: readFileSync(path.resolve(__dirname, 'components/ui/confirm-dialog.tsx'), 'utf8'),
+  executionConsole: readFileSync(
+    path.resolve(__dirname, 'components/execution/ExecutionConsole.tsx'),
+    'utf8'
+  ),
+  scenarioTable: readFileSync(
+    path.resolve(__dirname, 'components/scenarios/ScenarioTable.tsx'),
+    'utf8'
+  ),
+  infrastructureTable: readFileSync(
+    path.resolve(__dirname, 'components/infrastructure/InfrastructureTable.tsx'),
+    'utf8'
+  ),
+  scenarioDetail: readFileSync(path.resolve(__dirname, 'pages/ScenarioDetail.tsx'), 'utf8'),
+  userManagement: readFileSync(path.resolve(__dirname, 'pages/UserManagement.tsx'), 'utf8'),
 };
 
 type Hsl = [number, number, number];
@@ -198,6 +213,29 @@ describe('destructive control hover palettes', () => {
     const darkForeground = hslToSrgb(themeTokens('.dark')['destructive-foreground']);
     expect(rgbContrastRatio(tailwindColors.red700, lightForeground)).toBeGreaterThanOrEqual(4.5);
     expect(rgbContrastRatio(tailwindColors.red700, darkForeground)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('direct destructive control hover palettes', () => {
+  it('keeps every direct destructive control on an opaque verified hover palette', () => {
+    const directDestructiveSources = {
+      confirmDialog: sourceFiles.confirmDialog,
+      topologyEditor: sourceFiles.topologyEditor,
+      executionConsole: sourceFiles.executionConsole,
+      scenarioTable: sourceFiles.scenarioTable,
+      infrastructureTable: sourceFiles.infrastructureTable,
+      scenarioDetail: sourceFiles.scenarioDetail,
+      userManagement: sourceFiles.userManagement,
+    };
+
+    for (const [file, source] of Object.entries(directDestructiveSources)) {
+      expect(source, `${file} must not use translucent destructive hover`).not.toMatch(
+        /bg-destructive\s+text-destructive-foreground\s+hover:bg-destructive\/\d+/
+      );
+      expect(source, `${file} must use the verified opaque destructive hover`).toContain(
+        'hover:bg-red-700'
+      );
+    }
   });
 });
 

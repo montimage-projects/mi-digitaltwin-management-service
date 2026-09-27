@@ -344,7 +344,7 @@ export function TopologyEditor({
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleResetConfirm}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  className="bg-destructive text-destructive-foreground hover:bg-red-700"
                 >
                   Clear canvas
                 </AlertDialogAction>

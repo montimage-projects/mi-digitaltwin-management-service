@@ -231,7 +231,7 @@ export function ScenarioTable({ scenarios, projectId }: ScenarioTableProps) {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-red-700"
             >
               Delete
             </AlertDialogAction>
