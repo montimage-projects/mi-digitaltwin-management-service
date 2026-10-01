@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { AppError } from '../../middleware/errorHandler.js';
 import { encrypt } from '../../utils/encryption.js';
 import type { IInfrastructure } from '../../models/Infrastructure.js';
+import type { V1Deployment } from '@kubernetes/client-node';
 
 /**
  * Unit tests for the Kubernetes deploy engine.
@@ -3615,5 +3616,105 @@ describe('buildClientFromInfrastructure', () => {
     expect(clients.batch).toBeInstanceOf(BatchV1Api);
     expect(clients.networking).toBeInstanceOf(NetworkingV1Api);
     expect(clients.rbac).toBeInstanceOf(RbacAuthorizationV1Api);
+  });
+});
+
+describe('deployTopology — observability stack (issue #25)', () => {
+  const TARGET_ID = '507f1f77bcf86cd799439011';
+  const KAFKA_ID = '507f1f77bcf86cd799439015';
+  const services = [
+    makeService({
+      _id: TARGET_ID,
+      deployment: {
+        kind: 'Deployment',
+        role: 'target',
+        containerPort: 8080,
+        exposePort: true,
+        readinessPath: '/',
+        env: [{ name: 'OTEL_SERVICE_NAME', value: 'custom-name' }],
+      },
+    }),
+    makeService({
+      _id: KAFKA_ID,
+      deployment: { kind: 'Deployment', role: 'generic', containerPort: 9092, exposePort: true },
+    }),
+  ];
+  const nodes = [
+    makeNode('target', { serviceId: TARGET_ID, label: 'ci-sim' }),
+    makeNode('kafka', { serviceId: KAFKA_ID, label: 'kafka' }),
+  ];
+  const deploy = (clients: ReturnType<typeof makeClients>, observability?: boolean) =>
+    deployTopology(clients as never, {
+      namespace: 'secsim-a-b',
+      nodes,
+      services,
+      endpoint: 'https://10.0.0.1:6443',
+      ...(observability === undefined ? {} : { observability }),
+    });
+  const deploymentBodies = (clients: ReturnType<typeof makeClients>) =>
+    clients.apps.createNamespacedDeployment.mock.calls.map(
+      (c) => (c as unknown as [{ body: V1Deployment }])[0].body
+    );
+
+  test('is off when the option is omitted: no stack, no telemetry env', async () => {
+    const clients = makeClients();
+    const result = await deploy(clients);
+    expect(result.observability).toBe(false);
+    const names = deploymentBodies(clients).map((d) => d.metadata?.name);
+    expect(names).not.toContain('secsim-otel-collector');
+    const env = deploymentBodies(clients).flatMap(
+      (d) => d.spec?.template.spec?.containers[0].env ?? []
+    );
+    expect(env.find((e) => e.name === 'OTEL_EXPORTER_OTLP_ENDPOINT')).toBeUndefined();
+  });
+
+  test('deploys the collector and Prometheus, outside the result rows', async () => {
+    const clients = makeClients();
+    const result = await deploy(clients, true);
+
+    expect(result.observability).toBe(true);
+    const names = deploymentBodies(clients).map((d) => d.metadata?.name);
+    expect(names).toEqual(expect.arrayContaining(['secsim-otel-collector', 'secsim-prometheus']));
+    expect(result.services.map((s) => s.name)).not.toContain('secsim-prometheus');
+
+    const configMaps = clients.core.createNamespacedConfigMap.mock.calls.map(
+      (c) =>
+        (
+          c as unknown as [{ body: { metadata: { name: string }; data: Record<string, string> } }]
+        )[0].body
+    );
+    const collector = configMaps.find((m) => m.metadata.name === 'secsim-otel-collector');
+    expect(collector?.data['config.yaml']).toMatch(/endpoint: http:\/\/[a-z0-9-]+:8080\//);
+    expect(collector?.data['config.yaml']).toMatch(/endpoint: [a-z0-9-]+:9092/);
+  });
+
+  test('points every container at the collector unless the spec sets the variable', async () => {
+    const clients = makeClients();
+    await deploy(clients, true);
+    const envOf = (fragment: string) => {
+      const body = deploymentBodies(clients).find(
+        (d) => d.metadata?.name?.includes(fragment) && !d.metadata.name.startsWith('secsim-')
+      );
+      return body?.spec?.template.spec?.containers[0].env ?? [];
+    };
+    const target = envOf('target');
+    expect(target).toContainEqual({
+      name: 'OTEL_EXPORTER_OTLP_ENDPOINT',
+      value: 'http://secsim-otel-collector:4318',
+    });
+    expect(target.filter((e) => e.name === 'OTEL_SERVICE_NAME')).toEqual([
+      { name: 'OTEL_SERVICE_NAME', value: 'custom-name' },
+    ]);
+    const kafka = envOf('kafka');
+    expect(kafka.find((e) => e.name === 'OTEL_SERVICE_NAME')?.value).toMatch(/kafka/);
+  });
+
+  test('a failing stack never fails the deploy', async () => {
+    const clients = makeClients();
+    clients.core.createNamespacedConfigMap.mockRejectedValueOnce(new Error('quota exceeded'));
+    const result = await deploy(clients, true);
+    expect(result.observability).toBe(false);
+    expect(result.services).toHaveLength(2);
+    expect(clients.core.deleteNamespace).not.toHaveBeenCalled();
   });
 });

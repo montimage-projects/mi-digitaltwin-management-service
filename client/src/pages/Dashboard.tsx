@@ -1,13 +1,23 @@
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Server, FolderKanban, Activity, Cloud, ArrowRight, Loader2 } from 'lucide-react';
+import {
+  Server,
+  FolderKanban,
+  Activity,
+  Cloud,
+  ArrowRight,
+  Loader2,
+  CircleHelp,
+} from 'lucide-react';
 import { servicesApi, projectsApi, infrastructuresApi } from '@/lib/api';
 import { APP_NAME } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useTourStore } from '@/store/tour-store';
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const startTour = useTourStore((state) => state.start);
 
   const { data: servicesData, isLoading: servicesLoading } = useQuery({
     queryKey: ['services', { limit: 5 }],
@@ -63,7 +73,7 @@ export function Dashboard() {
         >
           <div className="flex items-center gap-4">
             <div className="rounded-full bg-green-100 p-3">
-              <FolderKanban className="h-6 w-6 text-green-600" />
+              <FolderKanban className="h-6 w-6 text-green-800" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Projects</p>
@@ -92,7 +102,10 @@ export function Dashboard() {
                 <div className="flex items-center gap-2">
                   <p className="text-2xl font-bold">{totalInfrastructures}</p>
                   {activeInfrastructures > 0 && (
-                    <Badge variant="outline" className="text-green-600 border-green-600 text-xs">
+                    <Badge
+                      variant="outline"
+                      className="text-green-700 border-green-700 dark:text-green-400 dark:border-green-400 text-xs"
+                    >
                       {activeInfrastructures} active
                     </Badge>
                   )}
@@ -166,7 +179,9 @@ export function Dashboard() {
 
         {/* Getting Started */}
         <div className="rounded-lg border bg-background p-6">
-          <h2 className="mb-4 text-lg font-semibold">Getting Started</h2>
+          <h2 className="mb-4 text-lg font-semibold" data-tour="getting-started">
+            Getting Started
+          </h2>
           <ul className="space-y-3">
             <li className="flex items-start gap-3">
               <div className="rounded-full bg-primary/10 p-1 mt-0.5">
@@ -234,6 +249,10 @@ export function Dashboard() {
               </div>
             </li>
           </ul>
+          <Button variant="outline" size="sm" className="mt-4 gap-2" onClick={startTour}>
+            <CircleHelp className="h-4 w-4" />
+            Take the guided tour
+          </Button>
         </div>
       </div>
     </div>

@@ -36,6 +36,17 @@ const envSchema = z.object({
   OLLAMA_NUM_CTX: z.string().default('4096').transform(Number),
   OLLAMA_TEMPERATURE: z.string().default('0.2').transform(Number),
   VECTOR_DB_TYPE: z.enum(['mongodb', 'qdrant']).default('mongodb'),
+  /** Serve Prometheus metrics at `GET /metrics` (default on). */
+  METRICS_ENABLED: z
+    .enum(['true', 'false', '1', '0'])
+    .optional()
+    .transform((v) => v !== 'false' && v !== '0'),
+  /** When set, `/metrics` requires `Authorization: Bearer <METRICS_TOKEN>`. */
+  // gitleaks:allow — variable name, not a credential
+  METRICS_TOKEN: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().min(16, 'METRICS_TOKEN must be at least 16 characters').optional()
+  ),
 });
 
 const parseEnv = () => {

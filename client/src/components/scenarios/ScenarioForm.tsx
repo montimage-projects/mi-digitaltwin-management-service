@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Form,
   FormControl,
@@ -27,6 +28,7 @@ const scenarioSchema = z.object({
   title: z.string().min(1, { error: 'Title is required' }).max(200),
   description: z.string().max(2000).optional(),
   infrastructureId: z.string().optional(),
+  observability: z.boolean(),
 });
 
 type ScenarioFormData = z.infer<typeof scenarioSchema>;
@@ -57,6 +59,7 @@ export function ScenarioForm({ scenario, onSubmit, isSubmitting }: ScenarioFormP
       title: scenario?.title || '',
       description: scenario?.description || '',
       infrastructureId: getInfrastructureId(),
+      observability: scenario?.observability !== false,
     },
   });
 
@@ -139,6 +142,29 @@ export function ScenarioForm({ scenario, onSubmit, isSubmitting }: ScenarioFormP
                 The infrastructure where this scenario will be deployed
               </FormDescription>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="observability"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start gap-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(checked === true)}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>Collect observability data</FormLabel>
+                <FormDescription>
+                  Deploys an OpenTelemetry Collector and Prometheus with each run to probe every
+                  component&apos;s availability and latency and scrape any metrics it exposes. Shown
+                  on the Monitoring page and in the execution report.
+                </FormDescription>
+              </div>
             </FormItem>
           )}
         />

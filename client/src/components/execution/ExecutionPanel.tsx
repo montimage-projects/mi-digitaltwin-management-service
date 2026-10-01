@@ -1,8 +1,22 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Rocket, Loader2, CheckCircle, XCircle, Clock } from 'lucide-react';
-import { scenariosApi, Execution, ExecuteResult } from '@/lib/api';
+import { Rocket, Loader2, CheckCircle, XCircle, Clock, FileDown } from 'lucide-react';
+import {
+  scenariosApi,
+  Execution,
+  ExecuteResult,
+  type ExecutionOutcome,
+  type ReportFormat,
+} from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -30,6 +44,43 @@ const statusIcons: Record<string, React.ReactNode> = {
   completed: <CheckCircle className="h-4 w-4 text-green-500" />,
   failed: <XCircle className="h-4 w-4 text-red-500" />,
 };
+
+const outcomeVariants: Record<ExecutionOutcome, 'default' | 'destructive' | 'secondary'> = {
+  passed: 'default',
+  failed: 'destructive',
+  partial: 'secondary',
+};
+
+const reportFormats: { format: ReportFormat; label: string }[] = [
+  { format: 'html', label: 'HTML' },
+  { format: 'md', label: 'Markdown' },
+  { format: 'json', label: 'JSON' },
+];
+
+/** Compact run duration: `850 ms`, `42s`, `3m 05s`, `1h 02m`. */
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  const total = Math.floor(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (h) return `${h}h ${pad(m)}m`;
+  if (m) return `${m}m ${pad(s)}s`;
+  return `${s}s`;
+}
+
+/** Save a Blob through a temporary object URL + anchor click. */
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 export function ExecutionPanel({
   scenarioId,
@@ -68,6 +119,17 @@ export function ExecutionPanel({
     },
     onError: (error: Error) => {
       toast.error(`Failed to save conclusion: ${error.message}`);
+    },
+  });
+
+  const reportMutation = useMutation({
+    mutationFn: ({ executionId, format }: { executionId: string; format: ReportFormat }) =>
+      scenariosApi.getReport(scenarioId, executionId, format),
+    onSuccess: (blob, { executionId, format }) => {
+      saveBlob(blob, `execution-${executionId}-report.${format}`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to download report: ${error.message}`);
     },
   });
 
@@ -140,15 +202,70 @@ export function ExecutionPanel({
                           <p className="text-xs text-muted-foreground">
                             {new Date(execution.executedAt).toLocaleString()} by{' '}
                             {execution.executedBy}
+                            {execution.durationMs !== undefined &&
+                              ` · ran ${formatDuration(execution.durationMs)}`}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {execution.outcome && (
+                          <Badge
+                            variant={outcomeVariants[execution.outcome]}
+                            className="text-xs capitalize"
+                          >
+                            {execution.outcome}
+                          </Badge>
+                        )}
                         {execution.conclusion && (
                           <Badge variant="outline" className="text-xs">
                             Has Conclusion
                           </Badge>
                         )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            asChild
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                          >
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 px-2"
+                              aria-label={`Download report for execution on ${new Date(
+                                execution.executedAt
+                              ).toLocaleString()}`}
+                              disabled={
+                                reportMutation.isPending &&
+                                reportMutation.variables?.executionId === execution._id
+                              }
+                            >
+                              {reportMutation.isPending &&
+                              reportMutation.variables?.executionId === execution._id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <FileDown className="h-4 w-4" />
+                              )}
+                              <span className="ml-1 text-xs">Report</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                          >
+                            <DropdownMenuLabel>Download report</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {reportFormats.map(({ format, label }) => (
+                              <DropdownMenuItem
+                                key={format}
+                                onClick={(e: React.MouseEvent) => {
+                                  e.stopPropagation();
+                                  reportMutation.mutate({ executionId: execution._id, format });
+                                }}
+                              >
+                                {label}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   ))}

@@ -12,6 +12,8 @@ resources:
 # resource-constrained: kind, minikube, k3d, ...).
 components:
   - ../../components/mongodb
+  # Prometheus + OpenTelemetry Collector for the platform itself.
+  - ../../components/observability
 
 patches:
   # Same reasoning as ../prod/kustomization.yaml: point the app at the

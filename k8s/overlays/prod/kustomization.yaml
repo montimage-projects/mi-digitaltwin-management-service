@@ -10,6 +10,8 @@ resources:
 # In-cluster MongoDB (StatefulSet + headless Service).
 components:
   - ../../components/mongodb
+  # Prometheus + OpenTelemetry Collector for the platform itself.
+  - ../../components/observability
 
 # Point the app at the in-cluster MongoDB Service bundled via the component
 # above, instead of the Secret-sourced value ../../base/deployment.yaml uses

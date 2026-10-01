@@ -35,3 +35,4 @@ export * from './scenarios';
 export * from './infrastructures';
 export * from './projects';
 export * from './users';
+export * from './monitoring';

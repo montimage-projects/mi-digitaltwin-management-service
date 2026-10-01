@@ -995,6 +995,26 @@ interactive-MAG sections were written alongside #233.
 
 ## Run it yourself
 
+> **Monitor module: secAnoD, alert bus: Kafka.** The demo's monitor is
+> [secAnoD](https://github.com/montimage-projects/secanod) (mmt-probe +
+> mmt-dpi + mmt-security), injected as the `secanod` sidecar of the CI-SIM
+> pod. The published `ghcr.io/montimage-projects/mmt-image` has no Kafka
+> output, so the demo uses `secanod-mmt-image:kafka`, which rebuilds only
+> mmt-probe (same commit) with `KAFKA_MODULE`:
+> `docker build -t secanod-mmt-image:kafka scripts/secanod-kafka`, then
+> `kind load docker-image secanod-mmt-image:kafka --name <cluster>`.
+> secAnoD captures eth0 live with only the rules for the MAG attacks the demo
+> performs — **56** (SYN flooding: `mag http-flood` / `synflood`), **20**
+> (ICMP flood) and **51** (ping of death), via
+> `security.exclude-rules=1-19,21-50,52-55,57-1000` — and publishes its
+> JSON reports to the `mmt-security-alerts` topic of the scenario's `kafka`
+> node (single-node `apache/kafka`, KRaft, `kafka:9092`), plus stdout for
+> the console's **Security alerts** pane (throttled to one alert per
+> detection/attacker every 5 s). AI4SOAR consumes the topic
+> (`KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_TOPIC`); the e2e stub acts once a source
+> crosses a flood signature (≥10 reports in 10 s), so kubelet probes are
+> never blocked. Topology: MAG → CI-SIM ← secAnoD → Kafka → AI4SOAR → CI-SIM.
+
 Everything above is delivered — this is the final run procedure on a fresh
 install.
 
@@ -1004,7 +1024,7 @@ install.
    `MONGODB_URI`: `npm run dev` from the repo root (API on `:3000`). The
    server auto-seeds on first boot; `npm run seed` re-seeds manually. Seeding
    creates the demo catalog services (`MAG`,
-   `CI-SIM`, `MMT-PROBE`, `AI4SOAR`) and the `MONTIMAGE-DEMO` project
+   `CI-SIM`, `SECANOD`, `KAFKA`, `AI4SOAR`) and the `MONTIMAGE-DEMO` project
    holding the scenario "CI attack → MMT detection → AI4SOAR block".
 2. **Register a cluster** as an Infrastructure (or
    `POST /api/infrastructures`) with the cluster endpoint and a kubeconfig or
@@ -1017,7 +1037,7 @@ install.
 4. **Execute** — click **Execute** in the UI, or
    `POST /api/scenarios/:id/execute`. The engine rolls the topology out in
    `startOrder` tiers and holds the MAG Deployment until the target pod (with
-   its MMT-Probe sidecar) and AI4SOAR report `Ready` inside the readiness
+   its secAnoD sidecar) and Kafka and AI4SOAR report `Ready` inside the readiness
    gate. MAG comes up idling — its pod entrypoint is the seeded sleep loop.
 5. **Run attack #1 — stop the service.** The MAG service row shows a
    copyable exec hint (issue #233); the seeded `attack-1-stop-the-server`
@@ -1034,7 +1054,7 @@ install.
    an `alert` event in the **Security alerts** pane (verdict +
    `src=<ip.src>` attacker address, issue #234); CI-SIM logging
    `service stopped` as the flood crosses its rate threshold, then its
-   container restarting (the `mmt-probe` sidecar holds the pod's network
+   container restarting (the monitor sidecars hold the pod's network
    namespace); and the AI4SOAR reaction landing in the **Namespace events**
    pane — the playbook POSTs the attacker address to
    `ci-sim:8080/admin/block` (issue #235).
@@ -1052,7 +1072,7 @@ install.
 
 7. **Run attack #2 — already blocked.** Re-run the profile (the seeded
    `attack-2-already-blocked` entry is the same command), capped so the
-   second run still trips the probe without pushing CI-SIM over its stop
+   second run still trips secAnoD without pushing CI-SIM over its stop
    threshold — `--count 25` on the real `mag` CLI, `MAG_REQUEST_COUNT=25`
    under the e2e stub:
 
@@ -1066,8 +1086,8 @@ install.
    target stays healthy.
 
 8. **Watch the Execution tab** throughout: `progress` events drive the bar,
-   per-container log tabs keep MMT-Probe output and ci-sim access logs
-   separate, the **Security alerts** pane lists each detection the probe
+   per-container log tabs keep secAnoD output and ci-sim access logs
+   separate, the **Security alerts** pane lists each detection secAnoD
    reports, and the **Namespace events** pane shows the AI4SOAR reaction
    landing. The event stream stays open after deploy settle so the
    exec-driven attacks and the reaction keep flowing into the console.
@@ -1139,8 +1159,9 @@ Python 3 (for the API snippets).
 
 3. **Register the cluster, repoint the services, assign the infra and
    execute** — one script driving the public API (the same repointing
-   `run-e2e.js` applies: `STUB_ROLE` selects each module's behaviour,
-   `MMT_ALERT_URL` wires the probe's alert delivery to the reaction):
+   `run-e2e.js` applies: `STUB_ROLE` selects each module's behaviour; the
+   secAnoD sidecar and Kafka keep their images, so detection and the alert
+   bus are real):
 
    ```bash
    export ADMIN_PASSWORD DEMO_KUBECONFIG=~/.kube/config   # or the container
@@ -1172,7 +1193,7 @@ Python 3 (for the API snippets).
    print('infrastructure:', infra['_id'], '→', server)
 
    for short, role in {'MAG': 'attack', 'CI-SIM': 'target',
-                       'MMT-PROBE': 'monitor', 'AI4SOAR': 'reaction'}.items():
+                       'AI4SOAR': 'reaction'}.items():
        res = api('GET', f'/api/services?search={short}', auth=token)
        lst = res if isinstance(res, list) else res.get('services') or res.get('data') or []
        svc = next(s for s in lst if s['shortName'] == short)
@@ -1180,8 +1201,6 @@ Python 3 (for the API snippets).
        env = [e for e in dep.get('env', [])
               if e.get('name') not in ('STUB_ROLE', 'MMT_ALERT_URL')]
        env.append({'name': 'STUB_ROLE', 'value': role})
-       if role == 'monitor':
-           env.append({'name': 'MMT_ALERT_URL', 'fromEdge': 'reaction'})
        dep['env'] = env
        api('PUT', f"/api/services/{svc['_id']}",
            {'currentVersion': 'v1.0.0',
@@ -1221,7 +1240,7 @@ Python 3 (for the API snippets).
      sh -c 'mag http-flood --target-ip ci-sim --target-port 8080 --count 25 2>&1 | tee /proc/1/fd/1'
    ```
 
-   Expected beats: a JSON alert from the `mmt-probe` sidecar (surfaced in the
+   Expected beats: an mmt-security report from the `secanod` sidecar (and AI4SOAR's `ALERT from kafka` line) (surfaced in the
    console's **Security alerts** pane), `service stopped` → container restart,
    the AI4SOAR playbook POSTing `ip.src` to `ci-sim:8080/admin/block`, then a
    second alert while the target stays healthy on attack #2.
@@ -1246,7 +1265,7 @@ touch the engine or the seed: it starts a kind cluster, boots the server
 REST API — login, register the cluster as an Infrastructure, execute the demo
 scenario — and asserts the R1 two-attack beats (issue #237): the MAG
 Deployment rollout, an exec-driven attack #1 (`kubectl exec` into the idling
-pod), the probe alert, CI-SIM's "service stopped" → Deployment restart, the
+pod), the secAnoD alert, CI-SIM's "service stopped" → Deployment restart, the
 attacker address landing on the ci-sim `/admin/block` blocklist, then an
 exec-driven attack #2 answered 403 with a second alert and a still-healthy
 target, and a clean teardown. Because CI

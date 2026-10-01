@@ -62,6 +62,12 @@ graph TD
   style STS fill:#fce4ec
 ```
 
+The `dev` and `prod` overlays also include `k8s/components/observability`:
+an OpenTelemetry Collector (receives the server's traces) and Prometheus
+(scrapes the server's `/metrics` and the collector's span metrics). Reach
+Prometheus with `kubectl -n <namespace> port-forward svc/prometheus 9090:9090`.
+See [Observability](../integration/observability.md).
+
 For the `atlas` overlay, the `mongodb` Service/StatefulSet do not exist — the
 Deployment's `MONGODB_URI` (from the Secret) points at the external Atlas
 cluster instead.

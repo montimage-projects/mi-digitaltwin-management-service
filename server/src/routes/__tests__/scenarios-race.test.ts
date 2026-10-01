@@ -238,15 +238,15 @@ describe('POST /api/scenarios/:id/execute concurrency', () => {
     ]);
 
     // Log error responses for debugging
-    if (res1.status !== 200) {
+    if (res1.status !== 202) {
       console.error('Request 1 failed:', res1.status, await res1.text());
     }
-    if (res2.status !== 200) {
+    if (res2.status !== 202) {
       console.error('Request 2 failed:', res2.status, await res2.text());
     }
 
-    expect(res1.status).toBe(200);
-    expect(res2.status).toBe(200);
+    expect(res1.status).toBe(202);
+    expect(res2.status).toBe(202);
 
     const body1 = (await res1.json()) as { executionId: string; status: string };
     const body2 = (await res2.json()) as { executionId: string; status: string };
@@ -265,9 +265,13 @@ describe('POST /api/scenarios/:id/execute concurrency', () => {
     const execIds = scenario!.executions.map((e) => e._id!.toString());
     expect(new Set(execIds).size).toBe(2);
 
-    // Both should be in a non-pending terminal-ish state (running or failed).
-    for (const exec of scenario!.executions) {
-      expect(exec.status).not.toBe('pending');
-    }
+    // Both background rollouts settle out of `pending` (running or failed).
+    await vi.waitFor(
+      async () => {
+        const fresh = await Scenario.findById(scenarioId).lean();
+        for (const exec of fresh!.executions) expect(exec.status).not.toBe('pending');
+      },
+      { timeout: 5000, interval: 50 }
+    );
   });
 });

@@ -84,10 +84,11 @@ Complete technical documentation for the MI Digital Twin Management Service. Cho
 
 ### Integration & Extensibility
 
-| Document                                                    | Purpose                                  |
-| ----------------------------------------------------------- | ---------------------------------------- |
-| [External Services](integration/external-services.md)       | Third-party services and APIs            |
-| [Kubernetes Execution](integration/kubernetes-execution.md) | Direct scenario deployment to Kubernetes |
+| Document                                                    | Purpose                                                           |
+| ----------------------------------------------------------- | ----------------------------------------------------------------- |
+| [External Services](integration/external-services.md)       | Third-party services and APIs                                     |
+| [Kubernetes Execution](integration/kubernetes-execution.md) | Direct scenario deployment to Kubernetes                          |
+| [Observability](integration/observability.md)               | Prometheus + OpenTelemetry for the platform and each scenario run |
 
 ### Reference
 

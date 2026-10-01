@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pencil, Trash2, MoreHorizontal, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { servicesApi, type Service } from '@/lib/api';
 import { Badge } from '@/components/ui/badge';
+import { ConfigStatusBadge } from '@/components/services/ConfigStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -140,6 +141,7 @@ export function ServiceTable({
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium">Provider</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Version</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Configuration</th>
             </tr>
           </thead>
           <tbody>
@@ -159,6 +161,9 @@ export function ServiceTable({
                 </td>
                 <td className="px-4 py-3">
                   <Skeleton className="h-5 w-12" />
+                </td>
+                <td className="px-4 py-3">
+                  <Skeleton className="h-5 w-28" />
                 </td>
               </tr>
             ))}
@@ -218,6 +223,7 @@ export function ServiceTable({
               </span>
             </th>
             <th className="px-4 py-3 text-left text-sm font-medium">Version</th>
+            <th className="px-4 py-3 text-left text-sm font-medium">Configuration</th>
             <th className="w-12 px-4 py-3 text-left text-sm font-medium"></th>
           </tr>
         </thead>
@@ -237,6 +243,9 @@ export function ServiceTable({
               </td>
               <td className="px-4 py-3 text-sm text-muted-foreground">{service.provider}</td>
               <td className="px-4 py-3 text-sm text-muted-foreground">{service.currentVersion}</td>
+              <td className="px-4 py-3">
+                <ConfigStatusBadge service={service} />
+              </td>
               <td className="px-4 py-3">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

@@ -18,6 +18,9 @@ data:
   ORG_NAME: ''
   ORG_URL: ''
   SERVE_STATIC: 'true'
+  # Prometheus metrics at GET /metrics. The observability component also sets
+  # OTEL_EXPORTER_OTLP_ENDPOINT to turn on tracing to its collector.
+  METRICS_ENABLED: 'true'
   # Opt-in: seeding refuses known-default ADMIN_PASSWORDs. Set a strong
   # ADMIN_PASSWORD in the Secret, then override this to 'true' (e.g. via a
   # kustomize patch) for the first boot.

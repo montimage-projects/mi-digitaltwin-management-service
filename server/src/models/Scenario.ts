@@ -1,3 +1,4 @@
+import type { Runbook } from '../services/runbook.js';
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IDeployedService {
@@ -11,6 +12,8 @@ export interface IDeployedService {
   status?: 'pending' | 'running' | 'completed' | 'failed';
   /** Reachable NodePort URL for the deployed service. */
   dashboardUrl?: string;
+  /** The node has a web-reachable Service (opened through the proxy). */
+  webInterface?: boolean;
 }
 
 export interface IConclusion {
@@ -28,6 +31,14 @@ export interface IExecution {
   namespace?: string;
   deployedServices: IDeployedService[];
   conclusion?: IConclusion;
+  /** When the run closed — teardown or deploy failure (issue #26). */
+  completedAt?: Date;
+  /** Wall-clock run time from `executedAt` to `completedAt`, in ms. */
+  durationMs?: number;
+  /** Overall verdict recorded when the run closed (issue #26). */
+  outcome?: 'passed' | 'failed' | 'partial';
+  /** The namespace got the observability stack (issue #25). */
+  observability?: boolean;
 }
 
 /**
@@ -67,6 +78,14 @@ export interface IScenario extends Document {
   description?: string;
   topology: ITopology;
   infrastructureId?: Types.ObjectId;
+  /** Step-by-step test guide rendered per execution (services/runbook.ts). */
+  runbook?: Runbook;
+  /**
+   * Deploy the per-namespace observability stack (OTel Collector +
+   * Prometheus) with each execution. Defaults to on; documents saved before
+   * the field existed read `undefined`, which the engine also treats as on.
+   */
+  observability?: boolean;
   executions: IExecution[];
   /**
    * Seed bookkeeping mirroring the catalog models — a seeded scenario (the
@@ -92,6 +111,7 @@ const deployedServiceSchema = new Schema<IDeployedService>(
       default: 'pending',
     },
     dashboardUrl: { type: String },
+    webInterface: { type: Boolean },
   },
   { _id: false }
 );
@@ -117,6 +137,10 @@ const executionSchema = new Schema<IExecution>(
     namespace: { type: String },
     deployedServices: [deployedServiceSchema],
     conclusion: conclusionSchema,
+    completedAt: { type: Date },
+    durationMs: { type: Number, min: 0 },
+    outcome: { type: String, enum: ['passed', 'failed', 'partial'] },
+    observability: { type: Boolean },
   },
   { _id: true }
 );
@@ -155,6 +179,13 @@ const scenarioSchema = new Schema<IScenario>(
     infrastructureId: {
       type: Schema.Types.ObjectId,
       ref: 'Infrastructure',
+    },
+    runbook: {
+      type: Schema.Types.Mixed,
+    },
+    observability: {
+      type: Boolean,
+      default: true,
     },
     executions: [executionSchema],
     deprecated: {

@@ -48,6 +48,9 @@ const ScenarioDetail = lazy(() =>
 const Infrastructure = lazy(() =>
   import('@/pages/Infrastructure').then((m) => ({ default: m.Infrastructure }))
 );
+const Monitoring = lazy(() =>
+  import('@/pages/Monitoring').then((m) => ({ default: m.Monitoring }))
+);
 const Analytics = lazy(() => import('@/pages/Analytics').then((m) => ({ default: m.Analytics })));
 const Settings = lazy(() => import('@/pages/Settings').then((m) => ({ default: m.Settings })));
 
@@ -166,6 +169,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<PageLoader />}>
             <Infrastructure />
+          </Suspense>
+        ),
+      },
+      {
+        path: '/monitoring',
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <Monitoring />
           </Suspense>
         ),
       },

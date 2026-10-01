@@ -23,6 +23,8 @@ export interface DeployedService {
   status?: 'pending' | 'running' | 'completed' | 'failed';
   /** Reachable NodePort URL for the deployed service. */
   dashboardUrl?: string;
+  /** Has a web-reachable Service (opened through the platform proxy). */
+  webInterface?: boolean;
 }
 
 /** Per-service result returned by the execute/deploy endpoint. */
@@ -34,6 +36,8 @@ export interface DeployedServiceResult {
   status: 'pending' | 'running' | 'completed' | 'failed';
   dashboardUrl?: string;
   nodePort?: number;
+  /** Has a web-reachable Service — known from the plan, before any NodePort. */
+  webInterface?: boolean;
 }
 
 export interface ExecuteResult {
@@ -58,7 +62,19 @@ export interface Execution {
   namespace?: string;
   deployedServices: DeployedService[];
   conclusion?: Conclusion;
+  /** When the run closed — teardown or deploy failure. */
+  completedAt?: string;
+  /** Run time from `executedAt` to `completedAt`, in ms. */
+  durationMs?: number;
+  /** Overall verdict recorded when the run closed. */
+  outcome?: ExecutionOutcome;
 }
+
+/** Overall verdict of a closed run. */
+export type ExecutionOutcome = 'passed' | 'failed' | 'partial';
+
+/** Export formats served by the execution report endpoint. */
+export type ReportFormat = 'json' | 'md' | 'html';
 
 export interface Scenario {
   _id: string;
@@ -73,6 +89,8 @@ export interface Scenario {
     status: string;
     endpoint?: string;
   } | null;
+  /** Per-execution observability stack; absent on older documents means on. */
+  observability?: boolean;
   executions: Execution[];
   latestExecution?: {
     status: Execution['status'];
@@ -88,6 +106,39 @@ export interface CreateScenarioData {
   description?: string;
   topology?: Partial<Topology>;
   infrastructureId?: string;
+  observability?: boolean;
+}
+
+/** An observable outcome the runbook checks off live. */
+export interface RunbookExpectation {
+  label: string;
+  source: 'alert' | 'log';
+  container?: string;
+  pattern?: string;
+}
+
+/** One runbook step, already resolved against the execution. */
+export interface RunbookStep {
+  id: string;
+  title: string;
+  description?: string;
+  profile?: { nodeId: string; name: string };
+  links?: string[];
+  commands?: string[];
+  expect?: RunbookExpectation[];
+}
+
+export interface ExecutionRunbook {
+  context: { namespace: string; pods: Record<string, { pod: string; ip?: string }> };
+  steps: RunbookStep[];
+}
+
+/** A node's seeded attack profile (e.g. MAG's R1 two-attack script). */
+export interface AttackProfile {
+  nodeId: string;
+  name: string;
+  description?: string;
+  args: string[];
 }
 
 export const scenariosApi = {
@@ -118,8 +169,60 @@ export const scenariosApi = {
   teardown: async (
     scenarioId: string,
     executionId: string
-  ): Promise<{ executionId: string; namespace?: string; status: string; message: string }> => {
+  ): Promise<{
+    executionId: string;
+    namespace?: string;
+    status: string;
+    outcome?: ExecutionOutcome;
+    durationMs?: number;
+    message: string;
+  }> => {
     const { data } = await api.delete(`/scenarios/${scenarioId}/executions/${executionId}`);
+    return data;
+  },
+  /** Signed, short-lived proxy link to a deployed service's web interface. */
+  getServiceLink: async (
+    scenarioId: string,
+    executionId: string,
+    serviceName: string
+  ): Promise<{ url: string }> => {
+    const { data } = await api.post(
+      `/scenarios/${scenarioId}/executions/${executionId}/services/${serviceName}/link`
+    );
+    return data;
+  },
+  /** The scenario runbook resolved against this execution. */
+  getRunbook: async (scenarioId: string, executionId: string): Promise<ExecutionRunbook> => {
+    const { data } = await api.get(`/scenarios/${scenarioId}/executions/${executionId}/runbook`);
+    return data;
+  },
+  /** Seeded attack profiles runnable in this execution's pods. */
+  listProfiles: async (scenarioId: string, executionId: string): Promise<AttackProfile[]> => {
+    const { data } = await api.get(`/scenarios/${scenarioId}/executions/${executionId}/profiles`);
+    return data.profiles;
+  },
+  /** Start one profile in its node's pod; output streams into the console. */
+  runProfile: async (
+    scenarioId: string,
+    executionId: string,
+    profile: Pick<AttackProfile, 'nodeId' | 'name'>
+  ): Promise<{ pod: string; container: string; message: string }> => {
+    const { data } = await api.post(
+      `/scenarios/${scenarioId}/executions/${executionId}/profiles/run`,
+      { nodeId: profile.nodeId, name: profile.name }
+    );
+    return data;
+  },
+  /** Download an execution report as a Blob (JSON, Markdown or HTML). */
+  getReport: async (
+    scenarioId: string,
+    executionId: string,
+    format: ReportFormat
+  ): Promise<Blob> => {
+    const { data } = await api.get(`/scenarios/${scenarioId}/executions/${executionId}/report`, {
+      params: { format },
+      responseType: 'blob',
+    });
     return data;
   },
   addConclusion: async (

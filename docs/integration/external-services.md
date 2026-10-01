@@ -200,11 +200,11 @@ kafka:
 
 ### Optional Services
 
-| Service    | Purpose    | When Needed |
-| ---------- | ---------- | ----------- |
-| Redis      | Caching    | High load   |
-| Prometheus | Metrics    | Monitoring  |
-| Grafana    | Dashboards | Monitoring  |
+| Service    | Purpose    | When Needed                                     |
+| ---------- | ---------- | ----------------------------------------------- |
+| Redis      | Caching    | High load                                       |
+| Prometheus | Metrics    | Bundled — see [Observability](observability.md) |
+| Grafana    | Dashboards | Monitoring                                      |
 
 ## Environment Configuration
 

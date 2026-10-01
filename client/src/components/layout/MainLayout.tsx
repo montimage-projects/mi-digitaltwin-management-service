@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Breadcrumb } from './Breadcrumb';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { GuidedTour } from '@/components/tour/GuidedTour';
 
 export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -48,6 +49,8 @@ export function MainLayout() {
           <Outlet />
         </main>
       </div>
+
+      <GuidedTour />
     </div>
   );
 }

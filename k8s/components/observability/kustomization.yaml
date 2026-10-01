@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+# Observability stack for the SecSim platform itself: an OpenTelemetry
+# Collector receiving the server's traces, and Prometheus scraping the
+# server's /metrics plus the collector's span-derived RED metrics. Included
+# by the dev and prod overlays; omit it from an overlay to run without.
+# Scenario namespaces get their own, separate stack (see the scenario
+# `observability` option in docs/API.md).
+resources:
+  - otel-collector-deployment.yaml
+  - prometheus-deployment.yaml
+
+configMapGenerator:
+  - name: otel-collector-config
+    files:
+      - config.yaml=otel-collector.yaml
+  - name: prometheus-config
+    files:
+      - prometheus.yml
+
+patches:
+  # Point the server's OTel SDK at the collector (tracing is opt-in and
+  # starts only when this variable is set).
+  - target:
+      kind: ConfigMap
+      name: app-config
+    patch: |-
+      - op: add
+        path: /data/OTEL_EXPORTER_OTLP_ENDPOINT
+        value: http://otel-collector:4318

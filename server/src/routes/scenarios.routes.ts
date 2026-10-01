@@ -1,16 +1,40 @@
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
+import mongoose from 'mongoose';
 import { Scenario } from '../models/Scenario.js';
 import { Project } from '../models/Project.js';
 import { Infrastructure } from '../models/Infrastructure.js';
 import { Service } from '../models/Service.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { validateBody, objectIdSchema } from '../middleware/validation.js';
-import { buildClientFromInfrastructure, teardownDeployment } from '../services/kubernetesDeploy.js';
+import {
+  buildClientFromInfrastructure,
+  buildKubeConfig,
+  teardownDeployment,
+} from '../services/kubernetesDeploy.js';
+import { listAttackProfiles, runAttackProfile } from '../services/attackProfiles.js';
+import { collectRunbookContext, renderRunbook } from '../services/runbook.js';
+import {
+  proxyToService,
+  rawProxyRest,
+  signProxyPath,
+  verifyProxySignature,
+} from '../services/serviceProxy.js';
+import { CoreV1Api } from '@kubernetes/client-node';
 import { asyncHandler, findById, validateObjectIdParam } from '../middleware/entityLoader.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { executeScenario } from '../services/scenarioExecution.js';
+import { logger } from '../utils/logger.js';
+import { executeScenario, planExecution } from '../services/scenarioExecution.js';
 import { runSSEStream } from '../services/scenarioSSE.js';
+import { apiGetFor } from '../services/observability.js';
+import { ExecutionReport } from '../models/ExecutionReport.js';
+import {
+  buildProvisionalReport,
+  captureReport,
+  renderHtml,
+  renderMarkdown,
+  toReportData,
+} from '../services/executionReport.js';
 
 /** Extract unique service IDs from a scenario's topology nodes. */
 function resolveServiceIds(scenario: { topology?: { nodes?: unknown[] } }): string[] {
@@ -70,6 +94,8 @@ const createScenarioSchema = z.object({
     .string()
     .refine((val) => !val || objectIdSchema.safeParse(val).success, 'Invalid infrastructure ID')
     .optional(),
+  /** Per-execution observability stack; omitted means the model default (on). */
+  observability: z.boolean().optional(),
 });
 
 const updateScenarioSchema = createScenarioSchema.partial();
@@ -240,9 +266,174 @@ router.post(
       endpoint: String(infrastructure.endpoint),
       credentials: infrastructure.credentials as { iv: string; encrypted: string; authTag: string },
     };
-    const result = await executeScenario(pushResult, infraForExec, services);
+    // Record the plan and answer at once — the console opens on the pending
+    // execution and follows the rollout over SSE, instead of the request
+    // blocking for minutes through the readiness gate (which made a second
+    // Deploy click start a duplicate execution).
+    let planned;
+    try {
+      planned = await planExecution(pushResult, services);
+    } catch (err) {
+      await Scenario.updateOne(
+        { _id: id },
+        { $pull: { executions: { _id: pushResult.executions.at(-1)?._id } } }
+      );
+      throw err;
+    }
+    void executeScenario(pushResult, infraForExec, services).catch((err: unknown) => {
+      // executeScenario already recorded the failed execution and its report.
+      logger.error('Background deploy failed', {
+        scenarioId: id,
+        executionId: planned.executionId,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    });
 
-    res.json(result);
+    res.status(202).json(planned);
+  })
+);
+
+/** Load a scenario and one of its executions from validated route params. */
+async function loadExecution(id: string, executionId: string) {
+  if (!/^[0-9a-fA-F]{24}$/.test(id) || !/^[0-9a-fA-F]{24}$/.test(executionId)) {
+    throw new AppError('Invalid ID format', 400);
+  }
+  const scenario = await Scenario.findById(id);
+  if (!scenario) throw new AppError('Scenario not found', 404);
+  const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
+  if (!execution) throw new AppError('Execution not found', 404);
+  return { scenario, execution };
+}
+
+/**
+ * Whether an execution's deployment is still up. `completed` only means the
+ * rollout settled (the console persists it on the SSE `end` event); teardown
+ * is what stamps `completedAt`.
+ */
+function isLive(execution: Awaited<ReturnType<typeof loadExecution>>['execution']): boolean {
+  return !!execution.namespace && !execution.completedAt && execution.status !== 'failed';
+}
+
+// GET /api/scenarios/:id/executions/:executionId/profiles - Runnable attack profiles
+router.get(
+  '/scenarios/:id/executions/:executionId/profiles',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const { scenario } = await loadExecution(req.params.id, req.params.executionId);
+    res.json({
+      profiles: listAttackProfiles(scenario.topology?.nodes ?? []).map(
+        ({ nodeId, name, description, args }) => ({ nodeId, name, description, args })
+      ),
+    });
+  })
+);
+
+// GET /api/scenarios/:id/executions/:executionId/runbook - The scenario's
+// runbook resolved against this execution (namespace, pod names/IPs).
+router.get(
+  '/scenarios/:id/executions/:executionId/runbook',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const { scenario, execution } = await loadExecution(req.params.id, req.params.executionId);
+    const namespace = execution.namespace ?? '';
+    let context = { namespace, pods: {} as Record<string, { pod: string; ip?: string }> };
+    if (isLive(execution) && scenario.infrastructureId) {
+      const infra = await findById(Infrastructure, scenario.infrastructureId.toString());
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const kc = buildKubeConfig(infra as any);
+      context = await collectRunbookContext(kc.makeApiClient(CoreV1Api), namespace);
+    }
+    res.json({ context, steps: renderRunbook(scenario.runbook, context) });
+  })
+);
+
+// POST /api/scenarios/:id/executions/:executionId/profiles/run - Run one profile
+// in its node's pod (body: { nodeId, name }). Only the stored profile argv runs.
+router.post(
+  '/scenarios/:id/executions/:executionId/profiles/run',
+  authMiddleware,
+  validateBody(z.object({ nodeId: z.string().min(1), name: z.string().min(1) })),
+  asyncHandler(async (req, res) => {
+    const { scenario, execution } = await loadExecution(req.params.id, req.params.executionId);
+    const { nodeId, name } = req.body as { nodeId: string; name: string };
+
+    const profile = listAttackProfiles(scenario.topology?.nodes ?? []).find(
+      (p) => p.nodeId === nodeId && p.name === name
+    );
+    if (!profile) throw new AppError(`Profile "${name}" not found on node "${nodeId}"`, 404);
+    if (!isLive(execution) || !scenario.infrastructureId) {
+      throw new AppError('Execution is not deployed', 409);
+    }
+
+    const infra = await findById(Infrastructure, scenario.infrastructureId.toString());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const kc = buildKubeConfig(infra as any);
+    const target = await runAttackProfile(
+      kc,
+      kc.makeApiClient(CoreV1Api),
+      execution.namespace as string,
+      profile
+    );
+    res.status(202).json({ nodeId, name, ...target, message: 'Profile started' });
+  })
+);
+
+/** A running execution's deployed, port-exposing service by resource name. */
+function exposedService(
+  execution: Awaited<ReturnType<typeof loadExecution>>['execution'],
+  name: string
+) {
+  if (!isLive(execution)) throw new AppError('Execution is not deployed', 409);
+  const service = execution.deployedServices.find((s) => s.name === name);
+  if (!service?.dashboardUrl) throw new AppError(`No web interface for "${name}"`, 404);
+  return service;
+}
+
+// POST /api/scenarios/:id/executions/:executionId/services/:name/link - Mint a
+// signed, short-lived link to the service's web interface via the proxy below.
+router.post(
+  '/scenarios/:id/executions/:executionId/services/:name/link',
+  authMiddleware,
+  asyncHandler(async (req, res) => {
+    const { id, executionId, name } = req.params;
+    const { execution } = await loadExecution(id, executionId);
+    exposedService(execution, name);
+    res.json({ url: signProxyPath({ scenarioId: id, executionId, service: name }) });
+  })
+);
+
+// ALL /api/proxy/:expires/:sig/:id/:executionId/:name/* - Relay to the
+// service through the Kubernetes API service proxy. Authorized by the signed
+// path (a new tab carries no bearer token), not authMiddleware.
+router.all(
+  /^\/proxy\/(\d+)\/([A-Za-z0-9_-]+)\/([0-9a-fA-F]{24})\/([0-9a-fA-F]{24})\/([a-z0-9-]+)(?:\/(.*))?$/,
+  asyncHandler(async (req, res) => {
+    const [expires, sig, id, executionId, name] = [0, 1, 2, 3, 4].map(
+      (i) => (req.params as Record<string, string | undefined>)[i]
+    ) as string[];
+    // Raw (undecoded) trailing path; rejects dot segments before any lookup.
+    const rest = rawProxyRest(req.url);
+    const target = { scenarioId: id, executionId, service: name };
+    if (!verifyProxySignature(target, Number(expires), sig)) {
+      throw new AppError('Invalid or expired link', 403);
+    }
+    const { scenario, execution } = await loadExecution(id, executionId);
+    exposedService(execution, name);
+    if (!scenario.infrastructureId) throw new AppError('No infrastructure assigned', 409);
+
+    const infra = await findById(Infrastructure, scenario.infrastructureId.toString());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const kc = buildKubeConfig(infra as any);
+    const svc = await kc
+      .makeApiClient(CoreV1Api)
+      .readNamespacedService({ name, namespace: execution.namespace as string });
+    const port = svc.spec?.ports?.[0]?.port;
+    if (!port) throw new AppError(`Service "${name}" exposes no port`, 404);
+
+    const query = req.originalUrl.includes('?')
+      ? req.originalUrl.slice(req.originalUrl.indexOf('?'))
+      : '';
+    await proxyToService(kc, execution.namespace as string, name, port, rest + query, req, res);
   })
 );
 
@@ -264,21 +455,111 @@ router.delete(
     if (!execution) throw new AppError('Execution not found', 404);
 
     // Only reach the cluster when something was actually deployed.
-    if (execution.namespace && scenario.infrastructureId) {
-      const infra = await findById(Infrastructure, scenario.infrastructureId.toString());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await teardownDeployment(buildClientFromInfrastructure(infra as any), execution.namespace);
+    const infrastructure =
+      execution.namespace && scenario.infrastructureId
+        ? await findById(Infrastructure, scenario.infrastructureId.toString())
+        : null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const clients = infrastructure ? buildClientFromInfrastructure(infrastructure as any) : null;
+    // The run's observability stack is read before it is deleted with the namespace.
+    const observabilityGet =
+      infrastructure && execution.observability
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          apiGetFor(buildKubeConfig(infrastructure as any))
+        : undefined;
+
+    // Close the run with a report (issue #26) *before* the namespace — and
+    // with it every pod log and event — is deleted. The outcome is computed
+    // from the status the run had before teardown; capture is bounded by a
+    // timeout and never throws, so a slow or failing cluster read yields a
+    // partial report rather than blocking the teardown.
+    const closed = await captureReport({ clients, scenario, execution, observabilityGet });
+
+    if (clients && execution.namespace) {
+      await teardownDeployment(clients, execution.namespace);
     }
 
-    execution.status = 'completed';
-    await scenario.save();
+    // Positional atomic update so a concurrent write to another execution of
+    // this scenario is not overwritten by a whole-document save().
+    await Scenario.findOneAndUpdate(
+      { _id: id, 'executions._id': new mongoose.Types.ObjectId(executionId) },
+      {
+        $set: {
+          'executions.$.status': 'completed',
+          'executions.$.completedAt': closed.completedAt,
+          'executions.$.durationMs': closed.durationMs,
+          'executions.$.outcome': closed.outcome,
+        },
+      }
+    );
 
     res.json({
       executionId,
       namespace: execution.namespace,
-      status: execution.status,
+      status: 'completed',
+      outcome: closed.outcome,
+      durationMs: closed.durationMs,
       message: 'Deployment torn down',
     });
+  })
+);
+
+const REPORT_FORMATS = ['json', 'md', 'html'] as const;
+type ReportFormat = (typeof REPORT_FORMATS)[number];
+
+// GET /api/scenarios/:id/executions/:executionId/report - Execution report (issue #26)
+// `?format=json|md|html` (default json). Serves the report stored when the run
+// closed; a run with no stored report gets a provisional one built from the
+// embedded execution fields only — this endpoint never reads the cluster.
+router.get(
+  '/scenarios/:id/executions/:executionId/report',
+  authMiddleware,
+  validateObjectIdParam,
+  asyncHandler(async (req, res) => {
+    const { id, executionId } = req.params;
+
+    if (!/^[0-9a-fA-F]{24}$/.test(executionId)) {
+      throw new AppError('Invalid ID format', 400);
+    }
+
+    const rawFormat = req.query.format ?? 'json';
+    if (typeof rawFormat !== 'string' || !REPORT_FORMATS.includes(rawFormat as ReportFormat)) {
+      throw new AppError(
+        `Invalid report format; expected one of ${REPORT_FORMATS.join(', ')}`,
+        400
+      );
+    }
+    const format = rawFormat as ReportFormat;
+
+    const scenario = await Scenario.findById(id).lean();
+    if (!scenario) throw new AppError('Scenario not found', 404);
+
+    const execution = scenario.executions.find((e) => e._id?.toString() === executionId);
+    if (!execution) throw new AppError('Execution not found', 404);
+
+    const stored = await ExecutionReport.findOne({ scenarioId: id, executionId }).lean();
+    const report = stored
+      ? toReportData(stored, execution)
+      : buildProvisionalReport(scenario, execution);
+
+    if (format === 'json') {
+      res.json(report);
+      return;
+    }
+
+    // The filename is built only from the validated hex execution id — never
+    // from user-controlled text such as the scenario title.
+    const filename = `execution-${executionId}-report.${format}`;
+    res.set('Content-Disposition', `attachment; filename="${filename}"`);
+
+    if (format === 'md') {
+      res.type('text/markdown; charset=utf-8').send(renderMarkdown(report));
+      return;
+    }
+
+    // Script-free page: lock it down even if opened in place of downloading.
+    res.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'");
+    res.type('text/html; charset=utf-8').send(renderHtml(report));
   })
 );
 
@@ -324,7 +605,17 @@ router.get(
           },
         }
       : null;
-    const cleanup = runSSEStream(res, scenario, execution, infraView);
+    // The rollout runs in the background (see POST /execute): the stream
+    // re-reads the execution so a failed deploy surfaces in the console.
+    const readState = async () => {
+      const fresh = await Scenario.findOne(
+        { _id: id, 'executions._id': new mongoose.Types.ObjectId(executionId) },
+        { 'executions.$': 1 }
+      ).lean();
+      const e = fresh?.executions?.[0];
+      return { status: e?.status ?? 'failed', completedAt: e?.completedAt };
+    };
+    const cleanup = runSSEStream(res, scenario, execution, infraView, readState);
 
     req.on('close', cleanup);
   })

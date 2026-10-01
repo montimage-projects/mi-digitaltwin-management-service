@@ -2,7 +2,7 @@
 #   git ls-remote --refs https://$CI_SERVER_FQDN/secassured/ci-cd-components.git 'refs/tags/v1.2.4'
 #   Then replace the @v1.2.4 tag with the full SHA.
 include:
-  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.4
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.4.0
     inputs:
       job_prefix: server
       build_stage: build
@@ -31,7 +31,7 @@ include:
       gitops_repo_branch: main
       gitops_environment: $DEPLOY_ENV
       gitops_values_file: $GITOPS_VALUES_FILE
-  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.2.4
+  - component: $CI_SERVER_FQDN/secassured/ci-cd-components/security-pipeline@v1.4.0
     inputs:
       job_prefix: client
       build_stage: build
@@ -248,6 +248,15 @@ test:
     MONGODB_URI: mongodb://mongo:27017/intact-test
     JWT_SECRET: ci-test-jwt-secret-min-32-characters-long
     ENCRYPTION_KEY: ci-test-encryption-key-16chr
+  # mongodb-memory-server (server/tests/global-setup.ts) downloads its own
+  # mongod binary instead of using the mongo service above, and doesn't pin a
+  # version - it just grabs whatever MongoDB reports as latest stable. Since
+  # MongoDB 6, the official Linux server builds dynamically link libcurl,
+  # which node's -slim image variant deliberately doesn't ship. Install it
+  # so the downloaded mongod can actually start; this only masks the symptom
+  # - the version is still unpinned and can drift to require other libs.
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends libcurl4 && rm -rf /var/lib/apt/lists/*
   script:
     - HUSKY=0 npm ci --prefer-offline --no-audit
     - npm run test:server

@@ -28,6 +28,7 @@ import type { IDeploymentSpec } from '../models/Service.js';
 import type { INodeConfig } from '../models/Scenario.js';
 import { decrypt } from '../utils/encryption.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { COLLECTOR_NAME, deployObservabilityStack } from './observability.js';
 
 /**
  * Kubernetes deploy engine.
@@ -146,11 +147,15 @@ export interface DeployedServiceResult {
   status: DeployStatus;
   dashboardUrl?: string;
   nodePort?: number;
+  /** The node gets a web-reachable Service (not a sidecar, Job or unexposed). */
+  webInterface?: boolean;
 }
 
 export interface DeployResult {
   namespace: string;
   services: DeployedServiceResult[];
+  /** The per-namespace observability stack was created (see observability.ts). */
+  observability: boolean;
 }
 
 export interface DeployTopologyOptions {
@@ -169,6 +174,12 @@ export interface DeployTopologyOptions {
   readinessTimeoutMs?: number;
   /** Delay between pod-list polls while waiting on readiness. */
   readinessPollMs?: number;
+  /**
+   * Deploy the per-namespace OTel Collector + Prometheus and point every
+   * container's OTLP exporter at it. Off when omitted; callers pass the
+   * scenario's `observability` option (default on).
+   */
+  observability?: boolean;
 }
 
 /** Default container/service port used for the single mapped port per node. */
@@ -544,6 +555,26 @@ function endpointHost(endpoint: string): string {
  */
 export function buildClientFromInfrastructure(infrastructure: IInfrastructure): K8sClients {
   try {
+    const kc = buildKubeConfig(infrastructure);
+    return {
+      core: kc.makeApiClient(CoreV1Api),
+      apps: kc.makeApiClient(AppsV1Api),
+      batch: kc.makeApiClient(BatchV1Api),
+      networking: kc.makeApiClient(NetworkingV1Api),
+      rbac: kc.makeApiClient(RbacAuthorizationV1Api),
+    };
+  } catch (err) {
+    throw toAppError(err, 'building the Kubernetes client');
+  }
+}
+
+/**
+ * KubeConfig for an Infrastructure's stored credentials — a full kubeconfig
+ * or a bearer token against `endpoint`. Also used directly where a typed API
+ * client is not enough (e.g. `Exec` for attack profiles).
+ */
+export function buildKubeConfig(infrastructure: IInfrastructure): KubeConfig {
+  try {
     const raw = decrypt(infrastructure.credentials).trim();
     const kc = new KubeConfig();
 
@@ -567,13 +598,7 @@ export function buildClientFromInfrastructure(infrastructure: IInfrastructure): 
       });
     }
 
-    return {
-      core: kc.makeApiClient(CoreV1Api),
-      apps: kc.makeApiClient(AppsV1Api),
-      batch: kc.makeApiClient(BatchV1Api),
-      networking: kc.makeApiClient(NetworkingV1Api),
-      rbac: kc.makeApiClient(RbacAuthorizationV1Api),
-    };
+    return kc;
   } catch (err) {
     throw toAppError(err, 'building the Kubernetes client');
   }
@@ -1080,6 +1105,45 @@ async function waitForWorkloadsReady(
 }
 
 /**
+ * The per-node result rows a deploy of this topology will produce, computed
+ * without touching the cluster — so an execution can be recorded (and its
+ * console opened) before the rollout, which runs in the background. Same
+ * row rules as `deployTopology`: a sidecar row carries its host's resource
+ * name; no NodePort/URL exists yet.
+ */
+export function planDeployedServices(
+  opts: Pick<DeployTopologyOptions, 'nodes' | 'edges' | 'services'>
+): DeployedServiceResult[] {
+  const resolved = resolveTopologyNodes(opts.nodes, opts.services, opts.edges);
+  const plans = planWorkloads(resolved);
+  const hostByNode = new Map<string, ResolvedNode>();
+  for (const plan of plans) {
+    hostByNode.set(plan.node.nodeId, plan.node);
+    for (const sidecar of plan.sidecars) hostByNode.set(sidecar.nodeId, plan.node);
+  }
+  return resolved.map((node) => {
+    const owner = hostByNode.get(node.nodeId) ?? node;
+    return {
+      nodeId: node.nodeId,
+      serviceId: node.serviceId,
+      name: owner.name,
+      uiType: node.uiType,
+      status: 'pending' as DeployStatus,
+      webInterface: exposesWebInterface(node, owner),
+    };
+  });
+}
+
+/** Whether a node's row gets a reachable Service port. */
+function exposesWebInterface(node: ResolvedNode, owner: ResolvedNode): boolean {
+  return (
+    node.deployment.attachMode !== 'sidecar' &&
+    owner.deployment.kind !== 'Job' &&
+    owner.deployment.exposePort !== false
+  );
+}
+
+/**
  * Deploy a scenario topology into a fresh per-execution namespace: create the
  * namespace (PodSecurity-labelled when a node needs `privileged` admission),
  * then one egress NetworkPolicy per `role: 'attack'` node, then per
@@ -1103,6 +1167,7 @@ export async function deployTopology(
   opts: DeployTopologyOptions
 ): Promise<DeployResult> {
   const resolved = resolveTopologyNodes(opts.nodes, opts.services, opts.edges);
+  if (opts.observability) addTelemetryEnv(resolved);
   // Throws AppError(400) for a sidecar with no monitor edge — before any
   // cluster call, so nothing is created for a topology that cannot deploy.
   const plans = planWorkloads(resolved);
@@ -1140,6 +1205,16 @@ export async function deployTopology(
           })
         )
     );
+
+    // Observability stack (issue #25): best-effort and outside the rollout —
+    // no readiness gate, progress row or outcome depends on it.
+    const observability = opts.observability
+      ? await deployObservabilityStack(
+          clients,
+          opts.namespace,
+          plans.map((p) => p.node)
+        )
+      : false;
 
     // Ordered rollout (task 1.6): workloads go up in ascending `startOrder`
     // tiers — target and monitor first, then reaction, then attack. Plans in
@@ -1255,14 +1330,33 @@ export async function deployTopology(
         status: 'pending' as DeployStatus,
         nodePort,
         dashboardUrl: nodePort ? `http://${host}:${nodePort}` : undefined,
+        webInterface: !!nodePort,
       };
     });
 
-    return { namespace: opts.namespace, services: results };
+    return { namespace: opts.namespace, services: results, observability };
   } catch (err) {
     // Best-effort teardown of resources already created.
     void clients.core.deleteNamespace({ name: opts.namespace }).catch(() => undefined);
     throw toAppError(err, `deploying topology to namespace ${opts.namespace}`);
+  }
+}
+
+/**
+ * Point every container's OpenTelemetry SDK at the namespace collector under
+ * its own node name, so any OTel-instrumented image reports without extra
+ * configuration. A value the catalog or node config already sets wins.
+ */
+function addTelemetryEnv(resolved: ResolvedNode[]): void {
+  for (const node of resolved) {
+    const env = [...(node.deployment.env ?? [])];
+    const declared = new Set(env.map((e) => e.name));
+    const add = (name: string, value: string) => {
+      if (!declared.has(name)) env.push({ name, value });
+    };
+    add('OTEL_EXPORTER_OTLP_ENDPOINT', `http://${COLLECTOR_NAME}:4318`);
+    add('OTEL_SERVICE_NAME', node.name);
+    node.deployment = { ...node.deployment, env };
   }
 }
 

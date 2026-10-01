@@ -10,7 +10,8 @@ the R1 two-attack script (issue #237):
 
   target   (ci-sim)     — mirrors sim/ci-sim/server.py (issue #231): health
                           on GET /, a small /api surface, and the
-                          /admin/block|unblock|blocks blocklist; a sustained
+                          /admin/block|unblock|blocks blocklist, Prometheus
+                          GET /metrics; a sustained
                           request rate from one source over CI_SIM_RATE_LIMIT
                           per CI_SIM_RATE_WINDOW_S logs 'service stopped' and
                           exits non-zero so the Deployment restarts it. The
@@ -24,7 +25,10 @@ the R1 two-attack script (issue #237):
                           reaction module — standing in for MMT-Probe's
                           security output channel.
   reaction (ai4soar)    — serves GET /health on :5000 (readiness) and applies
-                          the seeded playbook response on alert (issue #235):
+                          the seeded playbook response on alert (issue #235),
+                          taking alerts from POST /api/alerts or — with
+                          KAFKA_BOOTSTRAP_SERVERS set — from secAnoD's reports
+                          on the Kafka topic KAFKA_TOPIC:
                           POST the reported attacker address to the acts-on
                           target's /admin/block endpoint — an
                           application-level block, so the attacker's traffic
@@ -134,6 +138,76 @@ def source_ip(handler):
     return handler.client_address[0]
 
 
+class HttpMetrics:
+    """Prometheus exposition of served traffic (issue #25): request counts by
+    method, route and status code plus a latency histogram — the series the
+    SecSim scenario observability stack scrapes from `GET /metrics`."""
+
+    BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0)
+    ROUTES = ('/', '/api/status', '/api/metrics', '/admin/block', '/admin/unblock', '/admin/blocks')
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.requests = defaultdict(int)  # (method, route, code) -> count
+        self.buckets = {}  # (method, route) -> cumulative bucket counts
+        self.sums = defaultdict(float)
+        self.counts = defaultdict(int)
+
+    @classmethod
+    def route(cls, path):
+        """Known route or `other` — never the raw path, which would let any
+        client create unbounded series."""
+        path = path.split('?', 1)[0]
+        return path if path in cls.ROUTES else 'other'
+
+    def observe(self, method, path, code, seconds):
+        method = method if method in ('GET', 'POST') else 'OTHER'
+        key = (method, self.route(path))
+        with self.lock:
+            self.requests[(*key, str(code))] += 1
+            buckets = self.buckets.setdefault(key, [0] * len(self.BUCKETS))
+            for i, bound in enumerate(self.BUCKETS):
+                if seconds <= bound:
+                    buckets[i] += 1
+            self.sums[key] += seconds
+            self.counts[key] += 1
+
+    def render(self, gauges):
+        lines = [
+            '# HELP http_requests_total HTTP requests served.',
+            '# TYPE http_requests_total counter',
+        ]
+        with self.lock:
+            for (method, route, code), n in sorted(self.requests.items()):
+                lines.append(
+                    f'http_requests_total{{method="{method}",route="{route}",status_code="{code}"}} {n}'
+                )
+            lines += [
+                '# HELP http_request_duration_seconds HTTP request latency.',
+                '# TYPE http_request_duration_seconds histogram',
+            ]
+            for (method, route), buckets in sorted(self.buckets.items()):
+                labels = f'method="{method}",route="{route}"'
+                for bound, n in zip(self.BUCKETS, buckets):
+                    lines.append(f'http_request_duration_seconds_bucket{{{labels},le="{bound:g}"}} {n}')
+                total = self.counts[(method, route)]
+                lines.append(f'http_request_duration_seconds_bucket{{{labels},le="+Inf"}} {total}')
+                lines.append(f'http_request_duration_seconds_sum{{{labels}}} {self.sums[(method, route)]:.6f}')
+                lines.append(f'http_request_duration_seconds_count{{{labels}}} {total}')
+        for name, help_text, value in gauges:
+            lines += [f'# HELP {name} {help_text}', f'# TYPE {name} gauge', f'{name} {value}']
+        return '\n'.join(lines) + '\n'
+
+
+METRICS = HttpMetrics()
+
+
+def metric_gauges():
+    with TARGET_STATE.lock:
+        blocked = len(TARGET_STATE.blocked)
+    return [('ci_sim_blocked_sources', 'Blocklisted source addresses.', blocked)]
+
+
 def run_target():
     with TARGET_STATE.lock:
         TARGET_STATE.blocked |= load_blocklist()
@@ -196,7 +270,38 @@ def run_target():
                 return False
             return True
 
+        # -- metrics -------------------------------------------------------------
+
+        def send_response(self, code, message=None):
+            self._status = code
+            super().send_response(code, message)
+
+        def _timed(self, handle):
+            """Serve one request and record it; `/metrics` scrapes are neither
+            counted as traffic nor subject to the rate watcher or blocklist."""
+            path = self.path.split('?', 1)[0]
+            if self.command == 'GET' and path == '/metrics':
+                body = METRICS.render(metric_gauges()).encode()
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/plain; version=0.0.4')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            self._status = 500
+            started = time.perf_counter()
+            try:
+                handle()
+            finally:
+                METRICS.observe(self.command, path, self._status, time.perf_counter() - started)
+
         def do_GET(self):  # noqa: N802 — stdlib hook name
+            self._timed(self._get)
+
+        def do_POST(self):  # noqa: N802 — stdlib hook name
+            self._timed(self._post)
+
+        def _get(self):
             if not self._admit():
                 return
             path = self.path.split('?', 1)[0]
@@ -235,7 +340,7 @@ def run_target():
             else:
                 self._json(404, {'error': 'not found'})
 
-        def do_POST(self):  # noqa: N802 — stdlib hook name
+        def _post(self):
             if not self._admit():
                 return
             path = self.path.split('?', 1)[0]
@@ -468,6 +573,70 @@ def block_attacker(address):
         time.sleep(5)
 
 
+
+def mmt_report_attacker(report):
+    """Attacker address of an mmt-security JSON report — the array
+    [10, probe, iface, ts, rule, verdict, type, description, events] whose
+    events.event_1.attributes carries ["ip.src", <addr>]."""
+    if not (isinstance(report, list) and len(report) >= 9 and report[0] == 10):
+        return None
+    if report[5] not in ('detected', 'not_respected'):
+        return None
+    first = report[8].get('event_1') if isinstance(report[8], dict) else None
+    for pair in (first or {}).get('attributes', []):
+        if isinstance(pair, list) and len(pair) == 2 and pair[0] in ('ip.src', 'ipv6.src'):
+            return str(pair[1])
+    return None
+
+
+def run_kafka_consumer(bootstrap, topic):
+    """Consume secAnoD's security reports from Kafka (the seeded playbook's
+    `source: kafka:mmt-security-alerts`). mmt-security reports every matching
+    packet, so a source is acted on only once it crosses a flood signature
+    (KAFKA_ALERT_MIN_REPORTS reports within KAFKA_ALERT_WINDOW_S) — sparse
+    traffic such as kubelet readiness probes never gets blocked — and at most
+    once per KAFKA_ALERT_RESEND_S."""
+    from kafka import KafkaConsumer  # installed in the stub image
+
+    min_reports = int(os.environ.get('KAFKA_ALERT_MIN_REPORTS', '10'))
+    window_s = float(os.environ.get('KAFKA_ALERT_WINDOW_S', '10'))
+    resend_s = float(os.environ.get('KAFKA_ALERT_RESEND_S', '5'))
+    recent, last_acted = {}, {}
+    while True:
+        try:
+            # earliest + a short metadata refresh: the topic is auto-created by
+            # the first report, possibly before this consumer is assigned it —
+            # those early reports must not be skipped.
+            consumer = KafkaConsumer(
+                topic, bootstrap_servers=bootstrap, auto_offset_reset='earliest',
+                group_id='ai4soar', metadata_max_age_ms=5000,
+            )
+            break
+        except Exception as exc:  # broker still starting
+            log('reaction', f'kafka {bootstrap} not ready: {exc}')
+            time.sleep(3)
+    log('reaction', f'consuming kafka {bootstrap} topic {topic}')
+    for message in consumer:
+        try:
+            report = json.loads(message.value)
+        except ValueError:
+            continue
+        attacker = mmt_report_attacker(report)
+        if not attacker:
+            continue
+        now = time.time()
+        hits = [t for t in recent.get(attacker, []) if now - t < window_s] + [now]
+        recent[attacker] = hits
+        if len(hits) < min_reports or now - last_acted.get(attacker, 0) < resend_s:
+            continue
+        last_acted[attacker] = now
+        log('reaction', f'ALERT from kafka: rule {report[4]} {report[7]} (ip.src={attacker})')
+        threading.Thread(
+            target=lambda a=attacker: print(f'REACTION {block_attacker(a)}', flush=True),
+            daemon=True,
+        ).start()
+
+
 def run_reaction():
     class Handler(BaseHTTPRequestHandler):
         def _json(self, code, payload):
@@ -511,6 +680,10 @@ def run_reaction():
         def log_message(self, fmt, *args):
             log('reaction', fmt % args)
 
+    bootstrap = os.environ.get('KAFKA_BOOTSTRAP_SERVERS')
+    if bootstrap:
+        topic = os.environ.get('KAFKA_TOPIC', 'mmt-security-alerts')
+        threading.Thread(target=run_kafka_consumer, args=(bootstrap, topic), daemon=True).start()
     server = ThreadingHTTPServer(('0.0.0.0', 5000), Handler)
     log('reaction', f'serving :5000 (/health, /api/alerts → {BLOCK_TARGET_URL}/admin/block)')
     server.serve_forever()
@@ -532,7 +705,8 @@ def arg_value(flag, default=None):
 def run_attack():
     target_ip = arg_value('--target-ip', 'ci-sim')
     target_port = arg_value('--target-port', '8080')
-    total = int(os.environ.get('MAG_REQUEST_COUNT', '400'))
+    # `--count` mirrors the real mag CLI; MAG_REQUEST_COUNT is the env form.
+    total = int(arg_value('--count') or os.environ.get('MAG_REQUEST_COUNT', '400'))
     url = f'http://{target_ip}:{target_port}/'
     log('attack', f'http-flood → {url} ({total} requests)')
 
