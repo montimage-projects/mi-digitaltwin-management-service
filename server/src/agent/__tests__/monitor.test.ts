@@ -100,5 +100,8 @@ describe('incidentFacts (triage prompt input)', () => {
     const ablated = JSON.stringify(incidentFacts(incident, false));
     expect(ablated).not.toContain('T1499');
     expect(ablated).toContain('SYN flooding'); // MMT's own cause text stays
+    const noMitre = JSON.stringify(incidentFacts(incident, true, false));
+    expect(noMitre).not.toContain('T1499');
+    expect(noMitre).toContain('exhausting the target'); // rule description kept
   });
 });

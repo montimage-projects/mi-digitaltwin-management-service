@@ -28,7 +28,7 @@ const triageSchema = z.object({
 export const TRIAGE_JSON_SCHEMA = z.toJSONSchema(triageSchema);
 
 /** Facts the model sees: the incident, without bookkeeping fields. */
-export function incidentFacts(incident: Incident, withReference = true) {
+export function incidentFacts(incident: Incident, withReference = true, withMitre = true) {
   const rule = ruleInfo(incident.ruleId);
   return {
     rule: {
@@ -36,7 +36,15 @@ export function incidentFacts(incident: Incident, withReference = true) {
       cause: incident.cause,
       verdict: incident.verdict,
       // Reference metadata (name, description, MITRE) — omitted in the ablation.
-      ...(withReference ? { reference: rule ?? 'unknown rule' } : {}),
+      ...(withReference
+        ? {
+            reference: rule
+              ? withMitre
+                ? rule
+                : { name: rule.name, description: rule.description }
+              : 'unknown rule',
+          }
+        : {}),
     },
     attacker: incident.srcIp ?? 'unknown',
     target: { service: incident.service, ip: incident.dstIp, port: incident.dstPort },
@@ -48,7 +56,8 @@ export function incidentFacts(incident: Incident, withReference = true) {
 
 export async function triageIncident(
   incident: Incident,
-  opts: { withReference?: boolean } = {}
+  // withMitre=false keeps the rule name/description but drops its MITRE label.
+  opts: { withReference?: boolean; withMitre?: boolean } = {}
 ): Promise<Triage> {
   const withReference = opts.withReference ?? env.MONITOR_TRIAGE_REFERENCE;
   const raw = await getLLMGateway().chatJson<unknown>(
@@ -56,7 +65,7 @@ export async function triageIncident(
       { role: 'system', content: MONITOR_SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `Incident:\n${JSON.stringify(incidentFacts(incident, withReference), null, 2)}`,
+        content: `Incident:\n${JSON.stringify(incidentFacts(incident, withReference, opts.withMitre ?? true), null, 2)}`,
       },
     ],
     TRIAGE_JSON_SCHEMA,
