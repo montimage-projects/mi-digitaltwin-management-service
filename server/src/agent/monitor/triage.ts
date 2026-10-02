@@ -9,7 +9,7 @@ You triage incidents raised by the MMT intrusion-detection probe for a human ope
 Rules:
 - Base your assessment only on the incident facts and rule reference you are given.
 - severity: low | medium | high | critical, considering the attack type, volume and the targeted service.
-- mitreTechnique: the MITRE ATT&CK technique id and name (use the rule reference when it fits).
+- mitreTechnique: the MITRE ATT&CK technique id and name.
 - confidence: 0..1, your confidence that this is a real attack.
 - falsePositiveLikelihood: low | medium | high.
 - summary: at most two sentences for the operator.
@@ -28,14 +28,15 @@ const triageSchema = z.object({
 export const TRIAGE_JSON_SCHEMA = z.toJSONSchema(triageSchema);
 
 /** Facts the model sees: the incident, without bookkeeping fields. */
-export function incidentFacts(incident: Incident) {
+export function incidentFacts(incident: Incident, withReference = true) {
   const rule = ruleInfo(incident.ruleId);
   return {
     rule: {
       id: incident.ruleId,
       cause: incident.cause,
       verdict: incident.verdict,
-      reference: rule ?? 'unknown rule',
+      // Reference metadata (name, description, MITRE) — omitted in the ablation.
+      ...(withReference ? { reference: rule ?? 'unknown rule' } : {}),
     },
     attacker: incident.srcIp ?? 'unknown',
     target: { service: incident.service, ip: incident.dstIp, port: incident.dstPort },
@@ -45,11 +46,18 @@ export function incidentFacts(incident: Incident) {
   };
 }
 
-export async function triageIncident(incident: Incident): Promise<Triage> {
+export async function triageIncident(
+  incident: Incident,
+  opts: { withReference?: boolean } = {}
+): Promise<Triage> {
+  const withReference = opts.withReference ?? env.MONITOR_TRIAGE_REFERENCE;
   const raw = await getLLMGateway().chatJson<unknown>(
     [
       { role: 'system', content: MONITOR_SYSTEM_PROMPT },
-      { role: 'user', content: `Incident:\n${JSON.stringify(incidentFacts(incident), null, 2)}` },
+      {
+        role: 'user',
+        content: `Incident:\n${JSON.stringify(incidentFacts(incident, withReference), null, 2)}`,
+      },
     ],
     TRIAGE_JSON_SCHEMA,
     env.MONITOR_MODEL || env.OLLAMA_MODEL

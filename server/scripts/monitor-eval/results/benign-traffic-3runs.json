@@ -1,0 +1,38 @@
+[
+  {
+    "run": 1,
+    "mode": "benign",
+    "traffic": "normal",
+    "clientRequests": {
+      "200": 446
+    },
+    "executionId": "6abf81a2e9211b0272591056",
+    "durationS": 300,
+    "falsePositiveIncidents": 0,
+    "incidents": []
+  },
+  {
+    "run": 2,
+    "mode": "benign",
+    "traffic": "normal",
+    "clientRequests": {
+      "200": 459
+    },
+    "executionId": "6abf82ece9211b02725910b9",
+    "durationS": 300,
+    "falsePositiveIncidents": 0,
+    "incidents": []
+  },
+  {
+    "run": 3,
+    "mode": "benign",
+    "traffic": "normal",
+    "clientRequests": {
+      "200": 456
+    },
+    "executionId": "6abf8435e9211b0272591123",
+    "durationS": 300,
+    "falsePositiveIncidents": 0,
+    "incidents": []
+  }
+]

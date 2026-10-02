@@ -91,3 +91,14 @@ describe('MonitorService.ingest', () => {
     });
   });
 });
+
+describe('incidentFacts (triage prompt input)', () => {
+  it('includes the rule reference by default and omits it in the ablation', async () => {
+    const { incidentFacts } = await import('../monitor/triage.js');
+    const incident = new IncidentAggregator('exec').add(parseMmtReport(REPORT)!, 'ci-sim').incident;
+    expect(JSON.stringify(incidentFacts(incident))).toContain('T1499.001');
+    const ablated = JSON.stringify(incidentFacts(incident, false));
+    expect(ablated).not.toContain('T1499');
+    expect(ablated).toContain('SYN flooding'); // MMT's own cause text stays
+  });
+});

@@ -40,6 +40,12 @@ const envSchema = z.object({
   // log polling interval, and the quiet gap that closes an incident.
   MONITOR_MODEL: z.string().default(''),
   MONITOR_POLL_MS: z.string().default('2000').transform(Number),
+  // Give the triage model the rule's reference MITRE technique (default). 'false'
+  // is the ablation: the model must map the MMT cause to ATT&CK on its own.
+  MONITOR_TRIAGE_REFERENCE: z
+    .enum(['true', 'false', '1', '0'])
+    .default('true')
+    .transform((v) => v === 'true' || v === '1'),
   MONITOR_INCIDENT_GAP_MS: z.string().default('30000').transform(Number),
   /** Serve Prometheus metrics at `GET /metrics` (default on). */
   METRICS_ENABLED: z
