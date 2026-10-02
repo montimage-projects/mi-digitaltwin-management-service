@@ -81,6 +81,27 @@ export class LLMGateway {
   }
 
   /**
+   * One non-streaming call whose answer must be JSON matching `schema`
+   * (Ollama structured outputs). Thinking is disabled: the Monitor needs a
+   * fast, bounded answer, and the schema already constrains the format.
+   */
+  async chatJson<T>(
+    messages: ChatMessage[],
+    schema: object,
+    model = this.config.chatModel
+  ): Promise<T> {
+    const response = await this.client.chat({
+      model,
+      messages,
+      format: schema,
+      think: false,
+      stream: false,
+      options: { num_predict: this.config.numPredict, num_ctx: this.config.numCtx, temperature: 0 },
+    });
+    return JSON.parse(response.message.content) as T;
+  }
+
+  /**
    * Generate an embedding vector for the given text.
    *
    * For asymmetric embedding models such as nomic-embed-text v1.5, callers

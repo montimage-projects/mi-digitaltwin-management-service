@@ -36,6 +36,11 @@ const envSchema = z.object({
   OLLAMA_NUM_CTX: z.string().default('4096').transform(Number),
   OLLAMA_TEMPERATURE: z.string().default('0.2').transform(Number),
   VECTOR_DB_TYPE: z.enum(['mongodb', 'qdrant']).default('mongodb'),
+  // Monitor agent: small model for incident triage (empty = OLLAMA_MODEL),
+  // log polling interval, and the quiet gap that closes an incident.
+  MONITOR_MODEL: z.string().default(''),
+  MONITOR_POLL_MS: z.string().default('2000').transform(Number),
+  MONITOR_INCIDENT_GAP_MS: z.string().default('30000').transform(Number),
   /** Serve Prometheus metrics at `GET /metrics` (default on). */
   METRICS_ENABLED: z
     .enum(['true', 'false', '1', '0'])

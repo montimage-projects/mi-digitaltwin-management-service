@@ -7,6 +7,7 @@ import { AgentService } from './agent-service.js';
 import { ConversationManager } from './conversation-manager.js';
 import { chatRequestSchema } from '../validators/agent.validators.js';
 import { env } from '../config/env.js';
+import { getMonitorService } from './monitor/monitor-service.js';
 
 const router: RouterType = Router();
 
@@ -180,6 +181,28 @@ router.post('/chat', validateBody(chatRequestSchema), async (req, res, next) => 
     res.write(`data: ${JSON.stringify({ message, code: 'AGENT_STREAM_ERROR' })}\n\n`);
     res.end();
   }
+});
+
+// Monitor agent (Step 1: detect → triage → Boss proposal; nothing is executed).
+router.post('/monitor/:executionId/start', async (req, res, next) => {
+  try {
+    res.json(await getMonitorService().start(String(req.params.executionId)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/monitor/:executionId/stop', (req, res) => {
+  res.json({ stopped: getMonitorService().stop(String(req.params.executionId)) });
+});
+
+router.get('/incidents', (req, res) => {
+  const executionId = typeof req.query.executionId === 'string' ? req.query.executionId : undefined;
+  const service = getMonitorService();
+  res.json({
+    watching: executionId ? service.isWatching(executionId) : undefined,
+    incidents: service.list(executionId),
+  });
 });
 
 export default router;

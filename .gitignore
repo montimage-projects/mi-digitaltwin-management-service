@@ -84,10 +84,14 @@ copilot-instructions.md
 .gitissue/
 .pi-subagents/
 
-# Thesis and articles related to the project
-article/
-literature/
-scripts/
+# Thesis and articles related to the project (repo-root only — do NOT match
+# server/scripts, scripts/e2e-kind, etc.)
+/article/
+/literature/
+/scripts/*
+!/scripts/e2e-kind/
+!/scripts/secanod-kafka/
+!/scripts/init-mongo.js
 
 # No need to track testbed files.
 testbed/*

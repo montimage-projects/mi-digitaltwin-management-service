@@ -1,0 +1,24 @@
+[
+  {
+    "run": 1,
+    "executionId": "6abf62428e411444cc0a6d6a",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.21",
+    "alertCount": 59,
+    "mttdMs": 2120,
+    "triageMs": 4342,
+    "proposalMs": 55180,
+    "triageSource": "model",
+    "triage": {
+      "severity": "high",
+      "mitreTechnique": "T1499.001",
+      "confidence": 0.95,
+      "falsePositiveLikelihood": "low",
+      "summary": "SYN flooding detected targeting ci-sim service. High volume of half-open TCP handshakes exhausting the target.",
+      "recommendedAction": "Block attacker IP 10.244.0.21 from the target service."
+    },
+    "proposal": "Propose using AI4SOAR (shortName: AI4SOAR) to block the attacker IP 10.244.0.21 via Kubernetes NetworkPolicy. Verify:  \n1. AI4SOAR's API/UI confirms the NetworkPolicy was created.  \n2. Monitor (SECANOD) confirms no further SYN flood alerts.  \n3. Ensure legitimate traffic to ci-sim remains unaffected.  \n4. Check AI4SOAR logs for successful playbook execution.  \n5. Confirm the attacker IP is blocked in the target namespace.  \n6. Validate system resilience metrics post-remediation.",
+    "status": "proposed"
+  }
+]
