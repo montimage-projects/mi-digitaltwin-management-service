@@ -1,0 +1,117 @@
+[
+  {
+    "run": 1,
+    "mode": "attack",
+    "executionId": "6abf738c4e87ddd2522ce5f1",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.33",
+    "alertCount": 54,
+    "mttdMs": 2171,
+    "triageMs": 5126,
+    "proposalMs": 42228,
+    "triageSource": "model",
+    "triage": {
+      "severity": "high",
+      "mitreTechnique": "T1499.001",
+      "confidence": 0.95,
+      "falsePositiveLikelihood": "low",
+      "summary": "SYN flooding detected targeting ci-sim service. High volume of half-open TCP handshakes exhausting the target.",
+      "recommendedAction": "Block attacker IP 10.244.0.33 to prevent further SYN flooding."
+    },
+    "proposal": "Propose using **AI4SOAR** to block the attacker IP `10.244.0.33` via Kubernetes NetworkPolicy or pod isolation. Verify:  \n1. SYN flood traffic reduction in **SECANOD** alerts.  \n2. No unintended service disruptions from the mitigation.  \n3. False positive likelihood remains low (per triage).  \nApprove before execution.",
+    "status": "proposed"
+  },
+  {
+    "run": 2,
+    "mode": "attack",
+    "executionId": "6abf73d14e87ddd2522ce61f",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.39",
+    "alertCount": 56,
+    "mttdMs": 2154,
+    "triageMs": 4970,
+    "proposalMs": 42901,
+    "triageSource": "model",
+    "triage": {
+      "severity": "high",
+      "mitreTechnique": "T1499.001",
+      "confidence": 0.95,
+      "falsePositiveLikelihood": "low",
+      "summary": "SYN flooding detected targeting ci-sim service. High volume of half-open TCP handshakes exhausting the target.",
+      "recommendedAction": "Block attacker IP 10.244.0.39 to prevent further SYN flooding."
+    },
+    "proposal": "Propose using AI4SOAR (shortName: AI4SOAR) to block attacker IP 10.244.0.39 via Kubernetes NetworkPolicy. Verify: 1) SYN flood traffic cessation in SECANOD alerts, 2) no false positives in triage summary. Confirm AI4SOAR's playbook execution logs for policy creation.",
+    "status": "proposed"
+  },
+  {
+    "run": 3,
+    "mode": "attack",
+    "executionId": "6abf74174e87ddd2522ce656",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.45",
+    "alertCount": 56,
+    "mttdMs": 2121,
+    "triageMs": 2560,
+    "proposalMs": 31148,
+    "triageSource": "model",
+    "triage": {
+      "severity": "high",
+      "mitreTechnique": "T1499.001",
+      "confidence": 0.95,
+      "falsePositiveLikelihood": "low",
+      "summary": "SYN flooding detected targeting ci-sim service. High volume of half-open TCP handshakes exhausting the target.",
+      "recommendedAction": "Block attacker IP 10.244.0.45 immediately to prevent further service exhaustion."
+    },
+    "proposal": "Propose using AI4SOAR to block attacker IP 10.244.0.45 via Kubernetes NetworkPolicy. Verify:  \n1. AI4SOAR's playbook execution status (block rule applied)  \n2. NetworkPolicy enforcement against the attacker IP  \n3. Continued SYN flood traffic detection (if any)  \n4. System resource utilization on the target service (ci-sim)  \n5. False positive likelihood from secAnoD's detection (confidence 0.95)  \n6. Triage severity alignment with MITRE T1499.001 exhaustion flood.",
+    "status": "proposed"
+  },
+  {
+    "run": 4,
+    "mode": "attack",
+    "executionId": "6abf744e4e87ddd2522ce696",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.51",
+    "alertCount": 55,
+    "mttdMs": 2129,
+    "triageMs": 2514,
+    "proposalMs": 33374,
+    "triageSource": "model",
+    "triage": {
+      "severity": "high",
+      "mitreTechnique": "T1499.001",
+      "confidence": 0.95,
+      "falsePositiveLikelihood": "low",
+      "summary": "SYN flooding detected targeting ci-sim service. High volume of half-open TCP handshakes exhausting the target.",
+      "recommendedAction": "Block attacker IP 10.244.0.51 to prevent further SYN flooding."
+    },
+    "proposal": "Propose using AI4SOAR (shortName: AI4SOAR) to block the attacker IP 10.244.0.51 via Kubernetes NetworkPolicy creation. Verify if the NetworkPolicy was applied successfully and monitor for continued SYN flood traffic. Confirm AI4SOAR's response logs show the action was triggered. Check if secAnoD continues detecting alerts post-block. Ensure no false positives (low likelihood here). Await human approval before execution.",
+    "status": "proposed"
+  },
+  {
+    "run": 5,
+    "mode": "attack",
+    "executionId": "6abf74884e87ddd2522ce6df",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.57",
+    "alertCount": 55,
+    "mttdMs": 2133,
+    "triageMs": 2511,
+    "proposalMs": 25674,
+    "triageSource": "model",
+    "triage": {
+      "severity": "high",
+      "mitreTechnique": "T1499.001",
+      "confidence": 0.95,
+      "falsePositiveLikelihood": "low",
+      "summary": "SYN flooding detected targeting ci-sim service. High volume of half-open TCP handshakes exhausting the target.",
+      "recommendedAction": "Block attacker IP 10.244.0.57 to prevent further SYN flooding."
+    },
+    "proposal": "Propose using AI4SOAR (shortName: AI4SOAR) to block attacker IP 10.244.0.57 via Kubernetes NetworkPolicy. Verify: 1) SYN flood traffic cessation, 2) NetworkPolicy enforcement status, 3) system resilience metrics improvement. Confirm AI4SOAR's playbook execution logs and secAnoD alert resolution.",
+    "status": "proposed"
+  }
+]

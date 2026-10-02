@@ -1,0 +1,72 @@
+[
+  {
+    "run": 1,
+    "executionId": "6abf738c4e87ddd2522ce5f1",
+    "incidents": [
+      {
+        "id": "inc-muqqlhll-0",
+        "ruleId": 56,
+        "srcIp": "10.244.0.33",
+        "alertCount": 54,
+        "status": "proposed",
+        "triageSource": "model"
+      }
+    ]
+  },
+  {
+    "run": 2,
+    "executionId": "6abf73d14e87ddd2522ce61f",
+    "incidents": [
+      {
+        "id": "inc-muqqmz9h-1",
+        "ruleId": 56,
+        "srcIp": "10.244.0.39",
+        "alertCount": 56,
+        "status": "proposed",
+        "triageSource": "model"
+      }
+    ]
+  },
+  {
+    "run": 3,
+    "executionId": "6abf74174e87ddd2522ce656",
+    "incidents": [
+      {
+        "id": "inc-muqqogvk-2",
+        "ruleId": 56,
+        "srcIp": "10.244.0.45",
+        "alertCount": 56,
+        "status": "proposed",
+        "triageSource": "model"
+      }
+    ]
+  },
+  {
+    "run": 4,
+    "executionId": "6abf744e4e87ddd2522ce696",
+    "incidents": [
+      {
+        "id": "inc-muqqpnn5-3",
+        "ruleId": 56,
+        "srcIp": "10.244.0.51",
+        "alertCount": 55,
+        "status": "proposed",
+        "triageSource": "model"
+      }
+    ]
+  },
+  {
+    "run": 5,
+    "executionId": "6abf74884e87ddd2522ce6df",
+    "incidents": [
+      {
+        "id": "inc-muqqqw2e-4",
+        "ruleId": 56,
+        "srcIp": "10.244.0.57",
+        "alertCount": 55,
+        "status": "proposed",
+        "triageSource": "model"
+      }
+    ]
+  }
+]

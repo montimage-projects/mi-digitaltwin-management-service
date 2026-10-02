@@ -1,0 +1,10 @@
+[
+  {
+    "run": 1,
+    "mode": "benign",
+    "executionId": "6abf73254e87ddd2522ce5d4",
+    "durationS": 60,
+    "falsePositiveIncidents": 0,
+    "incidents": []
+  }
+]

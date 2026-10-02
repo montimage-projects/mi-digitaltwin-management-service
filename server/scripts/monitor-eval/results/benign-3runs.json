@@ -1,0 +1,26 @@
+[
+  {
+    "run": 1,
+    "mode": "benign",
+    "executionId": "6abf752c4e87ddd2522ce731",
+    "durationS": 300,
+    "falsePositiveIncidents": 0,
+    "incidents": []
+  },
+  {
+    "run": 2,
+    "mode": "benign",
+    "executionId": "6abf766c4e87ddd2522ce778",
+    "durationS": 300,
+    "falsePositiveIncidents": 0,
+    "incidents": []
+  },
+  {
+    "run": 3,
+    "mode": "benign",
+    "executionId": "6abf77ab4e87ddd2522ce7c6",
+    "durationS": 300,
+    "falsePositiveIncidents": 0,
+    "incidents": []
+  }
+]
