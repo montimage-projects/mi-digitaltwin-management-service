@@ -69,7 +69,7 @@ export async function triageIncident(
       },
     ],
     TRIAGE_JSON_SCHEMA,
-    env.MONITOR_MODEL || env.OLLAMA_MODEL
+    env.MONITOR_MODEL || env.CHAT_MODEL || env.OLLAMA_MODEL
   );
   return triageSchema.parse(raw);
 }

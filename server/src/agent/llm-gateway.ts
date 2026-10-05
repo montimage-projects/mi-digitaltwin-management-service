@@ -32,33 +32,11 @@ export class LLMGateway {
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const generationPromise = (async () => {
-        const response = await this.client.chat({
-          model: this.config.chatModel,
-          messages,
-          options: {
-            num_predict: this.config.numPredict,
-            num_ctx: this.config.numCtx,
-            temperature: this.config.temperature,
-          },
-          stream: true,
-        });
-
-        let fullResponse = '';
-
-        for await (const part of response) {
-          const token = part.message?.content ?? '';
-          if (!token) {
-            continue;
-          }
-          fullResponse += token;
-          if (onToken) {
-            onToken(token);
-          }
-        }
-
-        return fullResponse;
-      })();
+      // Only the generator is swapped; retrieval + embeddings stay on Ollama.
+      const generationPromise =
+        this.config.chatProvider === 'openai'
+          ? this.chatOpenAI(messages, onToken)
+          : this.chatOllama(messages, onToken);
 
       const timeoutPromise = new Promise<never>((_resolve, reject) => {
         timeoutHandle = setTimeout(() => {
@@ -69,6 +47,7 @@ export class LLMGateway {
       return await Promise.race([generationPromise, timeoutPromise]);
     } catch (error) {
       logger.error('LLMGateway chat request failed', {
+        provider: this.config.chatProvider,
         model: this.config.chatModel,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -80,9 +59,126 @@ export class LLMGateway {
     }
   }
 
+  /** Local Ollama chat generation (the default Boss Agent path). */
+  private async chatOllama(
+    messages: ChatMessage[],
+    onToken?: (token: string) => void
+  ): Promise<string> {
+    const response = await this.client.chat({
+      model: this.config.chatModel,
+      messages,
+      options: {
+        num_predict: this.config.numPredict,
+        num_ctx: this.config.numCtx,
+        temperature: this.config.temperature,
+      },
+      stream: true,
+    });
+
+    let fullResponse = '';
+    for await (const part of response) {
+      const token = part.message?.content ?? '';
+      if (!token) {
+        continue;
+      }
+      fullResponse += token;
+      onToken?.(token);
+    }
+
+    return fullResponse;
+  }
+
   /**
-   * One non-streaming call whose answer must be JSON matching `schema`
-   * (Ollama structured outputs). Thinking is disabled: the Monitor needs a
+   * OpenAI-compatible chat generation (OpenRouter or any /v1 endpoint), used to
+   * compare the Boss Agent against hosted frontier models. Streams the response
+   * so the SSE token flow to the client is identical to the Ollama path.
+   *
+   * Hosted free tiers are often overloaded (429/5xx) and the network can blip.
+   * Failed requests are not billed/counted, so they are retried with
+   * exponential backoff (2s, 4s, 8s, 16s) as long as no token was streamed.
+   */
+  private async chatOpenAI(
+    messages: ChatMessage[],
+    onToken?: (token: string) => void
+  ): Promise<string> {
+    for (let attempt = 1; ; attempt++) {
+      let retryReason: string;
+      try {
+        const response = await fetch(`${this.config.chatBaseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // Local servers (e.g. vLLM) need no key; hosted ones do.
+            ...(this.config.chatApiKey && { Authorization: `Bearer ${this.config.chatApiKey}` }),
+            // Optional OpenRouter attribution headers (ignored by other providers).
+            'HTTP-Referer': 'https://montimage.com',
+            'X-Title': 'SecSim Boss Agent',
+          },
+          body: JSON.stringify({
+            model: this.config.chatModel,
+            messages: LLMGateway.leadingSystem(messages),
+            temperature: this.config.temperature,
+            max_tokens: this.config.numPredict,
+            stream: true,
+            ...this.thinkingOptions(),
+          }),
+        });
+
+        if (!response.ok || !response.body) {
+          const detail = await response.text().catch(() => '');
+          const message =
+            `OpenAI-compatible chat failed: ${response.status} ${response.statusText} ${detail}`.trim();
+          if (!RETRYABLE_STATUS.has(response.status)) {
+            throw new NonRetryableChatError(message);
+          }
+          retryReason = message;
+        } else {
+          return await readOpenAIStream(response.body, onToken);
+        }
+      } catch (error) {
+        // Non-retryable HTTP status, or an error after tokens were streamed.
+        if (error instanceof NonRetryableChatError || !isRetryable(error)) {
+          throw error;
+        }
+        retryReason = error instanceof Error ? error.message : String(error);
+      }
+
+      if (attempt >= MAX_CHAT_ATTEMPTS) {
+        throw new Error(`${retryReason} (gave up after ${attempt} attempts)`);
+      }
+      const delayMs = 2000 * 2 ** (attempt - 1);
+      logger.warn('OpenAI-compatible chat failed, retrying', {
+        model: this.config.chatModel,
+        attempt,
+        delayMs,
+        reason: retryReason,
+      });
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  /**
+   * Some OpenAI-compatible routers (vLLM) require a single system message at
+   * the start. Coalesce all system messages into one leading message and keep
+   * the user/assistant turns in order. The Ollama path is unaffected.
+   */
+  private static leadingSystem(messages: ChatMessage[]): ChatMessage[] {
+    const system = messages
+      .filter((m) => m.role === 'system')
+      .map((m) => m.content)
+      .join('\n\n');
+    const rest = messages.filter((m) => m.role !== 'system');
+    return system ? [{ role: 'system', content: system }, ...rest] : rest;
+  }
+
+  /** vLLM/Qwen3 switch that turns reasoning off (ignored by other servers). */
+  private thinkingOptions(force = this.config.chatDisableThinking) {
+    return force ? { chat_template_kwargs: { enable_thinking: false } } : {};
+  }
+
+  /**
+   * One non-streaming, deterministic call whose answer must be JSON matching
+   * `schema` (structured outputs). Thinking is disabled: the Monitor needs a
    * fast, bounded answer, and the schema already constrains the format.
    */
   async chatJson<T>(
@@ -90,6 +186,30 @@ export class LLMGateway {
     schema: object,
     model = this.config.chatModel
   ): Promise<T> {
+    if (this.config.chatProvider === 'openai') {
+      const response = await fetch(`${this.config.chatBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.config.chatApiKey && { Authorization: `Bearer ${this.config.chatApiKey}` }),
+        },
+        body: JSON.stringify({
+          model,
+          messages: LLMGateway.leadingSystem(messages),
+          temperature: 0,
+          max_tokens: this.config.numPredict,
+          response_format: { type: 'json_schema', json_schema: { name: 'answer', schema } },
+          ...this.thinkingOptions(true),
+        }),
+      });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        throw new Error(`OpenAI-compatible JSON chat failed: ${response.status} ${detail}`.trim());
+      }
+      const body = (await response.json()) as { choices?: { message?: { content?: string } }[] };
+      return JSON.parse(body.choices?.[0]?.message?.content ?? '') as T;
+    }
+
     const response = await this.client.chat({
       model,
       messages,
@@ -144,7 +264,12 @@ export class LLMGateway {
       const modelList = await this.client.list();
       const availableModels = modelList.models.map((model) => model.name);
 
-      const chatModelAvailable = modelExists(this.config.chatModel, availableModels);
+      // For the openai provider the chat model is remote (not in the local
+      // Ollama list), so gate it on having credentials + a model id instead.
+      const chatModelAvailable =
+        this.config.chatProvider === 'openai'
+          ? Boolean(this.config.chatModel)
+          : modelExists(this.config.chatModel, availableModels);
       const embedModelAvailable = modelExists(this.config.embedModel, availableModels);
 
       const status: GatewayHealthStatus['status'] =
@@ -181,4 +306,85 @@ export class LLMGateway {
       };
     }
   }
+}
+
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const MAX_CHAT_ATTEMPTS = 5;
+
+/** An upstream error reported before any token was streamed — safe to retry. */
+class RetryableStreamError extends Error {}
+
+/** A client-side HTTP error (e.g. 400/401/404) that retrying cannot fix. */
+class NonRetryableChatError extends Error {}
+
+/**
+ * Retry stream errors raised before any token, and network-level fetch
+ * failures (`TypeError: fetch failed`: DNS/TLS/connection reset).
+ */
+function isRetryable(error: unknown): boolean {
+  return error instanceof RetryableStreamError || error instanceof TypeError;
+}
+
+/**
+ * Parse an OpenAI-compatible SSE stream: `data:` lines carry JSON chunks,
+ * terminated by `data: [DONE]`. Comment/keepalive lines are ignored. An error
+ * chunk (e.g. provider overload after the HTTP 200) is surfaced as an error.
+ */
+async function readOpenAIStream(
+  body: ReadableStream<Uint8Array>,
+  onToken?: (token: string) => void
+): Promise<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let fullResponse = '';
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) {
+        continue;
+      }
+      const data = trimmed.slice(5).trim();
+      if (data === '' || data === '[DONE]') {
+        continue;
+      }
+
+      let parsed: {
+        choices?: { delta?: { content?: string } }[];
+        error?: { message?: string };
+      };
+      try {
+        parsed = JSON.parse(data);
+      } catch {
+        // Ignore partial/keepalive frames; the next chunk completes them.
+        continue;
+      }
+
+      if (parsed.error) {
+        const message = `OpenAI-compatible stream error: ${parsed.error.message ?? 'unknown'}`;
+        // Nothing streamed yet → the caller can safely retry.
+        throw fullResponse === '' ? new RetryableStreamError(message) : new Error(message);
+      }
+
+      const token = parsed.choices?.[0]?.delta?.content ?? '';
+      if (token) {
+        fullResponse += token;
+        onToken?.(token);
+      }
+    }
+  }
+
+  // An empty answer is returned as-is: agent-service replaces it with a
+  // fallback message, the same way as for the Ollama path.
+  return fullResponse;
 }

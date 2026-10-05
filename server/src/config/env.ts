@@ -36,7 +36,23 @@ const envSchema = z.object({
   OLLAMA_NUM_CTX: z.string().default('4096').transform(Number),
   OLLAMA_TEMPERATURE: z.string().default('0.2').transform(Number),
   VECTOR_DB_TYPE: z.enum(['mongodb', 'qdrant']).default('mongodb'),
-  // Monitor agent: small model for incident triage (empty = OLLAMA_MODEL),
+  // Chat generator provider. 'ollama' (default) uses OLLAMA_MODEL on
+  // OLLAMA_BASE_URL; 'openai' uses any OpenAI-compatible endpoint
+  // (CHAT_BASE_URL, e.g. the office vLLM) for chat only — embeddings always
+  // stay on Ollama so retrieval is held constant.
+  CHAT_PROVIDER: z.enum(['ollama', 'openai']).default('ollama'),
+  CHAT_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
+  CHAT_API_KEY: z.string().default(''),
+  // Empty falls back to OLLAMA_MODEL (so the default ollama path is unchanged).
+  CHAT_MODEL: z.string().default(''),
+  // Disable reasoning on OpenAI-compatible Qwen3 servers (vLLM
+  // chat_template_kwargs.enable_thinking=false); otherwise the thinking
+  // consumes max_tokens and answers can come back empty.
+  CHAT_DISABLE_THINKING: z
+    .enum(['true', 'false', '1', '0'])
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
+  // Monitor agent: small model for incident triage (empty = the chat model),
   // log polling interval, and the quiet gap that closes an incident.
   MONITOR_MODEL: z.string().default(''),
   MONITOR_POLL_MS: z.string().default('2000').transform(Number),
