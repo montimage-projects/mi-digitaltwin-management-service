@@ -1,0 +1,25 @@
+[
+  {
+    "run": 1,
+    "mode": "attack",
+    "executionId": "6ac37472ff72babf3e4ffbeb",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.121",
+    "alertCount": 106,
+    "mttdMs": 2166,
+    "triageMs": 2042,
+    "proposalMs": 2563,
+    "triageSource": "model",
+    "triage": {
+      "severity": "low",
+      "mitreTechnique": "T1499.001 Endpoint Denial of Service: OS Exhaustion Flood",
+      "confidence": 0.6,
+      "falsePositiveLikelihood": "medium",
+      "summary": "A single SYN flood event was detected targeting the ci-sim service, indicating a potential half-open TCP handshake attack. The low volume suggests this may be a probe or misconfiguration rather than a sustained denial-of-service campaign.",
+      "recommendedAction": "Monitor the target service for increased connection attempts and verify if the source IP is a known legitimate scanner or bot."
+    },
+    "proposal": "Propose **AI4SOAR** to execute an automated response playbook for rule 56 (SYN flood).\nIt should apply namespace-scoped Kubernetes actions, such as creating a **NetworkPolicy** to block attacker `10.244.0.121` or scaling down the `ci-sim` pod if necessary.\nThis leverages AI4SOAR’s capability to ingest secAnoD alerts and trigger remediation via ServiceAccount.\nAfter approval, verify that the NetworkPolicy is active and the attacker’s traffic is dropped.\nConfirm `ci-sim` service stability and check for any residual half-open connections.\nMonitor for recurrence to ensure the false-positive likelihood was correctly assessed.",
+    "status": "proposed"
+  }
+]

@@ -1,0 +1,117 @@
+[
+  {
+    "run": 1,
+    "mode": "attack",
+    "executionId": "6ac374a9ff72babf3e4ffc97",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.127",
+    "alertCount": 92,
+    "mttdMs": 2108,
+    "triageMs": 1796,
+    "proposalMs": 2815,
+    "triageSource": "model",
+    "triage": {
+      "severity": "low",
+      "mitreTechnique": "T1499.001 Endpoint Denial of Service: OS Exhaustion Flood",
+      "confidence": 0.6,
+      "falsePositiveLikelihood": "medium",
+      "summary": "A single SYN flooding alert was detected targeting the ci-sim service, indicating a potential half-open TCP handshake attack. However, the low volume (1 alert) suggests this may be a transient network anomaly or misconfiguration rather than a sustained attack.",
+      "recommendedAction": "Monitor the target service for increased connection attempts or resource exhaustion over the next few minutes."
+    },
+    "proposal": "Propose **AI4SOAR** to execute a namespace-scoped Kubernetes playbook response, such as creating a NetworkPolicy to block attacker `10.244.0.127` or scaling down the `ci-sim` pod if resource exhaustion is confirmed.\nVerify afterwards that the attacker's traffic is blocked and the `ci-sim` service remains accessible to legitimate users.\nMonitor **SECANOD** for subsequent alerts to confirm the mitigation effectiveness and check for any false positives.\nEnsure no unintended disruption to other services in the namespace occurs during the response action.",
+    "status": "proposed"
+  },
+  {
+    "run": 2,
+    "mode": "attack",
+    "executionId": "6ac374ceff72babf3e4ffd4c",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.133",
+    "alertCount": 106,
+    "mttdMs": 2133,
+    "triageMs": 1797,
+    "proposalMs": 1990,
+    "triageSource": "model",
+    "triage": {
+      "severity": "low",
+      "mitreTechnique": "T1499.001 Endpoint Denial of Service: OS Exhaustion Flood",
+      "confidence": 0.6,
+      "falsePositiveLikelihood": "medium",
+      "summary": "A single SYN flooding alert was detected targeting the ci-sim service, indicating a potential half-open TCP handshake attack. The low volume of alerts suggests this may be an isolated event or a false positive rather than a sustained denial-of-service campaign.",
+      "recommendedAction": "Monitor the target service for increased connection latency or resource exhaustion and verify if the source IP is known malicious."
+    },
+    "proposal": "Propose **AI4SOAR** (AI4SOAR) to execute an automated response playbook.\nIt should apply a namespace-scoped **NetworkPolicy** to block traffic from attacker `10.244.0.133`.\nThis aligns with its capability to ingest secAnoD alerts and enforce Kubernetes security controls.\nAfter approval, verify the NetworkPolicy is active and the attacker's SYN packets are dropped.\nMonitor for a reduction in alert count and ensure `ci-sim` service latency remains normal.\nConfirm no false positives impact legitimate traffic to the target pod.",
+    "status": "proposed"
+  },
+  {
+    "run": 3,
+    "mode": "attack",
+    "executionId": "6ac374e7ff72babf3e4ffe0a",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.139",
+    "alertCount": 107,
+    "mttdMs": 2148,
+    "triageMs": 1829,
+    "proposalMs": 2168,
+    "triageSource": "model",
+    "triage": {
+      "severity": "low",
+      "mitreTechnique": "T1499.001 Endpoint Denial of Service: OS Exhaustion Flood",
+      "confidence": 0.6,
+      "falsePositiveLikelihood": "medium",
+      "summary": "A single instance of a probable SYN flooding attack was detected targeting the ci-sim service. The low alert count suggests this may be a transient network anomaly or a very small-scale probe rather than a sustained denial-of-service campaign.",
+      "recommendedAction": "Monitor the target service for increased connection latency or resource exhaustion and verify if the source IP is part of a larger botnet."
+    },
+    "proposal": "Propose **AI4SOAR** to execute an automated response playbook.\nIt should apply a **NetworkPolicy** to block traffic from attacker `10.244.0.139` to target `10.244.0.137`.\nThis aligns with its capability for namespace-scoped Kubernetes responses to secAnoD alerts.\nPost-response, verify the NetworkPolicy is active and monitor for connection resets.\nCheck if the attacker IP is part of a larger botnet as suggested in triage.\nConfirm the `ci-sim` service latency returns to normal levels.",
+    "status": "proposed"
+  },
+  {
+    "run": 4,
+    "mode": "attack",
+    "executionId": "6ac37502ff72babf3e4ffed1",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.145",
+    "alertCount": 109,
+    "mttdMs": 2166,
+    "triageMs": 1997,
+    "proposalMs": 2457,
+    "triageSource": "model",
+    "triage": {
+      "severity": "low",
+      "mitreTechnique": "T1499.001 Endpoint Denial of Service: OS Exhaustion Flood",
+      "confidence": 0.6,
+      "falsePositiveLikelihood": "medium",
+      "summary": "A single SYN flooding alert was detected targeting the ci-sim service, indicating a potential half-open TCP handshake attack. The low volume (1 alert) suggests this may be a transient network anomaly or a very small-scale probe rather than a sustained denial-of-service campaign.",
+      "recommendedAction": "Monitor the target service for increased connection latency or dropped packets and verify if the source IP is known or malicious."
+    },
+    "proposal": "Propose **AI4SOAR** (AI4SOAR) to execute an automated response playbook.\nIt should apply namespace-scoped Kubernetes actions, such as creating a **NetworkPolicy** to block attacker IP `10.244.0.145` or scaling down the affected `ci-sim` pod.\nThis leverages AI4SOAR’s capability to ingest secAnoD alerts and orchestrate immediate remediation.\nAfter approval, verify that the NetworkPolicy is active and the attacker can no longer reach `10.244.0.143`.\nMonitor secAnoD for a drop in alert count to confirm the SYN flood has ceased.\nEnsure the `ci-sim` service remains responsive and check for any residual false positives.",
+    "status": "proposed"
+  },
+  {
+    "run": 5,
+    "mode": "attack",
+    "executionId": "6ac37526ff72babf3e4fffa1",
+    "attack": "attack-1-stop-the-server",
+    "ruleId": 56,
+    "attacker": "10.244.0.151",
+    "alertCount": 106,
+    "mttdMs": 2169,
+    "triageMs": 1910,
+    "proposalMs": 2373,
+    "triageSource": "model",
+    "triage": {
+      "severity": "low",
+      "mitreTechnique": "T1499.001 Endpoint Denial of Service: OS Exhaustion Flood",
+      "confidence": 0.6,
+      "falsePositiveLikelihood": "medium",
+      "summary": "A single SYN flooding alert was detected targeting the ci-sim service, indicating a potential half-open TCP handshake attack. The low volume suggests this may be a transient network anomaly rather than a sustained attack.",
+      "recommendedAction": "Monitor the target service for increased connection latency or dropped packets and verify if the source IP is known or malicious."
+    },
+    "proposal": "Service **AI4SOAR** should act by executing a namespace-scoped Kubernetes playbook (e.g., NetworkPolicy creation or pod deletion) to mitigate the SYN flood from attacker `10.244.0.151`.\nThis leverages AI-driven orchestration to automate remediation based on the `secAnoD` alert.\nPost-response, verify that the `ci-sim` service (`10.244.0.149`) connection latency has normalized and no further SYN flood alerts appear in `secAnoD` reports.\nConfirm the attacker IP is blocked via the applied NetworkPolicy.\nAwaiting human approval to proceed with this automated response.",
+    "status": "proposed"
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "run": 1,
+    "mode": "benign",
+    "traffic": "normal",
+    "clientRequests": {
+      "200": 914
+    },
+    "executionId": "6ac37567ff72babf3e50007a",
+    "durationS": 600,
+    "falsePositiveIncidents": 0,
+    "incidents": []
+  }
+]
