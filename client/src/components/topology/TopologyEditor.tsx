@@ -308,12 +308,28 @@ export function TopologyEditor({
     [onNodesChange, onEdgesChange, onYamlChange]
   );
 
+  // Every node/edge seen so far, by id. YAML is parsed on each keystroke, so a
+  // transient state that still parses (an id half-retyped, a service block cut
+  // to be pasted elsewhere) drops nodes/edges; when the id comes back, its
+  // YAML-invisible data (deployment config overrides, edge styling) is
+  // restored from here instead of being lost for good.
+  const seenNodesById = useRef(new Map<string, TopologyNode>());
+  const seenEdgesById = useRef(new Map<string, TopologyEdge>());
+
   // Sync YAML edits from the code view back to the canvas (split mode shows
   // both at once, so a renamed node must update its visual label).
   const handleYamlChangeWithCanvasSync = useCallback(
     (newYaml: string) => {
       onYamlChange(newYaml);
-      const topology = yamlToTopology(newYaml, nodes as TopologyNode[], edges as TopologyEdge[]);
+      for (const node of nodes as TopologyNode[]) seenNodesById.current.set(node.id, node);
+      for (const edge of edges as TopologyEdge[]) seenEdgesById.current.set(edge.id, edge);
+      // The seen maps are only used to look up prior data by id; the result
+      // still contains exactly the services/connections the YAML lists.
+      const topology = yamlToTopology(
+        newYaml,
+        [...seenNodesById.current.values()],
+        [...seenEdgesById.current.values()]
+      );
       if (!topology) return;
       onNodesChange(topology.nodes);
       onEdgesChange(topology.edges);
@@ -325,6 +341,8 @@ export function TopologyEditor({
 
   const handleReset = useCallback(() => {
     // Reset to empty topology
+    seenNodesById.current.clear();
+    seenEdgesById.current.clear();
     onYamlChange('');
     onNodesChange([]);
     onEdgesChange([]);

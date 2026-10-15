@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TopologyEditor, nodesToYaml } from './TopologyEditor';
@@ -89,5 +90,75 @@ describe('TopologyEditor split view YAML sync', () => {
     act(() => canvasProps.current!.onNodesChange(moved, { viewOnly: false }));
 
     expect(onYamlChange).toHaveBeenCalledWith(nodesToYaml(moved, edges));
+  });
+});
+
+describe('TopologyEditor YAML sync keeps YAML-invisible data across transient edits', () => {
+  const configured = [
+    {
+      id: 'soar',
+      position: { x: 400, y: 0 },
+      data: {
+        label: 'AI4SOAR',
+        type: 'reaction',
+        config: { env: [{ name: 'MODE', value: 'auto' }] },
+      },
+    },
+    { id: 'sim', position: { x: 200, y: 0 }, data: { label: 'CI-SIM', type: 'target' } },
+  ];
+  const styled = [
+    {
+      id: 'e1',
+      source: 'soar',
+      target: 'sim',
+      animated: true,
+      style: { stroke: 'red' },
+      data: { edgeType: 'acts-on' },
+    },
+  ];
+
+  // Stateful parent, like useScenarioTopology: edits feed back as props.
+  const latest: { nodes: object[]; edges: object[] } = { nodes: [], edges: [] };
+  function Harness() {
+    const [yaml, setYaml] = useState(nodesToYaml(configured, styled));
+    const [nodes, setNodes] = useState<object[]>(configured);
+    const [edges, setEdges] = useState<object[]>(styled);
+    latest.nodes = nodes;
+    latest.edges = edges;
+    return (
+      <TopologyEditor
+        yaml={yaml}
+        nodes={nodes}
+        edges={edges}
+        onYamlChange={setYaml}
+        onNodesChange={setNodes}
+        onEdgesChange={setEdges}
+        onSave={vi.fn()}
+      />
+    );
+  }
+
+  it('restores node config and edge styling when a retyped id comes back', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: /Code/ }));
+    const original = nodesToYaml(configured, styled);
+
+    // Backspacing the id leaves YAML that still parses: `soa` is a new node
+    // and the `soar` connection is dropped.
+    act(() => yamlEditorProps.current!.onChange(original.replace('id: soar', 'id: soa')));
+    expect((latest.nodes as { id: string }[]).map((n) => n.id)).toEqual(['soa', 'sim']);
+    expect(latest.edges).toEqual([]);
+
+    // Retyping the id restores the original data.
+    act(() => yamlEditorProps.current!.onChange(original));
+    const soar = (latest.nodes as typeof configured).find((n) => n.id === 'soar')!;
+    expect(soar.data.config).toEqual({ env: [{ name: 'MODE', value: 'auto' }] });
+    expect(latest.edges).toHaveLength(1);
+    expect(latest.edges[0]).toMatchObject({
+      id: 'e1',
+      animated: true,
+      style: { stroke: 'red' },
+      data: { edgeType: 'acts-on' },
+    });
   });
 });

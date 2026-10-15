@@ -188,10 +188,11 @@ export function ScenarioDetail() {
         onOpenChange={setExecutionPanelOpen}
         onExecutionStart={topology.handleExecutionStart}
       />
-      {/* Focus mode reclaims the header's height: 112px = app header + main padding. */}
+      {/* Focus mode reclaims the header's height: 148px = app header (64px) + main
+          padding (48px) + MainLayout's breadcrumb (20px line + 16px margin). */}
       <div
         className="flex gap-4"
-        style={{ height: focusMode ? 'calc(100vh - 112px)' : 'calc(100vh - 200px)' }}
+        style={{ height: focusMode ? 'calc(100vh - 148px)' : 'calc(100vh - 200px)' }}
       >
         <div className="flex-1 min-w-0 transition-all duration-300">
           <ScenarioTabs
