@@ -69,11 +69,26 @@ interface ServiceOption {
   deployment?: ServiceDeployment;
 }
 
+/**
+ * Extra context passed with canvas-originated node/edge updates. `viewOnly`
+ * is true when React Flow only measured nodes or changed the selection — the
+ * topology itself did not change, so derived state (e.g. the YAML view) must
+ * not be regenerated from it.
+ */
+export interface TopologyChangeMeta {
+  viewOnly: boolean;
+}
+
+// Change kinds that only affect rendering state, never the topology.
+const VIEW_ONLY_CHANGE_TYPES = new Set(['dimensions', 'select']);
+const isViewOnly = (changes: { type: string }[]) =>
+  changes.every((change) => VIEW_ONLY_CHANGE_TYPES.has(change.type));
+
 interface TopologyCanvasProps {
   nodes: object[];
   edges: object[];
-  onNodesChange: (nodes: object[]) => void;
-  onEdgesChange: (edges: object[]) => void;
+  onNodesChange: (nodes: object[], meta?: TopologyChangeMeta) => void;
+  onEdgesChange: (edges: object[], meta?: TopologyChangeMeta) => void;
   /**
    * Combined nodes+edges update for atomic actions (task 5.3 Auto-wire):
    * lets the parent regenerate YAML from both final arrays in one pass.
@@ -415,12 +430,13 @@ function TopologyCanvasInner({
   const handleNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChange>[0]) => {
       onNodesChange(changes);
+      const meta = { viewOnly: isViewOnly(changes) };
       // Notify parent after React Flow has processed changes internally.
       // Using requestAnimationFrame avoids the race-condition risk of setTimeout
       // while still deferring past the current render cycle.
       requestAnimationFrame(() => {
         setNodes((nds) => {
-          onNodesChangeProp(nds);
+          onNodesChangeProp(nds, meta);
           return nds;
         });
       });
@@ -431,9 +447,10 @@ function TopologyCanvasInner({
   const handleEdgesChange = useCallback(
     (changes: Parameters<typeof onEdgesChange>[0]) => {
       onEdgesChange(changes);
+      const meta = { viewOnly: isViewOnly(changes) };
       requestAnimationFrame(() => {
         setEdges((eds) => {
-          onEdgesChangeProp(eds);
+          onEdgesChangeProp(eds, meta);
           return eds;
         });
       });

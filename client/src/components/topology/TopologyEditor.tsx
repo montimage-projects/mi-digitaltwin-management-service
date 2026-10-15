@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { YamlEditor } from './YamlEditor';
-import { TopologyCanvas } from './TopologyCanvas';
+import { TopologyCanvas, type TopologyChangeMeta } from './TopologyCanvas';
 import { cn } from '@/lib/utils';
 import { dump as yamlDump, load as yamlLoad } from 'js-yaml';
 import { edgeKindOf, EDGE_TYPE_SPELLING } from '@/lib/topology-roles';
@@ -255,11 +255,16 @@ export function TopologyEditor({
   const [codeCollapsed, setCodeCollapsed] = useState(false);
   const isUpdatingFromCanvas = useRef(false);
 
-  // Sync nodes/edges changes to YAML
+  // Sync nodes/edges changes to YAML. View-only changes (React Flow measuring
+  // nodes, selection) leave the topology untouched, so they must not
+  // regenerate the YAML — in split view that would overwrite the user's
+  // in-progress text (comments, formatting, cursor) right after a YAML edit
+  // re-renders the canvas.
   const handleNodesChangeWithYamlSync = useCallback(
-    (newNodes: object[]) => {
-      isUpdatingFromCanvas.current = true;
+    (newNodes: object[], meta?: TopologyChangeMeta) => {
       onNodesChange(newNodes);
+      if (meta?.viewOnly) return;
+      isUpdatingFromCanvas.current = true;
       const newYaml = nodesToYaml(newNodes as TopologyNode[], edges as TopologyEdge[]);
       onYamlChange(newYaml);
       // Reset flag after a short delay
@@ -271,9 +276,10 @@ export function TopologyEditor({
   );
 
   const handleEdgesChangeWithYamlSync = useCallback(
-    (newEdges: object[]) => {
-      isUpdatingFromCanvas.current = true;
+    (newEdges: object[], meta?: TopologyChangeMeta) => {
       onEdgesChange(newEdges);
+      if (meta?.viewOnly) return;
+      isUpdatingFromCanvas.current = true;
       const newYaml = nodesToYaml(nodes as TopologyNode[], newEdges as TopologyEdge[]);
       onYamlChange(newYaml);
       // Reset flag after a short delay
@@ -381,8 +387,8 @@ export function TopologyEditor({
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between border-b px-4 py-2 bg-muted/30">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2 bg-muted/30">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center rounded-md border bg-background p-1">
             <Button
               variant={viewMode === 'code' ? 'secondary' : 'ghost'}
@@ -421,13 +427,12 @@ export function TopologyEditor({
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {onFocusModeChange && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => onFocusModeChange(!focusMode)}
-              aria-pressed={focusMode}
               title={
                 focusMode
                   ? 'Show the scenario header and infrastructure selector'

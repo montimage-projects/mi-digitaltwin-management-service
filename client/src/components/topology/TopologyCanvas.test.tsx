@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TopologyCanvas } from './TopologyCanvas';
 import { toast } from 'sonner';
@@ -305,5 +305,25 @@ describe('TopologyCanvas node config panel (task 3.3)', () => {
       data: { config?: { env?: { name: string; value?: string }[] } };
     }[];
     expect(lastNodes[0].data.config?.env).toEqual([{ name: 'HOST_INTERFACE', value: 'eth1' }]);
+  });
+});
+
+describe('TopologyCanvas change metadata', () => {
+  it('flags selection-only node changes as view-only', async () => {
+    const onNodesChange = vi.fn();
+    render(
+      <TopologyCanvas
+        {...baseProps}
+        onNodesChange={onNodesChange}
+        nodes={[makeNode('n-a', 'A')]}
+        edges={[]}
+        services={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('rf__node-n-a'));
+
+    await waitFor(() => expect(onNodesChange).toHaveBeenCalled());
+    expect(onNodesChange.mock.calls.every(([, meta]) => meta?.viewOnly === true)).toBe(true);
   });
 });

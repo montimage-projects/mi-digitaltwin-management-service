@@ -140,7 +140,11 @@ describe('TopologyEditor focus mode', () => {
     );
     expect(screen.getByText(/Target Infrastructure/)).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: /Hide header/ }));
+    const toggle = screen.getByRole('button', { name: /Hide header/ });
+    // The swapping visible label conveys the state; aria-pressed would
+    // contradict it for screen readers (WCAG 4.1.2).
+    expect(toggle).not.toHaveAttribute('aria-pressed');
+    fireEvent.click(toggle);
     expect(onFocusModeChange).toHaveBeenCalledWith(true);
 
     rerender(<TopologyEditor {...defaultProps} focusMode onFocusModeChange={onFocusModeChange} />);
