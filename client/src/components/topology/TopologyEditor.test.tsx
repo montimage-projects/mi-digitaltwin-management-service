@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { load as yamlLoad } from 'js-yaml';
-import { TopologyEditor, nodesToYaml } from './TopologyEditor';
+import { TopologyEditor, nodesToYaml, yamlToTopology } from './TopologyEditor';
 import { edgeKindOf } from '@/lib/topology-roles';
 
 const createWrapper = () => {
@@ -189,5 +189,58 @@ describe('nodesToYaml typed edges', () => {
     const connections = parse(yaml).connections;
     expect(connections[0]).not.toHaveProperty('type');
     expect(connections[1]).not.toHaveProperty('type');
+  });
+});
+
+describe('yamlToTopology (code view → canvas sync)', () => {
+  const nodes = [
+    {
+      id: 'soar',
+      position: { x: 400, y: 0 },
+      data: { label: 'AI4SOAR', type: 'reaction', serviceId: 's1', role: 'reaction' },
+    },
+    { id: 'sim', position: { x: 200, y: 0 }, data: { label: 'CI-SIM', type: 'target' } },
+  ];
+  const edges = [
+    { id: 'e1', source: 'soar', target: 'sim', data: { edgeType: 'acts-on' }, animated: true },
+  ];
+
+  it('applies a renamed service to the node label and keeps other node data', () => {
+    const yaml = nodesToYaml(nodes, edges).replace('name: AI4SOAR', 'name: secAI4SOAR');
+
+    const result = yamlToTopology(yaml, nodes, edges)!;
+
+    const soar = result.nodes.find((n) => n.id === 'soar')!;
+    expect(soar.data.label).toBe('secAI4SOAR');
+    expect(soar.data).toMatchObject({ serviceId: 's1', role: 'reaction' });
+    expect(result.edges[0]).toMatchObject({
+      id: 'e1',
+      animated: true,
+      label: 'acts-on',
+      data: { edgeType: 'acts-on' },
+    });
+  });
+
+  it('round-trips nodesToYaml output unchanged', () => {
+    const result = yamlToTopology(nodesToYaml(nodes, edges), nodes, edges)!;
+
+    expect(nodesToYaml(result.nodes, result.edges)).toBe(nodesToYaml(nodes, edges));
+  });
+
+  it('returns null for invalid or mid-edit YAML so the canvas keeps its state', () => {
+    expect(yamlToTopology('services: [', nodes, edges)).toBeNull();
+    expect(yamlToTopology('foo: bar', nodes, edges)).toBeNull();
+    expect(yamlToTopology('services:\n  - name: x', nodes, edges)).toBeNull();
+    expect(yamlToTopology('services:\n  - id: a\n  - id: a', nodes, edges)).toBeNull();
+  });
+
+  it('drops connections that reference a removed service', () => {
+    const yaml =
+      'services:\n  - id: sim\n    name: CI-SIM\nconnections:\n  - id: e1\n    from: soar\n    to: sim\n';
+
+    const result = yamlToTopology(yaml, nodes, edges)!;
+
+    expect(result.nodes.map((n) => n.id)).toEqual(['sim']);
+    expect(result.edges).toEqual([]);
   });
 });
