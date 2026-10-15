@@ -11,6 +11,8 @@ import {
   PanelLeftOpen,
   HelpCircle,
   CheckCircle2,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import {
   Select,
@@ -224,6 +226,9 @@ interface TopologyEditorProps {
   onHelpClick?: () => void;
   /** Callback invoked when the user confirms clearing the canvas. */
   onClearCanvas?: () => void;
+  /** Focus mode hides the page chrome and infrastructure row to enlarge the canvas. */
+  focusMode?: boolean;
+  onFocusModeChange?: (focusMode: boolean) => void;
 }
 
 export function TopologyEditor({
@@ -243,6 +248,8 @@ export function TopologyEditor({
   onValidate,
   onHelpClick,
   onClearCanvas,
+  focusMode = false,
+  onFocusModeChange,
 }: TopologyEditorProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('visual');
   const [codeCollapsed, setCodeCollapsed] = useState(false);
@@ -326,7 +333,7 @@ export function TopologyEditor({
   return (
     <div className="flex flex-col h-full">
       {/* Infrastructure Selector and Help Section */}
-      <div className="border-b px-4 py-3 bg-background space-y-3">
+      <div className={cn('border-b px-4 py-3 bg-background space-y-3', focusMode && 'hidden')}>
         <div className="flex items-center gap-3">
           <div className="flex-1 max-w-xs">
             <label className="text-sm font-medium text-foreground block mb-1">
@@ -415,6 +422,26 @@ export function TopologyEditor({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {onFocusModeChange && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onFocusModeChange(!focusMode)}
+              aria-pressed={focusMode}
+              title={
+                focusMode
+                  ? 'Show the scenario header and infrastructure selector'
+                  : 'Hide the scenario header and infrastructure selector to enlarge the canvas'
+              }
+            >
+              {focusMode ? (
+                <Minimize2 className="h-4 w-4 mr-1" />
+              ) : (
+                <Maximize2 className="h-4 w-4 mr-1" />
+              )}
+              {focusMode ? 'Show header' : 'Hide header'}
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"

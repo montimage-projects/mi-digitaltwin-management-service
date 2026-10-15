@@ -131,6 +131,25 @@ describe('TopologyEditor', () => {
   });
 });
 
+describe('TopologyEditor focus mode', () => {
+  it('toggles focus mode and hides the infrastructure row while focused', () => {
+    const onFocusModeChange = vi.fn();
+    const { rerender } = render(
+      <TopologyEditor {...defaultProps} onFocusModeChange={onFocusModeChange} />,
+      { wrapper: createWrapper() }
+    );
+    expect(screen.getByText(/Target Infrastructure/)).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: /Hide header/ }));
+    expect(onFocusModeChange).toHaveBeenCalledWith(true);
+
+    rerender(<TopologyEditor {...defaultProps} focusMode onFocusModeChange={onFocusModeChange} />);
+    expect(screen.getByText(/Target Infrastructure/).closest('.hidden')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Show header/ }));
+    expect(onFocusModeChange).toHaveBeenLastCalledWith(false);
+  });
+});
+
 describe('nodesToYaml typed edges', () => {
   interface ParsedTopology {
     connections: { id: string; from: string; to: string; type?: string }[];

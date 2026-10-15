@@ -3,6 +3,7 @@ import { Settings2, Rocket, X } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TopologyEditor } from '@/components/topology/TopologyEditor';
 import { ExecutionConsole } from '@/components/execution/ExecutionConsole';
+import { cn } from '@/lib/utils';
 import type { Infrastructure } from '@/lib/api';
 import type { DeployedServiceResult } from '@/lib/api';
 
@@ -39,6 +40,8 @@ interface ScenarioTabsProps {
     onInfrastructureChange?: (id: string | null) => void;
     onValidate?: () => void;
     onHelpClick?: () => void;
+    focusMode?: boolean;
+    onFocusModeChange?: (focusMode: boolean) => void;
   };
   onCloseExecution: () => void;
 }
@@ -58,7 +61,13 @@ export function ScenarioTabs({
 
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="h-full flex flex-col">
-      <div className="rounded-t-lg border border-b-0 bg-background px-2">
+      {/* Focus mode drops the tab strip unless an execution tab needs it. */}
+      <div
+        className={cn(
+          'rounded-t-lg border border-b-0 bg-background px-2',
+          topologyProps.focusMode && !activeExecution && 'hidden'
+        )}
+      >
         <TabsList className="h-10 bg-transparent">
           <TabsTrigger value="editor" className="gap-2 data-[state=active]:bg-muted">
             <Settings2 className="h-4 w-4" />
@@ -91,7 +100,12 @@ export function ScenarioTabs({
         </TabsList>
       </div>
 
-      <div className="flex-1 rounded-b-lg border bg-background overflow-hidden">
+      <div
+        className={cn(
+          'flex-1 rounded-b-lg border bg-background overflow-hidden',
+          topologyProps.focusMode && !activeExecution && 'rounded-t-lg'
+        )}
+      >
         <TabsContent value="editor" className="h-full m-0 data-[state=inactive]:hidden">
           <TopologyEditor {...topologyProps} />
         </TabsContent>
