@@ -144,6 +144,18 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
       <div className="flex items-center gap-2">
         <div className="text-muted-foreground">{getIcon()}</div>
         <div className="flex-1 min-w-0">
+          {data.role && (
+            <Badge
+              variant="outline"
+              data-testid={`role-badge-${data.role}`}
+              className={cn(
+                'mb-0.5 h-4 px-1.5 py-0 text-[10px] leading-none font-semibold uppercase tracking-wide',
+                ROLE_BADGE_STYLES[data.role]
+              )}
+            >
+              {data.role}
+            </Badge>
+          )}
           <div className="flex items-center gap-1 text-sm font-medium text-card-foreground">
             {attached && <Link2 className="h-3 w-3 text-teal-500 shrink-0" aria-hidden />}
             <span className="truncate">{data.label}</span>
@@ -152,18 +164,6 @@ function ServiceNode({ data }: { data: ServiceNodeData }) {
             <div className="text-[10px] text-muted-foreground bg-muted/50 rounded px-1 py-0.5 inline-block mt-0.5">
               v{data.version}
             </div>
-          )}
-          {data.role && (
-            <Badge
-              variant="outline"
-              data-testid={`role-badge-${data.role}`}
-              className={cn(
-                'mt-0.5 h-4 px-1.5 py-0 text-[10px] leading-none font-semibold uppercase tracking-wide',
-                ROLE_BADGE_STYLES[data.role]
-              )}
-            >
-              {data.role}
-            </Badge>
           )}
           {isSidecar && !attached && (
             <div className="text-[10px] italic text-muted-foreground mt-0.5">
